@@ -1,13 +1,9 @@
-// Globální proměnné jádra převzaté z ComLib.cpp (Task 8 je přesune do kontextu).
+// Kontext jádra (bývalé globály z ComLib.cpp).
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba; Modifications Copyright 2026 OK1XOE, LGPL v3
 #include "MMTTYCompat.h"
 
-CoreSys sys;
-double SampFreq = 11025.0;
-double SampBase = 11025.0;
-double DemSamp  = 11025.0 * 0.5;
-int DemOver = 1, FFT_SIZE = 2048, SampType = 0, SampSize = 1024;
-int FSKCount = 0, FSKCount1 = 0, FSKCount2 = 0, FSKDeff = 0;
+static CoreContext g_defaultCtx;                 // pro volání mimo C API (statická inicializace)
+thread_local CoreContext* g_ctx = &g_defaultCtx;
 
 void InitSampType(void)
 {

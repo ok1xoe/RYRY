@@ -101,3 +101,35 @@ func rejectsUnsupportedSampleRate(rate: Double) {
     #expect(rttycore_get_param(core, RC_BIT_LENGTH) == 5)
     #expect(rttycore_get_param(core, RC_AFC) == 1)
 }
+
+@Test func twoInstancesWithDifferentRatesAreIndependent() throws {
+    let a = try #require(makeCore(sampleRate: 11025))
+    let b = try #require(makeCore(sampleRate: 12000))
+    defer { rttycore_destroy(a); rttycore_destroy(b) }
+    // Přenastavení po vytvoření b: návrh filtrů čte vzorkovací frekvenci – musí být ta z a.
+    #expect(rttycore_set_param(a, RC_SPACE, 2300) == RC_OK)
+    #expect(rttycore_set_param(a, RC_SPACE, 2295) == RC_OK)
+    #expect(rttycore_set_param(a, RC_IIR_BW, 60) == RC_OK)
+    #expect(rttycore_set_param(a, RC_BAUD, 45.45) == RC_OK)
+    let sa = RTTYSignalGenerator(sampleRate: 11025).generate(text: sample)
+    let sb = RTTYSignalGenerator(sampleRate: 12000).generate(text: sample)
+    var ta = "", tb = ""
+    var buf = [RTTYCoreChar](repeating: RTTYCoreChar(), count: 256)
+    var ia = 0, ib = 0
+    while ia < sa.count || ib < sb.count {           // prokládané zpracování
+        if ia < sa.count {
+            let n = min(512, sa.count - ia)
+            sa.withUnsafeBufferPointer { rttycore_process_rx(a, $0.baseAddress! + ia, n) }; ia += n
+            let g = rttycore_read_chars(a, &buf, 256)
+            for k in 0..<g { ta.unicodeScalars.append(UnicodeScalar(UInt8(bitPattern: buf[k].ch))) }
+        }
+        if ib < sb.count {
+            let n = min(512, sb.count - ib)
+            sb.withUnsafeBufferPointer { rttycore_process_rx(b, $0.baseAddress! + ib, n) }; ib += n
+            let g = rttycore_read_chars(b, &buf, 256)
+            for k in 0..<g { tb.unicodeScalars.append(UnicodeScalar(UInt8(bitPattern: buf[k].ch))) }
+        }
+    }
+    #expect(ta == sample)
+    #expect(tb == sample)
+}

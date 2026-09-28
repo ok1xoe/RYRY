@@ -10,6 +10,7 @@
 #include <vector>
 
 struct RTTYCore {
+    CoreContext ctx;          // MUSÍ být první: ostatní členy se ničí, dokud je kontext platný
     RTTYCoreConfig cfg;
     std::unique_ptr<CFSKDEM> dem;
     std::unique_ptr<CFSKMOD> mod;
@@ -54,7 +55,9 @@ extern "C" const char* rttycore_version(void) { return "MMTTYCore 0.1 (MMTTY 1.7
 
 extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     if (!cfg || !validRate(cfg->sampleRate)) return nullptr;
-    // Globály MUSÍ být nastavené PŘED konstrukcí CFSKDEM/CFSKMOD (konstruktory je čtou).
+    auto* c = new RTTYCore();
+    CoreScope scope(&c->ctx);
+    // Kontext MUSÍ být nastavený PŘED konstrukcí CFSKDEM/CFSKMOD/CFFT (konstruktory ho čtou).
     SampFreq = cfg->sampleRate;
     InitSampType();
     sys.m_SampFreq = SampFreq;
@@ -64,7 +67,6 @@ extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     sys.m_txuos    = cfg->txUOS;
     sys.m_TxPort   = txSound;
 
-    auto* c = new RTTYCore();
     c->cfg = *cfg;
     c->dem = std::make_unique<CFSKDEM>();
     c->mod = std::make_unique<CFSKMOD>();
@@ -79,10 +81,15 @@ extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     return c;
 }
 
-extern "C" void rttycore_destroy(RTTYCore* c) { delete c; }
+extern "C" void rttycore_destroy(RTTYCore* c) {
+    if (!c) return;
+    CoreScope scope(&c->ctx);
+    delete c;   // scope.prev se obnoví až po destrukci (ctx je uvnitř c, ale ~CoreScope ho nečte)
+}
 
 extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
     if (!c || !s || n == 0) return;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     c->block.resize(n);
     for (size_t i = 0; i < n; i++) c->block[i] = std::isfinite(s[i]) ? double(s[i]) * 32768.0 : 0.0;
     double* lp = c->block.data();
@@ -101,6 +108,7 @@ extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
 
 extern "C" size_t rttycore_read_chars(RTTYCore* c, RTTYCoreChar* out, size_t max) {
     if (!c || !out) return 0;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     size_t k = 0;
     while (k < max) {
         int d = c->dem->GetData();
@@ -136,6 +144,7 @@ static bool isInt(double v, int lo, int hi) { return inRange(v, lo, hi) && v == 
 
 extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
     if (!c) return RC_ERR_UNKNOWN;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     CFSKDEM& dem = *c->dem;
     CFSKMOD& mod = *c->mod;
     switch (p) {
@@ -251,6 +260,7 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
 
 extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
     if (!c) return NAN;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     CFSKDEM& dem = *c->dem;
     CFSKMOD& mod = *c->mod;
     switch (p) {
@@ -296,6 +306,7 @@ extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
 
 extern "C" void rttycore_tx_begin(RTTYCore* c, int tune) {
     if (!c) return;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     if (c->net) {   // UpdateNet(): TX na kmitočtu RX (po AFC)
         c->mod->SetMarkFreq(c->dem->GetMarkFreq());
         c->mod->SetSpaceFreq(c->dem->GetSpaceFreq());
@@ -324,6 +335,7 @@ extern "C" size_t rttycore_tx_pending(const RTTYCore* c) {
 
 extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
     if (!c || !text || !c->txActive || c->txStopping) return 0;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     size_t used = 0;
     BYTE codes[8];
     for (const char* p = text; *p; p++) {
@@ -341,6 +353,7 @@ extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
 
 extern "C" size_t rttycore_generate_tx(RTTYCore* c, float* out, size_t n) {
     if (!c || !out) return 0;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     size_t i = 0;
     if (c->txActive) {
         for (; i < n; i++) {
@@ -356,6 +369,7 @@ extern "C" size_t rttycore_generate_tx(RTTYCore* c, float* out, size_t n) {
 
 extern "C" void rttycore_tx_stop(RTTYCore* c) {
     if (!c || !c->txActive) return;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     c->mod->SetDiddleTimer(-1);
     c->mod->DeleteTXBuf();
     c->txStopping = 1;
@@ -363,6 +377,7 @@ extern "C" void rttycore_tx_stop(RTTYCore* c) {
 
 extern "C" void rttycore_tx_abort(RTTYCore* c) {
     if (!c) return;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     c->mod->DeleteTXBuf();
     c->txActive = 0; c->txStopping = 0;
 }
@@ -373,6 +388,7 @@ extern "C" int rttycore_is_tx(const RTTYCore* c) { return c && c->txActive ? 1 :
 
 extern "C" int rttycore_tick(RTTYCore* c) {
     if (!c) return 0;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     if (c->fft->m_CollectFFT) {
         double gain;
         switch (sys.m_FFTGain) {
@@ -395,6 +411,7 @@ extern "C" int rttycore_tick(RTTYCore* c) {
 
 extern "C" size_t rttycore_spectrum(RTTYCore* c, float* out, size_t max, double* binHz) {
     if (!c || !out) return 0;
+    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     size_t n = size_t(c->fftWindow);
     if (n > max) n = max;
     for (size_t i = 0; i < n; i++) out[i] = float(c->fft->m_fft[i]);
