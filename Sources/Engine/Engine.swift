@@ -393,4 +393,34 @@ public actor Engine {
     }
 
     public var rigStatus: RigStatus? { lastRig }
+    public var rigName: String { rig.name }
+
+    public func setRigFrequency(_ hz: Double) async throws {
+        do { try await rig.setFrequency(hz) } catch { throw EngineError.rig("\(error)") }
+        await pollRig()
+    }
+
+    public func setRigMode(_ mode: String) async throws {
+        do { try await rig.setMode(mode) } catch { throw EngineError.rig("\(error)") }
+        await pollRig()
+    }
+
+    // MARK: Modem (Sendable přístup pro AppController/API)
+
+    public func modemParam(_ id: String) -> ParameterValue? { modem.get(parameter: id) }
+    public func setModemParam(_ id: String, _ v: ParameterValue) throws { try modem.set(parameter: id, value: v) }
+    public func modemParams() -> [String: ParameterValue] {
+        var d: [String: ParameterValue] = [:]
+        for p in modem.parameters { if let v = modem.get(parameter: p.id) { d[p.id] = v } }
+        return d
+    }
+    public func parameterDescriptors() -> [ParameterDescriptor] { modem.parameters }
+    public func modes() -> [ModeDescriptor] { modem.modes }
+    public func currentMode() -> ModeDescriptor { modem.currentMode }
+    public func selectMode(_ id: String) throws {
+        guard let m = modem.modes.first(where: { $0.id == id }) else { throw ParameterError.unknown(id) }
+        try modem.select(mode: m)
+    }
+    public func spectrum() -> SpectrumFrame? { modem.spectrum() }
+    public var txPending: Int { modem.txPending }
 }
