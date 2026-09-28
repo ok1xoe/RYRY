@@ -48,6 +48,8 @@ let package = Package(
         .testTarget(name: "AudioIOTests", dependencies: ["AudioIO"]),
         .target(name: "QSOLog"),
         .testTarget(name: "QSOLogTests", dependencies: ["QSOLog"]),
+        .target(name: "MacroEngine"),
+        .testTarget(name: "MacroEngineTests", dependencies: ["MacroEngine"]),
         .target(name: "RTTYSignalKit"),
         .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],
