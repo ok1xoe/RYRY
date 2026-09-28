@@ -46,6 +46,8 @@ let package = Package(
         .target(name: "CRingBuffer"),
         .target(name: "AudioIO", dependencies: ["CRingBuffer"]),
         .testTarget(name: "AudioIOTests", dependencies: ["AudioIO"]),
+        .target(name: "QSOLog"),
+        .testTarget(name: "QSOLogTests", dependencies: ["QSOLog"]),
         .target(name: "RTTYSignalKit"),
         .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],
