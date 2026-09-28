@@ -1,7 +1,7 @@
 /// Obecné rozhraní modemu (RTTY teď, později PSK z MMVARI, SSTV z MMSSTV).
 ///
-/// Vlákna: `processRx`, `generateTx` a `spectrum` volá jen DSP vlákno. Ostatní metody volá
-/// Engine, který zajistí jejich serializaci s DSP vláknem. `events` lze číst odkudkoli.
+/// Vlákna: všechny metody volá jeden sériový kontext (Engine). `events` je AsyncStream
+/// s jediným odběratelem (Engine), který události dále rozesílá.
 public protocol Modem: AnyObject {
     static var id: String { get }
     /// Módy, které modem umí.
@@ -37,6 +37,8 @@ public protocol Modem: AnyObject {
     func spectrum() -> SpectrumFrame?
     /// Kódy, které modulátor začal vysílat (pro FSK klíčovač); modemy bez FSK vrací [].
     func takeFskCodes() -> [UInt8]
+    /// Ukončí proud `events` (po doručení čekajících událostí). Modem pak už nic nehlásí.
+    func finishEvents()
 }
 
 public extension Modem {

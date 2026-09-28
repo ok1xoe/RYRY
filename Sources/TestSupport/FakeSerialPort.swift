@@ -51,4 +51,5 @@ public final class ManualClock: Clock, @unchecked Sendable {
     public init() {}
     public func now() -> UInt64 { lock.withLock { t } }
     public func sleep(untilNanos: UInt64) { lock.withLock { if untilNanos > t { t = untilNanos } } }
+    public func advance(ms: Double) { lock.withLock { t += UInt64(ms * 1_000_000) } }
 }
