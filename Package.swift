@@ -20,6 +20,8 @@ let package = Package(
                               "-Wno-parentheses", "-Wno-dangling-else", "-Wno-unused-variable"]),
             ]
         ),
+        .testTarget(name: "MMTTYCoreTests", dependencies: ["MMTTYCore", "RTTYSignalKit", "WaveFile"],
+                    resources: [.copy("Fixtures")]),
         .target(name: "RTTYSignalKit"),
         .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],
