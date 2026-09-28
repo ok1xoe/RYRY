@@ -56,6 +56,7 @@ typedef enum {
     RC_RX_BPF_WIDTH,        /* 20 .. 500 Hz (TSound m_bpffw, výchozí 100) */
     RC_RX_LMS,              /* 0/1 LMS/notch */
     RC_TX_OUTPUT_GAIN,      /* 0 .. 32768 (CFSKMOD m_OutputGain) */
+    RC_NET,                 /* 0/1: při tx_begin převezme TX kmitočty z RX (po AFC), výchozí 1 */
     RC_PARAM_COUNT
 } RTTYCoreParam;
 
@@ -96,6 +97,12 @@ size_t rttycore_generate_tx(RTTYCore* core, float* out, size_t n);
 void   rttycore_tx_stop(RTTYCore* core);   /* dovysílá rozpracovaný znak, zbytek zahodí */
 void   rttycore_tx_abort(RTTYCore* core);  /* okamžitý konec */
 int    rttycore_is_tx(const RTTYCore* core);
+
+/* Volat po každých ~100 ms zpracovaných vzorků: spočítá FFT a provede AFC.
+   Vrací 1, když AFC změnilo mark/space. */
+int    rttycore_tick(RTTYCore* core);
+/* Poslední spektrum (CFFT::m_fft), vrací počet binů; *binHz = šířka binu. */
+size_t rttycore_spectrum(RTTYCore* core, float* out, size_t max, double* binHz);
 
 #ifdef __cplusplus
 }

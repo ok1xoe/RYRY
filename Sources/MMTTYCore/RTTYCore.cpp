@@ -4,6 +4,7 @@
 #include "MMTTYCompat.h"
 #include "mmtty/Rtty.h"
 #include "mmtty/Fft.h"
+#include "AFC.h"
 #include <cmath>
 #include <memory>
 #include <vector>
@@ -12,6 +13,10 @@ struct RTTYCore {
     RTTYCoreConfig cfg;
     std::unique_ptr<CFSKDEM> dem;
     std::unique_ptr<CFSKMOD> mod;
+    std::unique_ptr<CFFT> fft;
+    int    fftWindow = 0;     // TSound::m_FFTWINDOW
+    int    bpfafc = 1;        // TSound::m_bpfafc
+    int    net = 1;
     CRTTY rtty;
     CLMS  lms;
     double HBPF[TAPMAX + 1];
@@ -63,6 +68,8 @@ extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     c->cfg = *cfg;
     c->dem = std::make_unique<CFSKDEM>();
     c->mod = std::make_unique<CFSKMOD>();
+    c->fft = std::make_unique<CFFT>();
+    c->fftWindow = (SampType == 2) ? int(3000 * FFT_SIZE / SampFreq) : int(4000 * FFT_SIZE / SampFreq);
     c->mod->SetDem(c->dem.get());
     c->mod->SetSampFreq(SampFreq + sys.m_TxOffset);
     c->rtty.SetCodeSet();
@@ -77,7 +84,7 @@ extern "C" void rttycore_destroy(RTTYCore* c) { delete c; }
 extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
     if (!c || !s || n == 0) return;
     c->block.resize(n);
-    for (size_t i = 0; i < n; i++) c->block[i] = double(s[i]) * 32768.0;
+    for (size_t i = 0; i < n; i++) c->block[i] = std::isfinite(s[i]) ? double(s[i]) * 32768.0 : 0.0;
     double* lp = c->block.data();
     if (c->bpf || c->lmsOn) {
         for (size_t i = 0; i < n; i++) {
@@ -85,6 +92,7 @@ extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
             if (c->lmsOn) lp[i] = c->lms.Do(lp[i]);
         }
     }
+    c->fft->CollectFFT(lp, int(n));
     if (!c->txActive || c->echo) {
         for (size_t i = 0; i < n; i++) c->dem->Do(lp[i]);
     }
@@ -112,7 +120,9 @@ extern "C" RTTYCoreSignal rttycore_signal(RTTYCore* c) {
     RTTYCoreSignal r{};
     if (!c) return r;
     r.level = c->dem->m_avgdeff;
-    r.squelchOpen = (!c->dem->GetSQ() || c->dem->m_avgdeff >= c->dem->GetSQLevel()) ? 1 : 0;
+    // Stejný práh jako CFSKDEM::DoFSK: při příjmu (m_Limit) SQLevel × 10.
+    double thr = c->dem->m_Limit ? c->dem->GetSQLevel() * 10.0 : c->dem->GetSQLevel();
+    r.squelchOpen = (!c->dem->GetSQ() || c->dem->m_avgdeff >= thr) ? 1 : 0;
     r.overflow = c->overflowLatched; c->overflowLatched = 0;
     r.mark = c->dem->GetMarkFreq();
     r.space = c->dem->GetSpaceFreq();
@@ -230,6 +240,9 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
     case RC_TX_OUTPUT_GAIN:
         if (!inRange(v, 0, 32768)) return RC_ERR_RANGE;
         mod.SetOutputGain(v); break;
+    case RC_NET:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        c->net = int(v); break;
     default:
         return RC_ERR_UNKNOWN;
     }
@@ -274,6 +287,7 @@ extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
     case RC_RX_BPF_WIDTH: return c->bpffw;
     case RC_RX_LMS: return c->lmsOn;
     case RC_TX_OUTPUT_GAIN: return mod.GetOutputGain();
+    case RC_NET: return c->net;
     default: return NAN;
     }
 }
@@ -282,6 +296,10 @@ extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
 
 extern "C" void rttycore_tx_begin(RTTYCore* c, int tune) {
     if (!c) return;
+    if (c->net) {   // UpdateNet(): TX na kmitočtu RX (po AFC)
+        c->mod->SetMarkFreq(c->dem->GetMarkFreq());
+        c->mod->SetSpaceFreq(c->dem->GetSpaceFreq());
+    }
     c->mod->ClearTXBuf();
     c->rtty.ClearTX();
     c->mod->SetBaudRate(c->dem->GetBaudRate());
@@ -350,3 +368,36 @@ extern "C" void rttycore_tx_abort(RTTYCore* c) {
 }
 
 extern "C" int rttycore_is_tx(const RTTYCore* c) { return c && c->txActive ? 1 : 0; }
+
+// --- Spektrum a AFC (podle TSound::DrawFFT a volání DoAFC z TMmttyWd::TimerTimer) ---
+
+extern "C" int rttycore_tick(RTTYCore* c) {
+    if (!c) return 0;
+    if (c->fft->m_CollectFFT) {
+        double gain;
+        switch (sys.m_FFTGain) {
+            case 0: gain = 30.0; break;
+            case 1: gain = 34.0; break;
+            case 2: gain = 42.0; break;
+            case 3: gain = 54.0; break;
+            default: gain = (c->echo != 2 && c->txActive) ? 0.02 : 0.1; break;
+        }
+        c->fft->CalcFFT(c->fftWindow, gain, sys.m_FFTResp);
+        c->fft->TrigFFT();
+    }
+    if (!c->afc) return 0;
+    if (c->txActive && c->echo != 2) return 0;        // během vysílání AFC neběží
+    AFCParams p{ c->afcMode, c->afcSQ, c->afcTime, c->afcSweep, sys.m_FFTGain };
+    int r = DoAFC(c->fft->m_fft, c->fftWindow, c->bpfafc, *c->dem, p);
+    if (r == AFC_CHANGED_RECALC_BPF) c->calcBPF();
+    return r != AFC_NOCHANGE ? 1 : 0;
+}
+
+extern "C" size_t rttycore_spectrum(RTTYCore* c, float* out, size_t max, double* binHz) {
+    if (!c || !out) return 0;
+    size_t n = size_t(c->fftWindow);
+    if (n > max) n = max;
+    for (size_t i = 0; i < n; i++) out[i] = float(c->fft->m_fft[i]);
+    if (binHz) *binHz = SampFreq / FFT_SIZE;
+    return n;
+}
