@@ -33,6 +33,8 @@ let package = Package(
         .executableTarget(name: "rtty-tool", dependencies: ["RTTYModem", "ModemKit", "WaveFile", "RTTYSignalKit"]),
         .target(name: "XMLRPC"),
         .testTarget(name: "XMLRPCTests", dependencies: ["XMLRPC"]),
+        .target(name: "RigControl", dependencies: ["XMLRPC"]),
+        .testTarget(name: "RigControlTests", dependencies: ["RigControl", "XMLRPC"]),
         .target(name: "RTTYSignalKit"),
         .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],
