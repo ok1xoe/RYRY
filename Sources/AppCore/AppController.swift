@@ -66,7 +66,7 @@ final class AppBroadcaster: @unchecked Sendable {
 public actor AppController {
     public nonisolated let engine: Engine
     public private(set) var settings: AppSettings
-    public let log: QSOLogStore?
+    public nonisolated let log: QSOLogStore?
     private let profiles: ProfileStore?
     public nonisolated let rxText = TextHistory()
     public nonisolated let txText = TextHistory()
