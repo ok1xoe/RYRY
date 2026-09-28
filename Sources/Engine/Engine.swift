@@ -27,6 +27,7 @@ public actor Engine {
     private var txAt: UInt64 = 0
     private var finishedAt: UInt64?
     private var stopRequested = false
+    private var drainRequested = false     // rx() přišlo ještě během pttOn
     private var rxBuf = [Float](repeating: 0, count: 4096)
     private var txBuf = [Float](repeating: 0, count: 512)
     private var loopTask: Task<Void, Never>?
@@ -158,13 +159,14 @@ public actor Engine {
         txAt = pttOnAt + nanos(config.txDelay)
         finishedAt = nil
         stopRequested = false
+        drainRequested = false
         setState(.pttOn)
     }
 
     /// RX po dovysílání textu ve frontě.
     public func rx() {
         switch state {
-        case .pttOn: rxNowSync(reason: nil)
+        case .pttOn: drainRequested = true        // po txDelay rovnou dovysílat a přejít na RX
         case .tx: setState(.drain)
         default: break
         }
@@ -173,16 +175,6 @@ public actor Engine {
     public func rxNow() async {
         guard [.pttOn, .tx, .drain, .pttOff].contains(state) else { return }
         await abortToRx(error: nil)
-    }
-
-    private func rxNowSync(reason: EngineError?) {
-        // pro volání ze synchronního kontextu: PTT se vypne v dalším kroku pump()
-        modem.abortTx()
-        keyer?.stop()
-        audio.clearTx()
-        finishedAt = 0
-        setState(.pttOff)
-        if let reason { broadcaster.send(.error(reason)) }
     }
 
     private func abortToRx(error: EngineError?) async {
@@ -228,7 +220,7 @@ public actor Engine {
         case .pttOn:
             if now >= txAt {
                 modem.beginTx(tune: tuneMode)
-                setState(.tx)
+                setState(drainRequested ? .drain : .tx)
                 await generate(now: now)
             }
         case .tx, .drain:

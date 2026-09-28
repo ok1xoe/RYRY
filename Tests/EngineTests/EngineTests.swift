@@ -228,3 +228,21 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     #expect(statuses.first == RigStatus(online: true, frequency: 14_080_000, mode: "USB"))
     #expect(statuses.last?.online == false)
 }
+
+/// tx() a hned rx() (typicky: odeslat řádek) musí text odvysílat celý, ne ho zahodit.
+@Test func rxRequestedDuringPttOnStillTransmitsQueuedText() async throws {
+    let r = try makeEngine()
+    try await r.engine.start()
+    await r.engine.send(text: "CQ DE OK1XOE K ")
+    try await r.engine.tx()
+    await r.engine.rx()
+    await pump(r) { await r.engine.state == .rx }
+    let m = try RTTYModem()
+    let ev = m.events
+    (r.audio.tx + [Float](repeating: 0, count: 4000)).withUnsafeBufferPointer { m.processRx($0) }
+    m.finishEvents()
+    var text = ""
+    for await e in ev { if case .rxText(let c, false) = e { text.append(c) } }
+    #expect(text.contains("CQ DE OK1XOE K"))
+    await r.engine.stop()
+}

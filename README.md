@@ -26,3 +26,13 @@ spouštějte s `DEVELOPER_DIR`:
     .build/release/rtty-tool decode cq.wav [--demod iir|fir|pll|fft] [--baud 45.45] [--mark 2125] [--shift 170] [--no-afc]
 
 Nahrávku z přijímače převeďte na 11025 Hz mono: `ffmpeg -i in.wav -ar 11025 -ac 1 out.wav`.
+
+## Živý provoz (Engine)
+
+    rtty-tool devices                       # zvuková zařízení a sériové porty
+    rtty-tool level --in <UID>              # úroveň vstupu
+    rtty-tool live --in <UID> --out <UID> --ptt cat --rig hamlib     # rigctld na 127.0.0.1:4532
+    rtty-tool live ... --ptt rts --port /dev/cu.usbserial-X --fsk uart
+
+V režimu `live` se každý řádek ze stdin odvysílá (TX → text → RX po dovysílání). Dále `:tx`, `:rx`, `:tune`, `:q`.
+Ruční testy hardwaru: `docs/hardware-checklist.md`.

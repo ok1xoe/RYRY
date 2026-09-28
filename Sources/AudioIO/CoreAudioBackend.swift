@@ -8,7 +8,6 @@ import Foundation
 public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
     private var inEngine: AVAudioEngine?
     private var outEngine: AVAudioEngine?
-    private var rxConv: SampleRateConverter?
     private var txConv: SampleRateConverter?
     private let rxRing = RingBuffer(capacity: 11025 * 4)
     private let txRing = RingBuffer(capacity: 48000 * 4)
@@ -34,17 +33,24 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
         stop()
         self.modemRate = modemRate
 
-        // Vstup
+        // Vstup. Po přepnutí zařízení hlásí inputNode zastaralý formát, proto tap bez formátu
+        // (dostane nativní formát zařízení) a převodník se vytvoří podle prvního bufferu.
         let ie = AVAudioEngine()
         try Self.setDevice(ie.inputNode, uid: config.inputUID)
-        let inFmt = ie.inputNode.outputFormat(forBus: 0)
-        guard inFmt.sampleRate > 0 else { throw AudioError.device("vstup nemá formát (oprávnění k mikrofonu?)") }
-        let rc = try SampleRateConverter(from: inFmt.sampleRate, to: modemRate)
-        rxConv = rc
+        let hwFmt = ie.inputNode.inputFormat(forBus: 0)
+        guard hwFmt.sampleRate > 0 else { throw AudioError.device("vstup nemá formát (oprávnění k mikrofonu?)") }
         let ch = config.inputChannel
         let ring = rxRing
-        ie.inputNode.installTap(onBus: 0, bufferSize: 1024, format: inFmt) { buf, _ in
+        let mr = modemRate
+        nonisolated(unsafe) var conv: SampleRateConverter?
+        nonisolated(unsafe) var convRate = 0.0
+        ie.inputNode.installTap(onBus: 0, bufferSize: 1024, format: hwFmt) { buf, _ in
             guard let d = buf.floatChannelData else { return }
+            let rate = buf.format.sampleRate
+            if conv == nil || convRate != rate {
+                conv = try? SampleRateConverter(from: rate, to: mr); convRate = rate
+            }
+            guard let c = conv else { return }
             let n = Int(buf.frameLength), chans = Int(buf.format.channelCount)
             var mono = [Float](repeating: 0, count: n)
             for i in 0..<n {
@@ -54,7 +60,7 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
                 case .mono: mono[i] = chans > 1 ? (d[0][i] + d[1][i]) * 0.5 : d[0][i]
                 }
             }
-            ring.write(rc.process(mono))
+            ring.write(c.process(mono))
         }
 
         // Výstup
