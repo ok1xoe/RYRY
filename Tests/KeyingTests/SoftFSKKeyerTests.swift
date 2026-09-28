@@ -67,3 +67,19 @@ func waitIdle(_ k: FSKKeyer) {
     k.stop()
     #expect(k.pending == 0)
 }
+
+/// Review: po stop() už vlákno nesmí sáhnout na linku a linka musí zůstat na mark.
+@Test func stopJoinsThreadAndLeavesMark() throws {
+    for _ in 0..<5 {
+        let port = FakeSerialPort()
+        let k = SoftFSKKeyer(port: port, line: .dtr)          // skutečné hodiny
+        try k.start()
+        k.send(codes: [0x00, 0x00, 0x00, 0x00])               // samé space bity
+        usleep(40_000)                                        // uprostřed znaku
+        k.stop()
+        let n = port.events.count
+        #expect(port.events.last == .dtr(false))
+        usleep(80_000)
+        #expect(port.events.count == n, "vlákno sáhlo na linku po stop()")
+    }
+}

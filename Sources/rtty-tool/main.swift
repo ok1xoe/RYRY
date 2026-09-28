@@ -66,6 +66,23 @@ func writeWav(_ s: [Float], _ path: String) {
     catch { fail("zápis \(path) selhal: \(error)") }
 }
 
+/// Obsluha SIGINT/SIGTERM mimo hlavní actor (hlavní vlákno blokuje readLine()).
+nonisolated(unsafe) var signalSources: [DispatchSourceSignal] = []   // musí žít po celou dobu běhu
+
+nonisolated func installStopOnSignals(_ engine: Engine) {
+    signal(SIGINT, SIG_IGN); signal(SIGTERM, SIG_IGN)
+    let q = DispatchQueue(label: "signals")
+    signalSources = [SIGINT, SIGTERM].map { sig in
+        let src = DispatchSource.makeSignalSource(signal: sig, queue: q)
+        src.setEventHandler { @Sendable in
+            FileHandle.standardError.write(Data("\n[ukončuji – PTT off]\n".utf8))
+            Task.detached { await engine.stop(); exit(0) }
+        }
+        src.resume()
+        return src
+    }
+}
+
 let usage = """
     použití:
       rtty-tool gen "TEXT" out.wav [--baud B] [--mark F] [--shift S] [--noise RMS] [--seed N]
@@ -75,7 +92,7 @@ let usage = """
       rtty-tool level [--in UID]          úroveň vstupu (5 s)
       rtty-tool live [--in UID] [--out UID] [--ptt none|rts|dtr|rtsDtr|cat] [--port /dev/cu.X]
                      [--rig none|hamlib|flrig] [--fsk uart|soft-dtr|soft-rts|soft-break] [--baud B] [--mark F]
-         stdin: text = odvysílat (TX → text → RX po dovysílání), :tx, :rx, :tune, :q
+         stdin: text = odvysílat (TX → text → RX po dovysílání), :tx, :rx, :abort, :tune, :q
     """
 
 let argv = CommandLine.arguments
@@ -198,6 +215,8 @@ case "live":
         }
     }
     do { try await engine.start() } catch { fail("start: \(error)") }
+    // Ctrl-C / SIGTERM: vždy bezpečně vypnout PTT a FSK linku
+    installStopOnSignals(engine)
     FileHandle.standardError.write(Data("mmtty4mac live – text + Enter = vysílat, :q = konec\n".utf8))
     while let line = readLine() {
         switch line {
@@ -205,6 +224,7 @@ case "live":
         case ":tx": do { try await engine.tx() } catch { print("TX: \(error)") }; continue
         case ":tune": do { try await engine.tune() } catch { print("TX: \(error)") }; continue
         case ":rx": await engine.rx(); continue
+        case ":abort": await engine.rxNow(); continue
         default:
             await engine.send(text: line + "\r\n")
             do { try await engine.tx(); await engine.rx() } catch { print("TX: \(error)") }

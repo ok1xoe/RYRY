@@ -10,6 +10,18 @@ public actor LineConnection {
     private var connection: NWConnection?
     private var buffer = Data()
     private let queue = DispatchQueue(label: "LineConnection")
+    // FIFO zámek: actor se uvnitř request() suspenduje, bez zámku by se požadavky prokládaly.
+    private var busy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    private func acquire() async {
+        if !busy { busy = true; return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    private func release() {
+        if waiters.isEmpty { busy = false } else { waiters.removeFirst().resume() }
+    }
 
     public init(host: String, port: UInt16, timeout: Duration = .seconds(2)) {
         self.host = host; self.port = port; self.timeout = timeout
@@ -49,6 +61,8 @@ public actor LineConnection {
 
     /// Pošle řádek a přečte `responseLines` řádků odpovědi. Při výpadku spojení zavře a hodí `.offline`.
     public func request(_ line: String, responseLines: Int) async throws -> [String] {
+        await acquire()
+        defer { release() }
         if connection == nil { try await open() }
         guard let c = connection else { throw RigError.offline }
         do {
@@ -69,16 +83,18 @@ public actor LineConnection {
             }
             return lines
         } catch let e as RigError {
-            if e != .timeout { close() } else { close() }   // po timeoutu je stav proudu neznámý
+            close()              // po chybě i timeoutu je stav proudu neznámý → nové spojení
             throw e
         }
     }
 
     private func send(_ c: NWConnection, _ data: Data) async throws {
-        let err: NWError? = await withCheckedContinuation { cont in
-            c.send(content: data, completion: .contentProcessed { cont.resume(returning: $0) })
-        }
-        if err != nil { throw RigError.offline }
+        let ok: Bool = try await withTimeout(timeout) {
+            await withCheckedContinuation { cont in
+                c.send(content: data, completion: .contentProcessed { cont.resume(returning: $0 == nil) })
+            }
+        } onTimeout: { c.cancel() }
+        if !ok { throw RigError.offline }
     }
 
     private func receive(_ c: NWConnection) async throws -> Data {

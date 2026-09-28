@@ -11,6 +11,9 @@ int cserial_open(const char* path, int* fd_out) {
     int fd = open(path, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd < 0) return errno;
     if (ioctl(fd, TIOCEXCL) < 0) { int e = errno; close(fd); return e; }
+    /* macOS při otevření zvedne DTR/RTS – hned shodit, aby PTT neblikl (klidový stav nastaví PTTController) */
+    int bits = TIOCM_DTR | TIOCM_RTS;
+    ioctl(fd, TIOCMBIC, &bits);
     int flags = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);   /* zápis blokující */
     *fd_out = fd;
@@ -28,7 +31,7 @@ int cserial_configure(int fd, int dataBits, int stopBits) {
     switch (dataBits) { case 5: t.c_cflag |= CS5; break; case 6: t.c_cflag |= CS6; break;
                         case 7: t.c_cflag |= CS7; break; default: t.c_cflag |= CS8; break; }
     if (stopBits >= 2) t.c_cflag |= CSTOPB;
-    t.c_cflag &= ~HUPCL;                      /* nezhazovat DTR při zavření */
+    t.c_cflag |= HUPCL;                       /* při zavření (i pádu procesu) shodit DTR/RTS → PTT off */
     if (tcsetattr(fd, TCSANOW, &t) < 0) return errno;
     return 0;
 }
@@ -55,3 +58,5 @@ int cserial_write(int fd, const unsigned char* buf, unsigned long n) {
 }
 
 int cserial_drain(int fd) { return tcdrain(fd) < 0 ? errno : 0; }
+
+int cserial_flush_output(int fd) { return tcflush(fd, TCOFLUSH) < 0 ? errno : 0; }

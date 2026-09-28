@@ -6,6 +6,8 @@ public protocol FSKKeyer: AnyObject, Sendable {
     func send(codes: [UInt8])
     var pending: Int { get }     // kódy čekající na odvysílání
     func stop()                  // linka na mark, fronta se zahodí
+    /// Počká, až je vše odvysíláno (UART: tcdrain; soft: prázdná fronta), max. `timeout`.
+    func finish(timeout: Duration) async
 }
 
 /// FSK přes UART TxD (45,45 Bd přes IOSSIOSPEED; spolehlivé s FTDI).
@@ -46,5 +48,17 @@ public final class UARTFSKKeyer: FSKKeyer, @unchecked Sendable {
 
     public var pending: Int { 0 }   // o časování se stará UART; modulátor dodává kódy v reálném čase
 
-    public func stop() { try? port.setBreak(false) }
+    public func stop() {
+        port.flushOutput()           // nedovysílané znaky zahodit
+        try? port.setBreak(false)
+    }
+
+    public func finish(timeout: Duration) async {
+        let p = port
+        await withTaskGroup(of: Void.self) { g in
+            g.addTask { await Task.detached { try? p.drain() }.value }
+            g.addTask { try? await Task.sleep(for: timeout) }
+            await g.next(); g.cancelAll()
+        }
+    }
 }

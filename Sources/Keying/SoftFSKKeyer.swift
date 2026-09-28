@@ -19,7 +19,10 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
     private var running = false
     private var generation = 0
     private var thread: Thread?
-    public private(set) var lastError: Error?
+    private var exited: DispatchSemaphore?
+    private var _lastError: Error?
+    /// Poslední chyba zápisu na linku (čte Engine; zapisuje vlákno klíčovače).
+    public var lastError: Error? { cond.lock(); defer { cond.unlock() }; return _lastError }
 
     public init(port: SerialPort, line: FSKLine, baud: Double = 45.45, stopBits: Double = 1.5,
                 invert: Bool = false, clock: Clock = HostClock()) {
@@ -35,7 +38,7 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
             case .dtr: try port.setDTR(active)
             case .rts: try port.setRTS(active)
             }
-        } catch { lastError = error }
+        } catch { cond.lock(); _lastError = error; cond.unlock() }
     }
 
     public func start() throws {
@@ -47,8 +50,10 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
         running = true
         generation += 1
         let gen = generation
+        let done = DispatchSemaphore(value: 0)
+        exited = done
         cond.unlock()
-        let t = Thread { [weak self] in self?.run(gen) }
+        let t = Thread { [weak self] in self?.run(gen); done.signal() }
         t.qualityOfService = .userInteractive
         t.name = "SoftFSKKeyer"
         thread = t
@@ -67,15 +72,23 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
         return queue.count + sending
     }
 
+    public func finish(timeout: Duration) async {
+        let deadline = ContinuousClock.now + timeout
+        while pending > 0 && ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
+    }
+
     public func stop() {
         cond.lock()
         running = false
         queue.removeAll()
         sending = 0
         generation += 1
+        let done = exited
+        exited = nil
         cond.broadcast()
         cond.unlock()
-        // vlákno při ukončení nastaví mark; pro jistotu i zde
+        // počkat na vlákno (nejdéle ~1 bit), aby po stop() už na linku nesáhlo
+        _ = done?.wait(timeout: .now() + .milliseconds(200))
         setLevel(mark: true)
     }
 

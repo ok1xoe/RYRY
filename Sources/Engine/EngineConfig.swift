@@ -25,7 +25,8 @@ public struct EngineConfig: Sendable, Equatable {
     public init() {}
 }
 
-public enum EngineState: String, Sendable { case stopped, rx, pttOn, tx, drain, pttOff }
+/// keying = PTT se právě zapíná; pttOff = PTT se vypíná (doběh nebo přerušení).
+public enum EngineState: String, Sendable { case stopped, rx, keying, pttOn, tx, drain, pttOff }
 
 public enum EngineError: Error, Equatable, Sendable {
     case pttUnavailable(String), audio(String), keying(String), rig(String), notRunning

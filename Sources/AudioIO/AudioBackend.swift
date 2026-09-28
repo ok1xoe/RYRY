@@ -21,4 +21,6 @@ public protocol AudioBackend: AnyObject, Sendable {
     func clearTx()
     var txQueued: Int { get }          // vzorky (na frekvenci modemu) čekající na výstup
     var isRunning: Bool { get }
+    /// Nenulové, když zařízení selhalo (odpojeno, změna konfigurace) – Engine přeruší TX.
+    var failure: String? { get }
 }

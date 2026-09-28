@@ -6,7 +6,7 @@ import Keying
 public final class FakeSerialPort: SerialPort, @unchecked Sendable {
     public enum Event: Equatable, Sendable {
         case open, close, rts(Bool), dtr(Bool), brk(Bool), configure(baud: Double, dataBits: Int, stopBits: Int)
-        case write([UInt8]), drain
+        case write([UInt8]), drain, flush
     }
     public let path: String
     private let lock = NSLock()
@@ -38,6 +38,7 @@ public final class FakeSerialPort: SerialPort, @unchecked Sendable {
     }
     public func write(_ bytes: [UInt8]) throws { try check(); record(.write(bytes)) }
     public func drain() throws { try check(); record(.drain) }
+    public func flushOutput() { record(.flush) }
     private func check() throws {
         guard isOpen else { throw SerialError.closed }
         if failLines { throw SerialError.ioError("simulated") }

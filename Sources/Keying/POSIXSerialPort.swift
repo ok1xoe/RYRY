@@ -33,7 +33,13 @@ public final class POSIXSerialPort: SerialPort, @unchecked Sendable {
         try lock.withLock {
             guard fd >= 0 else { throw SerialError.closed }
             let e = body(fd)
-            if e != 0 { throw SerialError.ioError("\(name): \(err(e))") }
+            if e != 0 {
+                // odpojené zařízení (USB): fd zavřít, další open() port otevře znovu
+                if e == ENXIO || e == EIO || e == ENODEV || e == EBADF {
+                    _ = cserial_close(fd); fd = -1
+                }
+                throw SerialError.ioError("\(name): \(err(e))")
+            }
         }
     }
 
@@ -55,6 +61,7 @@ public final class POSIXSerialPort: SerialPort, @unchecked Sendable {
     }
 
     public func drain() throws { try op("drain") { cserial_drain($0) } }
+    public func flushOutput() { try? op("flush") { cserial_flush_output($0) } }
 
     /// Sériová zařízení (/dev/cu.*).
     public static func availablePorts() -> [String] {

@@ -12,7 +12,9 @@ public final class FakeAudioBackend: AudioBackend, @unchecked Sendable {
     public var rxChunk = 1103            // vzorků na jedno readRx (≈ 100 ms)
     public var failStart = false
     public private(set) var isRunning = false
-    public var txQueued: Int { 0 }       // výstup „spotřebuje“ vzorky okamžitě
+    public var stuckQueued = 0            // >0 = výstup se zasekl (zařízení zmizelo)
+    public var txQueued: Int { stuckQueued }   // jinak výstup „spotřebuje“ vzorky okamžitě
+    public var failure: String?
 
     public init() {}
 

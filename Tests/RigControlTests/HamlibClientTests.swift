@@ -75,3 +75,21 @@ func withFake(_ body: (FakeRigctld, HamlibClient) async throws -> Void) async th
     await #expect(throws: RigError.offline) { _ = try await rig.frequency() }
     await #expect(throws: RigError.offline) { try await rig.setPTT(true) }
 }
+
+/// Review (critical): souběžné požadavky (poll frekvence + PTT) nesmí rozhodit proud odpovědí.
+@Test func concurrentRequestsStayInSync() async throws {
+    try await withFake { fake, rig in
+        fake.replyDelayMs = 5
+        var errors = 0, wrong = 0
+        for _ in 0..<30 {
+            async let f = rig.frequency()
+            async let p: Void = rig.setPTT(true)
+            async let m = rig.mode()
+            do {
+                let (fv, _, mv) = try await (f, p, m)
+                if fv != 14_080_000 || mv != "PKTUSB" { wrong += 1 }
+            } catch { errors += 1 }
+        }
+        #expect(errors == 0 && wrong == 0, "errors \(errors) wrong \(wrong)")
+    }
+}

@@ -15,6 +15,10 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
     private var modemRate = 11025.0
     private let lock = NSLock()
     public private(set) var isRunning = false
+    private let failLock = NSLock()
+    private var _failure: String?
+    public var failure: String? { failLock.withLock { _failure } }
+    private var observers: [NSObjectProtocol] = []
 
     public init() {}
 
@@ -99,10 +103,22 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
             throw AudioError.engine("\(error)")
         }
         inEngine = ie; outEngine = oe
+        failLock.withLock { _failure = nil }
+        // Změna konfigurace (odpojené zařízení, změna formátu) zastaví engine → nahlásit.
+        for (eng, label) in [(ie, "vstup"), (oe, "výstup")] {
+            observers.append(NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange, object: eng, queue: nil) { [weak self, weak eng] _ in
+                    // notifikace chodí i při běžném startu; porucha = engine se zastavil
+                    guard let eng, !eng.isRunning else { return }
+                    self?.failLock.withLock { self?._failure = "změna zvukového zařízení (\(label))" }
+                })
+        }
         isRunning = true
     }
 
     public func stop() {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
         inEngine?.inputNode.removeTap(onBus: 0)
         inEngine?.stop(); outEngine?.stop()
         inEngine = nil; outEngine = nil

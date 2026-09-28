@@ -12,6 +12,7 @@ final class FakeRigctld: @unchecked Sendable {
     var freq = 14_080_000.0
     var rigMode = "PKTUSB"
     var ptt = false
+    var replyDelayMs = 0          // zpoždění odpovědi (odhalí souběžné požadavky)
     private(set) var commands: [String] = []
 
     func start() async throws {
@@ -91,7 +92,13 @@ final class FakeRigctld: @unchecked Sendable {
             default: reply = "RPRT -11\n"
             }
         }
-        c.send(content: Data(reply.utf8), completion: .contentProcessed { _ in })
+        if replyDelayMs > 0 {
+            queue.asyncAfter(deadline: .now() + .milliseconds(Int.random(in: 0...replyDelayMs))) {
+                c.send(content: Data(reply.utf8), completion: .contentProcessed { _ in })
+            }
+        } else {
+            c.send(content: Data(reply.utf8), completion: .contentProcessed { _ in })
+        }
     }
 }
 

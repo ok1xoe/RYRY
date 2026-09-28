@@ -13,3 +13,4 @@ int cserial_set_dtr(int fd, int on);
 int cserial_set_break(int fd, int on);
 int cserial_write(int fd, const unsigned char* buf, unsigned long n);
 int cserial_drain(int fd);
+int cserial_flush_output(int fd);

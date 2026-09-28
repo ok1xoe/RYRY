@@ -34,6 +34,12 @@ public actor Engine {
     private var rigTask: Task<Void, Never>?
     private var modemTask: Task<Void, Never>?
     private var lastRig: RigStatus?
+    /// Zvyšuje se při každém tx/rxNow/stop; po každém await se ověřuje, že příkaz stále platí.
+    private var epoch = 0
+    private var lastQueued = 0
+    private var lastProgressAt: UInt64 = 0
+    private static let stallNs: UInt64 = 2_000_000_000   // výstup bez pohybu 2 s = zaseknuté zařízení
+    private var everStarted = false
 
     public init(modem: sending any Modem, rig: Rig = NoRig(), audio: AudioBackend, config: EngineConfig,
                 serialFactory: @escaping @Sendable (String) -> SerialPort = { POSIXSerialPort(path: $0) },
@@ -64,7 +70,8 @@ public actor Engine {
     // MARK: Start/stop
 
     public func start() async throws {
-        guard state == .stopped else { return }
+        guard !everStarted else { throw EngineError.notRunning }   // Engine je jednorázový
+        everStarted = true
         do { try audio.start(modemRate: modem.sampleRate, config: config.audio) }
         catch { throw EngineError.audio("\(error)") }
         let portForPTT: SerialPort? = config.pttPort.map { port($0) }
@@ -105,20 +112,28 @@ public actor Engine {
     }
 
     public func stop() async {
-        guard state != .stopped else { return }
+        guard state != .stopped, everStarted else { return }
+        epoch += 1
+        let wasTx = state != .rx
+        setState(.stopped)                      // hned: souběžné příkazy už nic nespustí
         loopTask?.cancel(); rigTask?.cancel()
         loopTask = nil; rigTask = nil
-        if state != .rx { modem.abortTx() }
-        keyer?.stop(); keyer = nil
+        if wasTx { modem.abortTx() }
+        await stopKeyer()
         await ptt?.forceOff()
         audio.stop()
         for p in ports.values { p.close() }
-        setState(.stopped)
         // doběhnutí událostí z modemu, pak konec streamů
         modem.finishEvents()
         await modemTask?.value
         modemTask = nil
         broadcaster.finish()
+    }
+
+    private func stopKeyer() async {
+        guard let k = keyer else { return }
+        keyer = nil
+        k.stop()
     }
 
     // MARK: Příkazy
@@ -129,8 +144,21 @@ public actor Engine {
     private func beginTx(tune: Bool) async throws {
         guard state != .stopped else { throw EngineError.notRunning }
         guard state == .rx else { return }                           // idempotence
-        if !pttReady, !(await preparePTT(reportErrors: false)) {
-            throw EngineError.pttUnavailable("PTT \(config.ptt.rawValue) není dostupné")
+        if let f = audio.failure { throw EngineError.audio(f) }
+        epoch += 1
+        let my = epoch
+        drainRequested = false
+        setState(.keying)
+        /// Platí příkaz ještě? (mezitím mohl přijít rxNow/stop/jiný tx)
+        func valid() -> Bool { epoch == my && state == .keying }
+
+        if !pttReady {
+            let ok = await preparePTT(reportErrors: false)
+            guard valid() else { return }
+            if !ok {
+                setState(.rx)
+                throw EngineError.pttUnavailable("PTT \(config.ptt.rawValue) není dostupné")
+            }
         }
         // FSK linka na mark ještě před PTT
         do {
@@ -143,48 +171,59 @@ public actor Engine {
             }
             try keyer?.start()
         } catch {
-            keyer?.stop(); keyer = nil
+            await stopKeyer()
+            setState(.rx)
             throw EngineError.keying("\(error)")
         }
         do {
             try await ptt?.set(true)
         } catch {
-            keyer?.stop(); keyer = nil
+            if epoch == my { await stopKeyer() }
             await ptt?.forceOff()
             pttReady = false
+            if epoch == my, state == .keying { setState(.rx) }
             throw EngineError.pttUnavailable("\(error)")
         }
+        guard valid() else {
+            // mezitím rxNow/stop: PTT, které jsme právě zapnuli, hned vypnout
+            await ptt?.forceOff()
+            return
+        }
         tuneMode = tune
+        lastQueued = 0
+        lastProgressAt = clock.now()
         pttOnAt = clock.now()
         txAt = pttOnAt + nanos(config.txDelay)
         finishedAt = nil
         stopRequested = false
-        drainRequested = false
         setState(.pttOn)
     }
 
     /// RX po dovysílání textu ve frontě.
     public func rx() {
         switch state {
-        case .pttOn: drainRequested = true        // po txDelay rovnou dovysílat a přejít na RX
+        case .keying, .pttOn: drainRequested = true   // po txDelay rovnou dovysílat a přejít na RX
         case .tx: setState(.drain)
         default: break
         }
     }
 
     public func rxNow() async {
-        guard [.pttOn, .tx, .drain, .pttOff].contains(state) else { return }
+        guard [.keying, .pttOn, .tx, .drain, .pttOff].contains(state) else { return }
         await abortToRx(error: nil)
     }
 
     private func abortToRx(error: EngineError?) async {
+        epoch += 1
+        let my = epoch
         modem.abortTx()
-        keyer?.stop(); keyer = nil
+        await stopKeyer()
         audio.clearTx()
-        await ptt?.forceOff()
         finishedAt = nil
-        setState(.rx)
+        setState(.pttOff)                       // během vypínání nový tx() nic nespustí
         if let error { broadcaster.send(.error(error)) }
+        await ptt?.forceOff()
+        if epoch == my, state == .pttOff { setState(.rx) }
     }
 
     public func send(text: String) { modem.queueTx(text: text) }
@@ -209,11 +248,27 @@ public actor Engine {
         }
         let now = clock.now()
 
-        // PTT časovač
-        if [.pttOn, .tx, .drain].contains(state), now - pttOnAt > nanos(config.pttTimeout) {
-            broadcaster.send(.pttTimeout)
-            await abortToRx(error: nil)
-            return
+        let keyed: Set<EngineState> = [.pttOn, .tx, .drain, .pttOff]
+        if keyed.contains(state) {
+            // PTT časovač
+            if now - pttOnAt > nanos(config.pttTimeout) {
+                broadcaster.send(.pttTimeout)
+                await abortToRx(error: nil)
+                return
+            }
+            // selhání zvukového zařízení
+            if let f = audio.failure {
+                await abortToRx(error: .audio(f))
+                return
+            }
+            // zaseknutý výstup: fronta neklesá a nic se nepřidává
+            let q = audio.txQueued
+            if q == 0 || q < lastQueued { lastProgressAt = now }
+            lastQueued = q
+            if state != .pttOn, now - lastProgressAt > Self.stallNs {
+                await abortToRx(error: .audio("zvukový výstup neodebírá data"))
+                return
+            }
         }
 
         switch state {
@@ -230,14 +285,22 @@ public actor Engine {
             await generate(now: now)
         case .pttOff:
             let tailDone = (finishedAt ?? 0) + nanos(config.pttTail)
+            let hardCap = tailDone + Self.stallNs
+            if now >= hardCap {
+                await abortToRx(error: .audio("doběh vysílání nedokončen, PTT vypnuto"))
+                return
+            }
             if now >= tailDone, audio.txQueued == 0, (keyer?.pending ?? 0) == 0 {
-                keyer?.stop(); keyer = nil
+                let my = epoch
+                await keyer?.finish(timeout: .seconds(3))       // UART buffer dovysílat před PTT off
+                guard epoch == my, state == .pttOff else { return }
+                await stopKeyer()
                 do { try await ptt?.set(false) } catch {
                     await ptt?.forceOff()
                     pttReady = false
                     broadcaster.send(.error(.pttUnavailable("\(error)")))
                 }
-                setState(.rx)
+                if epoch == my, state == .pttOff { setState(.rx) }
             }
         default: break
         }
@@ -259,6 +322,7 @@ public actor Engine {
                 if !config.audioDuringFSK { for i in txBuf.indices { txBuf[i] = 0 } }
             }
             _ = audio.writeTx(txBuf)
+            lastProgressAt = now
             blocks += 1
             if st == .finished {
                 finishedAt = now

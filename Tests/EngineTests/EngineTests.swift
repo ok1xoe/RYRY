@@ -246,3 +246,56 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     #expect(text.contains("CQ DE OK1XOE K"))
     await r.engine.stop()
 }
+
+/// Review: výstup zamrzne (zařízení zmizelo) → PTT se vypne nejpozději tail + 2 s.
+@Test func stuckAudioOutputStillReleasesPTT() async throws {
+    let r = try makeEngine()
+    try await r.engine.start()
+    await r.engine.send(text: "RY")
+    try await r.engine.tx()
+    await r.engine.rx()
+    await pump(r) { await r.engine.state == .drain || r.audio.writeCalls > 0 }
+    r.audio.stuckQueued = 5000
+    await pump(r, ms: 100, steps: 200) { await r.engine.state == .rx }
+    #expect(await r.engine.state == .rx)
+    #expect(lastRTS(r.port) == false)
+    await r.engine.stop()
+    var sawError = false
+    for await e in r.events { if case .error = e { sawError = true } }
+    #expect(sawError)
+}
+
+/// Review: selhání zvukového zařízení během TX → RX + chyba.
+@Test func audioFailureDuringTxAborts() async throws {
+    let r = try makeEngine()
+    try await r.engine.start()
+    await r.engine.send(text: String(repeating: "RY", count: 100))
+    try await r.engine.tx()
+    await pump(r) { await r.engine.state == .tx }
+    r.audio.failure = "device removed"
+    await pump(r, steps: 5) { await r.engine.state == .rx }
+    #expect(await r.engine.state == .rx)
+    #expect(lastRTS(r.port) == false)
+    await r.engine.stop()
+}
+
+/// Review: UART buffer se musí dovysílat (tcdrain) dřív, než PTT spadne; přerušení frontu zahodí.
+@Test func uartIsDrainedBeforePTTOffAndFlushedOnAbort() async throws {
+    let r = try makeEngine(txOutput: .fskUART(path: "/dev/cu.fake"))
+    try await r.engine.start()
+    await r.engine.send(text: "RY")
+    try await r.engine.tx()
+    await r.engine.rx()
+    await pump(r) { await r.engine.state == .rx }
+    let ev = r.port.events
+    let lastWrite = try #require(ev.lastIndex { if case .write = $0 { return true } else { return false } })
+    let drain = try #require(ev.lastIndex(of: .drain))
+    let off = try #require(ev.lastIndex(of: .rts(false)))
+    #expect(lastWrite < drain && drain < off)
+
+    try await r.engine.tx()
+    await pump(r) { await r.engine.state == .tx }
+    await r.engine.rxNow()
+    #expect(r.port.events.contains(.flush))
+    await r.engine.stop()
+}

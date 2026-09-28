@@ -12,6 +12,8 @@ public protocol SerialPort: AnyObject, Sendable {
     func configure(baud: Double, dataBits: Int, stopBits: Int) throws
     func write(_ bytes: [UInt8]) throws
     func drain() throws
+    /// Zahodí data čekající v bufferu ovladače (tcflush TCOFLUSH).
+    func flushOutput()
 }
 public protocol Clock: Sendable {
     func now() -> UInt64
