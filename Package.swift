@@ -50,6 +50,8 @@ let package = Package(
         .testTarget(name: "QSOLogTests", dependencies: ["QSOLog"]),
         .target(name: "MacroEngine"),
         .testTarget(name: "MacroEngineTests", dependencies: ["MacroEngine"]),
+        .target(name: "Settings", dependencies: ["Engine", "AudioIO", "Keying", "ModemKit"]),
+        .testTarget(name: "SettingsTests", dependencies: ["Settings", "Engine", "AudioIO", "Keying", "ModemKit"]),
         .target(name: "RTTYSignalKit"),
         .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],
