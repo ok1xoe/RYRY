@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import MMTTYCore
 import RTTYSignalKit
@@ -37,4 +38,20 @@ import RTTYSignalKit
     var s = RTTYSignalGenerator().generate(text: sample)
     s.insert(contentsOf: [Float.nan, .infinity, -.infinity], at: 100)
     #expect(runWithTicks(core, s).contains("CQ CQ DE OK1XOE"))
+}
+
+/// MMTTY spoléhá na vynulovanou paměť (VCL TObject); konstruktory některé členy nenastavují.
+/// Nová instance nesmí zdědit stav z paměti předchozí (zničené) instance.
+@Test func freshCoreDoesNotInheritStateFromFreedInstance() throws {
+    for _ in 0..<20 {
+        let old = try #require(makeCore())
+        #expect(rttycore_set_param(old, RC_DEMOD_TYPE, 3) == RC_OK)
+        #expect(rttycore_set_param(old, RC_ATC, 1) == RC_OK)
+        #expect(rttycore_set_param(old, RC_LPF_ORDER, 7) == RC_OK)
+        rttycore_destroy(old)
+        let core = try #require(makeCore())
+        defer { rttycore_destroy(core) }
+        #expect(rttycore_get_param(core, RC_DEMOD_TYPE) == 0)
+        #expect(rttycore_get_param(core, RC_ATC) == 0)
+    }
 }

@@ -7,19 +7,34 @@
 #include "AFC.h"
 #include <cmath>
 #include <memory>
+#include <new>
 #include <vector>
+
+// MMTTY třídy nenastavují v konstruktorech všechny členy – v originálu je VCL (TObject)
+// alokoval ve vynulované paměti. Zachováváme to: raw paměť → memset 0 → placement new.
+template <class T> struct ZeroedDeleter {
+    void operator()(T* p) const { if (p) { p->~T(); ::operator delete(p); } }
+};
+template <class T> using ZeroedPtr = std::unique_ptr<T, ZeroedDeleter<T>>;
+template <class T> static ZeroedPtr<T> makeZeroed() {
+    void* mem = ::operator new(sizeof(T));
+    memset(mem, 0, sizeof(T));
+    return ZeroedPtr<T>(new (mem) T());
+}
 
 struct RTTYCore {
     CoreContext ctx;          // MUSÍ být první: ostatní členy se ničí, dokud je kontext platný
     RTTYCoreConfig cfg;
-    std::unique_ptr<CFSKDEM> dem;
-    std::unique_ptr<CFSKMOD> mod;
-    std::unique_ptr<CFFT> fft;
+    ZeroedPtr<CFSKDEM> dem;
+    ZeroedPtr<CFSKMOD> mod;
+    ZeroedPtr<CFFT> fft;
+    ZeroedPtr<CRTTY> rttyPtr;
+    ZeroedPtr<CLMS> lmsPtr;
     int    fftWindow = 0;     // TSound::m_FFTWINDOW
     int    bpfafc = 1;        // TSound::m_bpfafc
     int    net = 1;
-    CRTTY rtty;
-    CLMS  lms;
+    CRTTY& rtty() const { return *rttyPtr; }
+    CLMS&  lms() const { return *lmsPtr; }
     double HBPF[TAPMAX + 1];
     double ZBPF[TAPMAX + 1];
     int    bpf = 0, lmsOn = 0, bpftap = 56;
@@ -36,7 +51,7 @@ struct RTTYCore {
     void calcBPF() {
         MakeFilter(HBPF, bpftap, ffBPF, SampFreq,
                    dem->GetMarkFreq() - bpffw, dem->GetSpaceFreq() + bpffw, 60, 1.0);
-        lms.SetWindow(dem->GetMarkFreq(), dem->GetSpaceFreq());
+        lms().SetWindow(dem->GetMarkFreq(), dem->GetSpaceFreq());
     }
 };
 
@@ -68,13 +83,15 @@ extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     sys.m_TxPort   = txSound;
 
     c->cfg = *cfg;
-    c->dem = std::make_unique<CFSKDEM>();
-    c->mod = std::make_unique<CFSKMOD>();
-    c->fft = std::make_unique<CFFT>();
+    c->dem = makeZeroed<CFSKDEM>();
+    c->mod = makeZeroed<CFSKMOD>();
+    c->fft = makeZeroed<CFFT>();
+    c->rttyPtr = makeZeroed<CRTTY>();
+    c->lmsPtr = makeZeroed<CLMS>();
     c->fftWindow = (SampType == 2) ? int(3000 * FFT_SIZE / SampFreq) : int(4000 * FFT_SIZE / SampFreq);
     c->mod->SetDem(c->dem.get());
     c->mod->SetSampFreq(SampFreq + sys.m_TxOffset);
-    c->rtty.SetCodeSet();
+    c->rtty().SetCodeSet();
     memset(c->HBPF, 0, sizeof(c->HBPF));
     memset(c->ZBPF, 0, sizeof(c->ZBPF));
     c->calcBPF();
@@ -96,7 +113,7 @@ extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
     if (c->bpf || c->lmsOn) {
         for (size_t i = 0; i < n; i++) {
             if (c->bpf)   lp[i] = DoFIR(c->HBPF, c->ZBPF, lp[i], c->bpftap);
-            if (c->lmsOn) lp[i] = c->lms.Do(lp[i]);
+            if (c->lmsOn) lp[i] = c->lms().Do(lp[i]);
         }
     }
     c->fft->CollectFFT(lp, int(n));
@@ -117,7 +134,7 @@ extern "C" size_t rttycore_read_chars(RTTYCore* c, RTTYCoreChar* out, size_t max
         switch (c->dem->m_BitLen) {
             case 7: d &= 0x7f; /* fallthrough */
             case 8: ch = char(d); break;
-            default: ch = c->rtty.ConvAscii(d); break;
+            default: ch = c->rtty().ConvAscii(d); break;
         }
         if (ch) { out[k].ch = ch; out[k].echo = uint8_t(c->txActive ? 1 : 0); k++; }
     }
@@ -134,7 +151,7 @@ extern "C" RTTYCoreSignal rttycore_signal(RTTYCore* c) {
     r.overflow = c->overflowLatched; c->overflowLatched = 0;
     r.mark = c->dem->GetMarkFreq();
     r.space = c->dem->GetSpaceFreq();
-    r.fig = c->rtty.m_fig;
+    r.fig = c->rtty().m_fig;
     return r;
 }
 
@@ -215,7 +232,7 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
         dem.m_LimitOverSampling = int(v); break;
     case RC_UOS:
         if (!isBool(v)) return RC_ERR_RANGE;
-        c->rtty.m_uos = int(v); break;
+        c->rtty().m_uos = int(v); break;
     case RC_DIDDLE:
         if (!isInt(v, 0, 2)) return RC_ERR_RANGE;
         mod.m_diddle = int(v); break;
@@ -285,7 +302,7 @@ extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
     case RC_PARITY: return dem.m_Parity;
     case RC_LIMITER_AGC: return dem.m_LimitAGC;
     case RC_LIMITER_OVERSAMPLE: return dem.m_LimitOverSampling;
-    case RC_UOS: return c->rtty.m_uos;
+    case RC_UOS: return c->rtty().m_uos;
     case RC_DIDDLE: return mod.m_diddle;
     case RC_ECHO: return c->echo;
     case RC_AFC: return c->afc;
@@ -312,7 +329,7 @@ extern "C" void rttycore_tx_begin(RTTYCore* c, int tune) {
         c->mod->SetSpaceFreq(c->dem->GetSpaceFreq());
     }
     c->mod->ClearTXBuf();
-    c->rtty.ClearTX();
+    c->rtty().ClearTX();
     c->mod->SetBaudRate(c->dem->GetBaudRate());
     c->mod->m_Amp.Reset();
     c->mod->m_AmpVal = 1;
@@ -345,7 +362,7 @@ extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
         if (u >= 'a' && u <= 'z') u = u - 'a' + 'A';
         if (!(u == '\r' || u == '\n' || (u >= 0x20 && u < 0x7F))) continue;
         char one[2] = { char(u), 0 };
-        int n = c->rtty.ConvRTTY(codes, one);
+        int n = c->rtty().ConvRTTY(codes, one);
         for (int i = 0; i < n; i++) c->mod->PutData(codes[i]);
     }
     return used;
