@@ -1,4 +1,5 @@
 //Copyright+LGPL
+// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba
@@ -20,10 +21,9 @@
 //---------------------------------------------------------------------------
 #ifndef firH
 #define firH
-#include <inifiles.hpp>
 
 //---------------------------------------------------------------------------
-#include "ComLib.h"
+#include "MMTTYCompat.h"
 #define	TAPMAX	512
 
 #define	PI	3.1415926535897932384626433832795
@@ -51,9 +51,6 @@ typedef struct {
 void MakeFilter(double *HP, int tap, int type, double fs, double fcl, double fch, double att, double gain);
 void MakeFilter(double *HP, FIR *fp);
 void __fastcall MakeHilbert(double *H, int N, double fs, double fc1, double fc2);
-void DrawGraph(Graphics::TBitmap *pBitmap, const double *H, int Tap, int Over, int &nmax, int init, TColor col);
-void DrawGraphIIR(Graphics::TBitmap *pBitmap, double a0, double a1, double a2, double b1, double b2, int Over, int &nmax, int init, TColor col);
-void DrawGraph2(Graphics::TBitmap *pBitmap, const double *H1, int Tap1, const double *H2, int Tap2, int Over, int &nmax, int init, TColor col);
 
 double __fastcall DoFIR(double *hp, double *zp, double d, int tap);
 
@@ -145,6 +142,7 @@ public:
 	CLMS();
 	~CLMS();
 
+	void Clear(void);
 	void Copy(CLMS &other);
 	double Do(double d);
 	void SetWindow(double mfq, double sfq);
@@ -316,6 +314,5 @@ public:
 };
 #endif
 
-void DrawGraphIIR(Graphics::TBitmap *pBitmap, CIIR *ip, int Over, int &nmax, int init, TColor col);
 #endif
 

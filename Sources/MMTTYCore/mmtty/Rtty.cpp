@@ -1,4 +1,5 @@
 //Copyright+LGPL
+// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba
@@ -18,8 +19,7 @@
 
 
 //---------------------------------------------------------------------------
-#include <vcl.h>
-#pragma hdrstop
+#include "MMTTYCompat.h"
 
 #include "Rtty.h"
 
@@ -105,7 +105,7 @@ CVCO::CVCO()
 
 CVCO::~CVCO()
 {
-	if( m_vlock ) ::VirtualUnlock(pSinTbl, sizeof(double)*m_TableSize);
+	/* if( m_vlock ) ::VirtualUnlock(...) – na macOS nepotřebné */
 	delete[] pSinTbl;
 }
 
@@ -117,7 +117,7 @@ void CVCO::SetGain(double gain)
 void CVCO::VirtualLock(void)
 {
 	if( !m_vlock ){
-		::VirtualLock(pSinTbl, sizeof(double)*m_TableSize);
+		/* ::VirtualLock – na macOS nepotřebné */
 		m_vlock = 1;
 	}
 }
@@ -128,12 +128,12 @@ void CVCO::SetSampleFreq(double f)
 	int size = int(m_SampleFreq*2);
 	if( m_TableSize != size ){
 		if( pSinTbl != NULL ){
-			if( m_vlock ) ::VirtualUnlock(pSinTbl, sizeof(double)*m_TableSize);
+			/* if( m_vlock ) ::VirtualUnlock(...) – na macOS nepotřebné */
 			delete[] pSinTbl;
 		}
 		m_TableSize = size;
 		pSinTbl = new double[m_TableSize];
-		if( m_vlock ) ::VirtualLock(pSinTbl, sizeof(double)*m_TableSize);
+		/* if( m_vlock ) ::VirtualLock(...) – na macOS nepotřebné */
 		double pi2t = 2 * PI / double(m_TableSize);
 		for( int i = 0; i < m_TableSize; i++ ){
 			pSinTbl[i] = sin(double(i) * pi2t);
@@ -727,6 +727,15 @@ void CFSKDEM::SetSmoozFreq(double f)
 	m_SmoozFreq = f;
 	m_Smooz = int(DemSamp / f + 0.5);
 
+	avgMark.SetCount(m_Smooz);
+	avgSpace.SetCount(m_Smooz);
+}
+
+void CFSKDEM::SetSmoozCount(int n)
+{
+	if( n < 1 ) n = 1;
+	m_Smooz = n;
+	m_SmoozFreq = DemSamp / double(n);
 	avgMark.SetCount(m_Smooz);
 	avgSpace.SetCount(m_Smooz);
 }
@@ -1744,7 +1753,7 @@ void CSamplePeak::Sync(int Delay)
 {
 	m_Count = m_ReCount - Delay;
 	while( m_Count < 0 ) m_Count += m_ReCount;
-	memcpy(Strage, &Strage[1], sizeof(double)*m_Strage);
+	memmove(Strage, &Strage[1], sizeof(double)*m_Strage);
 	Strage[m_Strage] = m_CurPeak;
 	m_Peak = 0.0;
 	int i;
@@ -1884,8 +1893,8 @@ double CATC::Do(double d)
 		if( m_CurLow > (ATCC-ATCW) ) m_CurLow = (ATCC-ATCW);
 		if( m_CurHigh < (ATCC+ATCW) ) m_CurHigh = (ATCC+ATCW);
 		if( m_Max ){
-			memcpy(m_LowList, &m_LowList[1], (m_Max)*sizeof(double));
-			memcpy(m_HighList, &m_HighList[1], (m_Max)*sizeof(double));
+			memmove(m_LowList, &m_LowList[1], (m_Max)*sizeof(double));
+			memmove(m_HighList, &m_HighList[1], (m_Max)*sizeof(double));
 		}
 		m_LowList[m_Max] = m_CurLow;
 		m_HighList[m_Max] = m_CurHigh;

@@ -1,4 +1,5 @@
 //Copyright+LGPL
+// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba
@@ -18,8 +19,7 @@
 
 
 //---------------------------------------------------------------------------
-#include <vcl.h>
-#pragma hdrstop
+#include "MMTTYCompat.h"
 
 #include "math.h"
 #include "CLX.h"
@@ -79,4 +79,3 @@ CLX operator/(const double R, const CLX &ref)
 	a/=ref;
 	return a;
 }
-#pragma package(smart_init)

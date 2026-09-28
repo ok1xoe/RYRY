@@ -1,4 +1,5 @@
 //Copyright+LGPL
+// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba
@@ -17,12 +18,11 @@
 
 
 
-#include <vcl.h>
-#pragma hdrstop
+#include "MMTTYCompat.h"
 
 #include <math.h>
-#include "fft.h"
-#include "ComLib.h"
+#include "Fft.h"
+#include "MMTTYCompat.h"
 
 #define	PI	3.1415926535897932384626433832795
 #define PI2 (2*PI)

@@ -10,6 +10,16 @@ let package = Package(
     targets: [
         .target(name: "WaveFile"),
         .testTarget(name: "WaveFileTests", dependencies: ["WaveFile"]),
+        .target(
+            name: "MMTTYCore",
+            path: "Sources/MMTTYCore",
+            cxxSettings: [
+                .headerSearchPath("mmtty"),
+                .headerSearchPath("compat"),
+                .unsafeFlags(["-Wno-deprecated-declarations", "-Wno-writable-strings",
+                              "-Wno-parentheses", "-Wno-dangling-else", "-Wno-unused-variable"]),
+            ]
+        ),
         .target(name: "RTTYSignalKit"),
         .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],

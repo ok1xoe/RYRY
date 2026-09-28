@@ -1,4 +1,5 @@
 //Copyright+LGPL
+// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba
@@ -21,7 +22,8 @@
 #ifndef RttyH
 #define RttyH
 //---------------------------------------------------------------------------
-#include "Fir.h"
+#include "MMTTYCompat.h"
+#include "fir.h"
 #include "CLX.h"
 
 #define	VERFFTDEM	1		// CPhaseX Version
@@ -32,7 +34,6 @@
 #define	FSKDEBUG	0		// FSKのデバッグモード
 
 #ifndef SampFreq
-extern	double	SampFreq;
 #endif
 
 //---------------------------------------------------------------------------
@@ -118,7 +119,7 @@ public:
     void __fastcall Reset(void);
     double __fastcall Do(int d);
 
-    inline __fastcall IsMax(void){return m_Cnt >= m_Max;};
+    inline int __fastcall IsMax(void){return m_Cnt >= m_Max;};
 };
 
 //---------------------------------------------------------------------------
@@ -881,12 +882,12 @@ public:
 	inline void SetDem(CFSKDEM *p){pDem = p;};
 };
 
-#pragma option -a-	// パックの指示
+#pragma pack(push, 1)	// パックの指示
 typedef struct {
 	BYTE	Code;
 	BYTE	Fig;
 }BCODETBL;
-#pragma option -a.	// パック解除の指示
+#pragma pack(pop)	// パック解除の指示
 
 class CRTTY
 {

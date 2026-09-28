@@ -1,4 +1,5 @@
 //Copyright+LGPL
+// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba
@@ -18,8 +19,7 @@
 
 
 //---------------------------------------------------------------------------
-#include <vcl.h>
-#pragma hdrstop
+#include "MMTTYCompat.h"
 
 #include <math.h>
 #include "fir.h"
@@ -28,7 +28,7 @@
 // ＦＩＲフィルタのたたき込み演算
 double __fastcall DoFIR(double *hp, double *zp, double d, int tap)
 {
-	memcpy(zp, &zp[1], sizeof(double)*tap);
+	memmove(zp, &zp[1], sizeof(double)*tap);
 	zp[tap] = d;
 	d = 0.0;
 	for( int i = 0; i <= tap; i++, hp++, zp++ ){
@@ -105,6 +105,14 @@ CLMS::~CLMS()
 	delete[] D;
 	delete[] H;
 	delete[] Z;
+}
+
+void CLMS::Clear()
+{
+	memset(Z, 0, sizeof(double[TAPMAX+1]));
+	memset(H, 0, sizeof(double[TAPMAX+1]));
+	memset(D, 0, sizeof(double[DELAYMAX+1]));
+	m_lmsErr = m_lmsMErr = 0;
 }
 
 void CLMS::Copy(CLMS &other)
@@ -200,13 +208,13 @@ double CLMS::Do(double d)
 	if( m_Type ){
 		if( !m_NotchTap ) return d;	// スルーの時
 		// ノッチフィルタ
-		memcpy(Z, &Z[1], sizeof(double)*m_NotchTap);
+		memmove(Z, &Z[1], sizeof(double)*m_NotchTap);
 		Z[m_NotchTap] = d;
 		for( i = 0; i <= m_NotchTap; i++, zp++, hp++ ){
 			a += (*zp) * (*hp);
 		}
 		if( m_lmsNotch2 && m_twoNotch ){
-			memcpy(D, &D[1], sizeof(double)*m_NotchTap);
+			memmove(D, &D[1], sizeof(double)*m_NotchTap);
 			D[m_NotchTap] = a;
 			zp = D;
 			hp = HBPF;
@@ -220,7 +228,7 @@ double CLMS::Do(double d)
 	else {
 		if( !m_Tap ) return d;	// スルーの時
 		// トランスバーサルフィルタ
-		memcpy(Z, &Z[1], sizeof(double)*m_Tap);
+		memmove(Z, &Z[1], sizeof(double)*m_Tap);
 		Z[m_Tap] = D[0];
 		for( i = 0; i <= m_Tap; i++, zp++, hp++ ){
 			a += (*zp) * (*hp);
@@ -231,7 +239,7 @@ double CLMS::Do(double d)
 	m_lmsMErr = m_lmsErr * m_lmsMU2 * m_lmsADJSC;	// lmsADJSC = 1/(32768 * 32768) スケーリング調整値
 
 	// 遅延器の移動
-	if( m_lmsDelay ) memcpy(D, &D[1], sizeof(double)*m_lmsDelay);
+	if( m_lmsDelay ) memmove(D, &D[1], sizeof(double)*m_lmsDelay);
 	D[m_lmsDelay] = d;
 
 	// 係数更新
@@ -267,8 +275,8 @@ CDECM2::CDECM2()
 
 double CDECM2::Do(double d1, double d2)
 {
-	memcpy(Z1, &Z1[1], sizeof(double)*18);
-	memcpy(Z2, &Z2[1], sizeof(double)*17);
+	memmove(Z1, &Z1[1], sizeof(double)*18);
+	memmove(Z2, &Z2[1], sizeof(double)*17);
 	Z1[18] = d1;
 	Z2[17] = d2;
 
@@ -326,8 +334,8 @@ CDECM2H::CDECM2H()
 
 double CDECM2H::Do(double d1, double d2)
 {
-	memcpy(Z1, &Z1[1], sizeof(double)*32);
-	memcpy(Z2, &Z2[1], sizeof(double)*31);
+	memmove(Z1, &Z1[1], sizeof(double)*32);
+	memmove(Z2, &Z2[1], sizeof(double)*31);
 	Z1[32] = d1;
 	Z2[31] = d2;
 
@@ -412,7 +420,7 @@ CINTP2::CINTP2()
 
 void CINTP2::Do(double &d1, double &d2, double d)
 {
-	memcpy(Z, &Z[1], sizeof(double)*18);
+	memmove(Z, &Z[1], sizeof(double)*18);
 	Z[18] = d;
 
 	d1 = Z[0] * H[36];
@@ -467,9 +475,9 @@ CDECM3::CDECM3()
 
 double CDECM3::Do(double d1, double d2, double d3)
 {
-	memcpy(Z1, &Z1[1], sizeof(double)*16);
-	memcpy(Z2, &Z2[1], sizeof(double)*15);
-	memcpy(Z3, &Z3[1], sizeof(double)*15);
+	memmove(Z1, &Z1[1], sizeof(double)*16);
+	memmove(Z2, &Z2[1], sizeof(double)*15);
+	memmove(Z3, &Z3[1], sizeof(double)*15);
 	Z1[16] = d1;
 	Z2[15] = d2;
 	Z3[15] = d3;
@@ -538,7 +546,7 @@ CINTP3::CINTP3()
 
 void CINTP3::Do(double &d1, double &d2, double &d3, double d)
 {
-	memcpy(Z, &Z[1], sizeof(double)*16);
+	memmove(Z, &Z[1], sizeof(double)*16);
 	Z[16] = d;
 
 	d1 = Z[0] * H[48];
@@ -773,633 +781,7 @@ void __fastcall MakeHilbert(double *H, int N, double fs, double fc1, double fc2)
 //
 //	H(ejωT) = [Σ0]Hm cos(mωT) - j[Σ1]Hm sin(mωT)
 //
-void DrawGraph(Graphics::TBitmap *pBitmap, const double *H, int Tap, int Over, int &nmax, int init, TColor col)
-{
-	int		k, x, y;
-	double	f, gdb, g, pi2t, fs;
-	double	max;
-	char	bf[80];
-
-	TCanvas *tp = pBitmap->Canvas;
-	TRect rc;
-	rc.Left = 0;
-	rc.Right = pBitmap->Width;
-	rc.Top = 0;
-	rc.Bottom = pBitmap->Height;
-	if( init ){
-		tp->Brush->Color = clWhite;
-		tp->FillRect(rc);
-	}
-	int	LM;		// 周波数表示のあるライン数
-	int DM;		// 内部線の数
-	int MM;		// 実線の間隔
-	switch(Over){
-		case 2:
-			max = 3000;
-			fs = SampFreq/2.0;
-			break;
-		case 3:
-			max = 2000;
-			fs = SampFreq/3.0;
-			break;
-		default:
-			max = 4000;
-			fs = SampFreq;
-			break;
-	}
-	if( nmax ){
-		max = nmax;
-	}
-	else {
-		nmax = max;
-	}
-	switch(nmax){
-		case 3000:
-			LM = 3;
-			DM = 14;
-			MM = 5;
-			break;
-		case 100:
-		case 200:
-		case 2000:
-			LM = 4;
-			DM = 19;
-			MM = 5;
-			break;
-		case 400:
-		case 800:
-		case 4000:
-			LM = 4;
-			DM = 19;
-			MM = 5;
-			break;
-		default:		// 6000
-			LM = 3;
-			DM = 11;
-			MM = 4;
-			break;
-	}
-	int XL = 32;
-	int XR = pBitmap->Width - 16;
-	int YT = 16;
-	int YB = pBitmap->Height - 24;
-
-	int i;
-	if( init ){
-		tp->Pen->Color = clBlack;
-		tp->Font->Size = 8;
-		tp->MoveTo(XL, YT); tp->LineTo(XR, YT); tp->LineTo(XR, YB); tp->LineTo(XL, YB); tp->LineTo(XL, YT);
-		tp->Pen->Color = clGray;
-		for( i = 0; i < 7; i++ ){
-			tp->Pen->Style = (i & 1) ? psSolid : psDot;
-			y = (int)(double(i + 1) * double(YB - YT)/8.0 + YT);
-			tp->MoveTo(XL, y); tp->LineTo(XR, y);
-		}
-		for( i = 1; i < 5; i++ ){
-			y = (int)(double(i) * double(YB - YT)/4.0 + YT);
-			sprintf( bf, "-%2u", (80 / 4)*i );
-			::SetBkMode(tp->Handle, TRANSPARENT);
-			tp->TextOut(XL - 6 - tp->TextWidth(bf), y - (tp->TextHeight(bf)/2), bf);
-		}
-		strcpy(bf, "dB");
-		tp->TextOut(XL - 6 - tp->TextWidth(bf), YT-(tp->TextHeight(bf)/2), bf);
-		for( i = 1; i <= DM; i++ ){
-			tp->Pen->Style = (i % MM) ? psDot : psSolid;
-			x = (int)(double(i) * double(XR - XL)/double(DM+1) + XL);
-			tp->MoveTo(x, YT); tp->LineTo(x, YB);
-		}
-		for( i = 0; i <= LM; i++ ){
-			x = (int)(double(i) * double(XR - XL)/double(LM) + XL);
-			sprintf(bf, "%4.0lf", (max*i)/LM);
-			::SetBkMode(tp->Handle, TRANSPARENT);
-			tp->TextOut(x - (tp->TextWidth(bf)/2), YB + 6, bf);
-		}
-		tp->Pen->Color = clRed;
-		tp->Pen->Style = psDot;
-		x = (int)(XL + (fs/2) * (double(XR-XL)/max));
-		tp->MoveTo(x, YT); tp->LineTo(x, YB);
-
-		tp->Pen->Color = clBlue;
-		tp->Pen->Style = psSolid;
-	}
-	int ay = 0;
-	double ra, im;
-	pi2t = 2.0 * PI / fs;
-	tp->Pen->Color = col;
-	for( x = XL, f = 0.0; x < XR; x++, f += (max/double(XR-XL)) ){
-		if( Tap ){
-			ra = im = 0.0;
-			for( k = 0; k <= Tap; k++ ){
-				ra += H[k] * cos(pi2t*f*k);
-				if( k ) im -= H[k] * sin(pi2t*f*k);
-			}
-			if( ra * im ){
-				g = sqrt(ra * ra + im * im);
-			}
-			else {
-				g = 0.0;
-			}
-		}
-		else {
-			g = 1.0;
-		}
-		if( g == 0 ) g = 1.0e-38;
-		gdb = 20*0.4342944*log(fabs(g)) + 80.0;
-		if( gdb < 0.0 ) gdb = 0.0;
-		gdb = (gdb * double(YB-YT))/80.0;
-		y = YB - (int)gdb;
-		if( x == XL ){
-			tp->MoveTo(x, y);
-			tp->LineTo(x, y);
-		}
-		else {
-			tp->MoveTo(x-1, ay);
-			tp->LineTo(x, y);
-		}
-		ay = y;
-	}
-}
-
-void DrawGraph2(Graphics::TBitmap *pBitmap, const double *H1, int Tap1, const double *H2, int Tap2, int Over, int &nmax, int init, TColor col)
-{
-	int		k, x, y;
-	double	f, gdb, g, pi2t, fs;
-	double	max;
-	char	bf[80];
-
-	TCanvas *tp = pBitmap->Canvas;
-	TRect rc;
-	rc.Left = 0;
-	rc.Right = pBitmap->Width;
-	rc.Top = 0;
-	rc.Bottom = pBitmap->Height;
-	if( init ){
-		tp->Brush->Color = clWhite;
-		tp->FillRect(rc);
-	}
-	int	LM;		// 周波数表示のあるライン数
-	int DM;		// 内部線の数
-	int MM;		// 実線の間隔
-	switch(Over){
-		case 2:
-			max = 3000;
-			fs = SampFreq/2.0;
-			break;
-		case 3:
-			max = 2000;
-			fs = SampFreq/3.0;
-			break;
-		default:
-			max = 4000;
-			fs = SampFreq;
-			break;
-	}
-	if( nmax ){
-		max = nmax;
-	}
-	else {
-		nmax = max;
-	}
-	switch(nmax){
-		case 3000:
-			LM = 3;
-			DM = 14;
-			MM = 5;
-			break;
-		case 100:
-		case 200:
-		case 2000:
-			LM = 4;
-			DM = 19;
-			MM = 5;
-			break;
-		case 400:
-		case 800:
-		case 4000:
-			LM = 4;
-			DM = 19;
-			MM = 5;
-			break;
-		default:		// 6000
-			LM = 3;
-			DM = 11;
-			MM = 4;
-			break;
-	}
-	int XL = 32;
-	int XR = pBitmap->Width - 16;
-	int YT = 16;
-	int YB = pBitmap->Height - 24;
-
-	int i;
-	if( init ){
-		tp->Pen->Color = clBlack;
-		tp->Font->Size = 8;
-		tp->MoveTo(XL, YT); tp->LineTo(XR, YT); tp->LineTo(XR, YB); tp->LineTo(XL, YB); tp->LineTo(XL, YT);
-		tp->Pen->Color = clGray;
-		for( i = 0; i < 7; i++ ){
-			tp->Pen->Style = (i & 1) ? psSolid : psDot;
-			y = (int)(double(i + 1) * double(YB - YT)/8.0 + YT);
-			tp->MoveTo(XL, y); tp->LineTo(XR, y);
-		}
-		for( i = 1; i < 5; i++ ){
-			y = (int)(double(i) * double(YB - YT)/4.0 + YT);
-			sprintf( bf, "-%2u", (80 / 4)*i );
-			::SetBkMode(tp->Handle, TRANSPARENT);
-			tp->TextOut(XL - 6 - tp->TextWidth(bf), y - (tp->TextHeight(bf)/2), bf);
-		}
-		strcpy(bf, "dB");
-		tp->TextOut(XL - 6 - tp->TextWidth(bf), YT-(tp->TextHeight(bf)/2), bf);
-		for( i = 1; i <= DM; i++ ){
-			tp->Pen->Style = (i % MM) ? psDot : psSolid;
-			x = (int)(double(i) * double(XR - XL)/double(DM+1) + XL);
-			tp->MoveTo(x, YT); tp->LineTo(x, YB);
-		}
-		for( i = 0; i <= LM; i++ ){
-			x = (int)(double(i) * double(XR - XL)/double(LM) + XL);
-			sprintf(bf, "%4.0lf", (max*i)/LM);
-			::SetBkMode(tp->Handle, TRANSPARENT);
-			tp->TextOut(x - (tp->TextWidth(bf)/2), YB + 6, bf);
-		}
-		tp->Pen->Color = clRed;
-		tp->Pen->Style = psDot;
-		x = (int)(XL + (fs/2) * (double(XR-XL)/max));
-		tp->MoveTo(x, YT); tp->LineTo(x, YB);
-
-		tp->Pen->Color = clBlue;
-		tp->Pen->Style = psSolid;
-	}
-	int ay = 0;
-	double ra, im;
-	pi2t = 2.0 * PI / fs;
-	tp->Pen->Color = col;
-	for( x = XL, f = 0.0; x < XR; x++, f += (max/double(XR-XL)) ){
-		if( Tap1 ){
-			ra = im = 0.0;
-			for( k = 0; k <= Tap1; k++ ){
-				ra += H1[k] * cos(pi2t*f*k);
-				if( k ) im -= H1[k] * sin(pi2t*f*k);
-			}
-			if( ra * im ){
-				g = sqrt(ra * ra + im * im);
-			}
-			else {
-				g = 0.0;
-			}
-		}
-		else {
-			g = 1.0;
-		}
-		if( Tap2 ){
-			ra = im = 0.0;
-			for( k = 0; k <= Tap2; k++ ){
-				ra += H2[k] * cos(pi2t*f*k);
-				if( k ) im -= H2[k] * sin(pi2t*f*k);
-			}
-			if( ra * im ){
-				g *= sqrt(ra * ra + im * im);
-			}
-			else {
-				g *= 0.0;
-			}
-		}
-		else {
-			g *= 1.0;
-		}
-		if( g == 0 ) g = 1.0e-38;
-		gdb = 20*0.4342944*log(fabs(g)) + 80.0;
-		if( gdb < 0.0 ) gdb = 0.0;
-		gdb = (gdb * double(YB-YT))/80.0;
-		y = YB - (int)gdb;
-		if( x == XL ){
-			tp->MoveTo(x, y);
-			tp->LineTo(x, y);
-		}
-		else {
-			tp->MoveTo(x-1, ay);
-			tp->LineTo(x, y);
-		}
-		ay = y;
-	}
-}
-
-//---------------------------------------------------------------------
-// 周波数特性グラフ（フィルタスレッド内でコールしてはいけない）
-//
-//
-void DrawGraphIIR(Graphics::TBitmap *pBitmap, double a0, double a1, double a2, double b1, double b2, int Over, int &nmax, int init, TColor col)
-{
-	int		x, y;
-	double	f, gdb, g, pi2t, pi4t, fs;
-	double	max;
-	char	bf[80];
-
-	TCanvas *tp = pBitmap->Canvas;
-	TRect rc;
-	rc.Left = 0;
-	rc.Right = pBitmap->Width;
-	rc.Top = 0;
-	rc.Bottom = pBitmap->Height;
-	if( init ){
-		tp->Brush->Color = clWhite;
-		tp->FillRect(rc);
-	}
-	int	LM;		// 周波数表示のあるライン数
-	int DM;		// 内部線の数
-	int MM;		// 実線の間隔
-	switch(Over){
-		case 2:
-			max = 3000;
-			fs = SampFreq/2.0;
-			break;
-		case 3:
-			max = 2000;
-			fs = SampFreq/3.0;
-			break;
-		default:
-			max = 4000;
-			fs = SampFreq;
-			break;
-	}
-	if( nmax ){
-		max = nmax;
-	}
-	else {
-		nmax = max;
-	}
-	switch(nmax){
-		case 3000:
-			LM = 3;
-			DM = 14;
-			MM = 5;
-			break;
-		case 100:
-		case 200:
-		case 2000:
-			LM = 4;
-			DM = 19;
-			MM = 5;
-			break;
-		case 400:
-		case 800:
-		case 4000:
-			LM = 4;
-			DM = 19;
-			MM = 5;
-			break;
-		default:		// 6000
-			LM = 3;
-			DM = 11;
-			MM = 4;
-			break;
-	}
-	int XL = 32;
-	int XR = pBitmap->Width - 16;
-	int YT = 16;
-	int YB = pBitmap->Height - 24;
-
-	int i;
-	if( init ){
-		tp->Pen->Color = clBlack;
-		tp->Font->Size = 8;
-		tp->MoveTo(XL, YT); tp->LineTo(XR, YT); tp->LineTo(XR, YB); tp->LineTo(XL, YB); tp->LineTo(XL, YT);
-		tp->Pen->Color = clGray;
-		for( i = 0; i < 5; i++ ){
-			tp->Pen->Style = (i & 1) ? psSolid : psDot;
-			y = (int)(double(i + 1) * double(YB - YT)/6.0 + YT);
-			tp->MoveTo(XL, y); tp->LineTo(XR, y);
-		}
-		for( i = 1; i < 4; i++ ){
-			y = (int)(double(i) * double(YB - YT)/3.0 + YT);
-			sprintf( bf, "-%2u", (60 / 3)*i );
-			::SetBkMode(tp->Handle, TRANSPARENT);
-			tp->TextOut(XL - 6 - tp->TextWidth(bf), y - (tp->TextHeight(bf)/2), bf);
-		}
-		strcpy(bf, "dB");
-		tp->TextOut(XL - 6 - tp->TextWidth(bf), YT-(tp->TextHeight(bf)/2), bf);
-		for( i = 1; i <= DM; i++ ){
-			tp->Pen->Style = (i % MM) ? psDot : psSolid;
-			x = (int)(double(i) * double(XR - XL)/double(DM+1) + XL);
-			tp->MoveTo(x, YT); tp->LineTo(x, YB);
-		}
-		for( i = 0; i <= LM; i++ ){
-			x = (int)(double(i) * double(XR - XL)/double(LM) + XL);
-			sprintf(bf, "%4.0lf", (max*i)/LM);
-			::SetBkMode(tp->Handle, TRANSPARENT);
-			tp->TextOut(x - (tp->TextWidth(bf)/2), YB + 6, bf);
-		}
-		tp->Pen->Color = clRed;
-		tp->Pen->Style = psDot;
-		x = (int)(XL + (fs/2) * (double(XR-XL)/max));
-		tp->MoveTo(x, YT); tp->LineTo(x, YB);
-
-		tp->Pen->Color = clBlue;
-		tp->Pen->Style = psSolid;
-	}
-	int ay = 0;
-	pi2t = 2.0 * PI / fs;
-	pi4t = 2.0 * pi2t;
-	tp->Pen->Color = col;
-	double	A, B, C, D, P, R;
-	double	cosw, sinw, cos2w, sin2w;
-	for( x = XL, f = 0.0; x < XR; x++, f += (max/double(XR-XL)) ){
-		cosw = cos(pi2t*f);
-		sinw = sin(pi2t*f);
-		cos2w = cos(pi4t*f);
-		sin2w = sin(pi4t*f);
-		A = a0 + a1 * cosw + a2 * cos2w;
-		B = 1 + b1 * cosw + b2 * cos2w;
-		C = a1 * sinw + a2 * sin2w;
-		D = b1 * sinw + b2 * sin2w;
-		P = A*A + C*C;
-		R = B*B + D*D;
-		g = sqrt(P/R);
-		if( g == 0 ) g = 1.0e-38;
-		gdb = 20*0.4342944*log(fabs(g)) + 60.0;
-		if( gdb < 0.0 ) gdb = 0.0;
-		gdb = (gdb * double(YB-YT))/60.0;
-		y = YB - (int)gdb;
-		if( x == XL ){
-			tp->MoveTo(x, y);
-			tp->LineTo(x, y);
-		}
-		else {
-			tp->MoveTo(x-1, ay);
-			tp->LineTo(x, y);
-		}
-		ay = y;
-	}
-}
-
-//---------------------------------------------------------------------
-// 周波数特性グラフ（フィルタスレッド内でコールしてはいけない）
-//
-//
-void DrawGraphIIR(Graphics::TBitmap *pBitmap, CIIR *ip, int Over, int &nmax, int init, TColor col)
-{
-	int		x, y;
-	double	f, gdb, g, pi2t, pi4t, fs;
-	double	max;
-	char	bf[80];
-
-	TCanvas *tp = pBitmap->Canvas;
-	TRect rc;
-	rc.Left = 0;
-	rc.Right = pBitmap->Width;
-	rc.Top = 0;
-	rc.Bottom = pBitmap->Height;
-	if( init ){
-		tp->Brush->Color = clWhite;
-		tp->FillRect(rc);
-	}
-	int	LM;		// 周波数表示のあるライン数
-	int DM;		// 内部線の数
-	int MM;		// 実線の間隔
-	switch(Over){
-		case 2:
-			max = 3000;
-			fs = SampFreq/2.0;
-			break;
-		case 3:
-			max = 2000;
-			fs = SampFreq/3.0;
-			break;
-		default:
-			max = 4000;
-			fs = SampFreq;
-			break;
-	}
-	if( nmax ){
-		max = nmax;
-	}
-	else {
-		nmax = max;
-	}
-	switch(nmax){
-		case 3000:
-			LM = 3;
-			DM = 14;
-			MM = 5;
-			break;
-		case 100:
-		case 200:
-		case 2000:
-			LM = 4;
-			DM = 19;
-			MM = 5;
-			break;
-		case 400:
-		case 800:
-		case 4000:
-			LM = 4;
-			DM = 19;
-			MM = 5;
-			break;
-		default:		// 6000
-			LM = 3;
-			DM = 11;
-			MM = 4;
-			break;
-	}
-	int XL = 32;
-	int XR = pBitmap->Width - 16;
-	int YT = 16;
-	int YB = pBitmap->Height - 24;
-
-	int i;
-	if( init ){
-		tp->Pen->Color = clBlack;
-		tp->Font->Size = 8;
-		tp->MoveTo(XL, YT); tp->LineTo(XR, YT); tp->LineTo(XR, YB); tp->LineTo(XL, YB); tp->LineTo(XL, YT);
-		tp->Pen->Color = clGray;
-		for( i = 0; i < 5; i++ ){
-			tp->Pen->Style = (i & 1) ? psSolid : psDot;
-			y = (int)(double(i + 1) * double(YB - YT)/6.0 + YT);
-			tp->MoveTo(XL, y); tp->LineTo(XR, y);
-		}
-		for( i = 1; i < 4; i++ ){
-			y = (int)(double(i) * double(YB - YT)/3.0 + YT);
-			sprintf( bf, "-%2u", (60 / 3)*i );
-			::SetBkMode(tp->Handle, TRANSPARENT);
-			tp->TextOut(XL - 6 - tp->TextWidth(bf), y - (tp->TextHeight(bf)/2), bf);
-		}
-		strcpy(bf, "dB");
-		tp->TextOut(XL - 6 - tp->TextWidth(bf), YT-(tp->TextHeight(bf)/2), bf);
-		for( i = 1; i <= DM; i++ ){
-			tp->Pen->Style = (i % MM) ? psDot : psSolid;
-			x = (int)(double(i) * double(XR - XL)/double(DM+1) + XL);
-			tp->MoveTo(x, YT); tp->LineTo(x, YB);
-		}
-		for( i = 0; i <= LM; i++ ){
-			x = (int)(double(i) * double(XR - XL)/double(LM) + XL);
-			sprintf(bf, "%4.0lf", (max*i)/LM);
-			::SetBkMode(tp->Handle, TRANSPARENT);
-			tp->TextOut(x - (tp->TextWidth(bf)/2), YB + 6, bf);
-		}
-		tp->Pen->Color = clRed;
-		tp->Pen->Style = psDot;
-		x = (int)(XL + (fs/2) * (double(XR-XL)/max));
-		tp->MoveTo(x, YT); tp->LineTo(x, YB);
-
-		tp->Pen->Color = clBlue;
-		tp->Pen->Style = psSolid;
-	}
-	int ay = 0;
-	pi2t = 2.0 * PI / fs;
-	pi4t = 2.0 * pi2t;
-	tp->Pen->Color = col;
-	double	A, B, C, D, P, R;
-	double	cosw, sinw, cos2w, sin2w;
-	for( x = XL, f = 0.0; x < XR; x++, f += (max/double(XR-XL)) ){
-		cosw = cos(pi2t*f);
-		sinw = sin(pi2t*f);
-		cos2w = cos(pi4t*f);
-		sin2w = sin(pi4t*f);
-		g = 1.0;
-		double *ap = ip->A;
-		double *bp = ip->B;
-		for( i = 0; i < ip->m_order/2; i++, ap += 3, bp += 2 ){
-/*
-		A = a0 + a1 * cosw + a2 * cos2w;
-		B = 1 + b1 * cosw + b2 * cos2w;
-		C = a1 * sinw + a2 * sin2w;
-		D = b1 * sinw + b2 * sin2w;
-*/
-			A = bp[0] + bp[1] * cosw + bp[0] * cos2w;
-			B = 1 + -ap[1] * cosw + -ap[2] * cos2w;
-			C = bp[1] * sinw + bp[0] * sin2w;
-			D = -ap[1] * sinw + -ap[2] * sin2w;
-			P = A*A + C*C;
-			R = B*B + D*D;
-			g *= sqrt(P/R);
-		}
-		if( ip->m_order & 1 ){
-			A = bp[0] + bp[1] * cosw;
-			B = 1 + -ap[1] * cosw;
-			C = bp[1] * sinw;
-			D = -ap[1] * sinw;
-			P = A*A + C*C;
-			R = B*B + D*D;
-			g *= sqrt(P/R);
-		}
-		if( g == 0 ) g = 1.0e-38;
-		gdb = 20*0.4342944*log(fabs(g)) + 60.0;
-		if( gdb < 0.0 ) gdb = 0.0;
-		gdb = (gdb * double(YB-YT))/60.0;
-		y = YB - (int)gdb;
-		if( x == XL ){
-			tp->MoveTo(x, y);
-			tp->LineTo(x, y);
-		}
-		else {
-			tp->MoveTo(x-1, ay);
-			tp->LineTo(x, y);
-		}
-		ay = y;
-	}
-}
-
-double asinh(double x)
+static double mm_asinh(double x)
 {
 	return log(x + sqrt(x*x+1.0));
 }
@@ -1413,7 +795,7 @@ void MakeIIR(double *A, double *B, double fc, double fs, int order, int bc, doub
 	int		j, n;
 
 	if( bc ){		// チェビシフ
-		u = 1.0/double(order)*asinh(1.0/sqrt(pow(10.0,0.1*rp)-1.0));
+		u = 1.0/double(order)*mm_asinh(1.0/sqrt(pow(10.0,0.1*rp)-1.0));
 	}
 	wa = tan(PI*fc/fs);
 	w0 = 1.0;
@@ -1577,7 +959,7 @@ CINTPXY2FIR::CINTPXY2FIR()
 
 void CINTPXY2FIR::Do(double *dp, double d)
 {
-	memcpy(Z, &Z[1], sizeof(double)*16);
+	memmove(Z, &Z[1], sizeof(double)*16);
 	Z[16] = d;
 
 	dp[0] = Z[0] * H[32];
@@ -1627,7 +1009,7 @@ CINTPXY4FIR::CINTPXY4FIR()
 
 void __fastcall CINTPXY4FIR::Do(double *dp, double d)
 {
-	memcpy(Z, &Z[1], sizeof(double)*16);
+	memmove(Z, &Z[1], sizeof(double)*16);
 	Z[16] = d;
 
 	dp[0] = Z[0] * H[64];
@@ -1708,7 +1090,7 @@ CINTPXY8FIR::CINTPXY8FIR()
 
 void __fastcall CINTPXY8FIR::Do(double *dp, double d)
 {
-	memcpy(Z, &Z[1], sizeof(double)*12);
+	memmove(Z, &Z[1], sizeof(double)*12);
 	Z[12] = d;
 
 	dp[0] = Z[0] * H[96];
@@ -1838,10 +1220,10 @@ CDECM4::CDECM4()
 
 double __fastcall CDECM4::Do(double *dp)
 {
-	memcpy(Z1, &Z1[1], sizeof(double)*20);
-	memcpy(Z2, &Z2[1], sizeof(double)*19);
-	memcpy(Z3, &Z3[1], sizeof(double)*19);
-	memcpy(Z4, &Z4[1], sizeof(double)*19);
+	memmove(Z1, &Z1[1], sizeof(double)*20);
+	memmove(Z2, &Z2[1], sizeof(double)*19);
+	memmove(Z3, &Z3[1], sizeof(double)*19);
+	memmove(Z4, &Z4[1], sizeof(double)*19);
 #if 1
 	Z4[19] = *dp++;
 	Z3[19] = *dp++;
@@ -1949,7 +1331,7 @@ CINTP4::CINTP4()
 
 void __fastcall CINTP4::Do(double *dp, double d)
 {
-	memcpy(Z, &Z[1], sizeof(double)*20);
+	memmove(Z, &Z[1], sizeof(double)*20);
 	Z[20] = d;
 
 	dp[0] = Z[0] * H[80];
