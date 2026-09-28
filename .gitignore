@@ -1,0 +1,12 @@
+# Referenční zdrojáky (samostatné git repozitáře)
+/mmtty/
+/mmsstv/
+/mmvari/
+/mmtty-ji1uui/
+
+.remember/
+.DS_Store
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
