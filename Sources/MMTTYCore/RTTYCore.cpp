@@ -370,12 +370,12 @@ extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
         unsigned char u = (unsigned char)*p;
         used++;
         if (u >= 'a' && u <= 'z') u = u - 'a' + 'A';
-        if (!(u == '\r' || u == '\n' || (u >= 0x20 && u < 0x7F))) continue;
+        if (!(u == '\r' || u == '\n' || u == 0x1B || u == 0x1F || (u >= 0x20 && u < 0x7F))) continue;
         // Řídicí znaky MMTTY (_ ~ [ ]) jen přes rttycore_queue_tx_raw.
         if (u == '_' || u == '~' || u == '[' || u == ']') continue;
         // Znak bez Baudot kódu (tabulka dává 0x00) nevysílat – zkouška na kopii (ConvRTTY mění stav).
         CRTTY probe = c->rtty();
-        if ((probe.ConvRTTY(char(u)) & 0xff) == 0) continue;
+        if (u != 0x1B && u != 0x1F && (probe.ConvRTTY(char(u)) & 0xff) == 0) continue;
         char one[2] = { char(u), 0 };
         int n = c->rtty().ConvRTTY(codes, one);
         for (int i = 0; i < n; i++) c->mod->PutData(codes[i]);

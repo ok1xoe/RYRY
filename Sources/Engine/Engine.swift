@@ -2,6 +2,7 @@
 import AudioIO
 import Foundation
 import Keying
+import MacroEngine
 import ModemKit
 import RigControl
 
@@ -227,6 +228,26 @@ public actor Engine {
     }
 
     public func send(text: String) { modem.queueTx(text: text) }
+
+    public func sendRaw(_ codes: [UInt8]) { modem.queueTxRaw(codes) }
+
+    /// Odešle rozvinuté makro (MMTTY OutputStr): TX, výstupy do fronty, `\` = RX po dovysílání.
+    /// Makro do editoru (`#`/`\` na začátku) se neodesílá – to řeší klient; `\` jen zapne TX.
+    public func sendMacro(_ m: MacroResult) async throws {
+        if m.logQSO { broadcaster.send(.logRequested) }
+        if m.mode == .toEditor {
+            if m.startsTx { try await tx() }
+            return
+        }
+        if state == .rx { try await tx() }
+        for o in m.outputs {
+            switch o {
+            case .text(let t): modem.queueTx(text: t)
+            case .raw(let r): modem.queueTxRaw(r)
+            }
+        }
+        if m.end == .rxAfter { rx() }
+    }
 
     public func clearTx() {
         if state == .tx || state == .drain { modem.abortTx(); modem.beginTx(tune: false) }

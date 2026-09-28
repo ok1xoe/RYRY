@@ -2,6 +2,8 @@ import AudioIO
 import Engine
 import Foundation
 import Keying
+import MacroEngine
+import Settings
 import RigControl
 import ModemKit
 import RTTYModem
@@ -12,6 +14,7 @@ struct Options {
     var baud = 45.45, mark = 2125.0, shift = 170.0, noise: Float = 0, seed: UInt64 = 1
     var demod = "iir", afc = true
     var inUID: String?, outUID: String?, ptt = "none", port: String?, rig = "none", fsk: String?
+    var call = "", his = ""
     var positional: [String] = []
 }
 
@@ -43,6 +46,8 @@ func parse(_ args: ArraySlice<String>) -> Options {
         case "--port": o.port = it.next()
         case "--rig": o.rig = it.next() ?? "none"
         case "--fsk": o.fsk = it.next()
+        case "--call": o.call = it.next() ?? ""
+        case "--his": o.his = it.next() ?? ""
         default:
             if a.hasPrefix("--") { fail("neznámý přepínač \(a)") }
             o.positional.append(a)
@@ -89,10 +94,12 @@ let usage = """
       rtty-tool encode "TEXT" out.wav [--baud B] [--mark F] [--shift S]
       rtty-tool decode in.wav [--baud B] [--mark F] [--shift S] [--demod iir|fir|pll|fft] [--no-afc]
       rtty-tool devices
+      rtty-tool macro "TEMPLATE" [--call MY --his HIS]   náhled makra (MMTTY syntaxe)
       rtty-tool level [--in UID]          úroveň vstupu (5 s)
       rtty-tool live [--in UID] [--out UID] [--ptt none|rts|dtr|rtsDtr|cat] [--port /dev/cu.X]
                      [--rig none|hamlib|flrig] [--fsk uart|soft-dtr|soft-rts|soft-break] [--baud B] [--mark F]
-         stdin: text = odvysílat (TX → text → RX po dovysílání), :tx, :rx, :abort, :tune, :q
+         stdin: text = odvysílat (TX → text → RX po dovysílání), :tx, :rx, :abort, :tune, :q,
+                :c ZNAČKA (protistanice), :m1…:m12 (makra), [--call MOJE]
     """
 
 let argv = CommandLine.arguments
@@ -169,6 +176,14 @@ case "level":
     }
     be.stop()
 
+case "macro":
+    guard o.positional.count == 1 else { fail(usage) }
+    var mc = MacroContext(); mc.myCall = o.call; mc.hisCall = o.his
+    let tpl = o.positional[0].replacingOccurrences(of: "\\r", with: "\r").replacingOccurrences(of: "\\n", with: "\n")
+    let r = MacroEngine.expand(tpl, context: mc)
+    print(r.plainText.replacingOccurrences(of: "\r\n", with: "⏎\n"))
+    print("[konec: \(r.end), režim: \(r.mode)\(r.logQSO ? ", log" : "")]")
+
 case "live":
     let m: RTTYModem
     do { m = try RTTYModem() } catch { fail("\(error)") }
@@ -218,7 +233,16 @@ case "live":
     // Ctrl-C / SIGTERM: vždy bezpečně vypnout PTT a FSK linku
     installStopOnSignals(engine)
     FileHandle.standardError.write(Data("mmtty4mac live – text + Enter = vysílat, :q = konec\n".utf8))
+    let macros = AppSettings.defaultMacros
+    var mctx = MacroContext(); mctx.myCall = o.call.uppercased(); mctx.hisCall = o.his.uppercased()
     while let line = readLine() {
+        if line.hasPrefix(":c ") { mctx.hisCall = String(line.dropFirst(3)).uppercased(); continue }
+        if line.hasPrefix(":m"), let n = Int(line.dropFirst(2)), (1...macros.count).contains(n) {
+            mctx.now = Date()
+            do { try await engine.sendMacro(MacroEngine.expand(macros[n - 1].text, context: mctx)) }
+            catch { print("TX: \(error)") }
+            continue
+        }
         switch line {
         case ":q": break
         case ":tx": do { try await engine.tx() } catch { print("TX: \(error)") }; continue

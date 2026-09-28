@@ -89,7 +89,7 @@ double    rttycore_get_param(const RTTYCore* core, RTTYCoreParam p);
 void   rttycore_tx_begin(RTTYCore* core, int tune);
 /* Vrací počet zpracovaných BAJTŮ vstupu (přijatých i vynechaných); zastaví se,
    když v bufferu není místo aspoň na 3 kódy. Malá písmena → velká. Vynechá: bajty mimo
-   ASCII 0x20..0x7E (kromě CR/LF), znaky bez Baudot kódu (@ # % * + < = > \ ^ ` { | })
+   ASCII 0x20..0x7E (kromě CR/LF a FIGS 0x1B / LTRS 0x1F, které vynutí přepnutí), znaky bez Baudot kódu (@ # % * + < = > \ ^ ` { | })
    a řídicí znaky MMTTY (_ ~ [ ]). Při tune (tx_begin(core,1)) nepřijímá nic. */
 size_t rttycore_queue_tx(RTTYCore* core, const char* text);
 /* Surové kódy do TX bufferu (pořadí bitů MMTTY) včetně řídicích: 0xFF mark 3 bity,

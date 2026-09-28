@@ -38,6 +38,8 @@ public enum EngineEvent: Sendable {
     case rig(RigStatus)
     case error(EngineError)
     case pttTimeout
+    /// Makro obsahovalo %l – klient (GUI/API) má zalogovat aktuální spojení.
+    case logRequested
 }
 
 /// Rozesílá události více odběratelům (každý dostane vlastní AsyncStream).

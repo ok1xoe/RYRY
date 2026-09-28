@@ -38,7 +38,9 @@ public final class RTTYModem: Modem, @unchecked Sendable {
     private let continuation: AsyncStream<ModemEvent>.Continuation
     private var samplesSinceTick = 0
     private let tickInterval: Int
-    private var txQueue: [UInt8] = []          // UTF-8 bajty čekající na místo v jádře
+    /// Fronta čekající na místo v jádře; text a surové kódy ve správném pořadí.
+    private enum TxItem { case text([UInt8]), raw([UInt8]) }
+    private var txItems: [TxItem] = []
     private var txWasActive = false
     private var lastFig = false
     private var lastTuning: TuningInfo
@@ -141,16 +143,39 @@ public final class RTTYModem: Modem, @unchecked Sendable {
     }
 
     public func queueTx(text: String) {
-        txQueue += text.utf8.filter { $0 != 0 }   // NUL by v C řetězci zablokoval frontu
+        let bytes = text.utf8.filter { $0 != 0 }   // NUL by v C řetězci zablokoval frontu
+        if !bytes.isEmpty { txItems.append(.text(bytes)) }
+        feedCore()
+    }
+
+    public func queueTxRaw(_ codes: [UInt8]) {
+        // LTRS/FIGS jdou textovou cestou (jádro si zapamatuje registr, jako MMTTY %L/%F)
+        var run: [UInt8] = []
+        for c in codes {
+            if c == 0x1B || c == 0x1F {
+                if !run.isEmpty { txItems.append(.raw(run)); run = [] }
+                txItems.append(.text([c]))
+            } else { run.append(c) }
+        }
+        if !run.isEmpty { txItems.append(.raw(run)) }
         feedCore()
     }
 
     private func feedCore() {
-        while !txQueue.isEmpty {
-            var chunk = txQueue.prefix(256).map { CChar(bitPattern: $0) } + [0]
-            let used = rttycore_queue_tx(core, &chunk)
-            if used == 0 { break }
-            txQueue.removeFirst(used)
+        while let first = txItems.first {
+            switch first {
+            case .text(let bytes):
+                var chunk = bytes.prefix(256).map { CChar(bitPattern: $0) } + [0]
+                let used = rttycore_queue_tx(core, &chunk)
+                if used == 0 { return }
+                let rest = Array(bytes.dropFirst(used))
+                if rest.isEmpty { txItems.removeFirst() } else { txItems[0] = .text(rest) }
+            case .raw(let codes):
+                let used = codes.withUnsafeBufferPointer { rttycore_queue_tx_raw(core, $0.baseAddress, $0.count) }
+                if used == 0 { return }
+                let rest = Array(codes.dropFirst(used))
+                if rest.isEmpty { txItems.removeFirst() } else { txItems[0] = .raw(rest) }
+            }
         }
     }
 
@@ -166,15 +191,18 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         return .active
     }
 
-    public func stopTx() { txQueue.removeAll(); rttycore_tx_stop(core) }
+    public func stopTx() { txItems.removeAll(); rttycore_tx_stop(core) }
 
     public func abortTx() {
-        txQueue.removeAll()
+        txItems.removeAll()
         rttycore_tx_abort(core)
         if txWasActive { txWasActive = false; continuation.yield(.txFinished) }
     }
 
-    public var txPending: Int { txQueue.count + rttycore_tx_pending(core) }
+    public var txPending: Int {
+        txItems.reduce(0) { n, i in if case .text(let b) = i { return n + b.count }; if case .raw(let r) = i { return n + r.count }; return n }
+            + rttycore_tx_pending(core)
+    }
 
     public func takeFskCodes() -> [UInt8] {
         var out: [UInt8] = []

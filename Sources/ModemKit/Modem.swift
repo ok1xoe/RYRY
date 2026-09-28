@@ -25,6 +25,8 @@ public protocol Modem: AnyObject {
     func beginTx(tune: Bool)
     /// Přidá text do vysílací fronty.
     func queueTx(text: String)
+    /// Přidá surové kódy modemu (RTTY: Baudot v pořadí MMTTY a řídicí 0xFC–0xFF) – ve stejném pořadí s textem.
+    func queueTxRaw(_ codes: [UInt8])
     /// Vygeneruje vysílané vzorky; `.finished`, když vysílání skončilo (zbytek bufferu je ticho).
     func generateTx(into buffer: UnsafeMutableBufferPointer<Float>) -> TxStatus
     /// Dovysílá rozpracovaný znak, zbytek fronty zahodí; pak `generateTx` vrátí `.finished`.
@@ -43,4 +45,5 @@ public protocol Modem: AnyObject {
 
 public extension Modem {
     func takeFskCodes() -> [UInt8] { [] }
+    func queueTxRaw(_ codes: [UInt8]) {}
 }
