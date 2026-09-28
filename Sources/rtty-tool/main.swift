@@ -1,8 +1,11 @@
+import APIServer
+import AppCore
 import AudioIO
 import Engine
 import Foundation
 import Keying
 import MacroEngine
+import QSOLog
 import Settings
 import RigControl
 import ModemKit
@@ -15,6 +18,7 @@ struct Options {
     var demod = "iir", afc = true
     var inUID: String?, outUID: String?, ptt = "none", port: String?, rig = "none", fsk: String?
     var call = "", his = ""
+    var settingsDir: String?, pttSet = false, rigSet = false, noAPI = false
     var positional: [String] = []
 }
 
@@ -42,11 +46,13 @@ func parse(_ args: ArraySlice<String>) -> Options {
         case "--no-afc": o.afc = false
         case "--in": o.inUID = it.next()
         case "--out": o.outUID = it.next()
-        case "--ptt": o.ptt = it.next() ?? "none"
+        case "--ptt": o.ptt = it.next() ?? "none"; o.pttSet = true
         case "--port": o.port = it.next()
-        case "--rig": o.rig = it.next() ?? "none"
+        case "--rig": o.rig = it.next() ?? "none"; o.rigSet = true
         case "--fsk": o.fsk = it.next()
         case "--call": o.call = it.next() ?? ""
+        case "--settings": o.settingsDir = it.next()
+        case "--no-api": o.noAPI = true
         case "--his": o.his = it.next() ?? ""
         default:
             if a.hasPrefix("--") { fail("neznámý přepínač \(a)") }
@@ -99,7 +105,8 @@ let usage = """
       rtty-tool live [--in UID] [--out UID] [--ptt none|rts|dtr|rtsDtr|cat] [--port /dev/cu.X]
                      [--rig none|hamlib|flrig] [--fsk uart|soft-dtr|soft-rts|soft-break] [--baud B] [--mark F]
          stdin: text = odvysílat (TX → text → RX po dovysílání), :tx, :rx, :abort, :tune, :q,
-                :c ZNAČKA (protistanice), :m1…:m12 (makra), [--call MOJE]
+                :c ZNAČKA (protistanice), :m1…:m12 (makra), :log; [--call MOJE] [--settings DIR] [--no-api]
+         nastavení: ~/Library/Application Support/mmtty4mac/settings.json (API: fldigi :7362, JSON-RPC :7363)
     """
 
 let argv = CommandLine.arguments
@@ -185,78 +192,96 @@ case "macro":
     print("[konec: \(r.end), režim: \(r.mode)\(r.logQSO ? ", log" : "")]")
 
 case "live":
+    // Nastavení ze souboru (nebo --settings DIR); přepínače příkazové řádky mají přednost.
+    let store = SettingsStore(directory: o.settingsDir.map { URL(fileURLWithPath: $0) } ?? SettingsPaths.defaultDirectory)
+    var (settings, warnings) = store.load()
+    for w in warnings { FileHandle.standardError.write(Data("[nastavení] \(w)\n".utf8)) }
+    if !o.call.isEmpty { settings.station.call = o.call.uppercased() }
+    if let v = o.inUID { settings.audio.inputUID = v }
+    if let v = o.outUID { settings.audio.outputUID = v }
+    if o.pttSet { guard let pm = PTTMethod(rawValue: o.ptt) else { fail("--ptt: \(o.ptt)") }; settings.ptt.method = pm }
+    if let p = o.port { settings.ptt.port = p; settings.fsk.port = p }
+    switch o.fsk {
+    case nil: break
+    case "uart"?: settings.fsk.output = .fskUART
+    case "soft-dtr"?: settings.fsk.output = .fskSoft; settings.fsk.line = .dtr
+    case "soft-rts"?: settings.fsk.output = .fskSoft; settings.fsk.line = .rts
+    case "soft-break"?: settings.fsk.output = .fskSoft; settings.fsk.line = .txdBreak
+    default: fail("--fsk: \(o.fsk!)")
+    }
+    if o.fsk != nil && settings.fsk.port == nil { fail("--fsk potřebuje --port") }
+    if o.rigSet { guard let t = RigType(rawValue: o.rig) else { fail("--rig: \(o.rig)") }; settings.rig.type = t }
+    if o.noAPI { settings.api.fldigiEnabled = false; settings.api.jsonRPCEnabled = false }
+
     let m: RTTYModem
     do { m = try RTTYModem() } catch { fail("\(error)") }
     configure(m, o)
-    var cfg = EngineConfig()
-    cfg.audio.inputUID = o.inUID
-    cfg.audio.outputUID = o.outUID
-    guard let pm = PTTMethod(rawValue: o.ptt) else { fail("--ptt: \(o.ptt)") }
-    cfg.ptt = pm
-    cfg.pttPort = o.port
-    func fskPort() -> String {
-        guard let p = o.port else { fail("--fsk potřebuje --port") }
-        return p
-    }
-    switch o.fsk {
-    case nil: cfg.txOutput = .afsk
-    case "uart"?: cfg.txOutput = .fskUART(path: fskPort())
-    case "soft-dtr"?: cfg.txOutput = .fskSoft(path: fskPort(), line: .dtr)
-    case "soft-rts"?: cfg.txOutput = .fskSoft(path: fskPort(), line: .rts)
-    case "soft-break"?: cfg.txOutput = .fskSoft(path: fskPort(), line: .txdBreak)
-    default: fail("--fsk: \(o.fsk!)")
-    }
     let rig: Rig
-    switch o.rig {
-    case "hamlib": rig = HamlibClient()
-    case "flrig": rig = FlrigClient()
-    case "none": rig = NoRig()
-    default: fail("--rig: \(o.rig)")
+    switch settings.rig.type {
+    case .hamlib: rig = HamlibClient(host: settings.rig.host, port: UInt16(settings.rig.effectivePort))
+    case .flrig: rig = FlrigClient(host: settings.rig.host, port: settings.rig.effectivePort)
+    case .none: rig = NoRig()
     }
-    let engine = Engine(modem: m, rig: rig, audio: CoreAudioBackend(), config: cfg)
-    let events = engine.events()
+    let engine = Engine(modem: m, rig: rig, audio: CoreAudioBackend(), config: settings.engineConfig())
+    let log: QSOLogStore?
+    do { log = try QSOLogStore(directory: URL(fileURLWithPath: settings.log.directory)) }
+    catch { log = nil; FileHandle.standardError.write(Data("[log] nedostupný: \(error)\n".utf8)) }
+    let app = AppController(settings: settings, engine: engine, log: log, profiles: ProfileStore(directory: store.url.deletingLastPathComponent()))
+    let events = app.events()
     let printer = Task.detached {
         for await e in events {
             switch e {
-            case .modem(.rxText(let c, _)):
+            case .engine(.modem(.rxText(let c, _))):
                 FileHandle.standardOutput.write(Data(String(c).utf8))
-            case .state(let s): FileHandle.standardError.write(Data("\n[\(s.rawValue)]\n".utf8))
-            case .rig(let r):
+            case .engine(.state(let s)): FileHandle.standardError.write(Data("\n[\(s.rawValue)]\n".utf8))
+            case .engine(.rig(let r)):
                 FileHandle.standardError.write(Data("\n[rig \(r.online ? "online" : "offline") \(r.frequency.map { String(Int($0)) } ?? "")]\n".utf8))
-            case .error(let err): FileHandle.standardError.write(Data("\n[chyba \(err)]\n".utf8))
-            case .pttTimeout: FileHandle.standardError.write(Data("\n[PTT timeout]\n".utf8))
+            case .engine(.error(let err)): FileHandle.standardError.write(Data("\n[chyba \(err)]\n".utf8))
+            case .engine(.pttTimeout): FileHandle.standardError.write(Data("\n[PTT timeout]\n".utf8))
+            case .qsoLogged(let r): FileHandle.standardError.write(Data("\n[zalogováno \(r.call)]\n".utf8))
+            case .error(let msg): FileHandle.standardError.write(Data("\n[chyba \(msg)]\n".utf8))
             default: break
             }
         }
     }
-    do { try await engine.start() } catch { fail("start: \(error)") }
+    do { try await app.start() } catch { fail("start: \(error)") }
+    let bindHost = settings.api.allowRemote ? "0.0.0.0" : "127.0.0.1"
+    var fldigiServer: FldigiXMLRPCServer?, jsonServer: JSONRPCServer?
+    if settings.api.fldigiEnabled {
+        let srv = FldigiXMLRPCServer(app: app, host: bindHost, port: UInt16(settings.api.fldigiPort))
+        do { let p = try await srv.start(); fldigiServer = srv; FileHandle.standardError.write(Data("[api] fldigi XML-RPC http://\(bindHost):\(p)/RPC2\n".utf8)) }
+        catch { FileHandle.standardError.write(Data("[api] fldigi XML-RPC nespuštěno: \(error)\n".utf8)) }
+    }
+    if settings.api.jsonRPCEnabled {
+        let srv = JSONRPCServer(app: app, host: bindHost, port: UInt16(settings.api.jsonRPCPort))
+        do { let p = try await srv.start(); jsonServer = srv; FileHandle.standardError.write(Data("[api] JSON-RPC ws://\(bindHost):\(p)/v1\n".utf8)) }
+        catch { FileHandle.standardError.write(Data("[api] JSON-RPC nespuštěno: \(error)\n".utf8)) }
+    }
     // Ctrl-C / SIGTERM: vždy bezpečně vypnout PTT a FSK linku
     installStopOnSignals(engine)
     FileHandle.standardError.write(Data("mmtty4mac live – text + Enter = vysílat, :q = konec\n".utf8))
-    let macros = AppSettings.defaultMacros
-    var mctx = MacroContext(); mctx.myCall = o.call.uppercased(); mctx.hisCall = o.his.uppercased()
     while let line = readLine() {
-        if line.hasPrefix(":c ") { mctx.hisCall = String(line.dropFirst(3)).uppercased(); continue }
-        if line.hasPrefix(":m"), let n = Int(line.dropFirst(2)), (1...macros.count).contains(n) {
-            mctx.now = Date()
-            do { try await engine.sendMacro(MacroEngine.expand(macros[n - 1].text, context: mctx)) }
-            catch { print("TX: \(error)") }
+        if line.hasPrefix(":c ") { try? await app.setQSOField("call", String(line.dropFirst(3))); continue }
+        if line == ":log" { do { _ = try await app.logQSO() } catch { print("log: \(error)") }; continue }
+        if line.hasPrefix(":m"), let n = Int(line.dropFirst(2)) {
+            do { try await app.runMacro(index: n - 1) } catch { print("makro: \(error)") }
             continue
         }
         switch line {
         case ":q": break
-        case ":tx": do { try await engine.tx() } catch { print("TX: \(error)") }; continue
-        case ":tune": do { try await engine.tune() } catch { print("TX: \(error)") }; continue
-        case ":rx": await engine.rx(); continue
-        case ":abort": await engine.rxNow(); continue
+        case ":tx": do { try await app.tx() } catch { print("TX: \(error)") }; continue
+        case ":tune": do { try await app.tune() } catch { print("TX: \(error)") }; continue
+        case ":rx": await app.rx(); continue
+        case ":abort": await app.rxNow(); continue
         default:
-            await engine.send(text: line + "\r\n")
-            do { try await engine.tx(); await engine.rx() } catch { print("TX: \(error)") }
+            await app.send(text: line + "\r\n")
+            do { try await app.tx(); await app.rx() } catch { print("TX: \(error)") }
             continue
         }
         break
     }
-    await engine.stop()
+    fldigiServer?.stop(); jsonServer?.stop()
+    await app.stop()
     await printer.value
 
 default:

@@ -36,3 +36,12 @@ Nahrávku z přijímače převeďte na 11025 Hz mono: `ffmpeg -i in.wav -ar 1102
 
 V režimu `live` se každý řádek ze stdin odvysílá (TX → text → RX po dovysílání). Dále `:tx`, `:rx`, `:tune`, `:q`.
 Ruční testy hardwaru: `docs/hardware-checklist.md`.
+
+## API pro jiné programy
+
+`rtty-tool live` spouští i API (lze vypnout v `settings.json` nebo přepínačem `--no-api`):
+
+- **fldigi XML-RPC** `http://127.0.0.1:7362/RPC2` – loggery, které umí fldigi, fungují beze změny.
+- **JSON-RPC 2.0 / WebSocket** `ws://127.0.0.1:7363/v1` – s událostmi (přijatý text, stav, AFC, rig, log).
+
+Podrobnosti: `docs/api.md`. Nastavení: `~/Library/Application Support/mmtty4mac/settings.json`.

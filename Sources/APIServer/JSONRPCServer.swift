@@ -23,10 +23,17 @@ final class ClientSession: @unchecked Sendable {
     private var subs: Set<String> = []
     private(set) var isClosed = false
     var spectrumTask: Task<Void, Never>?
+    /// Příchozí požadavky – zpracují se postupně jedním úkolem (zachování pořadí).
+    let inbox: AsyncStream<String>
+    let inboxContinuation: AsyncStream<String>.Continuation
+    var worker: Task<Void, Never>?
     var lastSignal = Date.distantPast
     var onClose: (@Sendable () -> Void)?
 
-    init(sink: WSSink, maxQueue: Int) { self.sink = sink; self.maxQueue = maxQueue }
+    init(sink: WSSink, maxQueue: Int) {
+        self.sink = sink; self.maxQueue = maxQueue
+        (inbox, inboxContinuation) = AsyncStream.makeStream(of: String.self, bufferingPolicy: .bufferingNewest(1000))
+    }
 
     func subscribe(_ names: [String]) { lock.withLock { subs.formUnion(names) } }
     func unsubscribe(_ names: [String]) { lock.withLock { subs.subtract(names) } }
@@ -61,6 +68,7 @@ final class ClientSession: @unchecked Sendable {
         let first: Bool = lock.withLock { if isClosed { return false }; isClosed = true; return true }
         guard first else { return }
         spectrumTask?.cancel()
+        inboxContinuation.finish()
         sink.close()
         onClose?()
     }
@@ -121,6 +129,13 @@ public final class JSONRPCServer: @unchecked Sendable {
         let session = ClientSession(sink: NWSink(c), maxQueue: maxQueue)
         session.onClose = { [weak self] in self?.lock.withLock { _ = self?.clients.removeValue(forKey: session.id) } }
         lock.withLock { clients[session.id] = session }
+        let inbox = session.inbox
+        session.worker = Task { [weak self, weak session] in
+            for await text in inbox {
+                guard let self, let session else { return }
+                await self.handle(text, session)
+            }
+        }
         c.stateUpdateHandler = { st in
             if case .failed = st { session.close() }
             if case .cancelled = st { session.close() }
@@ -136,8 +151,7 @@ public final class JSONRPCServer: @unchecked Sendable {
             let meta = ctx?.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata
             switch meta?.opcode {
             case .text?:
-                let text = String(decoding: data ?? Data(), as: UTF8.self)
-                Task { await self.handle(text, s) }
+                s.inboxContinuation.yield(String(decoding: data ?? Data(), as: UTF8.self))
             case .close?: s.close(); return
             case .binary?:
                 s.sendJSON(["jsonrpc": "2.0", "id": NSNull(), "error": ["code": -32600, "message": "binary frames not supported"]])

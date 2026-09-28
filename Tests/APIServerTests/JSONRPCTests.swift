@@ -158,3 +158,19 @@ final class StuckSink: WSSink, @unchecked Sendable {
     #expect((try await c2.call("engine.status"))["result"] != nil)
     await h.app.stop()
 }
+
+/// Požadavky jednoho klienta se zpracují v pořadí (qso.setField musí proběhnout před macro.run).
+@Test func requestsFromOneClientAreProcessedInOrder() async throws {
+    let h = try await makeAPIHarness()
+    let (srv, port) = try await jsonServer(h)
+    defer { srv.stop() }
+    let c = WSClient(port: port)
+    for i in 1...60 {
+        let method = i % 2 == 0 ? "qso.getCurrent" : "engine.status"
+        try await c.sendRaw(#"{"jsonrpc":"2.0","id":\#(i),"method":"\#(method)"}"#)
+    }
+    var ids: [Int] = []
+    while ids.count < 60 { if let id = (try await c.receive())["id"] as? Int { ids.append(id) } }
+    #expect(ids == Array(1...60))
+    await h.app.stop()
+}
