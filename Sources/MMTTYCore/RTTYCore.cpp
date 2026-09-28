@@ -22,6 +22,8 @@ struct RTTYCore {
     int    afc = 1, afcMode = 1;
     double afcSQ = 32, afcTime = 8.0, afcSweep = 1.0;
     int    txActive = 0;
+    int    txStopping = 0;
+    static constexpr int kBufSize = 1024;   // MMTTY m_BuffSize při 11025 Hz
     int    overflowLatched = 0;
     std::vector<double> block;
 
@@ -275,3 +277,76 @@ extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
     default: return NAN;
     }
 }
+
+// --- Vysílání (podle TMmttyWd::XMIT, ToRX a TX větve TSound::Execute) ---
+
+extern "C" void rttycore_tx_begin(RTTYCore* c, int tune) {
+    if (!c) return;
+    c->mod->ClearTXBuf();
+    c->rtty.ClearTX();
+    c->mod->SetBaudRate(c->dem->GetBaudRate());
+    c->mod->m_Amp.Reset();
+    c->mod->m_AmpVal = 1;
+    c->mod->OutTone(tune ? 1 : 0, RTTYCore::kBufSize);
+    if (c->echo != 2) c->dem->ClearRXBuf();
+    c->mod->InitPhase();
+    c->mod->SetCount(RTTYCore::kBufSize * 3);
+    c->mod->SetDiddleTimer(int(SampFreq / 4));     // 0,25 s jako XMIT
+    c->txActive = 1;
+    c->txStopping = 0;
+}
+
+extern "C" size_t rttycore_tx_space(const RTTYCore* c) {
+    return c ? size_t(MODBUFMAX - c->mod->GetBufCount()) : 0;
+}
+
+extern "C" size_t rttycore_tx_pending(const RTTYCore* c) {
+    return c ? size_t(c->mod->GetBufCount()) : 0;
+}
+
+extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
+    if (!c || !text || !c->txActive || c->txStopping) return 0;
+    size_t used = 0;
+    BYTE codes[8];
+    for (const char* p = text; *p; p++) {
+        if (rttycore_tx_space(c) < 3) break;
+        unsigned char u = (unsigned char)*p;
+        used++;
+        if (u >= 'a' && u <= 'z') u = u - 'a' + 'A';
+        if (!(u == '\r' || u == '\n' || (u >= 0x20 && u < 0x7F))) continue;
+        char one[2] = { char(u), 0 };
+        int n = c->rtty.ConvRTTY(codes, one);
+        for (int i = 0; i < n; i++) c->mod->PutData(codes[i]);
+    }
+    return used;
+}
+
+extern "C" size_t rttycore_generate_tx(RTTYCore* c, float* out, size_t n) {
+    if (!c || !out) return 0;
+    size_t i = 0;
+    if (c->txActive) {
+        for (; i < n; i++) {
+            if (c->txStopping && !c->mod->GetMode()) { c->txActive = 0; c->txStopping = 0; break; }
+            double d = c->mod->Do(c->echo);
+            double f = d / 32768.0;
+            out[i] = float(f > 1.0 ? 1.0 : (f < -1.0 ? -1.0 : f));
+        }
+    }
+    for (size_t k = i; k < n; k++) out[k] = 0.0f;
+    return i;
+}
+
+extern "C" void rttycore_tx_stop(RTTYCore* c) {
+    if (!c || !c->txActive) return;
+    c->mod->SetDiddleTimer(-1);
+    c->mod->DeleteTXBuf();
+    c->txStopping = 1;
+}
+
+extern "C" void rttycore_tx_abort(RTTYCore* c) {
+    if (!c) return;
+    c->mod->DeleteTXBuf();
+    c->txActive = 0; c->txStopping = 0;
+}
+
+extern "C" int rttycore_is_tx(const RTTYCore* c) { return c && c->txActive ? 1 : 0; }

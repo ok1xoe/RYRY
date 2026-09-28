@@ -83,6 +83,20 @@ RTTYCoreSignal rttycore_signal(RTTYCore* core);
 int       rttycore_set_param(RTTYCore* core, RTTYCoreParam p, double value);
 double    rttycore_get_param(const RTTYCore* core, RTTYCoreParam p);
 
+/* Vysílání. tune=1 vysílá jen nosnou mark. */
+void   rttycore_tx_begin(RTTYCore* core, int tune);
+/* Vrací počet zpracovaných BAJTŮ vstupu (přijatých i vynechaných); zastaví se,
+   když v bufferu není místo aspoň na 3 kódy. Malá písmena → velká, bajty mimo
+   ASCII 0x20..0x7E (kromě CR/LF) se vynechají. */
+size_t rttycore_queue_tx(RTTYCore* core, const char* text);
+size_t rttycore_tx_space(const RTTYCore* core);    /* volné místo v bufferu (kódy) */
+size_t rttycore_tx_pending(const RTTYCore* core);  /* kódy čekající na odvysílání */
+/* Vrací počet vzorků; < n, když vysílání skončilo (zbytek vyplní nulami). */
+size_t rttycore_generate_tx(RTTYCore* core, float* out, size_t n);
+void   rttycore_tx_stop(RTTYCore* core);   /* dovysílá rozpracovaný znak, zbytek zahodí */
+void   rttycore_tx_abort(RTTYCore* core);  /* okamžitý konec */
+int    rttycore_is_tx(const RTTYCore* core);
+
 #ifdef __cplusplus
 }
 #endif
