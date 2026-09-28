@@ -53,14 +53,23 @@ public final class ProfileStore: Sendable {
 
     private struct File: Codable { var slots: [Profile?] }
 
+    /// nil = soubor existuje, ale nejde přečíst (pak se odmítá zápis, aby se nepřepsal).
+    private func loadChecked() -> [Profile?]? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+        return (try? JSONDecoder().decode(File.self, from: Data(contentsOf: url)))?.slots
+    }
+
     public func load() -> [Profile?] {
-        var slots = (try? JSONDecoder().decode(File.self, from: Data(contentsOf: url)))?.slots ?? []
+        var slots = loadChecked() ?? []
         if slots.count < Self.slotCount { slots += [Profile?](repeating: nil, count: Self.slotCount - slots.count) }
         return Array(slots.prefix(Self.slotCount))
     }
 
     public func save(_ p: Profile?, slot: Int) throws {
         guard (0..<Self.slotCount).contains(slot) else { throw SettingsError.badSlot(slot) }
+        guard loadChecked() != nil else {
+            throw SettingsError.io("\(url.lastPathComponent) nelze přečíst – nepřepisuji (opravte nebo smažte soubor)")
+        }
         var slots = load()
         slots[slot] = p
         try writeAtomically(File(slots: slots), to: url)

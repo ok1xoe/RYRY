@@ -93,12 +93,19 @@ public struct APISettings: Codable, Sendable, Equatable {
     }
 }
 
-public struct Macro: Codable, Sendable, Equatable {
+public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public var name: String
     public var text: String
     public var repeatSeconds: Double?
     public init(name: String, text: String, repeatSeconds: Double? = nil) {
         self.name = name; self.text = text; self.repeatSeconds = repeatSeconds
+    }
+    static var fallback: Macro { Macro(name: "", text: "") }
+    enum CodingKeys: String, CodingKey { case name, text, repeatSeconds }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "macro"
+        name = c.tolerant(.name, "", w, s); text = c.tolerant(.text, "", w, s)
+        repeatSeconds = c.tolerant(.repeatSeconds, nil, w, s)
     }
 }
 
@@ -147,7 +154,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
         station = c.tolerant(.station, x.station, w, s); audio = c.tolerant(.audio, x.audio, w, s)
         ptt = c.tolerant(.ptt, x.ptt, w, s); fsk = c.tolerant(.fsk, x.fsk, w, s)
         rig = c.tolerant(.rig, x.rig, w, s); api = c.tolerant(.api, x.api, w, s)
-        rtty = c.tolerant(.rtty, x.rtty, w, s); macros = c.tolerant(.macros, x.macros, w, s)
+        rtty = c.tolerant(.rtty, TolerantDict<ParameterValue>(), w, s).items
+        macros = c.contains(.macros) ? c.tolerant(.macros, TolerantArray<Macro>(), w, s).items : x.macros
         log = c.tolerant(.log, x.log, w, s)
     }
 

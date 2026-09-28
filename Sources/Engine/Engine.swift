@@ -29,6 +29,7 @@ public actor Engine {
     private var finishedAt: UInt64?
     private var stopRequested = false
     private var drainRequested = false     // rx() přišlo ještě během pttOn
+    private var pendingMacros: [MacroResult] = []   // makra zadaná během doběhu – spustí se po návratu do RX
     private var rxBuf = [Float](repeating: 0, count: 4096)
     private var txBuf = [Float](repeating: 0, count: 512)
     private var loopTask: Task<Void, Never>?
@@ -210,6 +211,7 @@ public actor Engine {
     }
 
     public func rxNow() async {
+        pendingMacros.removeAll()
         guard [.keying, .pttOn, .tx, .drain, .pttOff].contains(state) else { return }
         await abortToRx(error: nil)
     }
@@ -234,12 +236,23 @@ public actor Engine {
     /// Odešle rozvinuté makro (MMTTY OutputStr): TX, výstupy do fronty, `\` = RX po dovysílání.
     /// Makro do editoru (`#`/`\` na začátku) se neodesílá – to řeší klient; `\` jen zapne TX.
     public func sendMacro(_ m: MacroResult) async throws {
-        if m.logQSO { broadcaster.send(.logRequested) }
         if m.mode == .toEditor {
+            if m.logQSO { broadcaster.send(.logRequested) }
             if m.startsTx { try await tx() }
             return
         }
+        // doběh už běží (jádro nepřijímá text) → odložit na nový TX po návratu do RX
+        if state == .pttOff || (state == .drain && stopRequested) {
+            pendingMacros.append(m)
+            return
+        }
+        if m.logQSO { broadcaster.send(.logRequested) }
         if state == .rx { try await tx() }
+        // makro bez '\' ruší plánovaný návrat na RX (MMTTY ToTX)
+        if m.end != .rxAfter {
+            if state == .drain { setState(.tx) }
+            drainRequested = false
+        }
         for o in m.outputs {
             switch o {
             case .text(let t): modem.queueTx(text: t)
@@ -247,6 +260,15 @@ public actor Engine {
             }
         }
         if m.end == .rxAfter { rx() }
+    }
+
+    private func runPendingMacro() async {
+        guard state == .rx, !pendingMacros.isEmpty else { return }
+        let m = pendingMacros.removeFirst()
+        do { try await sendMacro(m) } catch {
+            pendingMacros.removeAll()
+            broadcaster.send(.error(.pttUnavailable("\(error)")))
+        }
     }
 
     public func clearTx() {
@@ -321,7 +343,10 @@ public actor Engine {
                     pttReady = false
                     broadcaster.send(.error(.pttUnavailable("\(error)")))
                 }
-                if epoch == my, state == .pttOff { setState(.rx) }
+                if epoch == my, state == .pttOff {
+                    setState(.rx)
+                    await runPendingMacro()
+                }
             }
         default: break
         }

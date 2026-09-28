@@ -9,6 +9,10 @@ public actor QSOLogStore {
     public let jsonlURL: URL
     public private(set) var records: [QSORecord] = []
     public private(set) var warnings: [String] = []
+    /// Poškozené řádky JSONL – zachovávají se při každém přepsání (lze je opravit ručně).
+    private var badLines: [String] = []
+    /// Log se nepodařilo přečíst → zápisy se odmítají, aby se nepřepsal.
+    private var readFailed = false
 
     private static let encoder: JSONEncoder = {
         let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]; return e
@@ -19,14 +23,45 @@ public actor QSOLogStore {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         adifURL = directory.appendingPathComponent(baseName + ".adi")
         jsonlURL = directory.appendingPathComponent(baseName + ".jsonl")
-        if let data = try? Data(contentsOf: jsonlURL) {
-            var recs: [QSORecord] = [], warns: [String] = []
-            for (n, line) in data.split(separator: UInt8(ascii: "\n")).enumerated() where !line.isEmpty {
-                if let r = try? Self.decoder.decode(QSORecord.self, from: Data(line)) { recs.append(r) }
-                else { warns.append("\(jsonlURL.lastPathComponent): řádek \(n + 1) je poškozený, přeskočen") }
+        let fm = FileManager.default
+        if fm.fileExists(atPath: jsonlURL.path) {
+            do {
+                var data = try Data(contentsOf: jsonlURL)
+                // useknutý poslední řádek (výpadek) → ukončit ho, aby další zápis začal na novém řádku
+                if let last = data.last, last != UInt8(ascii: "\n") {
+                    data.append(UInt8(ascii: "\n"))
+                    try? Self.appendRaw(Data([UInt8(ascii: "\n")]), to: jsonlURL)
+                    warnings.append("\(jsonlURL.lastPathComponent): poslední řádek byl neúplný")
+                }
+                var n = 0
+                for line in data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: false) {
+                    n += 1
+                    if line.isEmpty { continue }
+                    if let r = try? Self.decoder.decode(QSORecord.self, from: Data(line)) { records.append(r) }
+                    else {
+                        badLines.append(String(decoding: line, as: UTF8.self))
+                        warnings.append("\(jsonlURL.lastPathComponent): řádek \(n) je poškozený (zachován v souboru)")
+                    }
+                }
+            } catch {
+                readFailed = true
+                warnings.append("\(jsonlURL.lastPathComponent) nelze přečíst: \(error.localizedDescription) – zápis do logu vypnut")
             }
-            records = recs; warnings = warns
         }
+        if !readFailed, !records.isEmpty, !Self.consistent(adifURL, records) {
+            do { try Self.atomicWrite(ADIF.header() + records.map(ADIF.record).joined(), to: adifURL); warnings.append("\(adifURL.lastPathComponent) neodpovídal JSONL – přegenerován") }
+            catch { warnings.append("\(adifURL.lastPathComponent) nelze přegenerovat: \(error)") }
+        }
+    }
+
+    private static func appendRaw(_ d: Data, to url: URL) throws {
+        let h = try FileHandle(forWritingTo: url)
+        defer { try? h.close() }
+        try h.seekToEnd(); try h.write(contentsOf: d); try h.synchronize()
+    }
+
+    private func checkWritable() throws {
+        if readFailed { throw QSOLogError.io("\(jsonlURL.lastPathComponent) nelze přečíst – zápis odmítnut") }
     }
 
     private func appendLine(_ text: String, to url: URL, header: String? = nil) throws {
@@ -51,23 +86,34 @@ public actor QSOLogStore {
     }
 
     public func append(_ r: QSORecord) throws {
-        try appendLine(try jsonLine(r), to: jsonlURL)
-        try appendLine(ADIF.record(r), to: adifURL, header: ADIF.header())
+        try checkWritable()
+        try appendLine(try jsonLine(r), to: jsonlURL)        // zdroj pravdy – chyba = spojení nezalogováno
         records.append(r)
+        do { try appendLine(ADIF.record(r), to: adifURL, header: ADIF.header()) }
+        catch { warnings.append("ADIF zápis selhal (\(error)); JSONL je v pořádku, ADIF se přegeneruje") }
     }
 
     private func rewrite(_ recs: [QSORecord]) throws {
-        let jsonl = try recs.map(jsonLine).joined()
-        let adif = ADIF.header() + recs.map(ADIF.record).joined()
+        try checkWritable()
+        let jsonl = try recs.map(jsonLine).joined() + badLines.map { $0 + "\n" }.joined()
         try atomicWrite(jsonl, to: jsonlURL)
-        try atomicWrite(adif, to: adifURL)
         records = recs
+        do { try atomicWrite(ADIF.header() + recs.map(ADIF.record).joined(), to: adifURL) }
+        catch { warnings.append("ADIF přepis selhal (\(error)); JSONL je v pořádku") }
     }
 
-    private func atomicWrite(_ text: String, to url: URL) throws {
+    private func atomicWrite(_ text: String, to url: URL) throws { try Self.atomicWrite(text, to: url) }
+
+    private static func consistent(_ adifURL: URL, _ records: [QSORecord]) -> Bool {
+        guard let text = try? String(contentsOf: adifURL, encoding: .utf8) else { return records.isEmpty }
+        return ADIF.parse(text).compactMap { $0["APP_MMTTY4MAC_ID"] } == records.map(\.id.uuidString)
+    }
+
+    private static func atomicWrite(_ text: String, to url: URL) throws {
         let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
         do {
-            try Data(text.utf8).write(to: tmp, options: .atomic)
+            try Data(text.utf8).write(to: tmp)
+            let h = try FileHandle(forWritingTo: tmp); try h.synchronize(); try h.close()   // fsync před výměnou
             if FileManager.default.fileExists(atPath: url.path) {
                 _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
             } else {
@@ -105,10 +151,7 @@ public actor QSOLogStore {
     }
 
     /// ADIF obsahuje přesně stejná ID jako JSONL (ve stejném pořadí)?
-    public func isADIFConsistent() -> Bool {
-        guard let text = try? String(contentsOf: adifURL, encoding: .utf8) else { return records.isEmpty }
-        return ADIF.parse(text).compactMap { $0["APP_MMTTY4MAC_ID"] } == records.map(\.id.uuidString)
-    }
+    public func isADIFConsistent() -> Bool { Self.consistent(adifURL, records) }
 
     public func rebuildADIF() throws {
         try atomicWrite(ADIF.header() + records.map(ADIF.record).joined(), to: adifURL)

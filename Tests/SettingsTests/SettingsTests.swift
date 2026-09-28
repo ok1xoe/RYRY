@@ -97,3 +97,29 @@ func tmp() -> URL {
     #expect(throws: SettingsError.self) { try store.save(p, slot: 16) }
     #expect(throws: SettingsError.self) { try store.save(p, slot: -1) }
 }
+
+// Review I6: jedno vadné makro / parametr nesmí zahodit ostatní
+@Test func badMacroOrParamKeepsTheRest() throws {
+    let dir = tmp()
+    let json = """
+    {"macros": [{"name": "CQ", "text": "CQ DE %m\\\\"}, {"name": 5}, {"name": "73", "text": "73"}],
+     "rtty": {"baud": {"double": {"_0": 50}}, "afc": "nonsense"}}
+    """
+    try Data(json.utf8).write(to: dir.appendingPathComponent("settings.json"))
+    let (s, w) = SettingsStore(directory: dir).load()
+    #expect(s.macros.map(\.name) == ["CQ", "", "73"])
+    #expect(s.macros[0].text == "CQ DE %m\\")
+    #expect(s.rtty["baud"] == .double(50))
+    #expect(s.rtty["afc"] == nil)
+    #expect(w.count >= 2)
+}
+
+// Review I6: nečitelný profiles.json se nesmí tiše přepsat
+@Test func unreadableProfilesAreNotOverwritten() throws {
+    let dir = tmp()
+    let url = dir.appendingPathComponent("profiles.json")
+    try Data("{broken".utf8).write(to: url)
+    let store = ProfileStore(directory: dir)
+    #expect(throws: SettingsError.self) { try store.save(Profile(name: "x", rtty: [:]), slot: 0) }
+    #expect(try String(contentsOf: url, encoding: .utf8) == "{broken")
+}

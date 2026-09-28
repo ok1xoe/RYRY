@@ -78,3 +78,35 @@ func macroContext() -> MacroContext { var c = MacroContext(); c.myCall = "OK1XOE
     #expect(await r.engine.state == .rx)
     await r.engine.stop()
 }
+
+// Review I3: makro během doběhu (pttOff) se odvysílá hned v novém TX, ne až příště
+@Test func macroDuringPttOffIsSentInNewTransmission() async throws {
+    let r = try makeEngine()
+    try await r.engine.start()
+    try await r.engine.sendMacro(MacroEngine.expand("AAAAA\\", context: macroContext()))
+    await pump(r) { await r.engine.state == .pttOff }
+    try await r.engine.sendMacro(MacroEngine.expand("BBBBB\\", context: macroContext()))
+    await pump(r) { await r.engine.state == .rx && r.audio.writeCalls > 0 }
+    #expect(try await decodeTx(r.audio.tx).contains("BBBBB"))
+    // další TX už BBBBB nesmí obsahovat
+    let before = r.audio.tx.count
+    try await r.engine.sendMacro(MacroEngine.expand("CCCCC\\", context: macroContext()))
+    await pump(r) { await r.engine.state == .rx && r.audio.tx.count > before }
+    #expect(!(try await decodeTx(Array(r.audio.tx[before...]))).contains("BBB"))
+    await r.engine.stop()
+}
+
+// Review I4: makro bez '\' během drain zruší návrat na RX (jako MMTTY ToTX)
+@Test func macroWithoutRxMarkerCancelsPendingDrain() async throws {
+    let r = try makeEngine()
+    try await r.engine.start()
+    await r.engine.send(text: "RYRYRYRYRYRYRYRYRYRY")
+    try await r.engine.tx()
+    await pump(r) { await r.engine.state == .tx }
+    await r.engine.rx()
+    #expect(await r.engine.state == .drain)
+    try await r.engine.sendMacro(MacroEngine.expand("RYRY #", context: macroContext()))
+    await pump(r, steps: 80) { false }
+    #expect(await r.engine.state == .tx)
+    await r.engine.stop()
+}

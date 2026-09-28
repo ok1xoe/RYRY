@@ -56,7 +56,7 @@ public enum ADIF {
             let name = parts.first.map { $0.uppercased() } ?? ""
             i = close + 1
             if name == "EOR" { out.append(cur); cur = [:]; continue }
-            if parts.count >= 2, let len = Int(parts[1]), len >= 0, i + len <= b.count {
+            if parts.count >= 2, let len = Int(parts[1]), len >= 0, len <= b.count - i {
                 cur[name] = String(decoding: b[i..<(i + len)], as: UTF8.self)
                 i += len
             }
