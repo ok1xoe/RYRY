@@ -401,6 +401,14 @@ extern "C" size_t rttycore_generate_tx(RTTYCore* c, float* out, size_t n) {
             if (c->txStopping && !c->mod->GetMode()) {
                 c->txActive = 0; c->txStopping = 0; c->tuning = 0;
                 c->echoHold = long(SampFreq / 2);
+                if (c->echo == 1) {
+                    // doběh: TX vzorky tohoto bloku + 0,2 s ticha, aby demodulátor dokončil poslední znak
+                    if (i > 0) rxPipeline(c, c->txBlock.data(), i);
+                    std::vector<double> tail(size_t(SampFreq * 0.2), 0.0);
+                    rxPipeline(c, tail.data(), tail.size());
+                    for (size_t k = i; k < n; k++) out[k] = 0.0f;
+                    return i;
+                }
                 break;
             }
             double d = c->mod->Do(c->echo);

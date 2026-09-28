@@ -394,6 +394,8 @@ public actor Engine {
 
     public var rigStatus: RigStatus? { lastRig }
     public var rigName: String { rig.name }
+    /// Probíhá ladění (tune) – pro main.get_trx_status.
+    public var isTuning: Bool { tuneMode && [.keying, .pttOn, .tx, .drain].contains(state) }
 
     public func setRigFrequency(_ hz: Double) async throws {
         do { try await rig.setFrequency(hz) } catch { throw EngineError.rig("\(error)") }

@@ -64,7 +64,7 @@ final class AppBroadcaster: @unchecked Sendable {
 
 /// Aplikační vrstva nad Engine: QSO okno, log, makra, historie textu. Společná pro GUI i API.
 public actor AppController {
-    public let engine: Engine
+    public nonisolated let engine: Engine
     public private(set) var settings: AppSettings
     public let log: QSOLogStore?
     private let profiles: ProfileStore?

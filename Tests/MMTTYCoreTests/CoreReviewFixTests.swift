@@ -81,3 +81,22 @@ func text(_ cs: [RTTYCoreChar]) -> String {
         i += win
     }
 }
+
+/// echo=1: i poslední znak vysílání se musí objevit v echu (demodulátor potřebuje doběh filtrů).
+@Test func echoIncludesLastCharacter() throws {
+    let core = try #require(makeCore())
+    defer { rttycore_destroy(core) }
+    rttycore_tx_begin(core, 0)
+    _ = rttycore_queue_tx(core, "CQ DE OK1XOE K")
+    var buf = [Float](repeating: 0, count: 1024)
+    var cb = [RTTYCoreChar](repeating: RTTYCoreChar(), count: 256)
+    var echo: [RTTYCoreChar] = []
+    var stopped = false
+    for _ in 0..<500 {
+        if !stopped && rttycore_tx_pending(core) == 0 { rttycore_tx_stop(core); stopped = true }
+        let n = rttycore_generate_tx(core, &buf, buf.count)
+        let k = rttycore_read_chars(core, &cb, cb.count); echo += cb[0..<k]
+        if n < buf.count { break }
+    }
+    #expect(text(echo).contains("CQ DE OK1XOE K"))
+}
