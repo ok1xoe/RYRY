@@ -57,7 +57,8 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         tickInterval = max(1, Int(sampleRate / 10))
         currentMode = modes[0]
         lastTuning = TuningInfo(mark: rttycore_get_param(c, RC_MARK), space: rttycore_get_param(c, RC_SPACE))
-        (events, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(8192))
+        // Neomezený buffer: pomalý odběratel nesmí přijít o přijatý text (Engine events vždy odebírá).
+        (events, continuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
     }
 
     deinit {
@@ -134,13 +135,13 @@ public final class RTTYModem: Modem, @unchecked Sendable {
     }
 
     public func beginTx(tune: Bool) {
-        txQueue.removeAll()
+        // Text zadaný před beginTx (makro, pak TX) se neztrácí.
         rttycore_tx_begin(core, tune ? 1 : 0)
         txWasActive = true
     }
 
     public func queueTx(text: String) {
-        txQueue += Array(text.utf8)
+        txQueue += text.utf8.filter { $0 != 0 }   // NUL by v C řetězci zablokoval frontu
         feedCore()
     }
 

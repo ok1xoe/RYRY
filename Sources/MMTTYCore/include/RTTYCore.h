@@ -84,12 +84,17 @@ RTTYCoreSignal rttycore_signal(RTTYCore* core);
 int       rttycore_set_param(RTTYCore* core, RTTYCoreParam p, double value);
 double    rttycore_get_param(const RTTYCore* core, RTTYCoreParam p);
 
-/* Vysílání. tune=1 vysílá jen nosnou mark. */
+/* Vysílání. tune=1 vysílá jen nosnou mark (bez diddle, bez textu).
+   Echo (RC_ECHO): 0 = kódy přímo do RX, 1 = RX dekóduje vlastní TX zvuk, 2 = RX poslouchá vstup. */
 void   rttycore_tx_begin(RTTYCore* core, int tune);
 /* Vrací počet zpracovaných BAJTŮ vstupu (přijatých i vynechaných); zastaví se,
-   když v bufferu není místo aspoň na 3 kódy. Malá písmena → velká, bajty mimo
-   ASCII 0x20..0x7E (kromě CR/LF) se vynechají. */
+   když v bufferu není místo aspoň na 3 kódy. Malá písmena → velká. Vynechá: bajty mimo
+   ASCII 0x20..0x7E (kromě CR/LF), znaky bez Baudot kódu (@ # % * + < = > \ ^ ` { | })
+   a řídicí znaky MMTTY (_ ~ [ ]). Při tune (tx_begin(core,1)) nepřijímá nic. */
 size_t rttycore_queue_tx(RTTYCore* core, const char* text);
+/* Surové kódy do TX bufferu (pořadí bitů MMTTY) včetně řídicích: 0xFF mark 3 bity,
+   0xFE nosná vyp., 0xFD diddle vyp., 0xFC diddle zap. Vrací počet přijatých. */
+size_t rttycore_queue_tx_raw(RTTYCore* core, const uint8_t* codes, size_t n);
 size_t rttycore_tx_space(const RTTYCore* core);    /* volné místo v bufferu (kódy) */
 size_t rttycore_tx_pending(const RTTYCore* core);  /* kódy čekající na odvysílání */
 /* Vrací počet vzorků; < n, když vysílání skončilo (zbytek vyplní nulami). */

@@ -44,6 +44,9 @@ struct RTTYCore {
     double afcSQ = 32, afcTime = 8.0, afcSweep = 1.0;
     int    txActive = 0;
     int    txStopping = 0;
+    int    tuning = 0;
+    long   echoHold = 0;          // po konci TX ještě chvíli značit znaky jako echo (echo=1)
+    std::vector<double> txBlock;
     static constexpr int kBufSize = 1024;   // MMTTY m_BuffSize při 11025 Hz
     int    overflowLatched = 0;
     std::vector<double> block;
@@ -104,12 +107,8 @@ extern "C" void rttycore_destroy(RTTYCore* c) {
     delete c;   // scope.prev se obnoví až po destrukci (ctx je uvnitř c, ale ~CoreScope ho nečte)
 }
 
-extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
-    if (!c || !s || n == 0) return;
-    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
-    c->block.resize(n);
-    for (size_t i = 0; i < n; i++) c->block[i] = std::isfinite(s[i]) ? double(s[i]) * 32768.0 : 0.0;
-    double* lp = c->block.data();
+// RX řetězec jako TSound::Execute: BPF/LMS → sběr FFT → demodulátor.
+static void rxPipeline(RTTYCore* c, double* lp, size_t n) {
     if (c->bpf || c->lmsOn) {
         for (size_t i = 0; i < n; i++) {
             if (c->bpf)   lp[i] = DoFIR(c->HBPF, c->ZBPF, lp[i], c->bpftap);
@@ -117,10 +116,19 @@ extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
         }
     }
     c->fft->CollectFFT(lp, int(n));
-    if (!c->txActive || c->echo) {
-        for (size_t i = 0; i < n; i++) c->dem->Do(lp[i]);
-    }
+    for (size_t i = 0; i < n; i++) c->dem->Do(lp[i]);
     if (c->dem->m_OverFlow) { c->overflowLatched = 1; c->dem->m_OverFlow = 0; }
+}
+
+extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
+    if (!c || !s || n == 0) return;
+    CoreScope scope(&c->ctx);
+    if (c->echoHold > 0) c->echoHold -= long(n);
+    // Během TX je v MMTTY vstup zavřený (echo 0/1); jen echo=2 poslouchá skutečný vstup.
+    if (c->txActive && c->echo != 2) return;
+    c->block.resize(n);
+    for (size_t i = 0; i < n; i++) c->block[i] = std::isfinite(s[i]) ? double(s[i]) * 32768.0 : 0.0;
+    rxPipeline(c, c->block.data(), n);
 }
 
 extern "C" size_t rttycore_read_chars(RTTYCore* c, RTTYCoreChar* out, size_t max) {
@@ -136,7 +144,7 @@ extern "C" size_t rttycore_read_chars(RTTYCore* c, RTTYCoreChar* out, size_t max
             case 8: ch = char(d); break;
             default: ch = c->rtty().ConvAscii(d); break;
         }
-        if (ch) { out[k].ch = ch; out[k].echo = uint8_t(c->txActive ? 1 : 0); k++; }
+        if (ch) { out[k].ch = ch; out[k].echo = uint8_t((c->txActive || c->echoHold > 0) ? 1 : 0); k++; }
     }
     return k;
 }
@@ -337,7 +345,8 @@ extern "C" void rttycore_tx_begin(RTTYCore* c, int tune) {
     if (c->echo != 2) c->dem->ClearRXBuf();
     c->mod->InitPhase();
     c->mod->SetCount(RTTYCore::kBufSize * 3);
-    c->mod->SetDiddleTimer(int(SampFreq / 4));     // 0,25 s jako XMIT
+    c->tuning = tune ? 1 : 0;
+    c->mod->SetDiddleTimer(tune ? -1 : int(SampFreq / 4));   // tune: čistá nosná, jinak 0,25 s jako XMIT
     c->txActive = 1;
     c->txStopping = 0;
 }
@@ -351,8 +360,8 @@ extern "C" size_t rttycore_tx_pending(const RTTYCore* c) {
 }
 
 extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
-    if (!c || !text || !c->txActive || c->txStopping) return 0;
-    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
+    if (!c || !text || !c->txActive || c->txStopping || c->tuning) return 0;
+    CoreScope scope(&c->ctx);
     size_t used = 0;
     BYTE codes[8];
     for (const char* p = text; *p; p++) {
@@ -361,6 +370,11 @@ extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
         used++;
         if (u >= 'a' && u <= 'z') u = u - 'a' + 'A';
         if (!(u == '\r' || u == '\n' || (u >= 0x20 && u < 0x7F))) continue;
+        // Řídicí znaky MMTTY (_ ~ [ ]) jen přes rttycore_queue_tx_raw.
+        if (u == '_' || u == '~' || u == '[' || u == ']') continue;
+        // Znak bez Baudot kódu (tabulka dává 0x00) nevysílat – zkouška na kopii (ConvRTTY mění stav).
+        CRTTY probe = c->rtty();
+        if ((probe.ConvRTTY(char(u)) & 0xff) == 0) continue;
         char one[2] = { char(u), 0 };
         int n = c->rtty().ConvRTTY(codes, one);
         for (int i = 0; i < n; i++) c->mod->PutData(codes[i]);
@@ -368,17 +382,33 @@ extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
     return used;
 }
 
+extern "C" size_t rttycore_queue_tx_raw(RTTYCore* c, const uint8_t* codes, size_t n) {
+    if (!c || !codes || !c->txActive || c->txStopping || c->tuning) return 0;
+    CoreScope scope(&c->ctx);
+    size_t i = 0;
+    for (; i < n && rttycore_tx_space(c) > 0; i++) c->mod->PutData(codes[i]);
+    return i;
+}
+
 extern "C" size_t rttycore_generate_tx(RTTYCore* c, float* out, size_t n) {
     if (!c || !out) return 0;
-    CoreScope scope(const_cast<CoreContext*>(&c->ctx));
+    CoreScope scope(&c->ctx);
     size_t i = 0;
     if (c->txActive) {
+        c->txBlock.resize(n);
         for (; i < n; i++) {
-            if (c->txStopping && !c->mod->GetMode()) { c->txActive = 0; c->txStopping = 0; break; }
+            if (c->txStopping && !c->mod->GetMode()) {
+                c->txActive = 0; c->txStopping = 0; c->tuning = 0;
+                c->echoHold = long(SampFreq / 2);
+                break;
+            }
             double d = c->mod->Do(c->echo);
+            c->txBlock[i] = d;
             double f = d / 32768.0;
             out[i] = float(f > 1.0 ? 1.0 : (f < -1.0 ? -1.0 : f));
         }
+        // echo=1: demodulátor dekóduje vlastní vysílaný zvuk (TSound: vstup zavřený, Buff = TX blok).
+        if (c->echo == 1 && i > 0) rxPipeline(c, c->txBlock.data(), i);
     }
     for (size_t k = i; k < n; k++) out[k] = 0.0f;
     return i;
@@ -394,6 +424,7 @@ extern "C" void rttycore_tx_stop(RTTYCore* c) {
 
 extern "C" void rttycore_tx_abort(RTTYCore* c) {
     if (!c) return;
+    c->tuning = 0;
     CoreScope scope(const_cast<CoreContext*>(&c->ctx));
     c->mod->DeleteTXBuf();
     c->txActive = 0; c->txStopping = 0;
@@ -435,3 +466,4 @@ extern "C" size_t rttycore_spectrum(RTTYCore* c, float* out, size_t max, double*
     if (binHz) *binHz = SampFreq / FFT_SIZE;
     return n;
 }
+

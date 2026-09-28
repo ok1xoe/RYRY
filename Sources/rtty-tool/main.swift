@@ -104,7 +104,7 @@ case "decode":
     }
     configure(m, o)
     let events = m.events
-    let reader = Task {
+    let reader = Task.detached {   // mimo main actor, aby četl souběžně s processRx
         var text = ""
         for await e in events { if case .rxText(let c, false) = e { text.append(c) } }
         return text

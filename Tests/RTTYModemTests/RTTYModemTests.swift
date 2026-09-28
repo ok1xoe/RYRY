@@ -124,3 +124,38 @@ func collectText(_ m: RTTYModem, _ samples: [Float]) async -> String {
         #expect(m.get(parameter: p.id) == p.defaultValue, "\(p.id)")
     }
 }
+
+// Review #3: NUL v textu nesmí zablokovat frontu.
+@Test func nulInTextDoesNotStallQueue() throws {
+    let m = try RTTYModem()
+    m.beginTx(tune: false)
+    m.queueTx(text: "AB\u{0}CD")
+    var buf = [Float](repeating: 0, count: 4096)
+    for _ in 0..<60 { _ = buf.withUnsafeMutableBufferPointer { m.generateTx(into: $0) } }
+    #expect(m.txPending == 0)
+}
+
+// Review #4: text zadaný před beginTx se neztratí.
+@Test func textQueuedBeforeBeginTxIsKept() throws {
+    let m = try RTTYModem()
+    m.queueTx(text: "CQ CQ")
+    #expect(m.txPending == 5)
+    m.beginTx(tune: false)
+    #expect(m.txPending > 0)
+}
+
+// Review #6: pomalý odběratel nesmí přijít o přijatý text.
+@Test func slowConsumerDoesNotLoseText() async throws {
+    let m = try RTTYModem()
+    try m.set(parameter: "baud", value: .double(110))
+    let line = "0123456789 ABCDEFGHIJ KLMNOPQRST UVWXYZ\r\n"
+    let text = String(repeating: line, count: 250)        // 10 000 znaků
+    let s = RTTYSignalGenerator(baud: 110).generate(text: text)
+    let stream = m.events
+    s.withUnsafeBufferPointer { m.processRx($0) }           // nikdo zatím nečte
+    m.finishEvents()
+    var got = ""
+    for await e in stream { if case .rxText(let c, false) = e { got.append(c) } }
+    #expect(got.hasPrefix("0123456789 ABCDEFGHIJ"))
+    #expect(got.count >= text.count - 5)
+}
