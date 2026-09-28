@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "WaveFile", targets: ["WaveFile"]),
+        .library(name: "ModemKit", targets: ["ModemKit"]),
     ],
     targets: [
         .target(name: "WaveFile"),
@@ -22,6 +23,8 @@ let package = Package(
         ),
         .testTarget(name: "MMTTYCoreTests", dependencies: ["MMTTYCore", "RTTYSignalKit", "WaveFile"],
                     resources: [.copy("Fixtures")]),
+        .target(name: "ModemKit"),
+        .testTarget(name: "ModemKitTests", dependencies: ["ModemKit"]),
         .target(name: "RTTYSignalKit"),
         .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],
