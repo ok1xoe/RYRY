@@ -337,6 +337,7 @@ extern "C" void rttycore_tx_begin(RTTYCore* c, int tune) {
         c->mod->SetSpaceFreq(c->dem->GetSpaceFreq());
     }
     c->mod->ClearTXBuf();
+    c->mod->ClearFskCodes();
     c->rtty().ClearTX();
     c->mod->SetBaudRate(c->dem->GetBaudRate());
     c->mod->m_Amp.Reset();
@@ -467,3 +468,15 @@ extern "C" size_t rttycore_spectrum(RTTYCore* c, float* out, size_t max, double*
     return n;
 }
 
+
+extern "C" size_t rttycore_read_fsk_codes(RTTYCore* c, uint8_t* out, size_t max) {
+    if (!c || !out) return 0;
+    size_t k = 0;
+    while (k < max) {
+        int d = c->mod->ReadFskCode();
+        if (d < 0) break;
+        if (d >= 0xFC) continue;
+        out[k++] = uint8_t(d & 0x1F);
+    }
+    return k;
+}

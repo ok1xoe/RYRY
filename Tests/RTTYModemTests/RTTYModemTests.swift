@@ -159,3 +159,17 @@ func collectText(_ m: RTTYModem, _ samples: [Float]) async -> String {
     #expect(got.hasPrefix("0123456789 ABCDEFGHIJ"))
     #expect(got.count >= text.count - 5)
 }
+
+@Test func modemExposesFskCodes() throws {
+    let m = try RTTYModem()
+    try m.set(parameter: "diddle", value: .string("off"))
+    m.beginTx(tune: false)
+    m.queueTx(text: "RY")
+    var buf = [Float](repeating: 0, count: 1024)
+    var codes: [UInt8] = []
+    for _ in 0..<16 {
+        _ = buf.withUnsafeMutableBufferPointer { m.generateTx(into: $0) }
+        codes += m.takeFskCodes()
+    }
+    #expect(codes == [0x1F, 0x0A, 0x15])
+}

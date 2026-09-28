@@ -102,6 +102,9 @@ size_t rttycore_generate_tx(RTTYCore* core, float* out, size_t n);
 void   rttycore_tx_stop(RTTYCore* core);   /* dovysílá rozpracovaný znak, zbytek zahodí */
 void   rttycore_tx_abort(RTTYCore* core);  /* okamžitý konec */
 int    rttycore_is_tx(const RTTYCore* core);
+/* Kódy (5bit, pořadí bitů MMTTY), které modulátor od posledního volání začal vysílat,
+   včetně diddle a LTRS/FIGS; řídicí kódy 0xFC–0xFF se nevracejí. Pro FSK klíčovač. */
+size_t rttycore_read_fsk_codes(RTTYCore* core, uint8_t* out, size_t max);
 
 /* Volat po každých ~100 ms zpracovaných vzorků: spočítá FFT a provede AFC.
    Vrací 1, když AFC změnilo mark/space. */

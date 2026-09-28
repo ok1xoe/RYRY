@@ -35,4 +35,10 @@ public protocol Modem: AnyObject {
     var txPending: Int { get }
     /// Poslední spektrum pro vodopád a AFC.
     func spectrum() -> SpectrumFrame?
+    /// Kódy, které modulátor začal vysílat (pro FSK klíčovač); modemy bez FSK vrací [].
+    func takeFskCodes() -> [UInt8]
+}
+
+public extension Modem {
+    func takeFskCodes() -> [UInt8] { [] }
 }

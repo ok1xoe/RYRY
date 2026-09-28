@@ -176,6 +176,17 @@ public final class RTTYModem: Modem, @unchecked Sendable {
 
     public var txPending: Int { txQueue.count + rttycore_tx_pending(core) }
 
+    public func takeFskCodes() -> [UInt8] {
+        var out: [UInt8] = []
+        var buf = [UInt8](repeating: 0, count: 64)
+        while true {
+            let n = rttycore_read_fsk_codes(core, &buf, buf.count)
+            if n == 0 { break }
+            out += buf[0..<n]
+        }
+        return out
+    }
+
     public func spectrum() -> SpectrumFrame? {
         var mags = [Float](repeating: 0, count: 2048)
         var binHz = 0.0

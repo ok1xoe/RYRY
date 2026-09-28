@@ -880,6 +880,12 @@ public:
 	void PutData(int d);
 	double Do(int echo);
 	inline void SetDem(CFSKDEM *p){pDem = p;};
+	// mmtty4mac: kódy, které modulátor začal vysílat (pro FSK klíčovač)
+	BYTE	m_FskOut[256];
+	int		m_FskW, m_FskR;
+	inline void PushFskCode(BYTE c){ m_FskOut[m_FskW & 255] = c; m_FskW++; if( m_FskW - m_FskR > 256 ) m_FskR = m_FskW - 256; };
+	inline int ReadFskCode(void){ if( m_FskR == m_FskW ) return -1; return m_FskOut[(m_FskR++) & 255]; };
+	inline void ClearFskCodes(void){ m_FskR = m_FskW; };
 };
 
 #pragma pack(push, 1)	// パックの指示

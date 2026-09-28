@@ -450,6 +450,7 @@ _try:;
 						}
 					}
 					m_figout = 0;
+					PushFskCode(BYTE(m_Data));	// mmtty4mac: kód pro FSK klíčovač
 					m_DataCount = m_BitLen;
 					m_SumParity = 0;
 					m_mode++;
@@ -491,6 +492,7 @@ _try:;
 							}
 							break;
 					}
+					PushFskCode(BYTE(m_Data));	// mmtty4mac: kód pro FSK klíčovač
 					m_DataCount = m_BitLen;
 					m_SumParity = 0;
 					m_mode++;
