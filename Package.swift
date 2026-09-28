@@ -10,6 +10,8 @@ let package = Package(
     targets: [
         .target(name: "WaveFile"),
         .testTarget(name: "WaveFileTests", dependencies: ["WaveFile"]),
+        .target(name: "RTTYSignalKit"),
+        .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],
     cxxLanguageStandard: .cxx17
 )
