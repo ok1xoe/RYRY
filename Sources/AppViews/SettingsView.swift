@@ -9,6 +9,7 @@ import Settings
 import RigControl
 import AppCore
 import SwiftUI
+import UniformTypeIdentifiers
 import Upload
 import QSOLog
 
@@ -760,6 +761,7 @@ struct ContestTab: View {
                 Text(L("%N odesílané číslo nebo výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST")).font(.callout)
             } header: { Text(L("Makra")) }
             ESMSection(s: $s)
+            CallHistorySection(s: $s, model: model)
             Section {
                 Toggle(L("Návrhy značek pod polem Call"), isOn: $s.log.superCheck)
                 LabeledContent(L("Databáze značek")) {
@@ -1099,5 +1101,45 @@ struct ESMSection: View {
             Text(L("V závodě Enter v poli Call nebo výměny pošle makro podle stavu: Run – CQ, výměna, TU a zalogování; S&P – moje značka, výměna a zalogování. Nemá-li makro TU nebo výměny S&P %l, spojení se zaloguje automaticky. Během vysílání Enter nic neposílá. Run / S&P přepíná i QSO panel a %@.", s.binding(for: .esmMode).display))
         }
         .disabled(!s.contest.enabled)
+    }
+}
+
+/// Nastavení → Závod → Historie značek (soubor ve formátu N1MM Call History).
+struct CallHistorySection: View {
+    @Binding var s: AppSettings
+    @Bindable var model: AppModel
+
+    private func choose() {
+        let p = NSOpenPanel()
+        p.canChooseFiles = true; p.canChooseDirectories = false; p.allowsMultipleSelection = false
+        p.allowedContentTypes = [.plainText, .commaSeparatedText, .text]
+        p.message = L("Vyberte soubor historie značek (N1MM Call History, .txt nebo .csv)")
+        if p.runModal() == .OK, let u = p.url { s.callHistory.path = u.path; s.callHistory.enabled = true }
+    }
+
+    var body: some View {
+        Section {
+            Toggle(L("Doplňovat z historie značek"), isOn: $s.callHistory.enabled)
+            LabeledContent(L("Soubor")) {
+                HStack {
+                    Text(s.callHistory.path.isEmpty ? L("nevybrán") : (s.callHistory.path as NSString).lastPathComponent)
+                        .foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        .hint(s.callHistory.path)
+                    Button(L("Vybrat…")) { choose() }
+                    if !s.callHistory.path.isEmpty {
+                        Button(L("Znovu načíst")) { model.reloadCallHistory() }
+                            .disabled(s.callHistory.path != model.settings.callHistory.path)
+                    }
+                }
+            }
+            if !model.callHistoryStatus.isEmpty {
+                Text(model.callHistoryStatus).font(.caption).foregroundStyle(.secondary)
+            } else if model.settings.callHistory.enabled, !model.settings.callHistory.path.isEmpty {
+                Text(L("%ld značek", model.callHistoryCount)).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
+            Toggle(L("Doplnit jen prázdná pole"), isOn: $s.callHistory.fillEmptyOnly)
+        } header: { Text(L("Historie značek")) } footer: {
+            Text(L("Po zadání značky doplní jméno, lokátor a výměnu protistanice ze souboru (N1MM Call History: hlavička !!Order!!, nebo jednoduché CSV Call,Name,Exch1). Historie má přednost před zónou z DXCC a před callbookem; ručně zadané hodnoty se nepřepisují. Počet značek se aktualizuje po uložení nastavení."))
+        }
     }
 }

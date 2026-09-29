@@ -93,6 +93,12 @@ public final class AppModel {
     public private(set) var apiStatus = ""
     /// Nenápadná informace pro QSO panel: „callbook: QRZ.com“ nebo chyba (prázdné = nic).
     public private(set) var callbookStatus = ""
+    /// Historie značek: počet načtených značek a stav načítání (prázdné = nic k hlášení).
+    public private(set) var callHistoryCount = 0
+    public private(set) var callHistoryStatus = ""
+    private var callHistory: CallHistory?
+    private var callHistoryPath = ""
+    private var callHistoryTask: Task<Void, Never>?
     private let secrets: SecretStore
     private let callbookFetcher: HTTPFetcher
     private let callbookDelay: Duration
@@ -219,6 +225,7 @@ public final class AppModel {
         let qtc = try? QTCStore(directory: loc.directory, fileName: loc.qtcFileName)
         let app = AppController(settings: settings, engine: engine, log: log, profiles: profileStore, qtc: qtc)
         self.app = app
+        syncCallHistory()
         let events = app.events()
         eventTask = Task { [weak self] in
             for await e in events { self?.handle(e) }
@@ -333,7 +340,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.callbook); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots)
+                take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
@@ -1329,6 +1336,42 @@ public final class AppModel {
         await run("QSO") { try await app.setQSOField(name, value) }
         qso = await app.qso
         if name == "call" { await refreshPrevious(); scheduleCallbook() }
+    }
+
+    // MARK: Historie značek
+
+    /// Znovu načte soubor historie značek (po úpravě souboru na disku).
+    public func reloadCallHistory() { callHistoryPath = ""; callHistory = nil; syncCallHistory() }
+
+    /// Předá řadiči načtenou historii; při novém souboru ho načte na pozadí (desítky tisíc řádků neblokují GUI).
+    private func syncCallHistory() {
+        callHistoryTask?.cancel(); callHistoryTask = nil
+        let cfg = settings.callHistory
+        guard cfg.enabled, !cfg.path.isEmpty else {
+            callHistory = nil; callHistoryPath = ""; callHistoryCount = 0; callHistoryStatus = ""
+            if let app { Task { await app.setCallHistory(nil) } }
+            return
+        }
+        if callHistoryPath == cfg.path, let h = callHistory {
+            if let app { Task { await app.setCallHistory(h) } }
+            return
+        }
+        let path = cfg.path
+        callHistoryStatus = L("Načítám historii značek…")
+        callHistoryTask = Task { [weak self] in
+            do {
+                let h = try await CallHistory.load(url: URL(fileURLWithPath: path))
+                guard !Task.isCancelled, let self else { return }
+                self.callHistory = h; self.callHistoryPath = path
+                self.callHistoryCount = h.count; self.callHistoryStatus = ""
+                await self.app?.setCallHistory(h)
+            } catch is CancellationError {
+            } catch {
+                guard !Task.isCancelled, let self else { return }
+                self.callHistory = nil; self.callHistoryPath = ""; self.callHistoryCount = 0
+                self.callHistoryStatus = L("Historii značek nelze načíst: %@", error.localizedDescription)
+            }
+        }
     }
 
     // MARK: Callbook

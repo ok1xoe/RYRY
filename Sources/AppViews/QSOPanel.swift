@@ -174,6 +174,13 @@ struct QSOField: View {
         TextField(label, text: $text)
             .textFieldStyle(.roundedBorder)
             .focused($focused)
+            .overlay(alignment: .trailing) {
+                // nenápadný štítek u hodnoty doplněné z historie značek (zmizí po ruční úpravě pole)
+                if let v = model.qso.historyFilled[field], !v.isEmpty, model.qso.value(field) == v {
+                    Text(L("z historie")).font(.caption2).foregroundStyle(.secondary).padding(.trailing, 6)
+                        .allowsHitTesting(false)
+                }
+            }
             .onSubmit { submit() }
             .onChange(of: focused) { if !focused { commit() } }
             .onChange(of: text) { _, t in if focused { onTyping?(t) } }

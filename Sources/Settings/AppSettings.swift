@@ -138,6 +138,20 @@ public struct CallbookSettings: Codable, Sendable, Equatable {
     }
 }
 
+/// Soubor historie značek (N1MM Call History): předvyplnění jména, lokátoru a výměny protistanice.
+public struct CallHistorySettings: Codable, Sendable, Equatable {
+    public var enabled = false
+    public var path = ""
+    public var fillEmptyOnly = true
+    public init() {}
+    enum CodingKeys: String, CodingKey { case enabled, path, fillEmptyOnly }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "callHistory", x = CallHistorySettings()
+        enabled = c.tolerant(.enabled, x.enabled, w, s); path = c.tolerant(.path, x.path, w, s)
+        fillEmptyOnly = c.tolerant(.fillEmptyOnly, x.fillEmptyOnly, w, s)
+    }
+}
+
 public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public var name: String
     public var text: String
@@ -501,6 +515,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var rig = RigSettings()
     public var api = APISettings()
     public var callbook = CallbookSettings()
+    public var callHistory = CallHistorySettings()
     public var rtty: [String: ParameterValue] = [:]
     public var macros: [Macro] = AppSettings.defaultMacros
     public var log = LogSettings()
@@ -543,7 +558,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "", text: ""),
     ]
 
-    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty,
+    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, callHistory, rtty,
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
                                              shortcuts, updates, upload, spots, decoders, esm }
 
@@ -560,6 +575,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         ptt = c.tolerant(.ptt, x.ptt, w, s); fsk = c.tolerant(.fsk, x.fsk, w, s)
         rig = c.tolerant(.rig, x.rig, w, s); api = c.tolerant(.api, x.api, w, s)
         callbook = c.tolerant(.callbook, x.callbook, w, s)
+        callHistory = c.tolerant(.callHistory, x.callHistory, w, s)
         rtty = c.tolerant(.rtty, TolerantDict<ParameterValue>(), w, s).items
         macros = c.contains(.macros) ? c.tolerant(.macros, TolerantArray<Macro>(), w, s).items : x.macros
         // dřívější výchozí závodní makro mělo %M (v MMTTY přijaté číslo) místo %N (odesílané)
