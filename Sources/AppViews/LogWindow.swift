@@ -106,7 +106,15 @@ public struct LogWindow: View {
             }
             HStack {
                 Text(L("%ld spojení", filtered.count)).foregroundStyle(.secondary)
+                Text((model.logLocation.displayPath as NSString).abbreviatingWithTildeInPath).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
+                    .hint(model.logLocation.displayPath)
                 Spacer()
+                Menu("Log") {
+                    Button(L("Nový log…")) { FileActions.newLog(model) }
+                    Button(L("Otevřít log…")) { FileActions.openLog(model) }
+                    Button(L("Uložit log jako…")) { FileActions.saveLogAs(model) }
+                    Button(L("Exportovat ADIF…")) { FileActions.exportADIF(model) }
+                }.fixedSize()
                 Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
             }.padding(6).font(.caption)

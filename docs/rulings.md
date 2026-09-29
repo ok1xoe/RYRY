@@ -238,3 +238,8 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 ## Závěrečná kontrola plánů 13 a 14
 - Opraveno: obnova CAT po odpojení USB (I/O chyby transportu = `CATIOError` → port se zavře a znovu otevře), počet číslic Yaesu FA podle odpovědi rádia (starší 8), volba RTS na portu CAT (výchozí zapnuto u Yaesu – „CAT RTS = ENABLE“), Použít nepřepíše záznam příjmu zapnutý v menu, jediné spuštění rigctld pro souběžné dotazy + chyba při obsazeném TCP portu, ukončení rigctld s limitem 2 s (pak SIGKILL), dvojí zavření WAV po chybě zápisu, Space/Return/šipky jen s modifikátorem, Kenwood `DA0;` při odchodu z datového režimu, Elecraft PKTLSB.
 - Odloženo (minor): CAT „RX“ při PTT přes RTS/DTR se neposílá s čekáním (může doběhnout po odpojení rigu); zalamování během TX počítá jen neodvysílaný text; po chybě záznamu příjmu zůstane přepínač v menu zapnutý; WAV přerušený pádem má nulovou délku v hlavičce; blokující zápis na zaseknutý USB CDC nemá limit.
+
+## Správa logu
+- Log = složka + název: `<název>.jsonl` (zdroj pravdy), `<název>.adi`, QTC `<název>-qtc.jsonl` (výchozí „mmtty4mac“ ponechává dosavadní `qtc.jsonl`). V nastavení `log.directory` + `log.name`, nedávné logy `log.recent` (8, cesty k ADIF).
+- Nový log: cíl nesmí existovat; pořadové číslo závodu se nastaví na 1. Otevřít: log mmtty4mac nebo cizí ADIF – převede se do JSONL, originál se zazálohuje jako `.adi.orig` (log pak ADIF přepisuje ze svých záznamů). Uložit jako = kopie všech souborů a přepnutí na ni. Samostatné „Uložit“ není – každé QSO se zapisuje hned (fsync).
+- Přepnutí logu restartuje engine (jako Použít; při TX nejdřív RX). Použít z dialogu Nastavení bere adresář logu jen při změně v dialogu (jinak by vrátil log přepnutý v menu).

@@ -77,6 +77,8 @@ Macro variables:
 - The log is stored in `~/Documents/mmtty4mac` (JSONL + ADIF `mmtty4mac.adi` that any logger can read).
 - An old MMTTY log: export it to ADIF in MMTTY and import it in mmtty4mac (duplicates are skipped).
 
+Log management (File menu): **New Log…** (⌘N; contest serials start at 1), **Open Log…** (⌘O; an mmtty4mac log or ADIF from another program – converted, the original stays as `.adi.orig`), **Open Recent Log**, **Save Log As…** (⇧⌘S; a copy you continue in), **Export ADIF…**, **Import ADIF…**. Each QSO is saved as soon as it is logged.
+
 ## 7. Contests
 
 Settings → Contest: turn on **Contest mode** and pick a **Preset** (ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE, OK DX RTTY). The preset sets the Cabrillo name, the exchange format and the next start date – always check the date in the contest rules.

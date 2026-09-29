@@ -178,10 +178,11 @@ public final class AppModel {
         let rig = Self.makeRig(settings.rig)
         let engine = engineFactory(settings, rig)
         let log: QSOLogStore?
-        do { log = try QSOLogStore(directory: URL(fileURLWithPath: settings.log.directory)) }
+        let loc = logLocation
+        do { log = try QSOLogStore(directory: loc.directory, baseName: loc.name) }
         catch { log = nil; note(L("Log nedostupný: %@", "\(error)")) }
         if let log { for w in await log.warnings { note(w) } }
-        let qtc = try? QTCStore(directory: URL(fileURLWithPath: settings.log.directory))
+        let qtc = try? QTCStore(directory: loc.directory, fileName: loc.qtcFileName)
         let app = AppController(settings: settings, engine: engine, log: log, profiles: profileStore, qtc: qtc)
         self.app = app
         let events = app.events()
@@ -283,7 +284,7 @@ public final class AppModel {
             func merge(_ cur: AppSettings) -> AppSettings {
                 var m = cur
                 m.station = s.station; m.audio = s.audio; m.ptt = s.ptt; m.fsk = s.fsk
-                m.rig = s.rig; m.api = s.api; m.log.directory = s.log.directory
+                m.rig = s.rig; m.api = s.api
                 m.clock = s.clock; m.rttyCore = s.rttyCore
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
@@ -292,6 +293,7 @@ public final class AppModel {
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
                 take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
+                take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 return m
@@ -717,6 +719,82 @@ public final class AppModel {
     /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
     public func cabrilloText(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
         await app?.cabrillo(from: from, to: to, contestOnly: contestOnly) ?? ""
+    }
+
+    // MARK: Správa logu (nový, otevřít, uložit jako)
+
+    public var logLocation: LogLocation {
+        LogLocation(directory: URL(fileURLWithPath: settings.log.directory), name: settings.log.name)
+    }
+
+    public enum LogFileError: Error, LocalizedError {
+        case exists(String), missing(String)
+        public var errorDescription: String? {
+            switch self {
+            case .exists(let n): return L("Log „%@“ už existuje – otevřete ho přes Otevřít log.", n)
+            case .missing(let n): return L("Log „%@“ neexistuje.", n)
+            }
+        }
+    }
+
+    /// Přepne na jiný log (restart jako po Použít – během vysílání nejdřív RX).
+    private func switchLog(to loc: LogLocation, resetSerial: Bool) async {
+        await serialized { [weak self] in
+            guard let self else { return }
+            if let app = self.app, await app.engine.state != .rx { await app.rxNow() }
+            await self.stopNow()
+            self.settings.log.directory = loc.directory.path
+            self.settings.log.name = loc.name
+            self.settings.log.remember(loc.displayPath)
+            if resetSerial { self.settings.contest.nextSerial = 1 }
+            do { try self.settingsStore.save(self.settings) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
+            self.qtcReceive = nil; self.qtcPendingCache = nil
+            await self.startNow()
+        }
+    }
+
+    /// Nový prázdný log (pořadová čísla závodu začnou od 1).
+    public func newLog(file: URL) async throws {
+        let loc = LogLocation(file: file)
+        let fm = FileManager.default
+        if fm.fileExists(atPath: loc.jsonlURL.path) || fm.fileExists(atPath: loc.adifURL.path) { throw LogFileError.exists(loc.name) }
+        try fm.createDirectory(at: loc.directory, withIntermediateDirectories: true)
+        await switchLog(to: loc, resetSerial: true)
+    }
+
+    /// Otevře existující log; ADIF z jiného programu se převede (originál zůstane jako .orig). Vrací text pro uživatele.
+    @discardableResult
+    public func openLog(file: URL) async throws -> String {
+        let loc = LogLocation(file: file)
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: loc.jsonlURL.path) || fm.fileExists(atPath: loc.adifURL.path)
+                || fm.fileExists(atPath: loc.directory.appendingPathComponent(loc.name + ".adif").path)
+        else { throw LogFileError.missing(loc.name) }
+        guard loc != logLocation else { return L("Log „%@“ je už otevřený.", loc.name) }
+        let r = try await loc.prepareForOpen()
+        await switchLog(to: loc, resetSerial: false)
+        if let b = r.backup {
+            return L("Log převeden z ADIF: %ld spojení, přeskočeno %ld. Původní soubor: %@", r.imported, r.skipped, b.lastPathComponent)
+        }
+        return L("Otevřen log „%@“ (%ld spojení).", loc.name, logRecords.count)
+    }
+
+    /// Uloží kopii logu pod jiným názvem a dál pracuje v ní.
+    public func saveLogAs(file: URL) async throws {
+        let dst = LogLocation(file: file)
+        if let log = app?.log, !(await log.isADIFConsistent()) { try await log.rebuildADIF() }
+        try logLocation.copy(to: dst)
+        await switchLog(to: dst, resetSerial: false)
+    }
+
+    /// Kopie ADIF logu jinam (log zůstává otevřený).
+    public func exportADIF(to url: URL) async throws {
+        guard let log = app?.log else { throw QSOLogError.io(L("Log není k dispozici.")) }
+        if !(await log.isADIFConsistent()) { try await log.rebuildADIF() }
+        let src = logLocation.adifURL
+        guard FileManager.default.fileExists(atPath: src.path) else { throw LogFileError.missing(logLocation.name) }
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        try FileManager.default.copyItem(at: src, to: url)
     }
 
     /// Import ADIF (např. log převedený z MMTTY); vrací text pro uživatele.

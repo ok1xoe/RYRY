@@ -64,3 +64,18 @@ import Testing
     #expect(o.type == .hamlibManaged && o.baud == 19200 && o.stopBits == 1 && o.civAddress == 0x94 && o.hamlibModel == 1)
     #expect(RigSettings.icomAddresses.first { $0.0 == "IC-7300" }?.1 == 0x94)
 }
+
+// Správa logu: název logu a nedávné logy
+@Test func logNameAndRecent() throws {
+    var l = LogSettings()
+    #expect(l.name == "mmtty4mac" && l.recent.isEmpty)
+    l.remember("/a/x.adi"); l.remember("/b/y.adi"); l.remember("/a/x.adi")
+    #expect(l.recent == ["/a/x.adi", "/b/y.adi"])
+    for i in 0..<10 { l.remember("/r/\(i).adi") }
+    #expect(l.recent.count == LogSettings.recentLimit && l.recent.first == "/r/9.adi")
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ln-\(UUID())")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    try #"{"log":{"name":"../zlo","recent":["/a.adi",5]}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+    let o = SettingsStore(directory: dir).load().0.log
+    #expect(o.name == "mmtty4mac")                                   // název s lomítkem odmítnut
+}

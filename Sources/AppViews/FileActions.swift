@@ -52,6 +52,60 @@ import UniformTypeIdentifiers
         }
     }
 
+    // MARK: Správa logu
+
+    static var adifTypes: [UTType] { [UTType(filenameExtension: "adi"), UTType(filenameExtension: "adif")].compactMap { $0 } }
+
+    private static func run(_ body: @escaping @MainActor () async throws -> String?) {
+        Task { @MainActor in
+            do {
+                if let msg = try await body() {
+                    let a = NSAlert(); a.messageText = "Log"; a.informativeText = msg; a.runModal()
+                }
+            } catch { NSAlert(error: error).runModal() }
+        }
+    }
+
+    /// Nový log: název a umístění (vytvoří se `<název>.adi` a `.jsonl`).
+    public static func newLog(_ model: AppModel) {
+        let p = NSSavePanel()
+        p.allowedContentTypes = adifTypes; p.nameFieldStringValue = "log.adi"; p.title = L("Nový log")
+        p.directoryURL = model.logLocation.directory
+        guard p.runModal() == .OK, let url = p.url else { return }
+        run { try await model.newLog(file: url); return nil }
+    }
+
+    /// Otevře log mmtty4mac nebo ADIF z jiného programu.
+    public static func openLog(_ model: AppModel) {
+        let p = NSOpenPanel()
+        p.allowedContentTypes = adifTypes + [UTType(filenameExtension: "jsonl")].compactMap { $0 }
+        p.title = L("Otevřít log"); p.directoryURL = model.logLocation.directory
+        guard p.runModal() == .OK, let url = p.url else { return }
+        openLog(model, url: url)
+    }
+
+    public static func openLog(_ model: AppModel, url: URL) {
+        run { try await model.openLog(file: url) }
+    }
+
+    /// Uloží kopii logu pod jiným názvem a dál pracuje v ní.
+    public static func saveLogAs(_ model: AppModel) {
+        let p = NSSavePanel()
+        p.allowedContentTypes = adifTypes; p.nameFieldStringValue = model.logLocation.name + "-" + L("kopie") + ".adi"
+        p.title = L("Uložit log jako")
+        guard p.runModal() == .OK, let url = p.url else { return }
+        run { try await model.saveLogAs(file: url); return nil }
+    }
+
+    /// Kopie ADIF jinam (log zůstává otevřený).
+    public static func exportADIF(_ model: AppModel) {
+        let p = NSSavePanel()
+        p.allowedContentTypes = adifTypes; p.nameFieldStringValue = model.logLocation.name + ".adi"
+        p.title = L("Exportovat ADIF")
+        guard p.runModal() == .OK, let url = p.url else { return }
+        run { try await model.exportADIF(to: url); return nil }
+    }
+
     /// Otevře nastavení zvuku systému (úroveň vstupu a výstupu zvukovky).
     public static func openSoundSettings() {
         if let u = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") { NSWorkspace.shared.open(u) }

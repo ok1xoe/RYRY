@@ -169,9 +169,9 @@ public actor QTCStore {
     private let url: URL
     private static let encoder: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .deferredToDate; return e }()
 
-    public init(directory: URL) throws {
+    public init(directory: URL, fileName: String = "qtc.jsonl") throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        url = directory.appendingPathComponent("qtc.jsonl")
+        url = directory.appendingPathComponent(fileName)
         if let d = try? Data(contentsOf: url) {
             let dec = JSONDecoder()
             for (i, line) in d.split(separator: UInt8(ascii: "\n")).enumerated() {
