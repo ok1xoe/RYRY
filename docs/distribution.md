@@ -13,7 +13,20 @@ Se stabilním podpisem si macOS pamatuje povolení mikrofonu i po novém sestave
 
 Verze se bere z `Resources/Info.plist` (`CFBundleShortVersionString`). Číslo sestavení je počet commitů.
 
-## Distribuce mimo App Store (notarizace)
+## Vydání jedním příkazem (účet v Xcode)
+
+    ./scripts/release.sh
+
+Skript použije účet přihlášený v Xcode, kde je tým GN8G426WK4 s cloudovým certifikátem Developer ID. Hesla ani lokální klíč nepotřebuje. Postup:
+1. Sestaví a podepíše aplikaci.
+2. Vytvoří `.xcarchive` a `xcodebuild -exportArchive` (method developer-id, destination upload) ji podepíše certifikátem Developer ID a odešle k notarizaci.
+3. Počká na výsledek a `xcodebuild -exportNotarizedApp` vytvoří `build/notarized/mmtty4mac.app` s připojeným lístkem.
+4. Ověří ji (`stapler`, `spctl`) a zabalí do `build/mmtty4mac-<verze>.dmg`.
+
+DMG zůstane nepodepsané, protože cloudový klíč nejde použít pro `codesign`. Aplikace uvnitř je notarizovaná a Gatekeeper ji přijme.
+Poprvé vyzkoušeno 2026-09-29: verze 0.9.0 (87), výsledek „accepted, source=Notarized Developer ID“.
+
+## Distribuce mimo App Store s lokálním klíčem (notarytool)
 
 Aplikace podepsaná certifikátem Apple Development běží jen na tvém Macu. Aby ji Gatekeeper pustil i na jiných Macích,
 potřebuje podpis **Developer ID Application** a notarizaci.
