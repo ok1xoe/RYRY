@@ -30,7 +30,7 @@ struct LanguageSection: View {
             }
             if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
         } header: { Text(L("Jazyk")) } footer: {
-            Text(L("Jazykové soubory (cs.json, en.json…) jsou ve složce jazyků a lze je upravit; změna se projeví po novém výběru jazyka nebo restartu. Nový překlad: ulož šablonu, přelož hodnoty v „strings“, nastav „code“ a „name“ a soubor nahraj."))
+            Text(L("Jazyk se přepne hned ve všech oknech. Jazykové soubory (cs.json, en.json…) jsou ve složce jazyků a lze je upravit – uložená změna se projeví okamžitě. Nový překlad: ulož šablonu, přelož hodnoty v „strings“, nastav „code“ a „name“ a soubor nahraj."))
         }
         .onAppear { packs = library.available() }
     }
