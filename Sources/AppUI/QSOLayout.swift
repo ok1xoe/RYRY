@@ -20,6 +20,10 @@ public enum QSOLayout {
         let base = [call, .country, rst]
         switch c.format {
         case .serial:
+            // ARRL RTTY Roundup: W/VE posílají stát/provincii místo čísla (násobič) – přijatá výměna zvlášť
+            if c.exchange.isEmpty, c.selectedPreset == .arrlRoundup {
+                return base + [serial, .single("exchangeRcvd", L("Stát/prov. r")), notes]
+            }
             return base + [c.exchange.isEmpty ? serial : .pair("exchangeSent", "Exch s", "exchangeRcvd", "Exch r"), notes]
         case .cqrj: return base + [.pair("exchangeSent", L("Zóna/QTH s"), "exchangeRcvd", L("Zóna/QTH r")), notes]
         case .bartg: return base + [serial, .pair("exchangeSent", L("Čas s"), "exchangeRcvd", L("Čas r")), notes]

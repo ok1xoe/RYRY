@@ -14,11 +14,7 @@ extension AppModel {
         return c.isEmpty ? "" : QSORecord.baseCall(c)
     }
 
-    /// Pásmo pro duplicity a „nová země na pásmu“: frekvence rigu, jinak ručně zadaná (jako `AppController.currentFrequency`).
-    public var currentBand: String? {
-        if let r = rig, r.online, let f = r.frequency { return Bands.band(forHz: f) }
-        return Bands.band(forHz: qso.frequency)
-    }
+    // currentBand (pásmo rigu, jinak ruční frekvence) je v AppModel.swift – sdílí ho násobiče i upozornění
 
     func countryRef(_ call: String) -> CountryRef? {
         app?.country(for: call).map { CountryRef(key: $0.primaryPrefix, name: $0.name) }

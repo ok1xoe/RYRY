@@ -27,8 +27,13 @@ public struct CountryDB: Sendable {
     private let entities: [CountryInfo]
     private var prefixes: [String: (Int, Override)] = [:]
     private var exact: [String: (Int, Override)] = [:]
+    /// Země jen ze seznamu WAE („*“ v cty.dat: Sicílie, Shetlandy, evropské Turecko, …) – indexy do `entities`.
+    private var waePrefixes: [String: (Int, Override)] = [:]
+    private var waeExact: [String: (Int, Override)] = [:]
+    private let dxccCount: Int
 
-    public var count: Int { entities.count }
+    /// Počet zemí DXCC (bez zemí jen ze seznamu WAE).
+    public var count: Int { dxccCount }
 
     public init(contentsOf url: URL) throws {
         let data = try Data(contentsOf: url)
@@ -38,15 +43,19 @@ public struct CountryDB: Sendable {
     public init(text: String) throws {
         var ents: [CountryInfo] = []
         var pfx: [String: (Int, Override)] = [:], ex: [String: (Int, Override)] = [:]
+        var wpfx: [String: (Int, Override)] = [:], wex: [String: (Int, Override)] = [:]
+        var dxcc = 0
         for chunk in text.split(separator: ";") {
             let fields = chunk.split(separator: ":", maxSplits: 8, omittingEmptySubsequences: false)
             guard fields.count == 9 else { continue }
             func f(_ i: Int) -> String { fields[i].trimmingCharacters(in: .whitespacesAndNewlines) }
             guard let cq = Int(f(1)), let itu = Int(f(2)), let lat = Double(f(4)), let lonW = Double(f(5)),
                   let off = Double(f(6)) else { continue }
-            let primary = f(7)
-            // „*“ = entita jen pro WAE/CQ (Sicílie, …), ne země DXCC – prefixy pak spadnou do mateřské země
-            if primary.hasPrefix("*") { continue }
+            var primary = f(7)
+            // „*“ = entita jen pro WAE/CQ (Sicílie, …), ne země DXCC – běžné hledání ji přeskočí
+            // (prefixy spadnou do mateřské země), hledání s `wae: true` ji najde
+            let waeOnly = primary.hasPrefix("*")
+            if waeOnly { primary.removeFirst() } else { dxcc += 1 }
             let idx = ents.count
             ents.append(CountryInfo(name: f(0), primaryPrefix: primary, continent: f(3), cqZone: cq, ituZone: itu,
                                     latitude: lat, longitude: -lonW, utcOffsetHours: -off))
@@ -55,11 +64,13 @@ public struct CountryDB: Sendable {
                 guard !tok.isEmpty else { continue }
                 let (isExact, base, ov) = Self.parseAlias(tok)
                 guard !base.isEmpty else { continue }
-                if isExact { ex[base] = (idx, ov) } else { pfx[base] = (idx, ov) }
+                if waeOnly {
+                    if isExact { wex[base] = (idx, ov) } else { wpfx[base] = (idx, ov) }
+                } else if isExact { ex[base] = (idx, ov) } else { pfx[base] = (idx, ov) }
             }
         }
-        guard !ents.isEmpty else { throw Error.noEntities }
-        entities = ents; prefixes = pfx; exact = ex
+        guard dxcc > 0 else { throw Error.noEntities }
+        entities = ents; prefixes = pfx; exact = ex; waePrefixes = wpfx; waeExact = wex; dxccCount = dxcc
     }
 
     /// `=W1AW(5)[8]{NA}<41.7/72.7>~5.0~` → přesná?, základ, přepisy.
@@ -99,11 +110,14 @@ public struct CountryDB: Sendable {
         return i
     }
 
-    private func longestPrefix(_ s: String) -> CountryInfo? {
+    private func longestPrefix(_ s: String, wae: Bool) -> CountryInfo? {
+        if wae, let e = waeExact[s] { return info(e) }
         if let e = exact[s] { return info(e) }
         var len = s.count
         while len > 0 {
-            if let h = prefixes[String(s.prefix(len))] { return info(h) }
+            let p = String(s.prefix(len))
+            if wae, let h = waePrefixes[p] { return info(h) }
+            if let h = prefixes[p] { return info(h) }
             len -= 1
         }
         return nil
@@ -112,9 +126,11 @@ public struct CountryDB: Sendable {
     static let modifiers: Set<String> = ["P", "M", "QRP", "QRPP", "A", "B", "LH", "J", "R", "T", "X"]
     static let noCountry: Set<String> = ["MM", "AM"]
 
-    public func lookup(_ call: String) -> CountryInfo? {
+    /// Země pro značku. `wae: true` = i země ze seznamu WAE (CQ WW, WAE DX Contest), jinak jen DXCC.
+    public func lookup(_ call: String, wae: Bool = false) -> CountryInfo? {
         let c = call.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !c.isEmpty else { return nil }
+        if wae, let e = waeExact[c] { return info(e) }
         if let e = exact[c] { return info(e) }
         var parts = c.split(separator: "/").map(String.init)
         if parts.count > 1, parts.contains(where: Self.noCountry.contains) { return nil }
@@ -124,10 +140,10 @@ public struct CountryDB: Sendable {
             parts.removeLast()
         }
         guard !parts.isEmpty else { return nil }
-        if parts.count == 1 { return longestPrefix(parts[0]) }
+        if parts.count == 1 { return longestPrefix(parts[0], wae: wae) }
         // portable: rozhoduje kratší část (prefix země)
         let p = parts.min { $0.count < $1.count }!
-        return longestPrefix(p)
+        return longestPrefix(p, wae: wae)
     }
 }
 

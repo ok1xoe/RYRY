@@ -70,7 +70,7 @@ public final class AppModel {
     private let engineFactory: EngineFactory
     private let spectrumFPS: Double
 
-    public private(set) var settings: AppSettings
+    public private(set) var settings: AppSettings { didSet { if multiplierKey != multiplierKeyApplied { refreshMultipliers() } } }
     public private(set) var state: EngineState = .stopped
     public private(set) var rxRuns: [RxRun] = []
     public private(set) var rxCharCount = 0
@@ -85,10 +85,10 @@ public final class AppModel {
     public private(set) var mark = 2125.0
     public private(set) var space = 2295.0
     public private(set) var fig = false
-    public internal(set) var rig: RigStatus?
-    public private(set) var qso = QSOFields()
+    public internal(set) var rig: RigStatus? { didSet { if currentBand != Self.band(oldValue, qso) { refreshNewMultiplier() } } }
+    public private(set) var qso = QSOFields() { didSet { refreshNewMultiplier() } }
     public private(set) var previousQSOs: [QSORecord] = []
-    public private(set) var logRecords: [QSORecord] = []
+    public private(set) var logRecords: [QSORecord] = [] { didSet { refreshMultipliers() } }
     /// Index logu pro zvýrazňování značek a hlídání (viz RxAlerts.swift, AppModel+Alerts.swift).
     public internal(set) var logIndex = LogIndex()
     /// Zvýšení znamená změnu stavu ovlivňující styl značek (log, pásmo, nastavení) – okno příjmu přestyluje konec textu.
@@ -589,6 +589,51 @@ public final class AppModel {
     private var superCheck = SuperCheck(calls: [])
 
     func refreshDupe() async { isDupe = await app?.dupe() ?? false }
+
+    // MARK: Násobiče
+
+    /// Odpracované násobiče závodu (přepočet jen při změně logu nebo závodu); nil = mimo závod / vlastní závod.
+    public private(set) var multipliers: MultiplierTally?
+    /// Pravidla násobičů zvoleného závodu (i Makrothen bez násobičů); nil = mimo závod.
+    public private(set) var multiplierRule: MultiplierRule?
+    /// Násobiče, které by přineslo spojení se značkou v QSO okně (štítek NEW MULT).
+    public private(set) var newMultiplier = NewMultiplier(hits: [], band: nil)
+    private var multiplierCalculator: MultiplierCalculator?
+    private var multiplierKeyApplied: MultiplierKey?
+
+    private struct MultiplierKey: Equatable { var contest: ContestSettings; var call: String }
+    private var multiplierKey: MultiplierKey {
+        var c = settings.contest; c.nextSerial = 0                     // číslo spojení násobiče nemění
+        return MultiplierKey(contest: c, call: settings.station.call.uppercased())
+    }
+    private var countryDB: CountryDB? { app?.countries ?? CountryDB.shared }
+
+    /// Pásmo aktuálního spojení: rig online, jinak ručně zadaná frekvence.
+    public var currentBand: String? { Self.band(rig, qso) }
+    private static func band(_ rig: RigStatus?, _ qso: QSOFields) -> String? {
+        Bands.band(forHz: rig?.online == true ? rig?.frequency : qso.frequency)
+    }
+
+    func refreshMultipliers() {
+        multiplierKeyApplied = multiplierKey
+        let db = countryDB
+        let own = db?.lookup(settings.station.call)?.primaryPrefix
+        guard let rule = MultiplierRule.rule(for: settings.contest, ownCountry: own) else {
+            multiplierRule = nil; multipliers = nil; multiplierCalculator = nil; refreshNewMultiplier(); return
+        }
+        let calc = MultiplierCalculator(rule: rule, countries: db)
+        multiplierRule = rule; multiplierCalculator = calc
+        multipliers = calc.tally(records: logRecords, since: settings.contest.effectiveStart)
+        refreshNewMultiplier()
+    }
+
+    private func refreshNewMultiplier() {
+        var n = NewMultiplier(hits: [], band: nil)
+        if let calc = multiplierCalculator, let t = multipliers, !qso.call.isEmpty {
+            n = t.newHits(calc.hits(call: qso.call, exchange: qso.exchangeRcvd), band: currentBand)
+        }
+        if n != newMultiplier { newMultiplier = n }
+    }
 
     /// Soubor MASTER.SCP (Application Support/mmtty4mac).
     public static var scpURL: URL {
