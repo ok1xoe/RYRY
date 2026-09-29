@@ -44,12 +44,21 @@ public actor Engine {
     private var lastPendingReportAt: UInt64 = 0
     private static let stallNs: UInt64 = 2_000_000_000   // výstup bez pohybu 2 s = zaseknuté zařízení
     private var everStarted = false
+    /// Doplňkové dekodéry (druhý dekodér, kanály) – vlastní fronta, jen příjem.
+    private let auxFactory: (@Sendable () -> (any Modem)?)?
+    private var aux: AuxDecoderHub?
+    private var auxConfig = AuxDecoderConfig()
+    private var auxSpectrumSamples = 0
+    private let auxMaxBacklog: Int?
 
+    /// `auxModemFactory`: výroba modemů pro druhý dekodér a kanály (nil = funkce nedostupná).
     public init(modem: sending any Modem, rig: Rig = NoRig(), audio: AudioBackend, config: EngineConfig,
                 serialFactory: @escaping @Sendable (String) -> SerialPort = { POSIXSerialPort(path: $0) },
-                clock: Clock = HostClock(), autoRun: Bool = true) {
+                clock: Clock = HostClock(), autoRun: Bool = true,
+                auxModemFactory: (@Sendable () -> (any Modem)?)? = nil, auxMaxBacklog: Int? = nil) {
         self.modem = modem; self.rig = rig; self.audio = audio; self.config = config
         self.serialFactory = serialFactory; self.clock = clock; self.autoRun = autoRun
+        self.auxFactory = auxModemFactory; self.auxMaxBacklog = auxMaxBacklog
     }
 
     /// Nový odběratel událostí (broadcast).
@@ -86,6 +95,7 @@ public actor Engine {
         let b = broadcaster
         modemTask = Task.detached { for await e in stream { b.send(.modem(e)) } }
         setState(.rx)
+        syncAux()
         if autoRun {
             loopTask = Task { [weak self] in
                 while !Task.isCancelled {
@@ -145,6 +155,7 @@ public actor Engine {
         modem.finishEvents()
         await modemTask?.value
         modemTask = nil
+        await stopAux()
         broadcaster.finish()
     }
 
@@ -335,7 +346,11 @@ public actor Engine {
         let end = min(playback.count, playbackPos + max(0, k))
         while playbackPos < end {
             let n = min(1024, end - playbackPos)
-            playback.withUnsafeBufferPointer { modem.processRx(UnsafeBufferPointer(rebasing: $0[playbackPos..<(playbackPos + n)])) }
+            playback.withUnsafeBufferPointer {
+                let b = UnsafeBufferPointer(rebasing: $0[playbackPos..<(playbackPos + n)])
+                modem.processRx(b)
+                feedAux(b)
+            }
             playbackPos += n
         }
         if playbackPos >= playback.count { stopPlayback() }
@@ -352,7 +367,11 @@ public actor Engine {
                 if state == .rx, playbackSpeed > 0, !playbackPaused { feedPlayback(Int((Double(n) * playbackSpeed).rounded())) }
             } else {
                 if recording != nil { recording!.append(contentsOf: rxBuf[0..<n]) }
-                rxBuf.withUnsafeBufferPointer { modem.processRx(UnsafeBufferPointer(rebasing: $0[0..<n])) }
+                rxBuf.withUnsafeBufferPointer {
+                    let b = UnsafeBufferPointer(rebasing: $0[0..<n])
+                    modem.processRx(b)
+                    feedAux(b)
+                }
             }
             if n < rxBuf.count { break }
         }
@@ -450,6 +469,56 @@ public actor Engine {
             }
         }
     }
+
+    // MARK: Doplňkové dekodéry
+
+    /// Zapne/vypne druhý dekodér a kanály (za běhu, bez restartu).
+    public func setAuxDecoders(_ c: AuxDecoderConfig) {
+        auxConfig = c
+        syncAux()
+    }
+    public var auxDecoders: AuxDecoderConfig { auxConfig }
+
+    private func syncAux() {
+        guard state != .stopped, !finished, let f = auxFactory else { return }
+        if aux == nil, auxConfig.isActive {
+            let b = broadcaster
+            aux = AuxDecoderHub(sampleRate: modem.sampleRate, maxBacklog: auxMaxBacklog, factory: f) { b.send(.aux($0)) }
+        }
+        aux?.configure(auxConfig)
+    }
+
+    private func stopAux() async {
+        guard let a = aux else { return }
+        aux = nil
+        await a.stop()
+    }
+
+    /// Kopie bloku pro doplňkové dekodéry – jen při příjmu (během TX pozastaveno jako hlavní).
+    private func feedAux(_ b: UnsafeBufferPointer<Float>) {
+        guard let aux, auxConfig.isActive, state == .rx, b.count > 0 else { return }
+        var spec: SpectrumFrame?
+        if auxConfig.channelsEnabled {
+            auxSpectrumSamples += b.count
+            if auxSpectrumSamples >= Int(modem.sampleRate / 10) { auxSpectrumSamples = 0; spec = modem.spectrum() }
+        }
+        aux.feed(Array(b), tuning: auxTuning(), spectrum: spec)
+    }
+
+    private func auxTuning() -> AuxTuning {
+        var t = AuxTuning()
+        if case .double(let v)? = modem.get(parameter: "mark") { t.mark = v }
+        if case .double(let v)? = modem.get(parameter: "shift") { t.shift = v }
+        if case .double(let v)? = modem.get(parameter: "baud") { t.baud = v }
+        if case .bool(let v)? = modem.get(parameter: "reverse") { t.reverse = v }
+        if case .string(let v)? = modem.get(parameter: "demodType") { t.demodType = v }
+        return t
+    }
+
+    /// Pro testy: počkat na zpracování zaslaných bloků; stav fronty.
+    func auxFlush() async { await aux?.flush() }
+    var auxModemCount: Int { aux?.modemCount ?? 0 }
+    var auxDropped: Int { aux?.dropped ?? 0 }
 
     // MARK: Rig
 

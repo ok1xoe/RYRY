@@ -69,6 +69,9 @@ struct TopBar: View {
                 Group {
                     Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
                         .hint(L("XY scope (křížový indikátor ladění)"))
+                    Toggle(L("2. dek."), isOn: Binding(get: { model.settings.decoders.secondEnabled },
+                                                       set: { v in Task { await model.setSecondDecoder(v) } }))
+                        .hint(L("2. dekodér: stejný signál jiným demodulátorem, text v panelu pod příjmem"))
                     Toggle("AFC", isOn: model.boolBinding("afc"))
                         .hint(L("AFC · kontextová nabídka: vazba na squelch, omezení rozsahu"))
                         .contextMenu {

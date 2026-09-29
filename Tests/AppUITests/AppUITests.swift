@@ -40,7 +40,8 @@ final class Fixture {
                         engineFactory: { [unowned self] settings, _ in
                             let e = Engine(modem: try! RTTYModem(config: settings.modemConfig()), rig: NoRig(), audio: self.audio,
                                            config: settings.engineConfig(), serialFactory: { _ in FakeSerialPort() },
-                                           clock: self.clock, autoRun: false)
+                                           clock: self.clock, autoRun: false,
+                                           auxModemFactory: AppModel.auxModemFactory(settings))
                             self.engines.append(e)
                             return e
                         }, spectrumFPS: 0, secrets: secrets, callbookFetcher: { [unowned self] u in try await self.callbookFetcher(u) },

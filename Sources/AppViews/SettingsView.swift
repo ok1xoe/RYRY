@@ -37,6 +37,7 @@ public struct SettingsView: View {
                 KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
                 UploadTab(s: $draft, secrets: model.uploader.secrets).tabItem { Label("Online", systemImage: "icloud.and.arrow.up") }.tag(9)
                 SpotsTab(s: $draft).tabItem { Label(L("Spoty"), systemImage: "dot.radiowaves.left.and.right") }.tag(10)
+                DecodersTab(s: $draft).tabItem { Label(L("Dekodéry"), systemImage: "square.stack.3d.down.right") }.tag(11)
             }
             Divider()
             HStack {

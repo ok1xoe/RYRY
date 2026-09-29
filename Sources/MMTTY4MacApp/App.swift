@@ -169,6 +169,12 @@ struct MMTTY4MacApp: App {
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
                 Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
                 Button(L("Spoty")) { openWindow(id: "spots") }
+                Divider()
+                Toggle(L("2. dekodér"), isOn: Binding(get: { model.settings.decoders.secondEnabled },
+                                                      set: { v in Task { await model.setSecondDecoder(v) } }))
+                Toggle(L("Vícekanálové dekódování"), isOn: Binding(get: { model.settings.decoders.channelsEnabled },
+                                                                   set: { v in Task { await model.setChannelDecoding(v) } }))
+                Button(L("Kanály")) { openWindow(id: "channels") }
             }
         }
         Window("Log – " + model.settings.log.name, id: "log") { LogWindow(model: model).environment(\.showHints, model.settings.display.showHints) }
@@ -179,6 +185,9 @@ struct MMTTY4MacApp: App {
             .windowResizability(.contentSize)
         Window(L("Spoty"), id: "spots") {
             SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        Window(L("Kanály"), id: "channels") {
+            ChannelsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
         Settings { SettingsView(model: model).environment(\.showHints, model.settings.display.showHints) }
     }

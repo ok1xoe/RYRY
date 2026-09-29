@@ -27,6 +27,14 @@ public struct RxRun: Equatable, Sendable, Identifiable {
 
 public enum SendMode: String, CaseIterable, Sendable { case char, word, line }
 
+/// Kanál vícekanálového dekodéru v GUI: kmitočet mark (sleduje AFC) a posledních ~80 znaků.
+public struct DecoderChannel: Equatable, Sendable, Identifiable {
+    public let id: Int
+    public var mark: Double
+    public var text: String
+    public init(id: Int, mark: Double, text: String = "") { self.id = id; self.mark = mark; self.text = text }
+}
+
 public extension AppSettings {
     /// Konfigurace jádra RTTY (vyžaduje nový modem, tj. restart Engine).
     func modemConfig() -> RTTYModem.Config {
@@ -176,7 +184,14 @@ public final class AppModel {
 
     public static let realEngine: EngineFactory = { s, rig in
         // RTTYModem na 11025 Hz (± 2 % korekce hodin) nemůže selhat
-        Engine(modem: try! RTTYModem(config: s.modemConfig()), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig())
+        Engine(modem: try! RTTYModem(config: s.modemConfig()), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig(),
+               auxModemFactory: auxModemFactory(s))
+    }
+
+    /// Výroba modemů pro druhý dekodér a kanály (stejná konfigurace jádra jako hlavní, jen příjem).
+    public static func auxModemFactory(_ s: AppSettings) -> @Sendable () -> (any Modem)? {
+        let cfg = s.modemConfig()
+        return { try? RTTYModem(config: cfg) }
     }
 
     func noteForTesting(_ m: String) { note(m) }
@@ -218,6 +233,7 @@ public final class AppModel {
         if !micOK {
             note(L("Přístup k mikrofonu zamítnut – povolte ho v Nastavení systému → Soukromí → Mikrofon. Příjem nefunguje."))
         }
+        await engine.setAuxDecoders(settings.decoders.auxConfig())
         do { try await app.start() }
         catch EngineError.audio(let m) { note(L("Zvuk nefunguje: %@ – zkontrolujte zařízení a oprávnění k mikrofonu", m)) }
         catch { note(L("Start selhal: %@", "\(error)")) }
@@ -293,6 +309,7 @@ public final class AppModel {
         eventTask = nil
         app = nil
         state = .stopped
+        decoderChannels = []
     }
 
     /// Uloží nastavení a restartuje (Engine je jednorázový). Během vysílání nejdřív bezpečně RX.
@@ -319,6 +336,8 @@ public final class AppModel {
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
+                take(\.decoders.secondEnabled); take(\.decoders.secondDemod); take(\.decoders.channelsEnabled)
+                take(\.decoders.maxChannels); take(\.decoders.channelTimeoutS); take(\.decoders.showChannelMarks)
                 return m
             }
             do { try self.settingsStore.save(merge(self.settings)) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
@@ -349,6 +368,7 @@ public final class AppModel {
             }
             if s == .tx, !txDraft.isEmpty { Task { await self.sendDraft(mode: self.sendMode) } }   // rozepsaný text hned vysílat
         case .engine(.modem(.rxText(let c, let echo))): appendRx(String(c), echo: echo)
+        case .engine(.aux(let a)): handleAux(a)
         case .engine(.modem(.signal(let l, let sq))): signalLevel = l; squelchOpen = sq
         case .engine(.modem(.tuning(let t))): mark = t.mark; space = t.space
         case .engine(.modem(.shift(let f))): fig = f
@@ -414,6 +434,69 @@ public final class AppModel {
                 rxRuns[0].text.removeFirst(over); rxCharCount -= over; rxTrimmedTotal += over
             }
         }
+    }
+
+    // MARK: Druhý dekodér a kanály
+
+    public static let rx2Limit = 20_000
+    public static let channelTextLimit = 80
+    /// Text druhého dekodéru a počitadla pro inkrementální zobrazení.
+    public private(set) var rx2Text = ""
+    public private(set) var rx2AppendedTotal = 0
+    public private(set) var rx2TrimmedTotal = 0
+    /// Kanály vícekanálového dekodéru (pořadí vzniku).
+    public private(set) var decoderChannels: [DecoderChannel] = []
+
+    func handleAux(_ a: AuxEvent) {
+        switch a {
+        case .secondText(let c): appendRx2(String(c))
+        case .channelText(let id, let c):
+            guard let i = decoderChannels.firstIndex(where: { $0.id == id }) else { return }   // kanál už zanikl
+            var t = decoderChannels[i].text
+            t.append(c)
+            if t.count > Self.channelTextLimit { t.removeFirst(t.count - Self.channelTextLimit) }
+            decoderChannels[i].text = t
+        case .channels(let list):
+            let old = Dictionary(uniqueKeysWithValues: decoderChannels.map { ($0.id, $0.text) })
+            decoderChannels = list.map { DecoderChannel(id: $0.id, mark: $0.mark, text: old[$0.id] ?? "") }
+        }
+    }
+
+    public func appendRx2(_ s: String) {
+        rx2Text += s
+        rx2AppendedTotal += s.count
+        if rx2Text.count > Self.rx2Limit {
+            let over = rx2Text.count - Self.rx2Limit
+            rx2Text.removeFirst(over); rx2TrimmedTotal += over
+        }
+    }
+
+    public func clearRx2() { rx2TrimmedTotal += rx2Text.count; rx2Text = "" }
+
+    /// Změna nastavení doplňkových dekodérů – hned se projeví (bez restartu) a uloží.
+    public func updateDecoders(_ change: (inout DecoderSettings) -> Void) async {
+        var d = settings.decoders
+        change(&d)
+        settings.decoders = d
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        if !d.channelsEnabled { decoderChannels = [] }
+        await app?.engine.setAuxDecoders(d.auxConfig())
+    }
+
+    public func setSecondDecoder(_ on: Bool) async { await updateDecoders { $0.secondEnabled = on } }
+    public func setChannelDecoding(_ on: Bool) async { await updateDecoders { $0.channelsEnabled = on } }
+
+    /// Demodulátor, který druhý dekodér právě používá (automaticky jiný než hlavní).
+    public var secondDemodEffective: String {
+        let main: String
+        if case .string(let m)? = params["demodType"] { main = m } else { main = "iir" }
+        return settings.decoders.auxConfig().resolvedSecondDemod(main: main)
+    }
+
+    /// „Naladit“: hlavní dekodér na mark kanálu.
+    public func tuneChannel(_ id: Int) async {
+        guard let ch = decoderChannels.first(where: { $0.id == id }) else { return }
+        await tune(toMarkHz: ch.mark)
     }
 
     /// Posledních `n` znaků jako úseky (text, echo) – pro doplnění konce zobrazení.
