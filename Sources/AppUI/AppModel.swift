@@ -89,8 +89,24 @@ public final class AppModel {
     var lastSentForTesting = ""
     private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
     static let micWaitMessage = "Čekám na povolení přístupu k mikrofonu (systémový dialog)…"
-    public var waterfallFromHz = 0.0
-    public var waterfallToHz = 3000.0
+    public var waterfallFromHz: Double { settings.display.fromHz }
+    public var waterfallToHz: Double { settings.display.toHz }
+
+    /// Zobrazení (rozsah, zesílení, písmo, časové značky) – bez restartu, hned uloží.
+    public func setDisplay(_ change: (inout DisplaySettings) -> Void) async {
+        var d = settings.display
+        change(&d)
+        if !(d.fromHz >= 0 && d.toHz <= 5500 && d.toHz - d.fromHz >= 200) { d.fromHz = settings.display.fromHz; d.toHz = settings.display.toHz }
+        d.gainDB = min(30, max(-30, d.gainDB))
+        settings.display = d
+        syncDisplay()
+        do { try settingsStore.save(settings) } catch { note("Nastavení nelze uložit: \(error)") }
+    }
+
+    private func syncDisplay() {
+        waterfall.gainDB = settings.display.gainDB
+        waterfall.autoGain = settings.display.autoGain
+    }
 
     public private(set) var app: AppController?
     private var fldigi: FldigiXMLRPCServer?
@@ -115,6 +131,7 @@ public final class AppModel {
         let (s, w) = settingsStore.load()
         settings = s
         messages = w
+        syncDisplay()
     }
 
     /// Stav oprávnění k mikrofonu; při prvním spuštění se zeptá (asynchronně).
@@ -260,6 +277,7 @@ public final class AppModel {
             if let app = self.app, await app.engine.state != .rx { await app.rxNow() }
             await self.stopNow()
             self.settings = merged
+            self.syncDisplay()
             await self.startNow()
         }
     }

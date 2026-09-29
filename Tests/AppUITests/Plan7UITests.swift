@@ -86,3 +86,41 @@ func cf(_ w: String, _ serial: Bool) -> [String]? { WordClassifier.contestField(
     #expect(t.contains("DL1ABC        599"))
     await f.model.stop()
 }
+
+private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
+    var m = [Float](repeating: 5, count: 743)
+    m[Int(hz / 5.3833)] = level
+    return SpectrumFrame(binHz: 5.3833, magnitudes: m)
+}
+
+@Test func waterfallGainBrightens() {
+    var a = WaterfallRenderer(width: 100, height: 2), b = WaterfallRenderer(width: 100, height: 2)
+    b.gainDB = 6
+    let f = frame(peakAt: 2125, level: 200)
+    a.push(f, fromHz: 0, toHz: 3000); b.push(f, fromHz: 0, toHz: 3000)
+    let sa = a.row(0).map(\.brightness).reduce(0, +), sb = b.row(0).map(\.brightness).reduce(0, +)
+    #expect(sb > sa, "\(sa) → \(sb)")
+}
+
+@Test func manualGainShowsWeakSignalDarkerThanAuto() {
+    var auto = WaterfallRenderer(width: 100, height: 2), manual = WaterfallRenderer(width: 100, height: 2)
+    manual.autoGain = false
+    let f = frame(peakAt: 2125, level: 60)                   // slabý signál
+    auto.push(f, fromHz: 0, toHz: 3000); manual.push(f, fromHz: 0, toHz: 3000)
+    let x = Int(2125.0 / 30)
+    #expect(manual.row(0)[x].brightness < auto.row(0)[x].brightness)
+    #expect(abs(manual.lastRow[x] - 60 / 256) < 0.01)
+}
+
+@Test @MainActor func displayRangeComesFromSettings() async throws {
+    let f = Fixture()
+    f.configure = { $0.display.fromHz = 1500; $0.display.toHz = 2500; $0.display.gainDB = 3; $0.display.autoGain = false }
+    await f.model.start()
+    #expect(f.model.waterfallFromHz == 1500 && f.model.waterfallToHz == 2500)
+    #expect(f.model.waterfall.gainDB == 3 && !f.model.waterfall.autoGain)
+    await f.model.setDisplay { $0.fromHz = 0; $0.toHz = 4000; $0.gainDB = -6 }
+    #expect(f.model.waterfallToHz == 4000 && f.model.waterfall.gainDB == -6)
+    #expect(SettingsStore(directory: f.dir).load().0.display.toHz == 4000)
+    #expect(f.engines.count == 1)                            // bez restartu
+    await f.model.stop()
+}

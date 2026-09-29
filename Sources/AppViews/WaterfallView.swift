@@ -178,6 +178,37 @@ struct SpectrumView: View {
                 Task { await model.notchClick(hz: hz) }
             }))
             .help("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch")
+            .overlay(alignment: .topLeading) { SpectrumMenu(model: model).padding(4) }
         }
+    }
+}
+
+/// Rychlá volba rozsahu a zesílení spektra/vodopádu (jako tlačítka šířky FFT v MMTTY).
+struct SpectrumMenu: View {
+    @Bindable var model: AppModel
+    var body: some View {
+        Menu {
+            Section("Rozsah") {
+                ForEach(DisplayTab.ranges, id: \.0) { r in
+                    Button((model.waterfallFromHz == r.1 && model.waterfallToHz == r.2 ? "✓ " : "") + r.0) {
+                        Task { await model.setDisplay { $0.fromHz = r.1; $0.toHz = r.2 } }
+                    }
+                }
+            }
+            Section("Zesílení (\(Int(model.settings.display.gainDB)) dB)") {
+                Button("+3 dB") { Task { await model.setDisplay { $0.gainDB += 3 } } }
+                Button("−3 dB") { Task { await model.setDisplay { $0.gainDB -= 3 } } }
+                Button("0 dB") { Task { await model.setDisplay { $0.gainDB = 0 } } }
+                Button((model.settings.display.autoGain ? "✓ " : "") + "Automatické zesílení") {
+                    Task { await model.setDisplay { $0.autoGain.toggle() } }
+                }
+            }
+        } label: {
+            Text("\(Int(model.waterfallFromHz))–\(Int(model.waterfallToHz)) Hz · \(model.settings.display.autoGain ? "AGC" : "\(Int(model.settings.display.gainDB)) dB")")
+                .font(.caption2.monospaced())
+        }
+        .menuStyle(.borderlessButton).fixedSize()
+        .padding(.horizontal, 4).background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 3))
+        .foregroundStyle(.white)
     }
 }
