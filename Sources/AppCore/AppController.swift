@@ -410,6 +410,22 @@ public actor AppController {
         broadcaster.send(.qtcChanged)
     }
 
+    /// Oprava uložené série (okno Log → QTC).
+    public func updateQTCSeries(_ s: QTCSeries) async throws {
+        guard let store = qtcStore else { throw AppError.qtc("QTC není k dispozici") }
+        guard !s.counterpart.isEmpty, !s.lines.isEmpty, s.lines.count <= QTCPlanner.maxPerPair else {
+            throw AppError.qtc("série musí mít protistanici a 1–10 řádků")
+        }
+        do { try await store.update(s) } catch { throw AppError.qtc("\(error)") }
+        broadcaster.send(.qtcChanged)
+    }
+
+    public func deleteQTCSeries(_ id: UUID) async throws {
+        guard let store = qtcStore else { throw AppError.qtc("QTC není k dispozici") }
+        do { try await store.delete(id: id) } catch { throw AppError.qtc("\(error)") }
+        broadcaster.send(.qtcChanged)
+    }
+
     /// Krátké provozní zprávy QTC.
     public enum QTCPhrase: Sendable { case ask, qrvQuery, qrv, agn(Int), allOK }
     public func sendQTCPhrase(_ p: QTCPhrase) async throws {

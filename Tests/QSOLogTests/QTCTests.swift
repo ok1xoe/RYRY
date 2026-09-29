@@ -126,3 +126,17 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     #expect(QTCText.parseIndexedLine("BKKA8 0803 BY4AOM 176") == nil)      // bez zopakování ne (mohlo by jít o šum)
     #expect(QTCText.parseIndexedLine("QRZ12 0803 BY4AOM 176 0803 BY4AOM 176")?.0 == nil)   // 12 není číslo řádku 1–10
 }
+
+@Test func storeUpdateAndDelete() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("qtc-\(UUID())")
+    let st = try QTCStore(directory: dir)
+    var a = QTCSeries(direction: .received, number: 12, counterpart: "K3LRX", time: Date(), lines: [QTCLine(time: "0712", call: "JA3YBK", serial: 118)])
+    let b = QTCSeries(direction: .sent, number: 1, counterpart: "JA1ZLO", time: Date(), lines: [QTCLine(time: "0645", call: "W6YI", serial: 201)])
+    try await st.append(a); try await st.append(b)
+    a.counterpart = "K3LR"; a.lines.append(QTCLine(time: "0803", call: "BY4AOM", serial: 176))
+    try await st.update(a)
+    try await st.delete(id: b.id)
+    let again = try QTCStore(directory: dir)
+    #expect(await again.series == [a])
+    await #expect(throws: QTCStore.StoreError.self) { try await st.update(b) }      // smazaná
+}

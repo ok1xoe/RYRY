@@ -107,3 +107,19 @@ import Settings
     #expect(f.model.qtcReceive?.lines[7] == QTCLine(time: "0803", call: "BY4AOM", serial: 176))
     await f.model.stop()
 }
+
+@Test @MainActor func qtcSeriesListAndSummaryInModel() async throws {
+    let f = await waeFixture()
+    try await f.model.app!.saveReceivedQTC(counterpart: "K3LR", number: 12, declaredCount: nil,
+                                           lines: [QTCLine(time: "0712", call: "JA3YBK", serial: 118), QTCLine(time: "0719", call: "UA9CDC", serial: 204)])
+    await f.settle()
+    await f.model.refreshQTCSeries()
+    #expect(f.model.qtcSeries.count == 1)
+    #expect(f.model.qtcSummary.received == 2 && f.model.qtcSummary.sent == 0 && f.model.qtcSummary.points == 2)
+    var s = f.model.qtcSeries[0]; s.lines.removeLast()
+    await f.model.updateQTCSeries(s)
+    #expect(f.model.qtcSummary.received == 1)
+    await f.model.deleteQTCSeries(s.id)
+    #expect(f.model.qtcSeries.isEmpty)
+    await f.model.stop()
+}

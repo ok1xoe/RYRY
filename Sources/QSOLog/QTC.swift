@@ -162,6 +162,7 @@ public enum QTCText {
 
 /// Úložiště sérií QTC (`qtc.jsonl` v adresáři logu, jedna série na řádek).
 public actor QTCStore {
+    public enum StoreError: Error, Equatable { case notFound(UUID) }
     public private(set) var series: [QTCSeries] = []
     /// Nečitelné řádky souboru (např. po havárii) – pro zobrazení v UI.
     public private(set) var warnings: [String] = []
@@ -178,6 +179,25 @@ public actor QTCStore {
                 else { warnings.append("qtc.jsonl řádek \(i + 1) je nečitelný – přeskočen") }
             }
         }
+    }
+
+    /// Oprava série (protistanice, řádky…) – soubor se přepíše atomicky.
+    public func update(_ s: QTCSeries) throws {
+        guard let i = series.firstIndex(where: { $0.id == s.id }) else { throw StoreError.notFound(s.id) }
+        var copy = series; copy[i] = s
+        try rewrite(copy)
+    }
+
+    public func delete(id: UUID) throws {
+        guard series.contains(where: { $0.id == id }) else { throw StoreError.notFound(id) }
+        try rewrite(series.filter { $0.id != id })
+    }
+
+    private func rewrite(_ all: [QTCSeries]) throws {
+        var d = Data()
+        for s in all { d.append(try Self.encoder.encode(s)); d.append(UInt8(ascii: "\n")) }
+        try d.write(to: url, options: .atomic)
+        series = all
     }
 
     public func append(_ s: QTCSeries) throws {
