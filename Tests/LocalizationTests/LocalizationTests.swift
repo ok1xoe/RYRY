@@ -155,3 +155,22 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(try LanguagePack.decode(Data(contentsOf: u)).strings["Zvuk"] == "My audio")
     #expect(lib.pack(code: "en")?.strings["Zvuk"] == "My audio")
 }
+
+// Uložení upraveného souboru ve složce jazyků se projeví hned (bez restartu)
+@Test func editedFileAppliesLive() async throws {
+    let bundled = tmp(), user = tmp()
+    try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
+    let lib = LanguageLibrary(bundled: [bundled], userDirectory: user)
+    lib.seedUserDirectory()
+    let d = UserDefaults(suiteName: "lang-\(UUID())")!
+    let l = Localizer()
+    lib.select("en", localizer: l, defaults: d)
+    #expect(l.tr("Zvuk") == "Audio")
+    let watcher = LanguageWatcher(library: lib, localizer: l, defaults: d, deliverOn: DispatchQueue(label: "t"))
+    watcher.start()
+    var mine = en; mine.strings["Zvuk"] = "Sound card"
+    try mine.encoded().write(to: user.appendingPathComponent("en.json"), options: .atomic)
+    for _ in 0..<40 where l.tr("Zvuk") != "Sound card" { try await Task.sleep(for: .milliseconds(50)) }
+    #expect(l.tr("Zvuk") == "Sound card")
+    watcher.stop()
+}

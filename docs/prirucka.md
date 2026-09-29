@@ -103,7 +103,7 @@ mmtty4mac se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovláda
 ## 10. Jazyk a klávesy
 
 - **Jazyk:** ve výchozím stavu angličtina; změna v Nastavení → Zobrazení → Jazyk rozhraní (čeština, angličtina, nahrané jazyky). Vlastní překlad: **Uložit šablonu…**, přeložit hodnoty v `strings`, nastavit `code` a `name`, **Nahrát jazyk…**.
-- **Jazykové soubory** `cs.json` a `en.json` jsou v `~/Library/Application Support/mmtty4mac/Languages` a lze je upravit (projeví se po novém výběru jazyka nebo restartu; upravený soubor aktualizace nepřepíše).
+- **Jazykové soubory** `cs.json` a `en.json` jsou v `~/Library/Application Support/mmtty4mac/Languages` a lze je upravit (uložená změna se projeví okamžitě; upravený soubor aktualizace nepřepíše).
 - **Klávesy:** Nastavení → Klávesy – klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).
 
 ## 11. Když něco nefunguje

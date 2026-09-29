@@ -71,10 +71,15 @@ struct MMTTY4MacApp: App {
     @Environment(\.openSettings) private var openSettings
 
     /// Jazyk rozhraní z minulého spuštění (spouštěcí parametr -language en přepíše volbu).
+    /// Hlídá složku jazyků – uložený soubor se projeví hned.
+    private let languageWatcher: LanguageWatcher
+
     init() {
         let lib = LanguageLibrary.standard()
         lib.seedUserDirectory()                  // cs.json, en.json do složky jazyků (k úpravám)
         lib.restore()
+        languageWatcher = LanguageWatcher(library: lib)
+        languageWatcher.start()
     }
 
     var body: some Scene {
@@ -85,6 +90,11 @@ struct MMTTY4MacApp: App {
                     delegate.model = model
                     // spouštěcí parametr -openSettings YES (+ -settingsTab N): otevřít Nastavení (snímky obrazovky, podpora)
                     if UserDefaults.standard.bool(forKey: "openSettings") { openSettings() }
+                    // -switchLanguage cs: za 4 s přepnout jazyk jako výběrem v Nastavení (zkouška živého přepnutí)
+                    if let c = UserDefaults.standard.string(forKey: "switchLanguage") {
+                        try? await Task.sleep(for: .seconds(4))
+                        LanguageLibrary.standard().select(c)
+                    }
                     // -openWindow log,scope: otevřít okna (snímky obrazovky do dokumentace)
                     for id in (UserDefaults.standard.string(forKey: "openWindow") ?? "").split(separator: ",") {
                         openWindow(id: String(id))

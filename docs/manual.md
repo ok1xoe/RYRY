@@ -103,7 +103,7 @@ mmtty4mac looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers su
 ## 10. Language and keys
 
 - **Language:** English by default; change it in Settings → Display → Interface language (Czech, English, loaded languages). Your own translation: **Save template…**, translate the values in `strings`, set `code` and `name`, **Load language…**.
-- **Language files** `cs.json` and `en.json` are in `~/Library/Application Support/mmtty4mac/Languages` and can be edited (applies after selecting the language again or restarting; updates do not overwrite an edited file).
+- **Language files** `cs.json` and `en.json` are in `~/Library/Application Support/mmtty4mac/Languages` and can be edited (a saved change applies immediately; updates do not overwrite an edited file).
 - **Keys:** Settings → Keys – click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).
 
 ## 11. Troubleshooting
