@@ -756,6 +756,7 @@ struct ContestTab: View {
             Section {
                 Text(L("%N odesílané číslo nebo výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST")).font(.callout)
             } header: { Text(L("Makra")) }
+            ESMSection(s: $s)
             Section {
                 Toggle(L("Návrhy značek pod polem Call"), isOn: $s.log.superCheck)
                 LabeledContent(L("Databáze značek")) {
@@ -937,6 +938,7 @@ struct KeysTab: View {
         case .clearRx: return L("Vymazat příjem")
         case .stopMacro: return L("Zastavit opakování makra")
         case .openLog: return L("Otevřít log")
+        case .esmMode: return L("ESM: přepnout Run / S&P")
         }
     }
 }
@@ -1042,5 +1044,41 @@ struct UploadTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+
+/// ESM (Enter Sends Message): zapnutí, výchozí režim a makra pro jednotlivé kroky.
+struct ESMSection: View {
+    @Binding var s: AppSettings
+
+    func macroPicker(_ title: String, _ value: Binding<Int>) -> some View {
+        Picker(title, selection: value) {
+            ForEach(0..<AppSettings.macroCount, id: \.self) { i in
+                let n = i < s.macros.count ? s.macros[i].name : ""
+                Text(n.isEmpty ? s.binding(for: .macro(i)).display : "\(s.binding(for: .macro(i)).display) – \(n)").tag(i)
+            }
+        }
+    }
+
+    var body: some View {
+        Section {
+            Toggle(L("Enter posílá makra (ESM)"), isOn: $s.esm.enabled)
+            Picker(L("Režim"), selection: $s.esm.mode) {
+                Text("Run").tag(ESMMode.run)
+                Text("S&P").tag(ESMMode.sp)
+            }.pickerStyle(.segmented)
+            Group {
+                macroPicker(L("Run: CQ"), $s.esm.runCQ)
+                macroPicker(L("Run: výměna"), $s.esm.runExchange)
+                macroPicker(L("Run: TU + zalogovat"), $s.esm.runTU)
+                macroPicker(L("S&P: moje značka"), $s.esm.spMyCall)
+                macroPicker(L("S&P: výměna + zalogovat"), $s.esm.spExchange)
+                macroPicker(L("AGN? (část výměny)"), $s.esm.agn)
+            }.disabled(!s.esm.enabled)
+        } header: { Text("ESM – Enter Sends Message") } footer: {
+            Text(L("V závodě Enter v poli Call nebo výměny pošle makro podle stavu: Run – CQ, výměna, TU a zalogování; S&P – moje značka, výměna a zalogování. Nemá-li makro TU nebo výměny S&P %l, spojení se zaloguje automaticky. Během vysílání Enter nic neposílá. Run / S&P přepíná i QSO panel a %@.", s.binding(for: .esmMode).display))
+        }
+        .disabled(!s.contest.enabled)
     }
 }
