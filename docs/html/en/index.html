@@ -53,6 +53,7 @@
   <li>Open <code>mmtty4mac-0.10.0.dmg</code> and drag the app into <b>Applications</b>.</li>
   <li>On first launch macOS asks for <b>microphone</b> access – allow it, otherwise receiving does not work. You can change it in System Settings → Privacy &amp; Security → Microphone.</li>
   <li>The app is signed and notarized by Apple and opens without warnings.</li>
+  <li>Open this manual any time from the app: <b>Help → mmtty4mac Manual</b> (<kbd>⌘</kbd><kbd>?</kbd>).</li>
 </ol>
 <p>Optional: for radios the built-in CAT does not know, install hamlib with <code>brew install hamlib</code>.</p>
 </section>
@@ -129,7 +130,7 @@
 <h2>6. QSO and log</h2>
 <p>The QSO window shows only the fields the current mode needs. Under the call you see the DXCC country (from cty.dat), CQ and ITU zones, the other station's local time and previous QSOs. <b>Log</b> (<kbd>⌘</kbd><kbd>L</kbd>) saves the QSO, <b>Clear</b> empties the window.</p>
 <figure><a href="../img/en-log.png"><img src="../img/en-log.png" alt="Log window" loading="lazy"></a>
-  <figcaption>Log window (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): search, edit by double-click, delete, ADIF import and Cabrillo export. The QTC tab lists QTC series from the WAE contest.</figcaption></figure>
+  <figcaption>Log window (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): search, edit by double-click, delete. At the bottom the path of the open log, the <b>Log</b> menu (new, open, save as, export ADIF), ADIF import and Cabrillo export. The QTC tab lists QTC series from the WAE contest.</figcaption></figure>
 <p>The log is stored in <code>~/Documents/mmtty4mac</code> as JSONL and also as ADIF (<code>mmtty4mac.adi</code>) that any logger can read. For an old MMTTY log, export it to ADIF in MMTTY and import it in mmtty4mac – duplicates are skipped.</p>
 <h3>Log management</h3>
 <p>Each log is a separate file – for example one for everyday operating and one per contest. In the <b>File</b> menu:</p>
@@ -174,7 +175,7 @@
 <h2>9. API for loggers</h2>
 <p>To loggers mmtty4mac looks like <b>fldigi</b> (XML-RPC on port 7362), so for example RUMlogNG or MacLoggerDX can control it – choose “fldigi” in the logger. The second API is JSON-RPC over WebSocket (<code>ws://127.0.0.1:7363/v1</code>) with events for received text, state and logged QSOs; a Java client is in <code>clients/java</code>.</p>
 <figure class="half"><a href="../img/en-settings-7.png"><img src="../img/en-settings-7.png" alt="Settings – API and log" loading="lazy"></a>
-  <figcaption>API and log: API ports, the log folder and the continuous RX text log.</figcaption></figure>
+  <figcaption>API and log: API ports, the folder and name of the open log and the continuous RX text log.</figcaption></figure>
 <div class="note warn">The API has no authentication and can key the transmitter. By default it listens on this Mac only; enable network access only on a trusted network.</div>
 </section>
 

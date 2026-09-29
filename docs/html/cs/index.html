@@ -53,6 +53,7 @@
   <li>Otevřete <code>mmtty4mac-0.10.0.dmg</code> a přetáhněte aplikaci do složky <b>Aplikace</b>.</li>
   <li>Při prvním spuštění se macOS zeptá na přístup k <b>mikrofonu</b> – potvrďte ho, jinak příjem nefunguje. Změnit to jde v Nastavení systému → Soukromí a zabezpečení → Mikrofon.</li>
   <li>Aplikace je podepsaná a notarizovaná Applem, spustí se bez varování.</li>
+  <li>Tuto příručku otevřete kdykoli z aplikace: menu <b>Nápověda → Příručka mmtty4mac</b> (<kbd>⌘</kbd><kbd>?</kbd>).</li>
 </ol>
 <p>Volitelně: pro rádia, která vestavěný CAT nezná, nainstalujte hamlib příkazem <code>brew install hamlib</code>.</p>
 </section>
@@ -129,7 +130,7 @@
 <h2>6. QSO a log</h2>
 <p>QSO okno ukazuje jen pole, která aktuální režim potřebuje. Pod značkou je země DXCC (z cty.dat), CQ a ITU zóna, místní čas protistanice a seznam předchozích spojení. <b>Log</b> (<kbd>⌘</kbd><kbd>L</kbd>) zapíše spojení, <b>Clear</b> okno vyprázdní.</p>
 <figure><a href="../img/cs-log.png"><img src="../img/cs-log.png" alt="Okno Log" loading="lazy"></a>
-  <figcaption>Okno Log (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): hledání, oprava dvojklikem, mazání, import ADIF a export Cabrillo. Záložka QTC ukazuje série QTC ze závodu WAE.</figcaption></figure>
+  <figcaption>Okno Log (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): hledání, oprava dvojklikem, mazání. Dole je cesta k otevřenému logu, menu <b>Log</b> (nový, otevřít, uložit jako, export ADIF), import ADIF a export Cabrillo. Záložka QTC ukazuje série QTC ze závodu WAE.</figcaption></figure>
 <p>Log se ukládá do <code>~/Documents/mmtty4mac</code> jako JSONL a zároveň jako ADIF (<code>mmtty4mac.adi</code>), který přečte každý logger. Starý log z MMTTY v MMTTY exportujte do ADIF a v mmtty4mac importujte – duplicity se přeskočí.</p>
 <h3>Správa logu</h3>
 <p>Každý log je samostatný soubor – třeba jeden pro běžný provoz a jeden pro každý závod. V menu <b>Soubor</b>:</p>
@@ -174,7 +175,7 @@
 <h2>9. API pro loggery</h2>
 <p>mmtty4mac se loggerům představuje jako <b>fldigi</b> (XML-RPC na portu 7362), takže ho ovládají například RUMlogNG nebo MacLoggerDX – v loggeru zvolte „fldigi“. Druhé API je JSON-RPC přes WebSocket (<code>ws://127.0.0.1:7363/v1</code>) s událostmi o přijatém textu, stavu a zalogovaných spojeních; Java klient je v <code>clients/java</code>.</p>
 <figure class="half"><a href="../img/cs-settings-7.png"><img src="../img/cs-settings-7.png" alt="Nastavení – API a log" loading="lazy"></a>
-  <figcaption>API a log: porty API, adresář logu a průběžný záznam příjmu.</figcaption></figure>
+  <figcaption>API a log: porty API, adresář a název otevřeného logu a průběžný záznam příjmu.</figcaption></figure>
 <div class="note warn">API nemá autentizaci a umí zapnout vysílač. Ve výchozím stavu naslouchá jen na tomto Macu; přístup ze sítě zapínejte jen v důvěryhodné síti.</div>
 </section>
 
