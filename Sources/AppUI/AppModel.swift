@@ -114,6 +114,8 @@ public final class AppModel {
     private func syncDisplay() {
         waterfall.gainDB = settings.display.gainDB
         waterfall.autoGain = settings.display.autoGain
+        waterfall.palette = settings.display.palette
+        waterfall.decay = settings.display.fftResponse.decay
     }
 
     public private(set) var app: AppController?
@@ -291,7 +293,11 @@ public final class AppModel {
                 m.clock = s.clock; m.rttyCore = s.rttyCore
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
-                take(\.display.timestamps); take(\.display.fontSize)
+                take(\.display.timestamps); take(\.display.fontSize); take(\.display.rxFont)
+                take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
+                take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
+                take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
+                take(\.txWindow); take(\.shortcuts)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 return m
@@ -737,7 +743,12 @@ public final class AppModel {
 
     public func toggleTx() async {
         guard let app else { return }
-        if state == .rx { await run("TX") { try await app.tx() } } else { await app.rx() }
+        if state == .rx {
+            await run("TX") {
+                try await app.tx()
+                if settings.txWindow.autoCRLF { lastSentForTesting = "\r\n"; await app.send(text: "\r\n") }
+            }
+        } else { await app.rx() }
     }
 
     public func rxNow() async { await app?.rxNow() }

@@ -327,10 +327,23 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     public var autoGain = true
     public var timestamps = false
     public var fontSize = 14.0
+    /// Písmo oken RX a TX (název rodiny; prázdné = systémové neproporcionální).
+    public var rxFont = ""
+    /// Barvy oken (#RRGGBB; nil = systémové): pozadí a text příjmu, echo vysílání, pozadí a text vysílání.
+    public var rxBackground: String?, rxTextColor: String?, rxEchoColor: String?
+    public var txBackground: String?, txTextColor: String?
+    public var palette = WaterfallPalette.classic
+    public var fftResponse = FFTResponse.normal
+    public var xySize = XYScopeSize.medium
+    public var xyQuality = XYScopeQuality.high
+    /// Bublinová nápověda tlačítek (MMTTY „Show Button Hint“).
+    public var showHints = true
     public init() {}
     /// FFT jádra pokrývá 0–4000 Hz (TSound m_FFTWINDOW).
     public static let maxHz = 4000.0
-    enum CodingKeys: String, CodingKey { case fromHz, toHz, gainDB, autoGain, timestamps, fontSize }
+    enum CodingKeys: String, CodingKey { case fromHz, toHz, gainDB, autoGain, timestamps, fontSize, rxFont, rxBackground,
+                                             rxTextColor, rxEchoColor, txBackground, txTextColor, palette, fftResponse,
+                                             xySize, xyQuality, showHints }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "display", x = DisplaySettings()
         fromHz = c.tolerant(.fromHz, x.fromHz, w, s); toHz = c.tolerant(.toHz, x.toHz, w, s)
@@ -338,6 +351,15 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
         gainDB = min(30, max(-30, c.tolerant(.gainDB, x.gainDB, w, s)))
         autoGain = c.tolerant(.autoGain, x.autoGain, w, s); timestamps = c.tolerant(.timestamps, x.timestamps, w, s)
         fontSize = min(40, max(8, c.tolerant(.fontSize, x.fontSize, w, s)))
+        rxFont = c.tolerant(.rxFont, x.rxFont, w, s)
+        rxBackground = Macro.validColor(c.tolerant(.rxBackground, nil, w, s))
+        rxTextColor = Macro.validColor(c.tolerant(.rxTextColor, nil, w, s))
+        rxEchoColor = Macro.validColor(c.tolerant(.rxEchoColor, nil, w, s))
+        txBackground = Macro.validColor(c.tolerant(.txBackground, nil, w, s))
+        txTextColor = Macro.validColor(c.tolerant(.txTextColor, nil, w, s))
+        palette = c.tolerant(.palette, x.palette, w, s); fftResponse = c.tolerant(.fftResponse, x.fftResponse, w, s)
+        xySize = c.tolerant(.xySize, x.xySize, w, s); xyQuality = c.tolerant(.xyQuality, x.xyQuality, w, s)
+        showHints = c.tolerant(.showHints, x.showHints, w, s)
     }
 }
 
@@ -358,6 +380,9 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var display = DisplaySettings()
     /// Seznam zpráv (MMTTY MsgList): pojmenované delší texty se syntaxí maker.
     public var messages: [Macro] = AppSettings.defaultMessages
+    public var txWindow = TxWindowSettings()
+    /// Vlastní klávesové zkratky (id příkazu → zkratka); chybějící = výchozí.
+    public var shortcuts: [String: KeyBinding] = [:]
     public init() {}
     public static let macroCount = 16
 
@@ -381,7 +406,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     ]
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, rtty, macros, log,
-                                             clock, rttyCore, contest, display, messages }
+                                             clock, rttyCore, contest, display, messages, txWindow, shortcuts }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -407,6 +432,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
         clock = c.tolerant(.clock, x.clock, w, s); rttyCore = c.tolerant(.rttyCore, x.rttyCore, w, s)
         contest = c.tolerant(.contest, x.contest, w, s); display = c.tolerant(.display, x.display, w, s)
         messages = c.contains(.messages) ? c.tolerant(.messages, TolerantArray<Macro>(), w, s).items : x.messages
+        txWindow = c.tolerant(.txWindow, x.txWindow, w, s)
+        shortcuts = c.tolerant(.shortcuts, TolerantDict<KeyBinding>(), w, s).items.filter { $0.value.isValid }
     }
 
     /// Konfigurace Engine z nastavení.
