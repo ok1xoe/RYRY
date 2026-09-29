@@ -12,11 +12,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let model else { return .terminateNow }
         Task { @MainActor in
-            await model.stop()
+            await model.shutdown(timeout: .seconds(3))      // RX + PTT off hned, stop max. 3 s
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
     }
+
+    /// Zavřením hlavního okna se aplikace ukončí (nesmí vysílat bez okna).
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -31,7 +34,7 @@ struct MMTTY4MacApp: App {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
-        WindowGroup("mmtty4mac") {
+        Window("mmtty4mac", id: "main") {
             MainView(model: model)
                 .task {
                     delegate.model = model

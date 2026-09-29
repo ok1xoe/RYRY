@@ -37,6 +37,9 @@ public final class AppModel {
     public private(set) var state: EngineState = .stopped
     public private(set) var rxRuns: [RxRun] = []
     public private(set) var rxCharCount = 0
+    /// Absolutní počitadla pro inkrementální zobrazení (co přibylo na konec / co se ořízlo zepředu).
+    public private(set) var rxAppendedTotal = 0
+    public private(set) var rxTrimmedTotal = 0
     private var nextRunId = 0
     public var txDraft = ""
     public var sendMode: SendMode = .word
@@ -62,6 +65,15 @@ public final class AppModel {
     private var json: JSONRPCServer?
     private var eventTask: Task<Void, Never>?
     private var spectrumTask: Task<Void, Never>?
+    /// Start/stop/applySettings běží postupně (jinak by vznikaly osiřelé enginy s otevřeným PTT portem).
+    private var lifecycle: Task<Void, Never>?
+
+    private func serialized(_ op: @escaping @MainActor () async -> Void) async {
+        let prev = lifecycle
+        let t = Task { @MainActor in await prev?.value; await op() }
+        lifecycle = t
+        await t.value
+    }
 
     public init(settingsStore: SettingsStore = SettingsStore(), profileStore: ProfileStore = ProfileStore(),
                 engineFactory: EngineFactory? = nil, spectrumFPS: Double = 15) {
@@ -102,7 +114,10 @@ public final class AppModel {
 
     // MARK: Start/stop
 
-    public func start() async {
+    public func start() async { await serialized { [weak self] in await self?.startNow() } }
+
+    private func startNow() async {
+        guard app == nil else { return }                 // už běží
         let rig = Self.makeRig(settings.rig)
         let engine = engineFactory(settings, rig)
         let log: QSOLogStore?
@@ -162,7 +177,20 @@ public final class AppModel {
         }
     }
 
-    public func stop() async {
+    public func stop() async { await serialized { [weak self] in await self?.stopNow() } }
+
+    /// Ukončení aplikace: okamžitě RX (PTT off), pak stop s časovým limitem – ⌘Q nesmí viset.
+    public func shutdown(timeout: Duration = .seconds(3)) async {
+        await app?.rxNow()
+        let stopper = Task { @MainActor in await self.stop() }
+        await withTaskGroup(of: Void.self) { g in
+            g.addTask { await stopper.value }
+            g.addTask { try? await Task.sleep(for: timeout) }
+            await g.next(); g.cancelAll()
+        }
+    }
+
+    private func stopNow() async {
         spectrumTask?.cancel(); spectrumTask = nil
         fldigi?.stop(); json?.stop(); fldigi = nil; json = nil
         await app?.stop()
@@ -173,12 +201,20 @@ public final class AppModel {
     }
 
     /// Uloží nastavení a restartuje (Engine je jednorázový). Během vysílání nejdřív bezpečně RX.
+    /// Sekce z dialogu Nastavení se sloučí do aktuálního nastavení; parametry modemu a makra
+    /// (mění se jinde, okamžitě) se nepřepisují starou kopií z dialogu.
     public func applySettings(_ s: AppSettings) async {
-        do { try settingsStore.save(s) } catch { note("Nastavení nelze uložit: \(error)") }
-        if let app, await app.engine.state != .rx { await app.rxNow() }
-        await stop()
-        settings = s
-        await start()
+        await serialized { [weak self] in
+            guard let self else { return }
+            var merged = self.settings
+            merged.station = s.station; merged.audio = s.audio; merged.ptt = s.ptt; merged.fsk = s.fsk
+            merged.rig = s.rig; merged.api = s.api; merged.log = s.log
+            do { try self.settingsStore.save(merged) } catch { self.note("Nastavení nelze uložit: \(error)") }
+            if let app = self.app, await app.engine.state != .rx { await app.rxNow() }
+            await self.stopNow()
+            self.settings = merged
+            await self.startNow()
+        }
     }
 
     // MARK: Události
@@ -211,15 +247,32 @@ public final class AppModel {
             rxRuns.append(RxRun(id: nextRunId, text: s, echo: echo)); nextRunId += 1
         }
         rxCharCount += s.count
+        rxAppendedTotal += s.count
         while rxCharCount > Self.rxLimit, !rxRuns.isEmpty {
             let over = rxCharCount - Self.rxLimit
-            if rxRuns[0].text.count <= over { rxCharCount -= rxRuns[0].text.count; rxRuns.removeFirst() }
-            else { rxRuns[0].text.removeFirst(over); rxCharCount -= over }
+            if rxRuns[0].text.count <= over {
+                let n = rxRuns[0].text.count
+                rxCharCount -= n; rxTrimmedTotal += n; rxRuns.removeFirst()
+            } else {
+                rxRuns[0].text.removeFirst(over); rxCharCount -= over; rxTrimmedTotal += over
+            }
         }
     }
 
+    /// Posledních `n` znaků jako úseky (text, echo) – pro doplnění konce zobrazení.
+    public func rxTail(_ n: Int) -> [RxRun] {
+        var need = max(0, n)
+        var out: [RxRun] = []
+        for r in rxRuns.reversed() where need > 0 {
+            let take = min(need, r.text.count)
+            out.append(RxRun(id: r.id, text: String(r.text.suffix(take)), echo: r.echo))
+            need -= take
+        }
+        return out.reversed()
+    }
+
     public var rxPlainText: String { rxRuns.map(\.text).joined() }
-    public func clearRx() { rxRuns.removeAll(); rxCharCount = 0 }
+    public func clearRx() { rxTrimmedTotal += rxCharCount; rxRuns.removeAll(); rxCharCount = 0 }
 
     private func refreshPrevious() async {
         guard let log = app?.log, !qso.call.isEmpty else { previousQSOs = []; return }
@@ -288,6 +341,7 @@ public final class AppModel {
         guard let app else { return }
         await run("QSO") { try await app.setQSOField(name, value) }
         qso = await app.qso
+        if name == "call" { await refreshPrevious() }
     }
 
     public func insertWord(_ w: String) async {

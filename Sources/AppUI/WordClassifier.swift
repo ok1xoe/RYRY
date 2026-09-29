@@ -13,16 +13,21 @@ public enum WordClassifier {
     ]
     // ITU značka: [prefix/]znaky s číslicí uprostřed[/suffix]
     static let callRegex = try! NSRegularExpression(
-        pattern: "^([A-Z0-9]{1,4}/)?([0-9]?[A-Z]{1,2}[0-9][A-Z0-9]*[A-Z])(/[A-Z0-9]{1,4})?$")
-    static let rstRegex = try! NSRegularExpression(pattern: "^[1-5][1-9N][1-9N]([0-9]{1,4})?$")
+        pattern: "^([A-Z0-9]{1,4}/)?([A-Z]{1,2}[0-9]{1,2}[A-Z]{1,4}|[0-9][A-Z][0-9]{1,2}[A-Z]{2,4})(/[A-Z0-9]{1,4})?$")
+    // RST 3 znaky, nebo 599/5NN + číslo závodu
+    static let rstRegex = try! NSRegularExpression(pattern: "^([1-5][1-9N][1-9N]|5[1-9N][9N][0-9]{1,4})$")
 
     public static func classify(_ word: String) -> WordKind {
         let w = word.uppercased().trimmingCharacters(in: .punctuationCharacters.subtracting(CharacterSet(charactersIn: "/")))
         guard !w.isEmpty else { return .other }
         let r = NSRange(w.startIndex..., in: w)
         if rstRegex.firstMatch(in: w, range: r) != nil { return .rst }
-        if !stopWords.contains(w), callRegex.firstMatch(in: w, range: r) != nil { return .call }
+        // značka: min. 4 znaky (nebo s lomítkem), aby šum typu E5T nepřepsal pole
+        if !stopWords.contains(w), w.count >= 4 || w.contains("/"), callRegex.firstMatch(in: w, range: r) != nil {
+            return .call
+        }
         if !stopWords.contains(w), w.count >= 2, w.count <= 10, w.allSatisfy({ $0.isLetter && $0.isASCII }),
+           !w.contains(where: \.isNumber),
            !(w.first == "Q" && w.count == 3) {
             return .name
         }

@@ -52,6 +52,7 @@ Podrobnosti: `docs/api.md`. Nastavení: `~/Library/Application Support/mmtty4mac
     open build/mmtty4mac.app
 
 Při prvním spuštění macOS požádá o přístup k mikrofonu (příjem z rádia) – povolte ho.
+Bundle je podepsaný ad-hoc, takže po každém novém sestavení se macOS může zeptat znovu.
 Hlavní okno: vodopád (klik = naladit mark), příjem (klik na slovo = značka/jméno/RST do QSO),
 vysílání (po znacích/slovech/řádcích), makra F1–F12 (pravé tlačítko = upravit, opakování = CQ smyčka),
 QSO panel s předchozími spojeními, okno Log (⇧⌘L), Nastavení (⌘,). Klávesy: ⌘T TX/RX, Esc okamžitě RX, ⌘L zalogovat.

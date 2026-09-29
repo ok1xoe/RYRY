@@ -10,23 +10,23 @@ struct QSOPanel: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("QSO").font(.headline)
             Form {
-                TextField("Call", text: model.qsoBinding("call")).font(.title3.monospaced())
-                TextField("Name", text: model.qsoBinding("name"))
-                TextField("QTH", text: model.qsoBinding("qth"))
-                TextField("Locator", text: model.qsoBinding("locator"))
+                QSOField(model: model, label: "Call", field: "call").font(.title3.monospaced())
+                QSOField(model: model, label: "Name", field: "name")
+                QSOField(model: model, label: "QTH", field: "qth")
+                QSOField(model: model, label: "Locator", field: "locator")
                 HStack {
-                    TextField("RST s", text: model.qsoBinding("rstSent"))
-                    TextField("RST r", text: model.qsoBinding("rstRcvd"))
+                    QSOField(model: model, label: "RST s", field: "rstSent")
+                    QSOField(model: model, label: "RST r", field: "rstRcvd")
                 }
                 HStack {
-                    TextField("Nr s", text: model.qsoBinding("serialSent"))
-                    TextField("Nr r", text: model.qsoBinding("serialRcvd"))
+                    QSOField(model: model, label: "Nr s", field: "serialSent")
+                    QSOField(model: model, label: "Nr r", field: "serialRcvd")
                 }
-                TextField("Exch r", text: model.qsoBinding("exchangeRcvd"))
-                TextField("Notes", text: model.qsoBinding("notes"))
+                QSOField(model: model, label: "Exch r", field: "exchangeRcvd")
+                QSOField(model: model, label: "Notes", field: "notes")
             }
             HStack {
-                Button("Log") { Task { await model.logQSO() } }.keyboardShortcut("l", modifiers: .command)
+                Button("Log") { Task { await model.logQSO() } }.help("Zalogovat (⌘L)")
                 Button("Clear") { Task { await model.clearQSO() } }
             }
             if !model.previousQSOs.isEmpty {
@@ -42,5 +42,30 @@ struct QSOPanel: View {
             Spacer()
         }
         .padding(10)
+    }
+}
+
+/// Pole QSO s lokální editací: potvrdí se Enterem nebo opuštěním pole (ne po každém znaku),
+/// a převezme hodnotu z modelu, když se změní zvenku (klik na slovo, API, Clear).
+struct QSOField: View {
+    @Bindable var model: AppModel
+    let label: String
+    let field: String
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField(label, text: $text)
+            .focused($focused)
+            .onSubmit { commit() }
+            .onChange(of: focused) { if !focused { commit() } }
+            .onChange(of: model.qso.value(field) ?? "") { _, v in if !focused { text = v } }
+            .onAppear { text = model.qso.value(field) ?? "" }
+    }
+
+    private func commit() {
+        guard text != (model.qso.value(field) ?? "") else { return }
+        let v = text
+        Task { await model.setQSOField(field, v) }
     }
 }

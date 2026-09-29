@@ -21,7 +21,6 @@ struct TopBar: View {
                     Text(model.state == .rx || model.state == .stopped ? "TX" : "RX")
                         .font(.headline).frame(width: 44)
                 }
-                .keyboardShortcut("t", modifiers: .command)
                 .help("Přepnout TX/RX (⌘T)")
                 Button("Tune") { Task { await model.tune() } }
                 Button("Stop") { Task { await model.rxNow() } }
