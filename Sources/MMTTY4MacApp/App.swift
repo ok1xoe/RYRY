@@ -30,6 +30,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Otevře přibalenou HTML příručku v jazyce rozhraní (čeština, jinak angličtina).
+@MainActor func openManual() {
+    let lang = Localizer.shared.code == "cs" ? "cs" : "en"
+    guard let r = Bundle.main.resourceURL?.appendingPathComponent("Help/\(lang)/index.html"),
+          FileManager.default.fileExists(atPath: r.path) else { return }
+    NSWorkspace.shared.open(r)
+}
+
 @MainActor func showAbout() {
     let credits = [
         L("RTTY pro macOS – nativní přepis MMTTY s API pro loggery (fldigi XML-RPC, JSON-RPC)."),
@@ -73,6 +81,10 @@ struct MMTTY4MacApp: App {
                     delegate.model = model
                     // spouštěcí parametr -openSettings YES (+ -settingsTab N): otevřít Nastavení (snímky obrazovky, podpora)
                     if UserDefaults.standard.bool(forKey: "openSettings") { openSettings() }
+                    // -openWindow log,scope: otevřít okna (snímky obrazovky do dokumentace)
+                    for id in (UserDefaults.standard.string(forKey: "openWindow") ?? "").split(separator: ",") {
+                        openWindow(id: String(id))
+                    }
                     if model.state == .stopped { await model.start() }
                 }
         }
@@ -91,6 +103,9 @@ struct MMTTY4MacApp: App {
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }
+            }
+            CommandGroup(replacing: .help) {
+                Button(L("Příručka mmtty4mac")) { openManual() }.keyboardShortcut("?", modifiers: .command)
             }
             CommandGroup(after: .newItem) {
                 Button(L("Uložit příjem do souboru…")) { FileActions.saveRxWindow(model) }

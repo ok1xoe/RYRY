@@ -19,6 +19,7 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp COPYING COPYING.LESSER "$APP/Contents/Resources/"
 cp Resources/cty.dat "$APP/Contents/Resources/"      # DXCC (AD1C country file)
 cp -R Resources/Languages "$APP/Contents/Resources/"   # jazyky rozhraní (JSON)
+rm -rf "$APP/Contents/Resources/Help"; cp -R docs/html "$APP/Contents/Resources/Help"   # příručka (Nápověda)
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 # číslo sestavení = počet commitů
 BUILD_NO=$(git rev-list --count HEAD 2>/dev/null || echo 1)
