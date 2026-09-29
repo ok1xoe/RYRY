@@ -43,13 +43,21 @@ struct QTCPanel: View {
     var sameContinent: Bool { model.qtcStatus?.differentContinent == false }
 
     var idleButtons: some View {
-        HStack {
-            Button("QTC?") { Task { await model.qtcPhrase(.ask) } }.help("Zeptat se, zda má protistanice QTC")
-            Button("Poslat…") {
-                sending = Array((model.qtcStatus?.available ?? []).prefix(10))
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Button("QTC?") { Task { await model.qtcPhrase(.ask) } }.help("Zeptat se, zda má protistanice QTC")
+                Button("QRV – přijmout") { Task { await model.qtcQRVReceive() } }
+                    .disabled(model.qso.call.isEmpty || sameContinent)
+                    .help("Protistanice nabízí QTC: otevřít příjem a odvysílat QRV")
             }
-            .disabled(model.qso.call.isEmpty || sameContinent || (model.qtcStatus?.available.isEmpty ?? true))
-            Button("Přijmout…") { model.startQTCReceive() }.disabled(model.qso.call.isEmpty || sameContinent)
+            HStack(spacing: 4) {
+                Button("Přijmout…") { model.startQTCReceive() }.disabled(model.qso.call.isEmpty || sameContinent)
+                    .help("Otevřít příjem QTC bez vysílání (série už přišla nebo přijde)")
+                Button("Poslat…") {
+                    sending = Array((model.qtcStatus?.available ?? []).prefix(10))
+                }
+                .disabled(model.qso.call.isEmpty || sameContinent || (model.qtcStatus?.available.isEmpty ?? true))
+            }
         }
         .controlSize(.small)
     }
