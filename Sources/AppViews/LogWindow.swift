@@ -52,21 +52,48 @@ public struct LogWindow: View {
         }
     }
 
+    /// QTC vyměněná se stanicí (WAE): ↓ přijato, ↑ odesláno.
+    var qtcByCall: [String: (rx: Int, tx: Int)] {
+        var d: [String: (rx: Int, tx: Int)] = [:]
+        for s in model.qtcSeries {
+            let k = QSORecord.baseCall(s.counterpart)
+            var v = d[k] ?? (0, 0)
+            if s.direction == .received { v.rx += s.count } else { v.tx += s.count }
+            d[k] = v
+        }
+        return d
+    }
+    static func timeLabel(_ r: QSORecord) -> String { fmt.string(from: r.timeOn) }
+    static func khzLabel(_ r: QSORecord) -> String { r.frequency.map { String(format: "%.1f", $0 / 1000) } ?? "" }
+    static func rstLabel(_ r: QSORecord) -> String { (r.rstSent ?? "") + "/" + (r.rstRcvd ?? "") }
+    static func nrLabel(_ r: QSORecord) -> String {
+        let s = r.serialSent.map { String(format: "%03d", $0) } ?? r.exchangeSent ?? ""
+        let v = r.serialRcvd.map { String(format: "%03d", $0) } ?? r.exchangeRcvd ?? ""
+        return s + "/" + v
+    }
+    func qtcLabel(_ call: String) -> String {
+        guard let v = qtcByCall[QSORecord.baseCall(call)] else { return "" }
+        return [v.rx > 0 ? "↓\(v.rx)" : nil, v.tx > 0 ? "↑\(v.tx)" : nil].compactMap { $0 }.joined(separator: " ")
+    }
+
     var qsoList: some View {
         VStack(spacing: 0) {
             Table(filtered, selection: $selection) {
-                TableColumn("Čas (UTC)") { r in Text(Self.fmt.string(from: r.timeOn)).monospacedDigit() }.width(min: 120, ideal: 140)
-                TableColumn("Značka") { r in Text(r.call).bold() }.width(min: 80, ideal: 100)
-                TableColumn("Pásmo") { r in Text(r.band ?? "") }.width(50)
-                TableColumn("kHz") { r in Text(r.frequency.map { String(format: "%.1f", $0 / 1000) } ?? "") }.width(70)
-                TableColumn("Mód") { r in Text(r.mode) }.width(50)
-                TableColumn("RST s/r") { r in Text("\(r.rstSent ?? "")/\(r.rstRcvd ?? "")") }.width(70)
-                TableColumn("Nr s/r") { r in
-                    Text("\(r.serialSent.map { String(format: "%03d", $0) } ?? r.exchangeSent ?? "")/\(r.serialRcvd.map { String(format: "%03d", $0) } ?? r.exchangeRcvd ?? "")")
-                }.width(70)
-                TableColumn("Jméno") { r in Text(r.name ?? "") }
-                TableColumn("QTH") { r in Text(r.qth ?? "") }
-                TableColumn("Země") { r in Text(r.country ?? "") }
+                Group {
+                    TableColumn("Čas (UTC)") { (r: QSORecord) in Text(Self.timeLabel(r)).monospacedDigit() }.width(min: 120, ideal: 140)
+                    TableColumn("Značka") { (r: QSORecord) in Text(r.call).bold() }.width(min: 80, ideal: 100)
+                    TableColumn("Pásmo") { (r: QSORecord) in Text(r.band ?? "") }.width(50)
+                    TableColumn("kHz") { (r: QSORecord) in Text(Self.khzLabel(r)) }.width(70)
+                    TableColumn("Mód") { (r: QSORecord) in Text(r.mode) }.width(50)
+                }
+                Group {
+                    TableColumn("RST s/r") { (r: QSORecord) in Text(Self.rstLabel(r)) }.width(70)
+                    TableColumn("Nr s/r") { (r: QSORecord) in Text(Self.nrLabel(r)) }.width(70)
+                    TableColumn("Jméno") { (r: QSORecord) in Text(r.name ?? "") }
+                    TableColumn("QTH") { (r: QSORecord) in Text(r.qth ?? "") }
+                    TableColumn("Země") { (r: QSORecord) in Text(r.country ?? "") }
+                }
+                TableColumn("QTC") { (r: QSORecord) in Text(qtcLabel(r.call)).monospacedDigit() }.width(70)
             }
             .contextMenu(forSelectionType: QSORecord.ID.self) { ids in
                 if let id = ids.first, let r = model.logRecords.first(where: { $0.id == id }) {

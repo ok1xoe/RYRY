@@ -31,9 +31,10 @@ struct QTCPanel: View {
         if let st = model.qtcStatus {
             let call = model.qso.call.isEmpty ? "—" : model.qso.call
             Text("S \(call): vyměněno \(st.exchanged)/10 · k odeslání \(st.available.count) · další série \(st.nextSeries)")
-                .font(.caption)
+                .font(.caption).fixedSize(horizontal: false, vertical: true)
             if st.differentContinent == false {
                 Text("Stejný kontinent – v RTTY se QTC vyměňují jen mezi kontinenty.").font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text("Body za QTC celkem: \(st.points)").font(.caption).foregroundStyle(.secondary)
         }
@@ -111,7 +112,8 @@ struct QTCPanel: View {
                 }
             }
             Text("Klik na slova v příjmu: série n/k, pak čas, značka, číslo.").font(.caption2).foregroundStyle(.secondary)
-            HStack {
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 4) {
                 Button("QRV") { Task { await model.qtcPhrase(.qrv) } }
                 Button("Uložit – R R ALL OK") {
                     // nejdřív uložit; potvrzení odeslat jen když se série opravdu zapsala
