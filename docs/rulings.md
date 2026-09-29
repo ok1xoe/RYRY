@@ -341,3 +341,14 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Rychlost ve stavovém řádku v `TimelineView(.periodic(by: 30))` (`logStats(now:)`) – klesá i bez provozu.
 - Zálohy: `backupLogNow` je async (kopírování v `Task.detached`); automatická záloha nejvýše jedna najednou (příznak), selhání hlášeno jen jednou za relaci.
 - `make-app.sh`: architektury v `MMTTY_ARCHS` (ne `ARCHS`, kterou exportuje Xcode).
+
+## Band mapa (okno Okno → Band mapa, id `bandmapwindow`)
+- Samostatné okno se svislou frekvenční stupnicí (vysoká frekvence nahoře) RTTY části aktuálního pásma; doplňuje štítky ve vodopádu (ty řeší jen úzký audio kanál). Čistá logika v `Sources/Spots/BandMapWindow.swift` (`RTTYBandPlan`, `BandScale`, `BandMapLayout.spread`, `BandMapFilter`), pohled `AppViews/BandMapWindow.swift`.
+- Rozsahy: 80 m 3580–3600, 40 m 7030–7060, 30 m 10130–10150, 20 m 14070–14100, 17 m 18095–18109, 15 m 21070–21100, 12 m 24910–24930, 10 m 28070–28120 kHz (shodné s `SpotParser.rttySegments`). 160 m a 6 m RTTY segment nemají – pásmo bez segmentu se přeskočí.
+- Výběr pásma: ruční volba (Picker, „auto“ = bez volby) → pásmo z frekvence rigu (jen online) → pásmo z ruční frekvence QSO. Bez výsledku hláška „Zvolte pásmo“.
+- Spoty: stejný zdroj jako okno Spoty (`spotFeed.book`, filtr „Jen RTTY“ z `spotFeed.rttyOnly`), jen pásmo okna, mladší než `maxAgeMinutes` spojení, uvnitř viditelného rozsahu. Barva = `AppModel.spotStatus` (nová zelená / už v logu oranžová / duplicita v závodě červená; stejná logika jako štítky ve vodopádu, extrahovaná z `bandMapMarkers`). Popisek „značka + stáří v min“; stáří se přepočítá `TimelineView` po 30 s.
+- Odpracované stanice z vlastního logu (Toggle „Můj log“, posledních N minut, výchozí 60, 5–1440) na pásmu okna, jen záznamy s frekvencí; šedě, neklikací. Volba se neukládá do nastavení (jen stav okna).
+- Rozmístění: štítky mají rozteč nejméně jeden řádek (16 b), skupina se rozjede symetricky kolem původní polohy, tenká spojnice vede od skutečné frekvence na stupnici k štítku; při nedostatku místa se rozteč zmenší, štítky zůstanou v okně.
+- Rig: červená vodorovná čára + trojúhelník + frekvence při dialu v zobrazeném rozsahu. Zoom: tlačítka ±, kolečko myši (kolem kurzoru; lokální `NSEvent` monitor), nejmenší rozsah 1 kHz, největší celé RTTY pásmo; „Střed na rig“ vystředí rozsah. Zoom se pamatuje po pásmech po dobu života okna. Tlačítka ± se přibližují k rigu, pokud je v rozsahu.
+- Klik na spot = `AppModel.useSpot` (mimo RX rig nepřelaďuje, jinak přeladí na spot + posun a vloží značku).
+- Bez zapnutého DX clusteru / RBN a bez rigu hláška „Zapněte DX cluster nebo RBN (Nastavení → Spoty)“.
