@@ -86,6 +86,9 @@ typedef enum {
     RC_TX_CHAR_WAIT,        /* 0 .. 50 (MMTTY TXCharWait) */
     RC_TX_CHAR_WAIT_DIDDLE, /* 0/1 čekání vyplnit diddle */
     RC_TX_RANDOM_DIDDLE,    /* 0/1 náhodný diddle */
+    /* Plán 9 (rozšíření proti MMTTY) */
+    RC_AFC_MAX_DEV,         /* 0 .. 1000 Hz: AFC nesmí odjet dál od ručně nastaveného marku (0 = bez omezení) */
+    RC_AFC_GATE,            /* 0/1: AFC jen při úrovni signálu nad prahem squelche */
     RC_PARAM_COUNT
 } RTTYCoreParam;
 

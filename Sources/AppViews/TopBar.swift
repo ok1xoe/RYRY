@@ -64,6 +64,14 @@ struct TopBar: View {
                     Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
                         .help("XY scope (křížový indikátor ladění)")
                     Toggle("AFC", isOn: model.boolBinding("afc"))
+                        .help("AFC · kontextová nabídka: vazba na squelch, omezení rozsahu")
+                        .contextMenu {
+                            Toggle("Jen při otevřeném squelchi", isOn: model.boolBinding("afcGate"))
+                            Picker("Max. odchylka od naladění", selection: model.doubleBinding("afcMaxDev")) {
+                                Text("bez omezení").tag(0.0)
+                                ForEach([25.0, 50, 100, 200], id: \.self) { Text("± \(Int($0)) Hz").tag($0) }
+                            }
+                        }
                     Toggle("NET", isOn: model.boolBinding("net"))
                     Toggle("REV", isOn: model.boolBinding("reverse"))
                     Toggle("ATC", isOn: model.boolBinding("atc"))

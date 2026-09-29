@@ -23,6 +23,8 @@ enum RTTYParameters {
         (.init(id: "afcSquelch", label: "AFC squelch", kind: .double(0...1024, unit: nil), defaultValue: .double(32)), .double(RC_AFC_SQ)),
         (.init(id: "afcTime", label: "AFC time constant", kind: .double(1...64, unit: nil), defaultValue: .double(8)), .double(RC_AFC_TIME)),
         (.init(id: "afcSweep", label: "AFC sweep", kind: .double(0.1...3.0, unit: nil), defaultValue: .double(1)), .double(RC_AFC_SWEEP)),
+        (.init(id: "afcMaxDev", label: "AFC max. deviation (0 = off)", kind: .double(0...1000, unit: "Hz"), defaultValue: .double(0)), .double(RC_AFC_MAX_DEV)),
+        (.init(id: "afcGate", label: "AFC only with open squelch", kind: .bool, defaultValue: .bool(false)), .bool(RC_AFC_GATE)),
         (.init(id: "net", label: "NET (TX follows RX)", kind: .bool, defaultValue: .bool(true)), .bool(RC_NET)),
         (.init(id: "atc", label: "ATC", kind: .bool, defaultValue: .bool(false)), .bool(RC_ATC)),
         (.init(id: "squelch", label: "Squelch", kind: .bool, defaultValue: .bool(false)), .bool(RC_SQUELCH)),

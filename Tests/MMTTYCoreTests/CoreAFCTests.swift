@@ -84,3 +84,35 @@ func txAverageFrequency(net: Bool) throws -> Double {
     let s = RTTYSignalGenerator().generate(text: sample)
     #expect(runWithTicks(core, s).contains("CQ CQ DE OK1XOE"))
 }
+
+// Plán 9: AFC nesmí odjet dál než RC_AFC_MAX_DEV od ručně nastaveného kmitočtu
+@Test func afcMaxDeviationLimitsDrift() throws {
+    let text = String(repeating: "RYRYRYRY CQ TEST DE OK1XOE ", count: 6)
+    let s = RTTYSignalGenerator(markHz: 2065).generate(text: text, leadIn: 1.0)   // o 60 Hz níž
+    let free = try #require(makeCore()), limited = try #require(makeCore())
+    defer { rttycore_destroy(free); rttycore_destroy(limited) }
+    #expect(rttycore_get_param(limited, RC_AFC_MAX_DEV) == 0)                    // výchozí = bez omezení
+    #expect(rttycore_set_param(limited, RC_AFC_MAX_DEV, 20) == RC_OK)
+    _ = runWithTicks(free, s); _ = runWithTicks(limited, s)
+    #expect(abs(rttycore_signal(free).mark - 2065) < 6)
+    #expect(abs(rttycore_signal(limited).mark - 2125) <= 20)
+    // ruční přeladění posune kotvu
+    #expect(rttycore_set_param(limited, RC_MARK, 2060) == RC_OK)
+    #expect(rttycore_set_param(limited, RC_SPACE, 2230) == RC_OK)
+    _ = runWithTicks(limited, s)
+    #expect(abs(rttycore_signal(limited).mark - 2065) < 6)
+    #expect(rttycore_set_param(limited, RC_AFC_MAX_DEV, -1) == RC_ERR_RANGE)
+}
+
+// Plán 9: AFC jen při otevřeném squelchi – slabý signál pod prahem AFC nepřeladí
+@Test func afcSquelchGate() throws {
+    var s = RTTYSignalGenerator(markHz: 2085, amplitude: 0.05).generate(text: String(repeating: "RYRYRYRY ", count: 10), leadIn: 1.0)
+    var g = NoiseGenerator(seed: 3); g.addNoise(to: &s, rms: 0.02)
+    let open = try #require(makeCore()), gated = try #require(makeCore())
+    defer { rttycore_destroy(open); rttycore_destroy(gated) }
+    for c in [open, gated] { #expect(rttycore_set_param(c, RC_SQUELCH_LEVEL, 30000) == RC_OK) }
+    #expect(rttycore_set_param(gated, RC_AFC_GATE, 1) == RC_OK)
+    _ = runWithTicks(open, s); _ = runWithTicks(gated, s)
+    #expect(abs(rttycore_signal(open).mark - 2085) < 8)                         // bez vazby doladí
+    #expect(rttycore_signal(gated).mark == 2125)                                // s vazbou zůstane
+}
