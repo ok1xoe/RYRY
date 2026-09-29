@@ -37,11 +37,11 @@ public struct XYPoint: Sendable, Equatable {
     public init(x: Float, y: Float) { self.x = x; self.y = y }
 }
 
-/// Dávka scope demodulátoru (MMTTY TTScope): úrovně mark/space ze zvoleného místa, bit 0/1,
-/// sync: 1 = vzorkování bitu, −1 = start bit, −0,5 = stop bit.
+/// Dávka scope demodulátoru (MMTTY TTScope): úrovně mark/space ze všech míst demodulátoru téhož okamžiku
+/// (index = zdroj, prázdné = zdroj se neplní), bit 0/1, sync: 1 = vzorkování bitu, −1 = start bit, −0,5 = stop bit.
 public struct DemodScope: Sendable, Equatable {
-    public var mark: [Float], space: [Float], bit: [Float], sync: [Float]
-    public init(mark: [Float], space: [Float], bit: [Float], sync: [Float]) {
-        self.mark = mark; self.space = space; self.bit = bit; self.sync = sync
+    public var marks: [[Float]], spaces: [[Float]], bit: [Float], sync: [Float]
+    public init(marks: [[Float]], spaces: [[Float]], bit: [Float], sync: [Float]) {
+        self.marks = marks; self.spaces = spaces; self.bit = bit; self.sync = sync
     }
 }

@@ -28,6 +28,8 @@ public struct ScopeWindow: View {
             }
             if model.scopeSource == 3 && model.param("atc") != .bool(true) {
                 Text("Zdroj ATC vyžaduje zapnuté ATC.").font(.caption).foregroundStyle(.secondary)
+            } else if let d = model.demodScope, d.marks.indices.contains(model.scopeSource), d.marks[model.scopeSource].isEmpty {
+                Text("Tento zdroj se u zvoleného demodulátoru neplní.").font(.caption).foregroundStyle(.secondary)
             }
             Canvas { ctx, size in draw(ctx, size) }
                 .background(Color.black)
@@ -50,8 +52,10 @@ public struct ScopeWindow: View {
     }
 
     private func draw(_ ctx: GraphicsContext, _ size: CGSize) {
-        guard let d = model.demodScope, !d.bit.isEmpty else { return }
-        let n = d.bit.count
+        guard let d = model.demodScope, !d.bit.isEmpty, d.marks.indices.contains(model.scopeSource) else { return }
+        let mk = d.marks[model.scopeSource], sp = d.spaces[model.scopeSource]
+        guard !mk.isEmpty, mk.count == sp.count else { return }
+        let n = min(d.bit.count, mk.count)
         let w = max(16, min(n, Int(width)))
         let start = Int(Double(n - w) * offset)
         let lane = size.height / 4
@@ -65,9 +69,9 @@ public struct ScopeWindow: View {
             return p
         }
         // mark/space – společná automatická stupnice, horní dvě pásma
-        let peak = max(1e-6, (d.mark[start..<(start + w)] + d.space[start..<(start + w)]).map { abs($0) }.max() ?? 1)
-        ctx.stroke(path(d.mark.map { abs($0) }, top: 4, height: lane * 2 - 8, scale: peak), with: .color(.yellow), lineWidth: 1)
-        ctx.stroke(path(d.space.map { abs($0) }, top: 4, height: lane * 2 - 8, scale: peak), with: .color(.orange), lineWidth: 1)
+        let peak = max(1e-6, (mk[start..<(start + w)] + sp[start..<(start + w)]).map { abs($0) }.max() ?? 1)
+        ctx.stroke(path(mk.map { abs($0) }, top: 4, height: lane * 2 - 8, scale: peak), with: .color(.yellow), lineWidth: 1)
+        ctx.stroke(path(sp.map { abs($0) }, top: 4, height: lane * 2 - 8, scale: peak), with: .color(.orange), lineWidth: 1)
         // bit
         ctx.stroke(path(d.bit, top: lane * 2 + 6, height: lane - 12, scale: 1), with: .color(.green), lineWidth: 1.2)
         // sync: značky

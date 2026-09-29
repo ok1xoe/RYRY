@@ -155,6 +155,7 @@ public actor AppController {
     public func setTxDisabled(_ on: Bool) { txDisabled = on }
     public func tx() async throws {
         if txDisabled { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        lockBARTGTime()
         try await engine.tx()
     }
     public func tune() async throws {
@@ -172,11 +173,22 @@ public actor AppController {
         c.myCall = settings.station.call.uppercased()
         c.hisCall = qso.call; c.name = qso.name; c.qth = qso.qth
         // MMTTY: HisRST = co posílám (%r %N), MyRST = co jsem dostal (%s %M); v závodě „599“ + číslo nebo výměna
-        c.hisRST = qso.rstSent + Self.exchangeSuffix(qso.serialSent, qso.exchangeSent)
+        // BARTG: do začátku QSO aktuální čas (MMTTY UpdateBARTG každou minutu)
+        let sentExch = isBARTG && qso.exchangeSent.isEmpty ? Self.hhmm.string(from: Date()) : qso.exchangeSent
+        c.hisRST = qso.rstSent + Self.exchangeSuffix(qso.serialSent, sentExch)
         c.myRST = qso.rstRcvd + Self.exchangeSuffix(qso.serialRcvd, qso.exchangeRcvd)
         c.now = Date()
         c.hisUTCOffsetHours = country(for: qso.call)?.utcOffsetHours
         return c
+    }
+
+    private var isBARTG: Bool { settings.contest.enabled && settings.contest.format == .bartg }
+
+    /// BARTG: první vysílání se zadanou značkou = začátek QSO → čas se zafixuje (MMTTY SetHisUTC).
+    private func lockBARTGTime() {
+        guard isBARTG, !qso.call.isEmpty, qso.exchangeSent.isEmpty else { return }
+        qso.exchangeSent = Self.hhmm.string(from: Date())
+        broadcaster.send(.qsoChanged(qso))
     }
 
     /// Část za RST: číslo, výměna, nebo obojí „NNN-výměna“ (MMTTY BARTG „599NNN-HHMM“; %x/%y).
@@ -196,6 +208,7 @@ public actor AppController {
 
     private func runMacroOnce(_ index: Int) async throws {
         guard settings.macros.indices.contains(index) else { throw AppError.badMacro(index) }
+        lockBARTGTime()
         let m = MacroEngine.expand(settings.macros[index].text, context: macroContext())
         if txDisabled, m.mode == .send { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
         try await engine.sendMacro(m)
@@ -228,6 +241,7 @@ public actor AppController {
     public func runMessage(index: Int) async throws {
         guard settings.messages.indices.contains(index) else { throw AppError.badMessage(index) }
         stopMacroRepeat()
+        lockBARTGTime()
         let m = MacroEngine.expand(settings.messages[index].text, context: macroContext())
         if txDisabled, m.mode == .send { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
         try await engine.sendMacro(m)
@@ -242,10 +256,8 @@ public actor AppController {
         case "call":
             qso.call = v.uppercased()
             if !v.isEmpty, qso.timeOn == nil { qso.timeOn = Date() }
-            // BARTG: čas začátku QSO jako odesílaná výměna (MMTTY SetHisUTC)
-            if !v.isEmpty, settings.contest.enabled, settings.contest.format == .bartg, qso.exchangeSent.isEmpty {
-                qso.exchangeSent = Self.hhmm.string(from: qso.timeOn ?? Date())
-            }
+            // BARTG: smazaná značka = QSO nezačalo, čas se znovu bere aktuální (MMTTY UpdateBARTG)
+            if v.isEmpty, isBARTG { qso.exchangeSent = ""; qso.timeOn = nil }
         case "name": qso.name = v
         case "qth": qso.qth = v
         case "locator": qso.locator = v.uppercased()
@@ -276,6 +288,7 @@ public actor AppController {
     @discardableResult
     public func logQSO() async throws -> QSORecord {
         guard let log else { throw AppError.noLog }
+        lockBARTGTime()
         let qso = self.qso                      // snímek – během await se pole mohou změnit
         guard !qso.call.isEmpty else { throw AppError.log("chybí značka") }
         let now = Date()
@@ -305,6 +318,7 @@ public actor AppController {
             if self.qso == qso { clearQSO() }
             else if settings.contest.sendsSerial, self.qso.serialSent == r.serialSent {
                 self.qso.serialSent = settings.contest.nextSerial
+                if isBARTG { self.qso.exchangeSent = "" }   // čas zalogovaného QSO nedědit
                 broadcaster.send(.qsoChanged(self.qso))
             }
         }

@@ -173,21 +173,34 @@ func makeFormatApp(_ f: ContestFormat, exchange: String = "") throws -> Harness 
     return Harness(app: app, engine: engine, audio: audio, clock: clock, rig: rig, dir: dir)
 }
 
-// Plán 8 / T5: BARTG = číslo + čas začátku QSO (MMTTY SetHisUTC), %x číslo, %y čas
+// Plán 8 / T5 + review #2: BARTG = číslo + čas; čas je aktuální až do začátku QSO (první vysílání se značkou,
+// MMTTY UpdateBARTG/SetHisUTC), smazáním značky se uvolní. %x číslo, %y čas.
 @Test func bartgSendsSerialAndStartTime() async throws {
     let h = try makeFormatApp(.bartg)
+    try await h.app.start()
+    let now = AppController.hhmm.string(from: Date())
+    #expect(await h.app.macroContext().hisRST == "599015-" + now)          // i bez značky aktuální čas
     try await h.app.setQSOField("call", "DL1ABC")
+    #expect(await h.app.qso.exchangeSent.isEmpty)                            // zatím nezafixováno
+    try await h.app.runMacro(index: 1)                                       // odpověď = začátek QSO
     let q = await h.app.qso
-    #expect(q.serialSent == 15 && q.exchangeSent.count == 4 && Int(q.exchangeSent) != nil)
+    #expect(q.serialSent == 15 && q.exchangeSent == now)
     let c = await h.app.macroContext()
-    #expect(c.hisRST == "599015-" + q.exchangeSent)
     let t = MacroEngine.expand("%x %y", context: c).outputs.compactMap { if case .text(let s) = $0 { return s } else { return nil } }.joined()
-    #expect(t == "015 " + q.exchangeSent)
+    #expect(t == "015 " + now)
     try await h.app.setQSOField("serialRcvd", "7"); try await h.app.setQSOField("exchangeRcvd", "1159")
     #expect(await h.app.macroContext().myRST == "599007-1159")
+    await h.app.rxNow()
     let r = try await h.app.logQSO()
-    #expect(r.serialSent == 15 && r.exchangeSent == q.exchangeSent)
+    #expect(r.serialSent == 15 && r.exchangeSent == now)
     #expect(await h.app.settings.contest.nextSerial == 16)
+    // další QSO: nový čas až při začátku; smazání značky čas uvolní
+    try await h.app.setQSOField("call", "OK2AAA")
+    try await h.app.runMacro(index: 1)
+    await h.app.rxNow()
+    try await h.app.setQSOField("call", "")
+    #expect(await h.app.qso.exchangeSent.isEmpty)
+    await h.app.stop()
 }
 
 @Test func cqrjAndPedSendNoSerials() async throws {

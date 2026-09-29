@@ -287,7 +287,7 @@ public final class AppModel {
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
                 take(\.display.timestamps); take(\.display.fontSize)
-                take(\.contest.enabled); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
+                take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial)
                 return m
             }
@@ -635,7 +635,7 @@ public final class AppModel {
 
     /// Jedno načtení dávky scope (volá smyčka spektra; pro testy ručně). Zmrazený scope se nepřepisuje.
     public func pollDemodScope() async {
-        guard demodScopeEnabled, !scopeFrozen, let d = await app?.engine.demodScope(source: scopeSource) else { return }
+        guard demodScopeEnabled, !scopeFrozen, let d = await app?.engine.demodScope() else { return }
         demodScope = d
     }
 

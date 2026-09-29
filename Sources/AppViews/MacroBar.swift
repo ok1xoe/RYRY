@@ -98,7 +98,7 @@ struct MacroEditor: View {
 struct BorderedProminentIf: PrimitiveButtonStyle {
     let on: Bool
     func makeBody(configuration: Configuration) -> some View {
-        if on { Button(configuration).buttonStyle(.borderedProminent) } else { Button(configuration).buttonStyle(.bordered) }
+        if on { Button(configuration).buttonStyle(.borderedProminent) } else { Button(configuration).buttonStyle(.automatic) }
     }
 }
 extension PrimitiveButtonStyle where Self == BorderedProminentIf {

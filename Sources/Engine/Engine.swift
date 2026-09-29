@@ -475,6 +475,6 @@ public actor Engine {
     public func setXYScope(_ on: Bool) { modem.setXYScope(on) }
     public func xyScope() -> [XYPoint]? { modem.xyScope() }
     public func setDemodScope(_ on: Bool) { modem.setDemodScope(on) }
-    public func demodScope(source: Int) -> DemodScope? { modem.demodScope(source: source) }
+    public func demodScope() -> DemodScope? { modem.demodScope() }
     public var txPending: Int { modem.txPending }
 }

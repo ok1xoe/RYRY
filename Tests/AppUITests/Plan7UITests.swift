@@ -241,9 +241,14 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
     await f.pump(30)
     await f.model.pollDemodScope()
-    #expect(f.model.demodScope?.bit.count == 8192)
-    f.model.scopeSource = 1
-    #expect(f.model.scopeSource == 1)
+    let d = try #require(f.model.demodScope)
+    #expect(d.bit.count == 8192 && d.marks[0].count == 8192 && d.marks[2].count == 8192)
+    // zmrazený záznam se dalšími dávkami nepřepíše (a obsahuje všechny zdroje pro přepínání)
+    f.model.scopeFrozen = true
+    f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
+    await f.pump(30)
+    await f.model.pollDemodScope()
+    #expect(f.model.demodScope == d)
     await f.model.stop()
 }
 
@@ -255,7 +260,8 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     #expect(f.model.settings.messages.map(\.name) == ["A"])
     #expect(SettingsStore(directory: f.dir).load().0.messages.map(\.name) == ["A"])
     await f.model.runMessage(0)
-    #expect(await f.engine.state != .rx)
+    await f.pump(20)
+    #expect(await f.engine.state == .tx || f.audio.tx.count > 0)
     await f.model.rxNow()
     await f.model.stop()
 }
@@ -294,4 +300,24 @@ func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = t
     await f.settle()
     #expect(f.model.qso.call == "OK2PBR" && f.model.qso.serialSent == nil)
     await f.model.stop()
+}
+
+// Review plán 8 #1: formát závodu z dialogu Nastavení se musí uložit
+@Test @MainActor func contestFormatAppliedFromSettingsDialog() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let base = f.model.settings
+    var d = base; d.contest.enabled = true; d.contest.format = .bartg
+    await f.model.applySettings(d, baseline: base)
+    #expect(f.model.settings.contest.format == .bartg)
+    #expect(SettingsStore(directory: f.dir).load().0.contest.format == .bartg)
+    await f.model.stop()
+}
+
+// Review plán 8 #4, #5
+@Test func contestUpdateEdgeCases() {
+    #expect(cu("OK", .cqrj, exch: "04") == ["exchangeRcvd": "04 OK"])      // Oklahoma
+    #expect(cu("AR", .cqrj, exch: "04") == ["exchangeRcvd": "04 AR"])      // Arkansas
+    #expect(cu("TU", .cqrj).isEmpty)
+    #expect(cu("01203", .bartg) == ["exchangeRcvd": "1203"])               // MMTTY StoreUTC: > 3 číslice = čas, je-li platný
 }

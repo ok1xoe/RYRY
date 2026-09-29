@@ -24,11 +24,18 @@ struct MessagesMenu: View {
 }
 
 /// Editor seznamu zpráv: přidat, smazat, přesunout, upravit název a text.
+/// Řádky mají stabilní ID (výběr ani rozepsané pole nesmí po smazání/přesunu ukazovat na jinou zprávu).
 struct MessagesEditor: View {
     @Bindable var model: AppModel
-    @State private var items: [Macro] = []
-    @State private var sel: Int?
+    struct Row: Identifiable { let id = UUID(); var m: Macro }
+    @State private var rows: [Row] = []
+    @State private var sel: UUID?
     @Environment(\.dismiss) private var dismiss
+
+    private func binding(_ id: UUID, _ kp: WritableKeyPath<Macro, String>) -> Binding<String> {
+        Binding(get: { rows.first { $0.id == id }?.m[keyPath: kp] ?? "" },
+                set: { v in if let i = rows.firstIndex(where: { $0.id == id }) { rows[i].m[keyPath: kp] = v } })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -36,26 +43,28 @@ struct MessagesEditor: View {
             HStack(alignment: .top, spacing: 10) {
                 VStack(spacing: 4) {
                     List(selection: $sel) {
-                        ForEach(Array(items.enumerated()), id: \.offset) { i, m in
-                            Text(m.name.isEmpty ? "Zpráva \(i + 1)" : m.name).tag(i)
-                        }
-                        .onMove { items.move(fromOffsets: $0, toOffset: $1) }
+                        ForEach(rows) { r in Text(r.m.name.isEmpty ? "(bez názvu)" : r.m.name).tag(r.id) }
+                            .onMove { rows.move(fromOffsets: $0, toOffset: $1) }
                     }
                     .frame(width: 180)
                     HStack {
-                        Button { items.append(Macro(name: "Nová", text: "")); sel = items.count - 1 } label: { Image(systemName: "plus") }
-                        Button { if let s = sel, items.indices.contains(s) { items.remove(at: s); sel = nil } } label: { Image(systemName: "minus") }
+                        Button { let r = Row(m: Macro(name: "Nová", text: "")); rows.append(r); sel = r.id } label: { Image(systemName: "plus") }
+                        Button {
+                            NSApp.keyWindow?.makeFirstResponder(nil)        // dokončit rozepsané pole ještě před smazáním
+                            if let s = sel { rows.removeAll { $0.id == s }; sel = rows.first?.id }
+                        } label: { Image(systemName: "minus") }
                             .disabled(sel == nil)
                         Spacer()
                     }
                 }
-                if let s = sel, items.indices.contains(s) {
+                if let s = sel, rows.contains(where: { $0.id == s }) {
                     VStack(alignment: .leading) {
-                        TextField("Název", text: $items[s].name)
-                        TextEditor(text: Binding(get: { items[s].text.replacingOccurrences(of: "\r\n", with: "\n") },
-                                                 set: { items[s].text = $0.replacingOccurrences(of: "\n", with: "\r\n") }))
+                        TextField("Název", text: binding(s, \.name))
+                        TextEditor(text: Binding(get: { binding(s, \.text).wrappedValue.replacingOccurrences(of: "\r\n", with: "\n") },
+                                                 set: { binding(s, \.text).wrappedValue = $0.replacingOccurrences(of: "\n", with: "\r\n") }))
                             .font(.system(.body, design: .monospaced))
                     }
+                    .id(s)                                           // při změně výběru nové pole, žádný přenos stavu
                 } else {
                     Text("Vyberte zprávu vlevo").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -65,12 +74,15 @@ struct MessagesEditor: View {
             HStack {
                 Spacer()
                 Button("Zrušit") { dismiss() }
-                Button("Uložit") { let m = items; Task { await model.saveMessages(m) }; dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Uložit") {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                    let m = rows.map(\.m); Task { await model.saveMessages(m) }; dismiss()
+                }.keyboardShortcut(.defaultAction)
             }
         }
         .padding()
         .frame(width: 640, height: 400)
-        .onAppear { items = model.settings.messages; sel = items.isEmpty ? nil : 0 }
+        .onAppear { rows = model.settings.messages.map { Row(m: $0) }; sel = rows.first?.id }
     }
 }
 

@@ -659,8 +659,18 @@ extern "C" size_t rttycore_read_scope(RTTYCore* c, int src, float* m, float* s, 
         m[i] = float(sm.pScopeData[i] / 32768.0); s[i] = float(ss.pScopeData[i] / 32768.0);
         b[i] = float(d.m_ScopeBit.pScopeData[i] / 8192.0); y[i] = float(d.m_ScopeSync.pScopeData[i] / 8192.0);
     }
-    scopeCollect(d);
     return n;
+}
+
+extern "C" int rttycore_scope_ready(RTTYCore* c) {
+    if (!c || !c->dem->m_Scope) return 0;
+    return (c->dem->m_ScopeBit.GetFlag() && c->dem->m_ScopeSync.GetFlag()) ? 1 : 0;
+}
+
+extern "C" void rttycore_scope_rearm(RTTYCore* c) {
+    if (!c || !c->dem->m_Scope) return;
+    CoreScope scope(&c->ctx);
+    scopeCollect(*c->dem);
 }
 
 extern "C" void rttycore_set_xy(RTTYCore* c, int on) {
