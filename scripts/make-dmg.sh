@@ -17,6 +17,7 @@ rm -rf "$STAGE" "$DMG"; mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 cp README.md COPYING COPYING.LESSER "$STAGE/"
+cp docs/prirucka.md "$STAGE/Příručka.md"; cp docs/manual.md "$STAGE/Manual.md"
 hdiutil create -volname "mmtty4mac $VER" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 
