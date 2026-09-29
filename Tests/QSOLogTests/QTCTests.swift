@@ -108,3 +108,14 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     let cab = Cabrillo.export([], header: CabrilloHeader(callsign: "OK1XOE", contest: "WAEDC"), qtc: [b])
     #expect(cab.contains(" 3/10 "))
 }
+
+// Poškozený řádek se zkráceným/porušeným časem musí držet místo (jinak se posunou další řádky a AGN N žádá špatný řádek)
+@Test func garbledLinesKeepTheirPlace() {
+    #expect(QTCText.looksLikeLine("083 BY4AOM 176"))
+    #expect(QTCText.looksLikeLine("0Q31 VK2XX 015"))
+    #expect(QTCText.looksLikeLine("08031 BY4AOM 176"))
+    #expect(QTCText.looksLikeLine("0803 BY4A?M 1Z6"))
+    #expect(!QTCText.looksLikeLine("CQ TEST DE UR5ZZZ"))
+    #expect(!QTCText.looksLikeLine("QTC 12/10 QTC 12/10"))
+    #expect(!QTCText.looksLikeLine("BKKQKM"))
+}
