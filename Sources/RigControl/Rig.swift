@@ -27,6 +27,12 @@ public protocol Rig: AnyObject, Sendable {
     func mode() async throws -> String
     func setMode(_ mode: String) async throws
     func setPTT(_ on: Bool) async throws
+    /// Spojení s rádiem není otevřené (port zavřený, rigctld neběží) – příkaz by ho teprve otevíral.
+    var isIdle: Bool { get }
+}
+
+public extension Rig {
+    var isIdle: Bool { false }
 }
 
 /// Bez ovládání rigu: vše hlásí offline.

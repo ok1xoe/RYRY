@@ -26,6 +26,9 @@ final class Fixture {
     let clock = ManualClock()
     var engines: [Engine] = []
     var configure: (inout AppSettings) -> Void = { _ in }
+    let secrets = MemorySecretStore()
+    var callbookFetcher: HTTPFetcher = { _ in throw CallbookError.network("žádná síť v testu") }
+    var callbookDelay: Duration = .milliseconds(800)
     lazy var model: AppModel = {
         var s = AppSettings()
         s.station.call = "OK1XOE"
@@ -37,10 +40,12 @@ final class Fixture {
                         engineFactory: { [unowned self] settings, _ in
                             let e = Engine(modem: try! RTTYModem(config: settings.modemConfig()), rig: NoRig(), audio: self.audio,
                                            config: settings.engineConfig(), serialFactory: { _ in FakeSerialPort() },
-                                           clock: self.clock, autoRun: false)
+                                           clock: self.clock, autoRun: false,
+                                           auxModemFactory: AppModel.auxModemFactory(settings))
                             self.engines.append(e)
                             return e
-                        }, spectrumFPS: 0)
+                        }, spectrumFPS: 0, secrets: secrets, callbookFetcher: { [unowned self] u in try await self.callbookFetcher(u) },
+                        callbookDelay: callbookDelay)
     }()
     var engine: Engine { engines.last! }
     func pump(_ n: Int = 1) async { for _ in 0..<n { clock.advance(ms: 50); await engine.pump() } }

@@ -121,6 +121,23 @@ public struct APISettings: Codable, Sendable, Equatable {
     }
 }
 
+public enum CallbookKind: String, Codable, Sendable, CaseIterable { case none, qrz, hamqth }
+
+/// Vyhledání značky v callbooku (QRZ.com / HamQTH). Heslo je v Klíčence, ne tady.
+public struct CallbookSettings: Codable, Sendable, Equatable {
+    public var service: CallbookKind = .none
+    public var username = ""
+    public var autoLookup = true
+    public var fillEmptyOnly = true
+    public init() {}
+    enum CodingKeys: String, CodingKey { case service, username, autoLookup, fillEmptyOnly }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "callbook", x = CallbookSettings()
+        service = c.tolerant(.service, x.service, w, s); username = c.tolerant(.username, x.username, w, s)
+        autoLookup = c.tolerant(.autoLookup, x.autoLookup, w, s); fillEmptyOnly = c.tolerant(.fillEmptyOnly, x.fillEmptyOnly, w, s)
+    }
+}
+
 public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public var name: String
     public var text: String
@@ -151,6 +168,10 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public var name = "mmtty4mac"
     /// Naposledy otevřené logy (cesty k ADIF), nejnovější první.
     public var recent: [String] = []
+    /// Ručně zadaná frekvence (Hz) pro spojení bez rigu – pamatuje se mezi spuštěními.
+    public var manualFrequency: Double?
+    /// Super Check Partial (MASTER.SCP + značky z logu) pod polem Call.
+    public var superCheck = true
     public static let recentLimit = 8
     public mutating func remember(_ path: String) {
         recent.removeAll { $0 == path }
@@ -166,12 +187,15 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public var rxTimestamps = true
     public init() {}
     public var rxDirectory: URL { URL(fileURLWithPath: directory).appendingPathComponent("rx") }
-    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps }
+    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps, manualFrequency, superCheck }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), x = LogSettings()
         directory = c.tolerant(.directory, x.directory, d.warningSink, "log")
         let n = c.tolerant(.name, x.name, d.warningSink, "log"); name = Self.validName(n) ? n : x.name
         recent = Array(c.tolerant(.recent, TolerantArray<String>(), d.warningSink, "log").items.prefix(Self.recentLimit))
+        let mf: Double? = c.tolerant(.manualFrequency, nil, d.warningSink, "log")
+        manualFrequency = mf.flatMap { $0.isFinite && $0 > 10_000 && $0 < 10e9 ? $0 : nil }
+        superCheck = c.tolerant(.superCheck, x.superCheck, d.warningSink, "log")
         rxText = c.tolerant(.rxText, x.rxText, d.warningSink, "log")
         rxTimestamps = c.tolerant(.rxTimestamps, x.rxTimestamps, d.warningSink, "log")
     }
@@ -202,6 +226,42 @@ public struct RTTYCoreSettings: Codable, Sendable, Equatable {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "rttyCore", x = RTTYCoreSettings()
         japanese = c.tolerant(.japanese, x.japanese, w, s); doubleShift = c.tolerant(.doubleShift, x.doubleShift, w, s)
         txUOS = c.tolerant(.txUOS, x.txUOS, w, s)
+    }
+}
+
+/// Doplňkové dekodéry: druhý dekodér (jiný demodulátor) a vícekanálové dekódování.
+public struct DecoderSettings: Codable, Sendable, Equatable {
+    public var secondEnabled = false
+    /// Demodulátor druhého dekodéru (iir/fir/pll/fft); nil = automaticky jiný než hlavní.
+    public var secondDemod: String?
+    public var channelsEnabled = false
+    public var maxChannels = 4              // 1…8
+    public var channelTimeoutS = 15.0       // kanál zaniká po tolika s bez signálu
+    public var showChannelMarks = true      // značky kanálů ve vodopádu
+    public init() {}
+    public static let channelRange = 1...8
+    public static let timeoutRange = 2.0...300.0
+    enum CodingKeys: String, CodingKey { case secondEnabled, secondDemod, channelsEnabled, maxChannels, channelTimeoutS, showChannelMarks }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "decoders", x = DecoderSettings()
+        secondEnabled = c.tolerant(.secondEnabled, x.secondEnabled, w, s)
+        let dm: String? = c.tolerant(.secondDemod, x.secondDemod, w, s)
+        secondDemod = dm.flatMap { AuxDecoderConfig.demodTypes.contains($0) ? $0 : nil }
+        channelsEnabled = c.tolerant(.channelsEnabled, x.channelsEnabled, w, s)
+        let n = c.tolerant(.maxChannels, x.maxChannels, w, s); maxChannels = Self.channelRange.contains(n) ? n : x.maxChannels
+        let t = c.tolerant(.channelTimeoutS, x.channelTimeoutS, w, s)
+        channelTimeoutS = Self.timeoutRange.contains(t) ? t : x.channelTimeoutS
+        showChannelMarks = c.tolerant(.showChannelMarks, x.showChannelMarks, w, s)
+    }
+
+    /// Konfigurace doplňkových dekodérů pro Engine.
+    public func auxConfig() -> AuxDecoderConfig {
+        var a = AuxDecoderConfig()
+        a.secondEnabled = secondEnabled; a.secondDemod = secondDemod
+        a.channelsEnabled = channelsEnabled
+        a.maxChannels = min(Self.channelRange.upperBound, max(Self.channelRange.lowerBound, maxChannels))
+        a.channelTimeout = min(Self.timeoutRange.upperBound, max(Self.timeoutRange.lowerBound, channelTimeoutS.isFinite ? channelTimeoutS : 15))
+        return a
     }
 }
 
@@ -405,6 +465,18 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     }
 }
 
+/// Kontrola aktualizací (poslední kontrola a přeskočená verze jsou v UserDefaults, ne tady).
+public struct UpdateSettings: Codable, Sendable, Equatable {
+    /// Při startu (nejvýš 1× denně) zjistit, zda existuje novější verze.
+    public var autoCheck = true
+    public init() {}
+    enum CodingKeys: String, CodingKey { case autoCheck }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "updates", x = UpdateSettings()
+        autoCheck = c.tolerant(.autoCheck, x.autoCheck, w, s)
+    }
+}
+
 public struct AppSettings: Codable, Sendable, Equatable {
     public var schemaVersion = 1
     public var station = Station()
@@ -413,6 +485,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var fsk = FSKSettings()
     public var rig = RigSettings()
     public var api = APISettings()
+    public var callbook = CallbookSettings()
     public var rtty: [String: ParameterValue] = [:]
     public var macros: [Macro] = AppSettings.defaultMacros
     public var log = LogSettings()
@@ -423,8 +496,14 @@ public struct AppSettings: Codable, Sendable, Equatable {
     /// Seznam zpráv (MMTTY MsgList): pojmenované delší texty se syntaxí maker.
     public var messages: [Macro] = AppSettings.defaultMessages
     public var txWindow = TxWindowSettings()
+    public var updates = UpdateSettings()
     /// Vlastní klávesové zkratky (id příkazu → zkratka); chybějící = výchozí.
     public var shortcuts: [String: KeyBinding] = [:]
+    /// Nahrávání na LoTW / eQSL / Club Log.
+    public var upload = UploadSettings()
+    /// DX cluster a RBN spoty.
+    public var spots = SpotSettings()
+    public var decoders = DecoderSettings()
     public init() {}
     public static let macroCount = 16
 
@@ -447,8 +526,9 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "", text: ""),
     ]
 
-    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, rtty, macros, log,
-                                             clock, rttyCore, contest, display, messages, txWindow, shortcuts }
+    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty,
+                                             macros, log, clock, rttyCore, contest, display, messages, txWindow,
+                                             shortcuts, updates, upload, spots, decoders }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -462,6 +542,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         station = c.tolerant(.station, x.station, w, s); audio = c.tolerant(.audio, x.audio, w, s)
         ptt = c.tolerant(.ptt, x.ptt, w, s); fsk = c.tolerant(.fsk, x.fsk, w, s)
         rig = c.tolerant(.rig, x.rig, w, s); api = c.tolerant(.api, x.api, w, s)
+        callbook = c.tolerant(.callbook, x.callbook, w, s)
         rtty = c.tolerant(.rtty, TolerantDict<ParameterValue>(), w, s).items
         macros = c.contains(.macros) ? c.tolerant(.macros, TolerantArray<Macro>(), w, s).items : x.macros
         // dřívější výchozí závodní makro mělo %M (v MMTTY přijaté číslo) místo %N (odesílané)
@@ -475,7 +556,11 @@ public struct AppSettings: Codable, Sendable, Equatable {
         contest = c.tolerant(.contest, x.contest, w, s); display = c.tolerant(.display, x.display, w, s)
         messages = c.contains(.messages) ? c.tolerant(.messages, TolerantArray<Macro>(), w, s).items : x.messages
         txWindow = c.tolerant(.txWindow, x.txWindow, w, s)
+        updates = c.tolerant(.updates, x.updates, w, s)
         shortcuts = c.tolerant(.shortcuts, TolerantDict<KeyBinding>(), w, s).items.filter { $0.value.isValid }
+        upload = c.tolerant(.upload, x.upload, w, s)
+        spots = c.tolerant(.spots, x.spots, w, s)
+        decoders = c.tolerant(.decoders, x.decoders, w, s)
     }
 
     /// Konfigurace Engine z nastavení.

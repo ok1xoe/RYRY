@@ -1,4 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import CSerial
 import Foundation
 import Testing
 @testable import RigControl
@@ -169,4 +170,30 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     #expect(TextCAT.setMode("RTTY", dialect: .kenwood) == "MD6;DA0;")
     #expect(TextCAT.setMode("USB", dialect: .kenwood) == "MD2;DA0;")
     #expect(TextCAT.setMode("PKTLSB", dialect: .elecraft) == "MD9;DT0;")
+}
+
+// Review (odloženo): zápis na zaseknutý port (plný buffer) skončí po limitu, nezablokuje frontu CAT
+@Test func serialWriteTimesOut() throws {
+    var fds: [Int32] = [0, 0]
+    #expect(pipe(&fds) == 0)
+    let w = fds[1]
+    _ = fcntl(w, F_SETFL, fcntl(w, F_GETFL) | O_NONBLOCK)
+    let chunk = [UInt8](repeating: 0x55, count: 4096)
+    while chunk.withUnsafeBufferPointer({ write(w, $0.baseAddress, 4096) }) > 0 {}      // naplnit buffer roury
+    _ = fcntl(w, F_SETFL, fcntl(w, F_GETFL) & ~O_NONBLOCK)
+    let t0 = Date()
+    let e = chunk.withUnsafeBufferPointer { cserial_write_timeout(w, $0.baseAddress, 16, 200) }
+    #expect(e == ETIMEDOUT)
+    #expect(Date().timeIntervalSince(t0) < 1)
+    close(fds[0]); close(fds[1])
+}
+
+// Po výslovném odpojení (stop engine) rig port znovu neotevře – pozdě doběhlý příkaz jen hlásí offline
+@Test func catStaysClosedAfterDisconnect() async throws {
+    let t = FakeCATTransport { _ in Array("FA00014085000;".utf8) }
+    let rig = SerialCATRig(transport: t, protocol: .text(.kenwood), timeout: .milliseconds(100))
+    #expect(try await rig.frequency() == 14_085_000)
+    await rig.disconnect()
+    await #expect(throws: RigError.offline) { try await rig.setPTT(false) }
+    #expect(!t.opened && rig.isIdle)
 }

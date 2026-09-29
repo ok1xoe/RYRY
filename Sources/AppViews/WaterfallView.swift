@@ -43,6 +43,7 @@ struct WaterfallView: View {
                         ctx.stroke(p, with: .color(color.opacity(0.85)), lineWidth: 1)
                     }
                     drawNotches(ctx, size, model)
+                    drawChannelMarks(ctx, size, model)
                     // stupnice po 500 Hz
                     var hz = (model.waterfallFromHz / 500).rounded(.up) * 500
                     while hz < model.waterfallToHz {

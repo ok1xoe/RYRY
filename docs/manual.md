@@ -2,6 +2,8 @@
 
 mmtty4mac is an RTTY program for macOS: a native port of MMTTY (JE3HHT) with the same demodulator, plus a log, contest support and an API for loggers. Česká verze: [prirucka.md](prirucka.md).
 
+**New in 0.13:** contest DUPE (red badge next to the call), band/frequency without a rig (below the QSO fields), Super Check Partial (call suggestions, MASTER.SCP in Settings → Contest), QRZ.com/HamQTH callbook (Settings → API and log), second decoder and multi-channel decoding (Settings → Decoders, Window → Channels), DX cluster and RBN (Settings → Spots, Window → Spots), upload to LoTW/eQSL/Club Log (Settings → Online, Log window → Upload), update check (app menu). Online services are off by default; passwords are kept in the Keychain.
+
 ## 1. Installation
 
 1. Open `mmtty4mac-<version>.dmg` and drag the app into Applications.

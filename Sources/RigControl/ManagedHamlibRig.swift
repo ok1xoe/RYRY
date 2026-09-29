@@ -21,6 +21,8 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     private var process: Process?
     private var stderrText = ""
     private var failedAt: ContinuousClock.Instant?
+    /// Po výslovném disconnect() se rigctld znovu nespouští (dokud nepřijde connect()).
+    private var closedByOwner = false
     /// Probíhající spuštění – souběžné dotazy (poll, PTT, zkouška) čekají na totéž, nespouští další rigctld.
     private var starting: Task<Void, Error>?
     /// Kolikrát se rigctld spouštěl (pro testy).
@@ -86,6 +88,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     }
 
     public var isRunning: Bool { lock.withLock { process?.isRunning ?? false } }
+    public var isIdle: Bool { !isRunning }
 
     private func startProcess() throws {
         if isRunning { return }
@@ -116,6 +119,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
 
     public func connect() async throws {
         let t: Task<Void, Error> = lock.withLock {
+            closedByOwner = false
             if let s = starting { return s }
             let s = Task { try await self.start() }
             starting = s
@@ -132,6 +136,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     /// Líné spuštění při prvním dotazu (Engine rig nepřipojuje zvlášť).
     private func ensureStarted() async throws {
         if isRunning { return }
+        if lock.withLock({ closedByOwner }) { throw RigError.offline }
         if let f = lock.withLock({ failedAt }), ContinuousClock.now - f < Self.retryAfter { throw RigError.offline }
         try await connect()
     }
@@ -170,6 +175,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     }
 
     public func disconnect() async {
+        lock.withLock { closedByOwner = true }
         await client.disconnect()
         stopProcess()
     }

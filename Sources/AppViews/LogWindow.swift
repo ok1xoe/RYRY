@@ -3,6 +3,7 @@ import AppKit
 import AppUI
 import QSOLog
 import SwiftUI
+import Upload
 import UniformTypeIdentifiers
 import Localization
 
@@ -39,6 +40,7 @@ public struct LogWindow: View {
     @State private var selection: QSORecord.ID?
     @State private var editing: QSORecord?
     @State private var confirmDelete: QSORecord?
+    @State private var uploadResult: String?
     public init(model: AppModel) { self.model = model }
 
     var filtered: [QSORecord] {
@@ -72,6 +74,16 @@ public struct LogWindow: View {
         let v = r.serialRcvd.map { String(format: "%03d", $0) } ?? r.exchangeRcvd ?? ""
         return s + "/" + v
     }
+    /// Stav nahrání: L = LoTW, e = eQSL, C = Club Log (zelená = nahráno).
+    @ViewBuilder static func uploadBadges(_ r: QSORecord) -> some View {
+        HStack(spacing: 4) {
+            ForEach([(UploadTarget.lotw, "L"), (.eqsl, "e"), (.clublog, "C")], id: \.0) { t, letter in
+                Text(letter).bold()
+                    .foregroundStyle(r.isUploaded(t) ? Color.green : Color.secondary.opacity(0.35))
+                    .help(r.isUploaded(t) ? "\(t.title): \(fmt.string(from: r.uploads?[t.rawValue] ?? Date()))" : t.title)
+            }
+        }
+    }
     func qtcLabel(_ call: String) -> String {
         guard let v = qtcByCall[QSORecord.baseCall(call)] else { return "" }
         return [v.rx > 0 ? "↓\(v.rx)" : nil, v.tx > 0 ? "↑\(v.tx)" : nil].compactMap { $0 }.joined(separator: " ")
@@ -95,6 +107,7 @@ public struct LogWindow: View {
                     TableColumn(L("Země")) { (r: QSORecord) in Text(r.country ?? "") }
                 }
                 TableColumn("QTC") { (r: QSORecord) in Text(qtcLabel(r.call)).monospacedDigit() }.width(70)
+                TableColumn(L("Nahráno")) { (r: QSORecord) in Self.uploadBadges(r) }.width(min: 60, ideal: 70)
             }
             .contextMenu(forSelectionType: QSORecord.ID.self) { ids in
                 if let id = ids.first, let r = model.logRecords.first(where: { $0.id == id }) {
@@ -115,6 +128,12 @@ public struct LogWindow: View {
                     Button(L("Uložit log jako…")) { FileActions.saveLogAs(model) }
                     Button(L("Exportovat ADIF…")) { FileActions.exportADIF(model) }
                 }.fixedSize()
+                Menu(L("Nahrát")) {
+                    ForEach(UploadTarget.allCases, id: \.self) { t in
+                        Button(t.title) { runUpload(t) }
+                            .disabled(!UploadCoordinator.isEnabled(t, model.settings.upload) || model.uploadsRunning.contains(t))
+                    }
+                }.fixedSize().hint(L("Nahraje dosud nenahraná spojení (služby se zapínají v Nastavení → Online)"))
                 Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
             }.padding(6).font(.caption)
@@ -125,7 +144,14 @@ public struct LogWindow: View {
                             presenting: confirmDelete) { r in
             Button(L("Smazat %@", r.call), role: .destructive) { Task { await model.deleteLog(r.id) } }
         }
+        .alert(L("Nahrávání"), isPresented: Binding(get: { uploadResult != nil }, set: { if !$0 { uploadResult = nil } })) {
+            Button("OK") { uploadResult = nil }
+        } message: { Text(uploadResult ?? "") }
         .frame(minWidth: 700, minHeight: 300)
+    }
+
+    func runUpload(_ t: UploadTarget) {
+        Task { uploadResult = await model.uploadPending(t) }
     }
 
     static let fmt: DateFormatter = {

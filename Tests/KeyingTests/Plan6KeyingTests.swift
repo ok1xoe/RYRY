@@ -53,3 +53,27 @@ import TestSupport
     #expect(Date().timeIntervalSince(t0) < 0.5)
     #expect(port.events.contains(.rts(false)))
 }
+
+// Review (odloženo): při PTT přes RTS/DTR se pojistné CAT „RX“ pošle jen otevřenému rigu a počká se na něj
+@Test func forceOffWithRTSOnlyTouchesActiveRig() async throws {
+    final class IdleRig: Rig, @unchecked Sendable {
+        var idle: Bool; var ptt: [Bool] = []
+        init(idle: Bool) { self.idle = idle }
+        var name: String { "idle" }
+        var isIdle: Bool { idle }
+        func connect() async throws {}
+        func disconnect() async {}
+        func frequency() async throws -> Double { 14e6 }
+        func setFrequency(_ hz: Double) async throws {}
+        func mode() async throws -> String { "USB" }
+        func setMode(_ mode: String) async throws {}
+        func setPTT(_ on: Bool) async throws { ptt.append(on) }
+    }
+    let idle = IdleRig(idle: true)
+    await PTTController(method: .rts, port: FakeSerialPort(), rig: idle).forceOff()
+    #expect(idle.ptt.isEmpty)                         // neotvírat port / nespouštět rigctld jen kvůli RX
+    let active = IdleRig(idle: false)
+    await PTTController(method: .rts, port: FakeSerialPort(), rig: active).forceOff()
+    for _ in 0..<50 where active.ptt.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(active.ptt == [false])                    // na pozadí, bez čekání
+}

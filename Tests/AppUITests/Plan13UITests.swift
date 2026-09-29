@@ -47,3 +47,11 @@ import Settings
     #expect(f.model.lastSentForTesting == "\r\n")
     await f.model.stop()
 }
+
+// Review (odloženo): zalamování počítá i text odvysílaný od posledního konce řádku
+@Test func txWrapWithSentPrefix() {
+    #expect(TxWrap.wrap("DE OK1XOE", column: 10, startColumn: 6) == "DE\nOK1XOE")
+    #expect(TxWrap.wrap("AB", column: 10, startColumn: 9) == "\nAB")               // na konci řádku zlom před slovem
+    #expect(TxWrap.wrap("CQ CQ", column: 10, startColumn: 0) == "CQ CQ")
+    #expect(TxWrap.column(afterSending: "CQ CQ\r\nDE OK1") == 6 && TxWrap.column(afterSending: "XY", from: 3) == 5)
+}

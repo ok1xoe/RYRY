@@ -45,6 +45,39 @@ potřebuje podpis **Developer ID Application** a notarizaci.
    Skript sestaví a podepíše aplikaci (Developer ID, hardened runtime, časové razítko). Pak podepíše DMG,
    odešle ho k notarizaci, připojí lístek (staple) a ověří ho přes `spctl`.
 
+## Kontrola aktualizací
+
+Aplikace umí zjistit, že existuje novější verze, stáhnout DMG a otevřít ho. Instalaci nedělá sama: uživatel přetáhne aplikaci do Aplikací. Bez Sparkle a bez dalších knihoven (proč viz `docs/rulings.md`).
+
+**Zdroj verzí** je adresa v klíči `MMUpdateFeedURL` v `Resources/Info.plist`. Prázdný řetězec (výchozí stav) = funkce vypnutá: automatická kontrola mlčí, ruční příkaz ukáže „Adresa aktualizací není nastavená“. Žádný síťový požadavek se pak neodešle. Formát se pozná podle tvaru adresy.
+
+**1. Appcast** (libovolná adresa, `https`; `http` jen pro localhost):
+
+    {"latest": {
+        "version": "0.13.0",
+        "build": 150,
+        "url": "https://example.com/mmtty4mac-0.13.0.dmg",
+        "notes": {"cs": "Co je nového…", "en": "What is new…"},
+        "minimumSystemVersion": "14.0",
+        "sha256": "<64 hexadecimálních znaků>"
+    }}
+
+Povinné jsou `version` (semver) a `url`. Nepovinné: `build` (rozhoduje jen při stejné verzi), `notes` (jazyk rozhraní, jinak `en`, jinak cokoli), `minimumSystemVersion` (na starším macOS se nabídne jen informace), `sha256` (stažený soubor se ověří, při neshodě se smaže).
+
+**2. GitHub Releases API**: `https://api.github.com/repos/<vlastník>/<repozitář>/releases/latest`. Použije se `tag_name` (`v0.13.0` nebo `0.13.0`), `body` jako poznámky (pro všechny jazyky stejné), první asset `*.dmg` a jeho `digest` (`sha256:…`), pokud ho GitHub uvádí. Build číslo tu není, porovnává se jen verze.
+
+**Porovnání:** semver (`0.10.0` > `0.9.0`, vydání > `-rc.1`); při stejné verzi vyhrává vyšší build (jen když je známý u obou).
+
+**Chování:**
+- Při startu (po spuštění enginu) se kontroluje nejvýš jednou za 24 hodin. Nastavení → Zobrazení → „Automaticky kontrolovat aktualizace“ (výchozí zapnuto, `updates.autoCheck`). Čas poslední úspěšné kontroly je v UserDefaults `updates.lastCheck`; při chybě sítě se nezapisuje.
+- Menu aplikace → „Zkontrolovat aktualizace…“ ignoruje denní limit i přeskočenou verzi a vždy otevře okno s výsledkem.
+- Nová verze otevře okno s poznámkami a tlačítky „Stáhnout“ (DMG do `~/Downloads`, existující soubor se nepřepíše, ověření sha256, otevření DMG přes NSWorkspace), „Později“ a „Přeskočit tuto verzi“ (UserDefaults `updates.skippedVersion`; automatická kontrola tu verzi už neohlásí, novější ano).
+- Síť: časový limit 15 s na dotaz, žádné blokování hlavního vlákna.
+
+**Vydání:** `scripts/release.sh` na konci vytvoří `build/appcast.json` (verze, build, sha256 DMG, `minimumSystemVersion`). S `UPDATE_BASE_URL=https://example.com/mmtty4mac` doplní `url` = `<BASE>/mmtty4mac-<verze>.dmg`, bez ní pole `url` vynechá (a upozorní). Volitelně `RELEASE_NOTES_CS` a `RELEASE_NOTES_EN`. Soubor `appcast.json` a DMG pak nahrajte na server a `MMUpdateFeedURL` nastavte na adresu appcastu.
+
+**Zabezpečení:** appcast ani DMG nejsou podepsané vlastním klíčem. Integritu stažení kryje `sha256` z appcastu (to chrání před poškozením, ne před útočníkem, který ovládá server) a hlavně Gatekeeper: aplikace v DMG je podepsaná Developer ID a notarizovaná, takže podvržená aplikace se nespustí. Zdroj proto musí být `https`.
+
 ## Poznámky
 
 - **Oprávnění (entitlements):** jen `com.apple.security.device.audio-input`. Aplikace není v sandboxu, protože potřebuje sériové porty a TCP pro rigctld/flrig a API.

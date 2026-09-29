@@ -42,6 +42,8 @@ public enum EngineEvent: Sendable {
     case logRequested
     /// Počet znaků/kódů čekajících na odvysílání (při změně, max. 5×/s).
     case txProgress(Int)
+    /// Druhý dekodér / vícekanálové dekódování.
+    case aux(AuxEvent)
 }
 
 /// Rozesílá události více odběratelům (každý dostane vlastní AsyncStream).

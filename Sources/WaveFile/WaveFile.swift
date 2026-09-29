@@ -106,13 +106,19 @@ public final class WaveWriter {
         }
         try handle.write(contentsOf: d)
         sampleCount += samples.count
+        try writeSizes()                                   // průběžně – soubor jde přečíst i po pádu aplikace
+        try handle.seekToEnd()
+    }
+
+    private func writeSizes() throws {
+        let bytes = UInt32(clamping: sampleCount * 2)
+        try handle.seek(toOffset: 4); try handle.write(contentsOf: withUnsafeBytes(of: (36 + bytes).littleEndian) { Data($0) })
+        try handle.seek(toOffset: 40); try handle.write(contentsOf: withUnsafeBytes(of: bytes.littleEndian) { Data($0) })
     }
 
     /// Doplní velikosti RIFF a data a zavře soubor.
     public func close() throws {
-        let bytes = UInt32(clamping: sampleCount * 2)
-        try handle.seek(toOffset: 4); try handle.write(contentsOf: withUnsafeBytes(of: (36 + bytes).littleEndian) { Data($0) })
-        try handle.seek(toOffset: 40); try handle.write(contentsOf: withUnsafeBytes(of: bytes.littleEndian) { Data($0) })
+        try writeSizes()
         try handle.close()
     }
 }

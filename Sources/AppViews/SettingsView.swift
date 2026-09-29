@@ -9,12 +9,16 @@ import Settings
 import RigControl
 import AppCore
 import SwiftUI
+import Upload
+import QSOLog
 
 public struct SettingsView: View {
     @Bindable var model: AppModel
     @State private var draft = AppSettings()
     @State private var baseline = AppSettings()       // stav, ze kterého koncept vyšel
     @State private var loaded = false
+    @State private var callbookPassword = ""          // heslo se ukládá do Klíčenky, ne do nastavení
+    @State private var callbookPasswordDirty = false
     /// Vybraná záložka (spouštěcí parametr `-settingsTab N` pro snímky obrazovky).
     @State private var tab = UserDefaults.standard.integer(forKey: "settingsTab")
     public init(model: AppModel) { self.model = model }
@@ -27,10 +31,13 @@ public struct SettingsView: View {
                 PTTTab(s: $draft).tabItem { Label("PTT / FSK", systemImage: "cable.connector") }.tag(2)
                 RigTab(s: $draft).tabItem { Label("Rig", systemImage: "antenna.radiowaves.left.and.right") }.tag(3)
                 ModemTab(model: model, s: $draft).tabItem { Label("Modem", systemImage: "slider.horizontal.3") }.tag(4)
-                ContestTab(s: $draft).tabItem { Label(L("Závod"), systemImage: "trophy") }.tag(5)
+                ContestTab(s: $draft, model: model).tabItem { Label(L("Závod"), systemImage: "trophy") }.tag(5)
                 DisplayTab(s: $draft).tabItem { Label(L("Zobrazení"), systemImage: "paintpalette") }.tag(6)
-                APITab(s: $draft).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
+                APITab(s: $draft, model: model, callbookPassword: $callbookPassword, callbookPasswordDirty: $callbookPasswordDirty).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
                 KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
+                UploadTab(s: $draft, secrets: model.uploader.secrets).tabItem { Label("Online", systemImage: "icloud.and.arrow.up") }.tag(9)
+                SpotsTab(s: $draft).tabItem { Label(L("Spoty"), systemImage: "dot.radiowaves.left.and.right") }.tag(10)
+                DecodersTab(s: $draft).tabItem { Label(L("Dekodéry"), systemImage: "square.stack.3d.down.right") }.tag(11)
             }
             Divider()
             HStack {
@@ -41,12 +48,22 @@ public struct SettingsView: View {
                 Button(L("Vrátit")) { draft = model.settings; baseline = draft }
                 Button(L("Použít")) {
                     let d = draft, b = baseline
+                    if callbookPasswordDirty {
+                        model.saveCallbookPassword(callbookPassword, kind: d.callbook.service, username: d.callbook.username)
+                        callbookPasswordDirty = false
+                    }
                     Task { await model.applySettings(d, baseline: b); draft = model.settings; baseline = draft }
                 }.keyboardShortcut(.defaultAction)
             }.padding(12)
         }
-        .frame(width: 720, height: 640)
-        .onAppear { if !loaded { draft = model.settings; baseline = draft; loaded = true } }
+        .frame(width: 820, height: 640)
+        .onAppear {
+            if !loaded {
+                draft = model.settings; baseline = draft; loaded = true
+                callbookPassword = model.callbookPassword(kind: draft.callbook.service, username: draft.callbook.username)
+                callbookPasswordDirty = false
+            }
+        }
         .onDisappear { loaded = false }                  // příště načíst aktuální stav
     }
 }
@@ -351,8 +368,46 @@ struct RigTab: View {
 
 struct APITab: View {
     @Binding var s: AppSettings
+    var model: AppModel
+    @Binding var callbookPassword: String
+    @Binding var callbookPasswordDirty: Bool
+    @State private var callbookTestResult = ""
+    @State private var callbookTesting = false
     var body: some View {
         Form {
+            Section {
+                Picker(L("Služba"), selection: $s.callbook.service) {
+                    Text(L("Vypnuto")).tag(CallbookKind.none)
+                    Text("QRZ.com").tag(CallbookKind.qrz)
+                    Text("HamQTH").tag(CallbookKind.hamqth)
+                }
+                .onChange(of: s.callbook.service) { _, _ in reloadPassword() }
+                Group {
+                    TextField(L("Uživatel"), text: $s.callbook.username)
+                        .onChange(of: s.callbook.username) { _, _ in reloadPassword() }
+                    SecureField(L("Heslo"), text: Binding(get: { callbookPassword },
+                                                          set: { callbookPassword = $0; callbookPasswordDirty = true }))
+                    Toggle(L("Automaticky doplnit"), isOn: $s.callbook.autoLookup)
+                    Toggle(L("Doplnit jen prázdná pole"), isOn: $s.callbook.fillEmptyOnly)
+                    LabeledContent {
+                        HStack {
+                            if callbookTesting { ProgressView().controlSize(.small) }
+                            Text(callbookTestResult).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        }
+                    } label: {
+                        Button(L("Vyzkoušet")) {
+                            let d = s.callbook, pw = callbookPassword, call = s.station.call
+                            callbookTesting = true; callbookTestResult = ""
+                            Task {
+                                callbookTestResult = await model.testCallbook(kind: d.service, username: d.username, password: pw, call: call)
+                                callbookTesting = false
+                            }
+                        }.disabled(callbookTesting)
+                    }
+                }.disabled(s.callbook.service == .none)
+            } header: { Text("Callbook") } footer: {
+                Text(L("Po zadání značky v okně QSO se dohledá jméno, QTH a lokátor. Heslo se ukládá do Klíčenky. Dotazy jdou na server služby jen při zapnutém callbooku."))
+            }
             Section {
                 Toggle("fldigi XML-RPC", isOn: $s.api.fldigiEnabled)
                 LabeledContent(L("Port")) {
@@ -401,7 +456,65 @@ struct APITab: View {
     }
 }
 
+/// Spoty: DX cluster a Reverse Beacon Network (telnet).
+struct SpotsTab: View {
+    @Binding var s: AppSettings
+    var commands: Binding<String> {
+        Binding(get: { s.spots.clusterCommands.joined(separator: "\n") },
+                set: { s.spots.clusterCommands = Array($0.split(separator: "\n", omittingEmptySubsequences: true)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.prefix(SpotSettings.maxCommands)) })
+    }
+    var body: some View {
+        Form {
+            Section {
+                Toggle(L("Zapnout DX cluster"), isOn: $s.spots.clusterEnabled)
+                TextField(L("Server"), text: $s.spots.clusterHost).disabled(!s.spots.clusterEnabled)
+                LabeledContent(L("Port")) {
+                    TextField("", value: $s.spots.clusterPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                }.disabled(!s.spots.clusterEnabled)
+                LabeledContent(L("Příkazy po přihlášení")) {
+                    TextEditor(text: commands).font(.system(.body, design: .monospaced)).frame(width: 260, height: 54)
+                        .border(Color.secondary.opacity(0.3))
+                }.disabled(!s.spots.clusterEnabled)
+            } header: { Text("DX cluster") } footer: {
+                Text(L("Přihlášení značkou ze záložky Stanice. Příklady serverů: dxc.ve7cc.net:23, dxfun.com:8000. Příkazy, jeden na řádek: set/skimmer, sh/dx 30."))
+            }
+            Section {
+                Toggle(L("Zapnout RBN"), isOn: $s.spots.rbnEnabled)
+                TextField(L("Server"), text: $s.spots.rbnHost).disabled(!s.spots.rbnEnabled)
+                LabeledContent(L("Port")) {
+                    TextField("", value: $s.spots.rbnPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                }.disabled(!s.spots.rbnEnabled)
+            } header: { Text("RBN") } footer: {
+                Text(L("Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat „Jen RTTY“."))
+            }
+            Section {
+                Toggle(L("Jen RTTY"), isOn: $s.spots.rttyOnly)
+                NumberRow(title: L("Stáří spotů"), value: $s.spots.maxAgeMinutes, range: SpotSettings.ageRange, unit: "min")
+                LabeledContent(L("Posun frekvence rigu")) {
+                    HStack {
+                        TextField("", value: $s.spots.offsetHz, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                        Text("Hz")
+                    }
+                }
+            } header: { Text(L("Spoty")) } footer: {
+                Text(L("Rig se nastaví na frekvenci spotu (u RTTY je to mark) + posun. Rádio v režimu LSB/AFSK s mark 2125 Hz potřebuje posun +2125 Hz. Síť se používá jen u zapnutých služeb; změny po Použít."))
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
 /// Parametry modemu generované z popisu (mění se hned, bez restartu) + nastavení jádra (po Použít).
+extension APITab {
+    /// Při změně služby nebo uživatele načíst heslo z Klíčenky (pokud se právě nepíše nové).
+    fileprivate func reloadPassword() {
+        guard !callbookPasswordDirty else { return }
+        callbookPassword = model.callbookPassword(kind: s.callbook.service, username: s.callbook.username)
+        callbookPasswordDirty = false
+    }
+}
+
 struct ModemTab: View {
     @Bindable var model: AppModel
     @Binding var s: AppSettings
@@ -567,6 +680,9 @@ struct ModemTab: View {
 
 struct ContestTab: View {
     @Binding var s: AppSettings
+    @Bindable var model: AppModel
+    @State private var scpStatus: String?
+    @State private var downloading = false
 
     /// Vybraná předvolba; výběr závodu nastaví jeho nejbližší termín, „Vlastní“ nechá hodnoty k ruční úpravě.
     var presetBinding: Binding<ContestPreset?> {
@@ -640,6 +756,25 @@ struct ContestTab: View {
             Section {
                 Text(L("%N odesílané číslo nebo výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST")).font(.callout)
             } header: { Text(L("Makra")) }
+            Section {
+                Toggle(L("Návrhy značek pod polem Call"), isOn: $s.log.superCheck)
+                LabeledContent(L("Databáze značek")) {
+                    HStack {
+                        Text(L("%ld značek", model.scpCount)).foregroundStyle(.secondary).monospacedDigit()
+                        Button(downloading ? L("Stahuji…") : L("Stáhnout MASTER.SCP")) {
+                            downloading = true; scpStatus = nil
+                            Task {
+                                do { scpStatus = L("Staženo %ld značek.", try await model.downloadSuperCheck()) }
+                                catch { scpStatus = error.localizedDescription }
+                                downloading = false
+                            }
+                        }.disabled(downloading)
+                    }
+                }
+                if let scpStatus { Text(scpStatus).font(.caption).foregroundStyle(.secondary) }
+            } header: { Text("Super Check Partial") } footer: {
+                Text(L("Při psaní značky nabízí známé značky z MASTER.SCP (supercheckpartial.com) a z vašeho logu; „≈“ = značky lišící se o jeden znak (oprava chybně přijaté značky). V závodě červené DUPE upozorní na opakované spojení na stejném pásmu a módu."))
+            }
         }
         .formStyle(.grouped)
     }
@@ -715,6 +850,11 @@ struct DisplayTab: View {
             Section(L("Ostatní")) {
                 Toggle(L("Časové značky UTC při přepnutí TX/RX"), isOn: $s.display.timestamps)
                 Toggle(L("Bublinová nápověda tlačítek"), isOn: $s.display.showHints)
+            }
+            Section {
+                Toggle(L("Automaticky kontrolovat aktualizace"), isOn: $s.updates.autoCheck)
+            } header: { Text(L("Aktualizace")) } footer: {
+                Text(L("Kontrola proběhne při startu nejvýš jednou denně. Nová verze se nikdy neinstaluje sama – stáhne se DMG a aplikaci přetáhnete do Aplikací. Ruční kontrola: menu aplikace → Zkontrolovat aktualizace…"))
             }
         }
         .formStyle(.grouped)
@@ -829,5 +969,78 @@ struct KeyRecorder: View {
     private func stop() {
         if let m = monitor { NSEvent.removeMonitor(m) }
         monitor = nil; recording = false
+    }
+}
+
+
+/// Heslo/API klíč uložený v Klíčence (mění se hned při psaní, ne přes Použít).
+struct SecretField: View {
+    let title: String
+    let service: String
+    let store: any UploadSecretStore
+    @State private var value = ""
+    @State private var saved = ""
+    @State private var loaded = false
+    @State private var error: String?
+    @FocusState private var focused: Bool
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            SecureField(title, text: $value)
+                .focused($focused)
+                .onSubmit { save() }
+                .onChange(of: focused) { if !focused { save() } }
+                .onDisappear { save() }
+            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+        }
+        .onAppear {
+            if !loaded { value = store.get(service: service, account: SecretServices.account) ?? ""; saved = value; loaded = true }
+        }
+    }
+
+    /// Uloží do Klíčenky při potvrzení nebo opuštění pole (ne po každém znaku); chybu ukáže.
+    private func save() {
+        guard loaded, value != saved else { return }
+        do { try store.set(value, service: service, account: SecretServices.account); saved = value; error = nil }
+        catch { self.error = L("Heslo nelze uložit do Klíčenky: %@", error.localizedDescription) }
+    }
+}
+
+/// Nahrávání na LoTW (TQSL), eQSL a Club Log.
+struct UploadTab: View {
+    @Binding var s: AppSettings
+    let secrets: any UploadSecretStore
+    var tqslFound: String? { TQSLLocator.find(custom: s.upload.lotwTqslPath) }
+    var body: some View {
+        Form {
+            Section {
+                Toggle(L("Nahrávat na LoTW"), isOn: $s.upload.lotwEnabled)
+                TextField(L("Station Location"), text: $s.upload.lotwLocation).disabled(!s.upload.lotwEnabled)
+                TextField(L("Cesta k tqsl"), text: $s.upload.lotwTqslPath, prompt: Text(L("prázdné = automaticky")))
+                    .disabled(!s.upload.lotwEnabled)
+                Toggle(L("Nahrát automaticky po zalogování"), isOn: $s.upload.lotwAuto).disabled(!s.upload.lotwEnabled)
+                LabeledContent("TQSL") {
+                    Text(tqslFound ?? L("nenalezen – nainstalujte TrustedQSL")).foregroundStyle(tqslFound == nil ? .orange : .secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+            } header: { Text("LoTW") } footer: {
+                Text(L("Spojení se podepíšou a odešlou programem TQSL (certifikát a Station Location musí být v TQSL nastaveny)."))
+            }
+            Section {
+                Toggle(L("Nahrávat na eQSL"), isOn: $s.upload.eqslEnabled)
+                TextField(L("Uživatel"), text: $s.upload.eqslUser).disabled(!s.upload.eqslEnabled)
+                SecretField(title: L("Heslo"), service: SecretServices.eqsl, store: secrets).disabled(!s.upload.eqslEnabled)
+                Toggle(L("Nahrát automaticky po zalogování"), isOn: $s.upload.eqslAuto).disabled(!s.upload.eqslEnabled)
+            } header: { Text("eQSL") }
+            Section {
+                Toggle(L("Nahrávat na Club Log"), isOn: $s.upload.clublogEnabled)
+                TextField("E-mail", text: $s.upload.clublogEmail).disabled(!s.upload.clublogEnabled)
+                SecretField(title: L("Heslo"), service: SecretServices.clublog, store: secrets).disabled(!s.upload.clublogEnabled)
+                SecretField(title: L("API klíč"), service: SecretServices.clublogAPIKey, store: secrets).disabled(!s.upload.clublogEnabled)
+                Toggle(L("Nahrát automaticky po zalogování"), isOn: $s.upload.clublogAuto).disabled(!s.upload.clublogEnabled)
+            } header: { Text("Club Log") } footer: {
+                Text(L("API klíč si vyžádáte u Club Log (Settings → Api Keys). Hesla a klíč se ukládají do Klíčenky, ne do nastavení."))
+            }
+        }
+        .formStyle(.grouped)
     }
 }

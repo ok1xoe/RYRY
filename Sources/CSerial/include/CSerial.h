@@ -17,3 +17,5 @@ int cserial_flush_output(int fd);
 /* Přečte až n bajtů, čeká nejvýše timeout_ms; *got = počet (0 = nic nepřišlo). */
 int cserial_read(int fd, unsigned char* buf, unsigned long n, int timeout_ms, long* got);
 int cserial_flush_input(int fd);
+/* Zápis s celkovým limitem timeout_ms; ETIMEDOUT při zaseknutém portu. */
+int cserial_write_timeout(int fd, const unsigned char* buf, unsigned long n, int timeout_ms);

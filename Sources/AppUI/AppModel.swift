@@ -15,6 +15,8 @@ import QSOLog
 import RigControl
 import RTTYModem
 import Settings
+import Upload
+import Spots
 import WaveFile
 
 public struct RxRun: Equatable, Sendable, Identifiable {
@@ -24,6 +26,14 @@ public struct RxRun: Equatable, Sendable, Identifiable {
 }
 
 public enum SendMode: String, CaseIterable, Sendable { case char, word, line }
+
+/// Kanál vícekanálového dekodéru v GUI: kmitočet mark (sleduje AFC) a posledních ~80 znaků.
+public struct DecoderChannel: Equatable, Sendable, Identifiable {
+    public let id: Int
+    public var mark: Double
+    public var text: String
+    public init(id: Int, mark: Double, text: String = "") { self.id = id; self.mark = mark; self.text = text }
+}
 
 public extension AppSettings {
     /// Konfigurace jádra RTTY (vyžaduje nový modem, tj. restart Engine).
@@ -81,6 +91,13 @@ public final class AppModel {
     public private(set) var logRecords: [QSORecord] = []
     public private(set) var messages: [String] = []
     public private(set) var apiStatus = ""
+    /// Nenápadná informace pro QSO panel: „callbook: QRZ.com“ nebo chyba (prázdné = nic).
+    public private(set) var callbookStatus = ""
+    private let secrets: SecretStore
+    private let callbookFetcher: HTTPFetcher
+    private let callbookDelay: Duration
+    private var callbookTask: Task<Void, Never>?
+    private var callbookCache: (key: String, service: CachingCallbook)?
     public private(set) var waterfall = WaterfallRenderer(width: 600, height: 200)
     public private(set) var params: [String: ParameterValue] = [:]
     public private(set) var descriptors: [ParameterDescriptor] = []
@@ -92,9 +109,14 @@ public final class AppModel {
     public private(set) var demodScopeEnabled = false
     public var scopeSource = 2
     public var scopeFrozen = false
+    /// Nahrávání na online služby (vyměnitelné v testech).
+    public var uploader = UploadCoordinator()
+    public private(set) var uploadsRunning: Set<UploadTarget> = []
     private var sqTarget: Double?
     private var sqChain: Task<Void, Never>?
     var lastSentForTesting = ""
+    /// Sloupec odvysílaného textu v aktuálním řádku (pro zalamování během TX); po přechodu na RX 0.
+    public private(set) var txSentColumn = 0
     private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
     static var micWaitMessage: String { L("Čekám na povolení přístupu k mikrofonu (systémový dialog)…") }
     public var waterfallFromHz: Double { settings.display.fromHz }
@@ -119,6 +141,8 @@ public final class AppModel {
     }
 
     public private(set) var app: AppController?
+    /// Spoty z DX clusteru a RBN (síť běží mimo hlavní vlákno, jen když je uživatel zapnul).
+    public let spotFeed = SpotFeed()
     private var fldigi: FldigiXMLRPCServer?
     private var json: JSONRPCServer?
     private var eventTask: Task<Void, Never>?
@@ -134,7 +158,10 @@ public final class AppModel {
     }
 
     public init(settingsStore: SettingsStore = SettingsStore(), profileStore: ProfileStore = ProfileStore(),
-                engineFactory: EngineFactory? = nil, spectrumFPS: Double = 15) {
+                engineFactory: EngineFactory? = nil, spectrumFPS: Double = 15,
+                secrets: SecretStore = KeychainSecretStore(), callbookFetcher: @escaping HTTPFetcher = CallbookFactory.liveFetcher,
+                callbookDelay: Duration = .milliseconds(800)) {
+        self.secrets = secrets; self.callbookFetcher = callbookFetcher; self.callbookDelay = callbookDelay
         self.settingsStore = settingsStore; self.profileStore = profileStore
         self.engineFactory = engineFactory ?? AppModel.realEngine
         self.spectrumFPS = spectrumFPS
@@ -157,7 +184,14 @@ public final class AppModel {
 
     public static let realEngine: EngineFactory = { s, rig in
         // RTTYModem na 11025 Hz (± 2 % korekce hodin) nemůže selhat
-        Engine(modem: try! RTTYModem(config: s.modemConfig()), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig())
+        Engine(modem: try! RTTYModem(config: s.modemConfig()), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig(),
+               auxModemFactory: auxModemFactory(s))
+    }
+
+    /// Výroba modemů pro druhý dekodér a kanály (stejná konfigurace jádra jako hlavní, jen příjem).
+    public static func auxModemFactory(_ s: AppSettings) -> @Sendable () -> (any Modem)? {
+        let cfg = s.modemConfig()
+        return { try? RTTYModem(config: cfg) }
     }
 
     func noteForTesting(_ m: String) { note(m) }
@@ -199,6 +233,7 @@ public final class AppModel {
         if !micOK {
             note(L("Přístup k mikrofonu zamítnut – povolte ho v Nastavení systému → Soukromí → Mikrofon. Příjem nefunguje."))
         }
+        await engine.setAuxDecoders(settings.decoders.auxConfig())
         do { try await app.start() }
         catch EngineError.audio(let m) { note(L("Zvuk nefunguje: %@ – zkontrolujte zařízení a oprávnění k mikrofonu", m)) }
         catch { note(L("Start selhal: %@", "\(error)")) }
@@ -207,6 +242,8 @@ public final class AppModel {
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
+        await loadSuperCheck()
+        await refreshDupe()
         profileNames = profileStore.load().map { $0?.name }
         if xyEnabled { await engine.setXYScope(true) }
         if demodScopeEnabled { await engine.setDemodScope(true) }
@@ -214,6 +251,7 @@ public final class AppModel {
         logger.info("start: stav \(st.rawValue, privacy: .public)")
         await startAPIs(app)
         startSpectrum(engine)
+        startSpots()
     }
 
     private func startAPIs(_ app: AppController) async {
@@ -264,12 +302,14 @@ public final class AppModel {
         await stopWAV()
         await stopRecordingWAV()
         spectrumTask?.cancel(); spectrumTask = nil
+        spotFeed.stop()
         fldigi?.stop(); json?.stop(); fldigi = nil; json = nil
         await app?.stop()
         await eventTask?.value
         eventTask = nil
         app = nil
         state = .stopped
+        decoderChannels = []
     }
 
     /// Uloží nastavení a restartuje (Engine je jednorázový). Během vysílání nejdřív bezpečně RX.
@@ -284,7 +324,7 @@ public final class AppModel {
             func merge(_ cur: AppSettings) -> AppSettings {
                 var m = cur
                 m.station = s.station; m.audio = s.audio; m.ptt = s.ptt; m.fsk = s.fsk
-                m.rig = s.rig; m.api = s.api
+                m.rig = s.rig; m.api = s.api; m.upload = s.upload
                 m.clock = s.clock; m.rttyCore = s.rttyCore
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
@@ -292,10 +332,12 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
+                take(\.callbook); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.updates.autoCheck); take(\.spots)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
+                take(\.decoders.secondEnabled); take(\.decoders.secondDemod); take(\.decoders.channelsEnabled)
+                take(\.decoders.maxChannels); take(\.decoders.channelTimeoutS); take(\.decoders.showChannelMarks)
                 return m
             }
             do { try self.settingsStore.save(merge(self.settings)) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
@@ -318,6 +360,7 @@ public final class AppModel {
         case .engine(.state(let s)):
             let prev = state
             state = s
+            if s == .rx { txSentColumn = 0 }
             // MMTTY „Time stamp“: UTC čas při přepnutí na TX a zpět
             if settings.display.timestamps, prev != s {
                 if prev == .rx, s != .stopped { appendRx("\r\n[\(Self.stampFmt.string(from: Date())) UTC TX]\r\n", echo: true) }
@@ -325,18 +368,33 @@ public final class AppModel {
             }
             if s == .tx, !txDraft.isEmpty { Task { await self.sendDraft(mode: self.sendMode) } }   // rozepsaný text hned vysílat
         case .engine(.modem(.rxText(let c, let echo))): appendRx(String(c), echo: echo)
+        case .engine(.aux(let a)): handleAux(a)
         case .engine(.modem(.signal(let l, let sq))): signalLevel = l; squelchOpen = sq
         case .engine(.modem(.tuning(let t))): mark = t.mark; space = t.space
         case .engine(.modem(.shift(let f))): fig = f
-        case .engine(.rig(let r)): rig = r
+        case .engine(.rig(let r)):
+            let bandChanged = Bands.band(forHz: r.frequency) != Bands.band(forHz: rig?.frequency)
+            rig = r
+            if bandChanged, !qso.call.isEmpty { Task { await self.refreshDupe() } }   // QSY na jiné pásmo
         case .engine(.error(let err)): note("\(err)")
         case .engine(.pttTimeout): note(L("PTT časovač vypnul vysílání"))
         case .error(let m): note(m)
         case .qsoChanged(let q):
-            let callChanged = q.call != qso.call
+            let callChanged = q.call != qso.call, freqChanged = q.frequency != qso.frequency
             qso = q
-            if callChanged { Task { await self.refreshPrevious(); await self.refreshQTC() } }
-        case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious(); await self.refreshQTC() }
+            if callChanged { updateSuperCheck(); Task { await self.refreshPrevious(); await self.refreshQTC() }; scheduleCallbook() }
+            if callChanged || freqChanged { Task { await self.refreshDupe() } }
+            if q.frequency != settings.log.manualFrequency {
+                settings.log.manualFrequency = q.frequency
+                try? settingsStore.save(settings)
+            }
+        case .qsoLogged(let r):
+            logRecords.insert(r, at: 0)
+            if historyCalls.insert(r.call).inserted { rebuildSuperCheck() }
+            Task { await self.refreshPrevious(); await self.refreshQTC(); await self.refreshDupe() }
+            for t in UploadTarget.allCases where UploadCoordinator.isAuto(t, settings.upload) {
+                Task { _ = await self.uploadPending(t, automatic: true) }
+            }
         case .qtcChanged: Task { await self.refreshQTC(); await self.refreshQTCSeries() }
         case .contestSerial(let n):
             settings.contest.nextSerial = n
@@ -358,6 +416,8 @@ public final class AppModel {
         if let rxLog {
             do { try rxLog.append(s) } catch {
                 self.rxLog = nil
+                settings.log.rxText = false                      // přepínač v menu nesmí lhát
+                try? settingsStore.save(settings)
                 note(L("Záznam příjmu do souboru selhal: %@", "\(error)"))
             }
         }
@@ -377,6 +437,69 @@ public final class AppModel {
                 rxRuns[0].text.removeFirst(over); rxCharCount -= over; rxTrimmedTotal += over
             }
         }
+    }
+
+    // MARK: Druhý dekodér a kanály
+
+    public static let rx2Limit = 20_000
+    public static let channelTextLimit = 80
+    /// Text druhého dekodéru a počitadla pro inkrementální zobrazení.
+    public private(set) var rx2Text = ""
+    public private(set) var rx2AppendedTotal = 0
+    public private(set) var rx2TrimmedTotal = 0
+    /// Kanály vícekanálového dekodéru (pořadí vzniku).
+    public private(set) var decoderChannels: [DecoderChannel] = []
+
+    func handleAux(_ a: AuxEvent) {
+        switch a {
+        case .secondText(let c): appendRx2(String(c))
+        case .channelText(let id, let c):
+            guard let i = decoderChannels.firstIndex(where: { $0.id == id }) else { return }   // kanál už zanikl
+            var t = decoderChannels[i].text
+            t.append(c)
+            if t.count > Self.channelTextLimit { t.removeFirst(t.count - Self.channelTextLimit) }
+            decoderChannels[i].text = t
+        case .channels(let list):
+            let old = Dictionary(uniqueKeysWithValues: decoderChannels.map { ($0.id, $0.text) })
+            decoderChannels = list.map { DecoderChannel(id: $0.id, mark: $0.mark, text: old[$0.id] ?? "") }
+        }
+    }
+
+    public func appendRx2(_ s: String) {
+        rx2Text += s
+        rx2AppendedTotal += s.count
+        if rx2Text.count > Self.rx2Limit {
+            let over = rx2Text.count - Self.rx2Limit
+            rx2Text.removeFirst(over); rx2TrimmedTotal += over
+        }
+    }
+
+    public func clearRx2() { rx2TrimmedTotal += rx2Text.count; rx2Text = "" }
+
+    /// Změna nastavení doplňkových dekodérů – hned se projeví (bez restartu) a uloží.
+    public func updateDecoders(_ change: (inout DecoderSettings) -> Void) async {
+        var d = settings.decoders
+        change(&d)
+        settings.decoders = d
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        if !d.channelsEnabled { decoderChannels = [] }
+        await app?.engine.setAuxDecoders(d.auxConfig())
+    }
+
+    public func setSecondDecoder(_ on: Bool) async { await updateDecoders { $0.secondEnabled = on } }
+    public func setChannelDecoding(_ on: Bool) async { await updateDecoders { $0.channelsEnabled = on } }
+
+    /// Demodulátor, který druhý dekodér právě používá (automaticky jiný než hlavní).
+    public var secondDemodEffective: String {
+        let main: String
+        if case .string(let m)? = params["demodType"] { main = m } else { main = "iir" }
+        return settings.decoders.auxConfig().resolvedSecondDemod(main: main)
+    }
+
+    /// „Naladit“: hlavní dekodér na mark kanálu.
+    public func tuneChannel(_ id: Int) async {
+        guard let ch = decoderChannels.first(where: { $0.id == id }) else { return }
+        await tune(toMarkHz: ch.mark)
     }
 
     /// Posledních `n` znaků jako úseky (text, echo) – pro doplnění konce zobrazení.
@@ -420,6 +543,69 @@ public final class AppModel {
             .write(to: url, options: .atomic)
     }
     public func clearRx() { rxTrimmedTotal += rxCharCount; rxRuns.removeAll(); rxCharCount = 0 }
+
+    // MARK: Duplicita a Super Check Partial
+
+    /// Značka v QSO okně je v závodě duplicita (stejné pásmo a mód).
+    public private(set) var isDupe = false
+    /// Návrhy pod polem Call: značky obsahující zadanou část a značky lišící se o jeden znak.
+    public private(set) var scpPartial: [String] = []
+    public private(set) var scpNear: [String] = []
+    public private(set) var scpCount = 0
+    private var scpMaster: [String] = []
+    private var historyCalls: Set<String> = []
+    private var superCheck = SuperCheck(calls: [])
+
+    func refreshDupe() async { isDupe = await app?.dupe() ?? false }
+
+    /// Soubor MASTER.SCP (Application Support/mmtty4mac).
+    public static var scpURL: URL {
+        (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory).appendingPathComponent("mmtty4mac/MASTER.SCP")
+    }
+
+    /// Načte MASTER.SCP a značky z logu (po startu a po přepnutí logu).
+    func loadSuperCheck() async {
+        let url = Self.scpURL
+        scpMaster = await Task.detached { (try? String(contentsOf: url, encoding: .utf8)).map(SuperCheck.parse) ?? [] }.value
+        historyCalls = Set(logRecords.map(\.call))
+        rebuildSuperCheck()
+    }
+
+    private func rebuildSuperCheck() {
+        superCheck = SuperCheck(calls: scpMaster + Array(historyCalls))
+        scpCount = superCheck.count
+        updateSuperCheck()
+    }
+
+    private func updateSuperCheck() { superCheckPreview(qso.call) }
+
+    /// Návrhy pro rozepsanou značku (volá se při psaní, ještě před potvrzením pole).
+    public func superCheckPreview(_ text: String) {
+        guard settings.log.superCheck else { scpPartial = []; scpNear = []; return }
+        let t = text.trimmingCharacters(in: .whitespaces).uppercased()
+        scpPartial = superCheck.partial(t).filter { $0 != t }
+        scpNear = superCheck.near(t)
+    }
+
+    /// Běžné RTTY kmitočty pásem (kHz) pro ruční volbu bez rigu.
+    public static let bandPresets: [(String, Double)] = [("160m", 1838), ("80m", 3590), ("40m", 7040), ("30m", 10140),
+        ("20m", 14080), ("17m", 18100), ("15m", 21080), ("12m", 24920), ("10m", 28080), ("6m", 50300)]
+
+    /// Stáhne aktuální MASTER.SCP (supercheckpartial.com) – jen na pokyn uživatele.
+    public func downloadSuperCheck() async throws -> Int {
+        let src = URL(string: "https://www.supercheckpartial.com/MASTER.SCP")!
+        let (data, resp) = try await URLSession.shared.data(from: src)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200, let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1)
+        else { throw QSOLogError.io(L("MASTER.SCP se nepodařilo stáhnout.")) }
+        let calls = SuperCheck.parse(text)
+        guard calls.count > 1000 else { throw QSOLogError.io(L("MASTER.SCP se nepodařilo stáhnout.")) }
+        try FileManager.default.createDirectory(at: Self.scpURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: Self.scpURL, options: .atomic)
+        scpMaster = calls
+        rebuildSuperCheck()
+        return calls.count
+    }
 
     private func refreshPrevious() async {
         guard let log = app?.log, !qso.call.isEmpty else { previousQSOs = []; return }
@@ -808,6 +994,28 @@ public final class AppModel {
         return L("Importováno %ld spojení, duplicit %ld, neplatných záznamů %ld.", r.added, r.duplicates, parsed.skipped)
     }
 
+    // MARK: Nahrávání (LoTW / eQSL / Club Log)
+
+    /// Nahraje dosud nenahraná spojení na službu. Ruční volání vrací zprávu pro alert; automatické (po zalogování)
+    /// běží na pozadí, chybu hlásí do stavového řádku (`note`) a vrací nil.
+    @discardableResult
+    public func uploadPending(_ t: UploadTarget, automatic: Bool = false) async -> String? {
+        guard let log = app?.log else { return automatic ? nil : L("Log není dostupný.") }
+        guard !uploadsRunning.contains(t) else { return automatic ? nil : L("%@: nahrávání už běží.", t.title) }
+        uploadsRunning.insert(t); defer { uploadsRunning.remove(t) }
+        let coordinator = uploader, cfg = settings
+        do {
+            let msg = try await coordinator.uploadPending(t, settings: cfg, log: log)
+            await refreshLog()
+            return automatic ? nil : msg
+        } catch {
+            await refreshLog()
+            let text = "\(t.title): \((error as? LocalizedError)?.errorDescription ?? "\(error)")"
+            if automatic { note(text); return nil }
+            return text
+        }
+    }
+
     private func refreshLog() async {
         guard let log = app?.log else { return }
         logRecords = await log.query()
@@ -861,6 +1069,7 @@ public final class AppModel {
         guard !part.isEmpty else { return }
         txDraft = String(txDraft[cut...])
         let out = part.replacingOccurrences(of: "\n", with: "\r\n")
+        txSentColumn = TxWrap.column(afterSending: out, from: txSentColumn)
         lastSentForTesting = out
         await app.send(text: out)
     }
@@ -920,6 +1129,57 @@ public final class AppModel {
         return r
     }
 
+    // MARK: Spoty (DX cluster, RBN)
+
+    /// Konfigurace spotů z nastavení; nil, když je vše vypnuto.
+    func spotFeedConfig() -> SpotFeedConfig? {
+        let p = settings.spots
+        guard p.clusterEnabled || p.rbnEnabled else { return nil }
+        var c = SpotFeedConfig(call: settings.station.call, rttyOnly: p.rttyOnly, maxAgeMinutes: p.maxAgeMinutes)
+        if p.clusterEnabled { c.cluster = SpotEndpoint(host: p.clusterHost, port: UInt16(clamping: p.clusterPort), commands: p.clusterCommands) }
+        if p.rbnEnabled { c.rbn = SpotEndpoint(host: p.rbnHost, port: UInt16(clamping: p.rbnPort)) }
+        return c
+    }
+
+    private func startSpots() {
+        guard let c = spotFeedConfig() else { spotFeed.stop(); return }
+        if settings.station.call.trimmingCharacters(in: .whitespaces).isEmpty { note(L("Spoty: v nastavení Stanice chybí značka pro přihlášení.")) }
+        spotFeed.start(c)
+    }
+
+    /// Změna nastavení spotů z okna (filtr RTTY) – hned uloží; spojení se přenastaví.
+    public func setSpots(_ change: (inout SpotSettings) -> Void) {
+        var p = settings.spots
+        change(&p)
+        guard p != settings.spots else { return }
+        let old = settings.spots
+        settings.spots = p
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        guard app != nil else { return }
+        var onlyFilter = old; onlyFilter.rttyOnly = p.rttyOnly
+        if onlyFilter == p, p.rttyOnly { spotFeed.rttyOnly = true }      // jen zúžení zobrazení, spojení se nemění
+        else { startSpots() }                                            // rozšíření na všechny módy: nová data ze serveru
+    }
+
+    /// Dvojklik na spot: nastaví rig na frekvenci spotu (+ posun) a vloží značku do QSO okna.
+    /// Bez rigu (nebo při chybě rigu) se jen vloží značka.
+    public func useSpot(_ spot: Spot) async {
+        let off = min(max(settings.spots.offsetHz, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound)
+        let hz = spot.frequencyHz + off
+        if let app, settings.rig.type != .none {
+            if state != .rx {
+                // nikdy nepřelaďovat zaklíčovaný vysílač (jiné pásmo pod zátěží, cizí kmitočet)
+                note(L("Během vysílání se rig nepřelaďuje – spot použijte po přechodu na RX."))
+            } else {
+                do { try await app.setFrequency(hz) }
+                catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
+            }
+        } else {
+            await setQSOField("freq", String(format: "%.1f", spot.frequencyHz / 1000))   // bez rigu: frekvence spotu do logu
+        }
+        await setQSOField("call", spot.call)
+    }
+
     public func tune(toMarkHz hz: Double) async {
         await setParam("mark", .double((hz * 10).rounded() / 10))
     }
@@ -928,7 +1188,79 @@ public final class AppModel {
         guard let app else { return }
         await run("QSO") { try await app.setQSOField(name, value) }
         qso = await app.qso
-        if name == "call" { await refreshPrevious() }
+        if name == "call" { await refreshPrevious(); scheduleCallbook() }
+    }
+
+    // MARK: Callbook
+
+    public func callbookPassword(kind: CallbookKind, username: String) -> String {
+        guard kind != .none, !username.isEmpty else { return "" }
+        return secrets.password(service: kind.rawValue, account: username) ?? ""
+    }
+
+    public func saveCallbookPassword(_ password: String, kind: CallbookKind, username: String) {
+        guard kind != .none, !username.isEmpty else { return }
+        do { try secrets.setPassword(password, service: kind.rawValue, account: username) }
+        catch { note(L("Heslo callbooku nelze uložit do Klíčenky: %@", "\(error)")) }
+        callbookCache = nil
+    }
+
+    /// Po krátké prodlevě dohledá aktuální značku (další změna dotaz zruší).
+    private func scheduleCallbook() {
+        callbookTask?.cancel(); callbookTask = nil
+        let cb = settings.callbook
+        let call = qso.call
+        guard !call.isEmpty else { callbookStatus = ""; return }
+        guard cb.service != .none, cb.autoLookup else { return }
+        callbookTask = Task { [weak self, delay = callbookDelay] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            await self?.performCallbook(call)
+        }
+    }
+
+    private func callbookService(_ cb: CallbookSettings) -> CachingCallbook? {
+        let pw = callbookPassword(kind: cb.service, username: cb.username)
+        guard cb.service != .none, !cb.username.isEmpty, !pw.isEmpty else { return nil }
+        let key = "\(cb.service.rawValue)|\(cb.username)|\(pw)"
+        if let c = callbookCache, c.key == key { return c.service }
+        guard let svc = CallbookFactory.make(cb.service, username: cb.username, password: pw, fetcher: callbookFetcher) else { return nil }
+        let c = CachingCallbook(svc)
+        callbookCache = (key, c)
+        return c
+    }
+
+    private func performCallbook(_ call: String) async {
+        let cb = settings.callbook
+        guard let svc = callbookService(cb) else { callbookStatus = L("callbook: chybí uživatel nebo heslo"); return }
+        do {
+            let entry = try await svc.lookup(call)
+            guard !Task.isCancelled, qso.call == call else { return }
+            guard let e = entry else { callbookStatus = L("callbook: %@ · nenalezeno", svc.name); return }
+            callbookStatus = L("callbook: %@", svc.name)
+            for (field, value) in [("name", e.name), ("qth", e.qth), ("locator", e.grid)] where !value.isEmpty {
+                guard qso.call == call else { return }
+                if !cb.fillEmptyOnly || (qso.value(field) ?? "").isEmpty { await setQSOField(field, value) }
+            }
+        } catch is CancellationError {
+        } catch {
+            guard !Task.isCancelled, qso.call == call else { return }
+            callbookStatus = L("callbook: chyba – %@", error.localizedDescription)
+        }
+    }
+
+    /// Tlačítko „Vyzkoušet“: přihlášení a vyhledání vlastní značky s hodnotami z dialogu (bez cache).
+    public func testCallbook(kind: CallbookKind, username: String, password: String, call: String) async -> String {
+        guard let svc = CallbookFactory.make(kind, username: username, password: password, fetcher: callbookFetcher),
+              !username.isEmpty, !password.isEmpty else { return L("Vyberte službu a zadejte uživatele a heslo.") }
+        guard !call.isEmpty else { return L("Ve Stanici chybí vaše značka.") }
+        do {
+            guard let e = try await svc.lookup(call) else { return L("Přihlášení v pořádku, značka %@ nenalezena.", call) }
+            let parts = [e.name, e.qth, e.grid, e.country].filter { !$0.isEmpty }
+            return L("Funguje: %@", ([e.call] + parts).joined(separator: " · "))
+        } catch {
+            return L("Chyba: %@", error.localizedDescription)
+        }
     }
 
     public func insertWord(_ w: String) async {
