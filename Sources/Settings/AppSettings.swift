@@ -162,7 +162,7 @@ public enum ContestFormat: String, Codable, Sendable, CaseIterable { case serial
 
 /// Předvolby známých RTTY závodů (název pro Cabrillo, formát, začátek) – v pořadí kalendářního roku.
 /// Termíny podle obvyklých pravidel; přesné datum je třeba ověřit v pravidlech závodu.
-public enum ContestPreset: String, CaseIterable, Sendable {
+public enum ContestPreset: String, CaseIterable, Codable, Sendable {
     case arrlRoundup, cqwpxRTTY, bartgHF, sartgRTTY, cqwwRTTY, makrothen, jartsRTTY, waeRTTY, okDXRTTY
     public var title: String {
         switch self {
@@ -244,14 +244,18 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     public var exchange = ""               // odesílaná výměna místo čísla (prázdné = pořadové číslo)
     /// Začátek závodu (UTC) – QTC (WAE) počítá jen spojení a série od tohoto okamžiku; nil = posledních 72 h.
     public var start: Date?
+    /// Zvolená předvolba; nil = vlastní nastavení.
+    public var preset: ContestPreset?
     public init() {}
+    /// Předvolba platná pro UI: jen dokud formát odpovídá předvolbě.
+    public var selectedPreset: ContestPreset? { preset.flatMap { $0.format == format ? $0 : nil } }
     public var effectiveStart: Date { start ?? Date().addingTimeInterval(-72 * 3600) }
 
     /// Nastavení podle předvolby závodu v daném roce. `locator` = vlastní lokátor (výměna Makrothenu).
     public static func preset(_ p: ContestPreset, year: Int, locator: String = "") -> ContestSettings {
         var c = ContestSettings()
         c.enabled = true; c.nextSerial = 1
-        c.name = p.cabrilloName; c.format = p.format
+        c.name = p.cabrilloName; c.format = p.format; c.preset = p
         if p == .makrothen { c.exchange = String(locator.uppercased().prefix(4)) }
         let s = p.schedule
         c.start = fullWeekendSaturday(year: year, month: s.month, n: s.weekend)
@@ -287,7 +291,7 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     public var prefillsZone: Bool { format == .zone }
     /// Formát, kde se bez vyplněné výměny posílá moje CQ zóna z DXCC (OK DX RTTY, CQ WW RTTY).
     public var sendsOwnZone: Bool { format == .zone || format == .cqrj }
-    enum CodingKeys: String, CodingKey { case enabled, format, name, category, nextSerial, exchange, start }
+    enum CodingKeys: String, CodingKey { case enabled, format, name, category, nextSerial, exchange, start, preset }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "contest", x = ContestSettings()
         enabled = c.tolerant(.enabled, x.enabled, w, s); format = c.tolerant(.format, x.format, w, s)
@@ -295,6 +299,16 @@ public struct ContestSettings: Codable, Sendable, Equatable {
         category = c.tolerant(.category, x.category, w, s); nextSerial = max(1, c.tolerant(.nextSerial, x.nextSerial, w, s))
         exchange = c.tolerant(.exchange, x.exchange, w, s)
         start = c.tolerant(.start, x.start, w, s)
+        // starší soubor bez pole preset: odvodit z názvu a formátu
+        preset = c.contains(.preset) ? c.tolerant(.preset, x.preset, w, s) : ContestPreset.matching(self)
+    }
+    /// preset se zapisuje i jako null – „vlastní“ se tak odliší od starého souboru bez tohoto pole.
+    public func encode(to e: Encoder) throws {
+        var c = e.container(keyedBy: CodingKeys.self)
+        try c.encode(enabled, forKey: .enabled); try c.encode(format, forKey: .format); try c.encode(name, forKey: .name)
+        try c.encode(category, forKey: .category); try c.encode(nextSerial, forKey: .nextSerial)
+        try c.encode(exchange, forKey: .exchange); try c.encodeIfPresent(start, forKey: .start)
+        try c.encode(preset, forKey: .preset)
     }
 }
 
