@@ -102,7 +102,7 @@ mmtty4mac looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers su
 
 ## 10. Language and keys
 
-- **Language:** Settings → Display → Interface language (Czech, English, loaded languages). Your own translation: **Save template…**, translate the values in `strings`, set `code` and `name`, **Load language…**.
+- **Language:** English by default; change it in Settings → Display → Interface language (Czech, English, loaded languages). Your own translation: **Save template…**, translate the values in `strings`, set `code` and `name`, **Load language…**.
 - **Keys:** Settings → Keys – click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).
 
 ## 11. Troubleshooting

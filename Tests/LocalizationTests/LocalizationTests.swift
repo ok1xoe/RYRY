@@ -100,3 +100,18 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(Localizer.placeholders("%.1f dB %@ %ld 100%%") == ["f", "@", "ld"])
     #expect(Localizer.placeholders("%m moje · %l zalogovat · %N") == [])
 }
+
+// Bez uložené volby je rozhraní anglicky; výslovně zvolená čeština se pamatuje
+@Test func defaultLanguageIsEnglish() throws {
+    let bundled = tmp(), user = tmp()
+    try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
+    let lib = LanguageLibrary(bundled: [bundled], userDirectory: user)
+    let d = UserDefaults(suiteName: "lang-\(UUID())")!
+    let l = Localizer()
+    lib.restore(localizer: l, defaults: d)
+    #expect(l.code == "en")
+    lib.select("cs", localizer: l, defaults: d)
+    let l2 = Localizer()
+    lib.restore(localizer: l2, defaults: d)
+    #expect(l2.code == "cs")
+}
