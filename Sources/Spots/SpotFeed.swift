@@ -35,6 +35,8 @@ public final class SpotFeed {
     public var bandFilter: String?
     /// Zobrazit jen RTTY (filtr zobrazení; příjem u klienta se řídí `config.rttyOnly`).
     public var rttyOnly = true
+    /// Volá se pro každý nově přidaný spot (značka + pásmo, které v seznamu ještě nebylo).
+    @ObservationIgnored public var onNewSpot: (@MainActor (Spot) -> Void)?
 
     @ObservationIgnored private var clients: [TelnetSpotClient] = []
     @ObservationIgnored private var pruneTask: Task<Void, Never>?
@@ -92,7 +94,10 @@ public final class SpotFeed {
     func ingest(_ spots: [Spot]) {
         guard isRunning else { return }
         let now = clock()
-        for s in spots { book.add(s, now: now, maxAge: maxAge) }
+        for s in spots {
+            let isNew = book.byID[s.id] == nil
+            if book.add(s, now: now, maxAge: maxAge), isNew { onNewSpot?(s) }
+        }
     }
 
     private func setState(_ src: SpotSource, _ st: TelnetSpotClient.State) {

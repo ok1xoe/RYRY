@@ -66,7 +66,7 @@ struct MMTTY4MacApp: App {
     }
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    @State private var model = AppModel()
+    @State private var model = AppModel(alertSink: SystemAlertSink())
     @State private var updates = UpdateModel()
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings

@@ -469,12 +469,14 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     public var xyQuality = XYScopeQuality.high
     /// Bublinová nápověda tlačítek (MMTTY „Show Button Hint“).
     public var showHints = true
+    /// Zvýrazňovat značky v přijatém textu (vlastní, duplicita, v logu, nová).
+    public var highlightCalls = true
     public init() {}
     /// FFT jádra pokrývá 0–4000 Hz (TSound m_FFTWINDOW).
     public static let maxHz = 4000.0
     enum CodingKeys: String, CodingKey { case fromHz, toHz, gainDB, autoGain, timestamps, fontSize, rxFont, rxBackground,
                                              rxTextColor, rxEchoColor, txBackground, txTextColor, palette, fftResponse,
-                                             xySize, xyQuality, showHints }
+                                             xySize, xyQuality, showHints, highlightCalls }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "display", x = DisplaySettings()
         fromHz = c.tolerant(.fromHz, x.fromHz, w, s); toHz = c.tolerant(.toHz, x.toHz, w, s)
@@ -491,6 +493,7 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
         palette = c.tolerant(.palette, x.palette, w, s); fftResponse = c.tolerant(.fftResponse, x.fftResponse, w, s)
         xySize = c.tolerant(.xySize, x.xySize, w, s); xyQuality = c.tolerant(.xyQuality, x.xyQuality, w, s)
         showHints = c.tolerant(.showHints, x.showHints, w, s)
+        highlightCalls = c.tolerant(.highlightCalls, x.highlightCalls, w, s)
     }
 }
 
@@ -536,6 +539,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var decoders = DecoderSettings()
     /// Enter Sends Message (Run / S&P) v závodě.
     public var esm = ESMSettings()
+    /// Upozornění (moje značka, hlídané značky, potřebné země).
+    public var alerts = AlertSettings()
     public init() {}
     public static let macroCount = 16
 
@@ -560,7 +565,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, callHistory, rtty,
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
-                                             shortcuts, updates, upload, spots, decoders, esm }
+                                             shortcuts, updates, upload, spots, decoders, esm, alerts }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -599,6 +604,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
             macros[14] = Self.defaultMacros[14]
         }
         esm = c.tolerant(.esm, x.esm, w, s)
+        alerts = c.tolerant(.alerts, x.alerts, w, s)
     }
 
     /// Konfigurace Engine z nastavení.

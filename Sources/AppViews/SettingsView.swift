@@ -504,6 +504,20 @@ struct SpotsTab: View {
             } header: { Text(L("Spoty")) } footer: {
                 Text(L("Rig se nastaví na frekvenci spotu (u RTTY je to mark) + posun. Rádio v režimu LSB/AFSK s mark 2125 Hz potřebuje posun +2125 Hz. Síť se používá jen u zapnutých služeb; změny po Použít."))
             }
+            Section {
+                Toggle(L("Zvuk, když se v příjmu objeví moje značka"), isOn: $s.alerts.myCallSound)
+                Toggle(L("Systémové oznámení, když mě někdo volá (jen když aplikace není aktivní)"), isOn: $s.alerts.myCallNotification)
+                Toggle(L("Hlídat novou zemi na aktuálním pásmu"), isOn: $s.alerts.newCountryBand)
+                Toggle(L("Hlídat novou zemi vůbec"), isOn: $s.alerts.newCountryAny)
+                LabeledContent(L("Hlídané značky")) {
+                    TextEditor(text: $s.alerts.watchCalls).font(.system(.body, design: .monospaced)).frame(width: 260, height: 70)
+                        .border(Color.secondary.opacity(0.3))
+                }
+                Toggle(L("Zvuk u potřebných značek a zemí"), isOn: $s.alerts.neededSound)
+                Toggle(L("Systémové oznámení u potřebných značek a zemí"), isOn: $s.alerts.neededNotification)
+            } header: { Text(L("Upozornění")) } footer: {
+                Text(L("Hlídané značky: jedna na řádek (porovnává se základní značka bez /P). Země se poznají z cty.dat a porovnají s logem. Kontroluje se ve spotech (označí se ve sloupci Potřeba) i v přijatém textu; každá značka jen jednou. Oprávnění k oznámením se vyžádá až při zapnutí."))
+            }
         }
         .formStyle(.grouped)
     }
@@ -853,9 +867,12 @@ struct DisplayTab: View {
                     NumberRow(title: L("Délka řádku"), value: $s.txWindow.wrapColumn, range: TxWindowSettings.wrapRange, unit: L("znaků"))
                 }
             } header: { Text(L("Okno vysílání")) }
-            Section(L("Ostatní")) {
+            Section {
                 Toggle(L("Časové značky UTC při přepnutí TX/RX"), isOn: $s.display.timestamps)
                 Toggle(L("Bublinová nápověda tlačítek"), isOn: $s.display.showHints)
+                Toggle(L("Zvýrazňovat značky v příjmu"), isOn: $s.display.highlightCalls)
+            } header: { Text(L("Ostatní")) } footer: {
+                Text(L("Vaše značka červeně tučně, duplicita v závodě šedě přeškrtnutě, značka už v logu modře, nová značka tučně. Echo vlastního vysílání se nezvýrazňuje."))
             }
             Section {
                 Toggle(L("Automaticky kontrolovat aktualizace"), isOn: $s.updates.autoCheck)
