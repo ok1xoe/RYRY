@@ -18,6 +18,7 @@ struct MacroBar: View {
                         let name = i < macros.count ? macros[i].name : ""
                         Button { Task { await model.runMacro(i) } } label: {
                             Text("\(Self.keyName(i)) \(name)").lineLimit(1).frame(maxWidth: .infinity)
+                                .foregroundStyle(Self.textColor(i < macros.count ? macros[i].color : nil))
                         }
                         .keyboardShortcut(Self.key(i), modifiers: i < 12 ? [] : .shift)
                         .tint(i < macros.count ? Color(hex: macros[i].color) : nil)
@@ -37,6 +38,11 @@ struct MacroBar: View {
 
 extension MacroBar {
     /// Makra 1–12 = F1–F12, 13–16 = ⇧F1–⇧F4 (MMTTY má 16 tlačítek).
+    /// Text tlačítka: na světlé barvě černý, na tmavé bílý, bez barvy výchozí.
+    static func textColor(_ hex: String?) -> Color {
+        guard let c = Color(hex: hex) else { return .primary }
+        return c.isLight ? .black : .white
+    }
     static func keyName(_ i: Int) -> String { i < 12 ? "F\(i + 1)" : "⇧F\(i - 11)" }
     static func key(_ i: Int) -> KeyEquivalent {
         KeyEquivalent(Character(UnicodeScalar(NSF1FunctionKey + (i < 12 ? i : i - 12))!))

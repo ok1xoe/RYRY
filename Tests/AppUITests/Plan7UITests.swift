@@ -341,3 +341,27 @@ func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = t
     w.push(noiseFrame(signal: true), fromHz: 0, toHz: 3000)
     #expect((135...147).map { w.row(0)[$0].brightness }.max()! > 500)
 }
+
+// Plán 9: měření hodin měří zařízení zvolené v dialogu; neúspěšné načtení profilu nemění nastavení
+@Test @MainActor func measureClockUsesGivenDevices() async throws {
+    let f = Fixture()
+    await f.model.start()
+    var asked: [String?] = []
+    f.model.clockRates = { uid, _ in asked.append(uid); return (48000, 48000) }
+    _ = await f.model.measureClock(seconds: 0.1, inputUID: "IN-DRAFT", outputUID: "OUT-DRAFT")
+    #expect(asked == ["IN-DRAFT", "OUT-DRAFT"])
+    await f.model.stop()
+}
+
+@Test @MainActor func failedProfileLoadKeepsSettings() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let before = SettingsStore(directory: f.dir).load().0
+    await f.model.setParam("baud", .double(50))
+    let mid = SettingsStore(directory: f.dir).load().0
+    await f.model.loadProfile(7)                                // prázdný slot → chyba
+    #expect(SettingsStore(directory: f.dir).load().0 == mid)
+    #expect(f.model.messages.contains { $0.contains("Profil") })
+    _ = before
+    await f.model.stop()
+}

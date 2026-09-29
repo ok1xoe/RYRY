@@ -95,7 +95,7 @@ struct AudioTab: View {
                     Button(measuring ? "Měřím…" : "Změřit (30 s)") {
                         measuring = true; result = ""
                         Task {
-                            let r = await model.measureClock(seconds: 30)
+                            let r = await model.measureClock(seconds: 30, inputUID: s.audio.inputUID, outputUID: s.audio.outputUID)
                             measuring = false
                             if let rx = r.rx { s.clock.rxPPM = (rx * 10).rounded() / 10 }
                             if let tx = r.tx { s.clock.txPPM = (tx * 10).rounded() / 10 }

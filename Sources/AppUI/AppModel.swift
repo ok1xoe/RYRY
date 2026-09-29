@@ -508,12 +508,14 @@ public final class AppModel {
 
     /// Změří odchylku hodin vstupního a výstupního zařízení (ppm) – náhrada ClockAdj z MMTTY.
     /// Zařízení musí běžet (aplikace přijímá); vzorkuje se 2× za sekundu, výsledkem je medián.
-    public func measureClock(seconds: Double) async -> (rx: Double?, tx: Double?) {
+    /// `inputUID`/`outputUID`: zařízení zvolená v dialogu (výchozí = uložené nastavení).
+    public func measureClock(seconds: Double, inputUID: String?? = nil, outputUID: String?? = nil) async -> (rx: Double?, tx: Double?) {
         var rx: [Double] = [], tx: [Double] = [], nomRx = 0.0, nomTx = 0.0
         let steps = max(1, Int(seconds / 0.5))
+        let inUID = inputUID ?? settings.audio.inputUID, outUID = outputUID ?? settings.audio.outputUID
         for i in 0..<steps {
-            if let r = clockRates(settings.audio.inputUID, true) { nomRx = r.nominal; rx.append(r.actual) }
-            if let r = clockRates(settings.audio.outputUID, false) { nomTx = r.nominal; tx.append(r.actual) }
+            if let r = clockRates(inUID, true) { nomRx = r.nominal; rx.append(r.actual) }
+            if let r = clockRates(outUID, false) { nomTx = r.nominal; tx.append(r.actual) }
             if i < steps - 1 { try? await Task.sleep(for: .milliseconds(500)) }
         }
         return (ClockCalibration.ppm(actual: rx, nominal: nomRx), ClockCalibration.ppm(actual: tx, nominal: nomTx))
@@ -591,8 +593,10 @@ public final class AppModel {
     public func profiles() -> [Profile?] { profileStore.load() }
     public func loadProfile(_ slot: Int) async {
         guard let app else { return }
-        await run("Profil") { try await app.loadProfile(slot) }
+        var ok = false
+        await run("Profil") { try await app.loadProfile(slot); ok = true }
         await refreshParams()
+        guard ok else { return }                    // nenačtený profil nastavení nemění
         settings.rtty = params
         try? settingsStore.save(settings)
     }

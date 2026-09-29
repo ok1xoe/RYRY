@@ -170,3 +170,11 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 ### Odložené drobnosti
 - bílý text na světlé barvě tlačítka (žlutá) má nízký kontrast
 - zda klávesové zkratky F1… fungují přes vlastní styl tlačítka – ověřit ručně
+
+## Plán 9 (doladění)
+- Vodopád: AGC relativně k šumovému dnu (20. percentil) s minimální dynamikou ~18 dB – po konci silného signálu šum nezežloutne — noiseOnlyWaterfallStaysDarkAfterSignal RED→GREEN.
+- AFC: `afcGate` (jen nad prahem squelche) a `afcMaxDev` (max. odchylka od ručně nastaveného marku), obojí rozšíření proti MMTTY, výchozí vypnuto (chování jako MMTTY) — afcSquelchGate, afcMaxDeviationLimitsDrift.
+- WAV: PCM 16/24/32 bit, float 32 bit, WAVE_FORMAT_EXTENSIBLE; srozumitelná chyba — readsMoreWaveFormats RED→GREEN.
+- Oprava značky v logu přepočítá zemi DXCC; měření hodin měří zařízení zvolená v dialogu; neúspěšné načtení profilu nemění nastavení; editor logu v UTC; text na obarvených makrech černý/bílý podle jasu barvy.
+- Položky „pasted CRLF…“ a „text typed before TX…“ ze seznamů plánu 5 už opravil plán 6 (seznam byl zastaralý).
+- F4 „Contest“ mimo závodní režim posílá „599“ bez čísla – ponecháno jako MMTTY (%N je prázdné).
