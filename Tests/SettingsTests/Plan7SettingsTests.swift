@@ -130,3 +130,27 @@ import Testing
     #expect(ContestSettings.preset(.makrothen, year: 2026, locator: "jo70fb").exchange == "JO70")
     #expect(ContestSettings.preset(.makrothen, year: 2026).exchange == "")
 }
+
+// „Vlastní nastavení“ se uloží a vydrží i s názvem a formátem shodným s předvolbou
+@Test func contestPresetChoicePersists() throws {
+    let dir = tmp()
+    var s = AppSettings()
+    s.contest = ContestSettings.preset(.waeRTTY, year: 2026)
+    #expect(s.contest.preset == .waeRTTY)
+    s.contest.preset = nil
+    try SettingsStore(directory: dir).save(s)
+    let loaded = SettingsStore(directory: dir).load().0
+    #expect(loaded.contest.preset == nil && loaded.contest.name == "WAEDC")
+    // změna formátu mimo předvolbu → vlastní
+    var c = ContestSettings.preset(.cqwpxRTTY, year: 2027); c.format = .bartg
+    #expect(c.selectedPreset == nil)
+    #expect(ContestSettings.preset(.cqwpxRTTY, year: 2027).selectedPreset == .cqwpxRTTY)
+}
+
+// Starší settings.json bez pole preset: předvolba se odvodí z názvu a formátu
+@Test func contestPresetLegacyDecode() throws {
+    let dir = tmp()
+    try #"{"contest":{"enabled":true,"format":"wae","name":"WAEDC"}}"#
+        .write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+    #expect(SettingsStore(directory: dir).load().0.contest.preset == .waeRTTY)
+}

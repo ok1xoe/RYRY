@@ -368,10 +368,10 @@ struct ModemTab: View {
 struct ContestTab: View {
     @Binding var s: AppSettings
 
-    /// Vybraná předvolba (podle názvu a formátu); výběr nastaví nejbližší termín závodu.
+    /// Vybraná předvolba; výběr závodu nastaví jeho nejbližší termín, „Vlastní“ nechá hodnoty k ruční úpravě.
     var presetBinding: Binding<ContestPreset?> {
-        Binding(get: { ContestPreset.matching(s.contest) }, set: { p in
-            guard let p else { return }
+        Binding(get: { s.contest.selectedPreset }, set: { p in
+            guard let p else { s.contest.preset = nil; return }
             let serial = s.contest.nextSerial
             s.contest = ContestSettings.upcoming(p, locator: s.station.locator)
             if p == .waeRTTY { s.contest.nextSerial = max(1, serial) }
@@ -397,7 +397,7 @@ struct ContestTab: View {
                     ForEach(ContestPreset.allCases, id: \.self) { p in Text(p.title).tag(ContestPreset?.some(p)) }
                 }
             } footer: {
-                if let p = ContestPreset.matching(s.contest) {
+                if let p = s.contest.selectedPreset {
                     Text("\(p.summary). Termín ověř v pravidlech závodu.")
                 } else {
                     Text("Předvolba nastaví název, formát výměny a nejbližší začátek známého závodu.")
