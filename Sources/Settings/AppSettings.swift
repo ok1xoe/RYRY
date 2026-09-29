@@ -429,6 +429,18 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     }
 }
 
+/// Kontrola aktualizací (poslední kontrola a přeskočená verze jsou v UserDefaults, ne tady).
+public struct UpdateSettings: Codable, Sendable, Equatable {
+    /// Při startu (nejvýš 1× denně) zjistit, zda existuje novější verze.
+    public var autoCheck = true
+    public init() {}
+    enum CodingKeys: String, CodingKey { case autoCheck }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "updates", x = UpdateSettings()
+        autoCheck = c.tolerant(.autoCheck, x.autoCheck, w, s)
+    }
+}
+
 public struct AppSettings: Codable, Sendable, Equatable {
     public var schemaVersion = 1
     public var station = Station()
@@ -448,6 +460,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     /// Seznam zpráv (MMTTY MsgList): pojmenované delší texty se syntaxí maker.
     public var messages: [Macro] = AppSettings.defaultMessages
     public var txWindow = TxWindowSettings()
+    public var updates = UpdateSettings()
     /// Vlastní klávesové zkratky (id příkazu → zkratka); chybějící = výchozí.
     public var shortcuts: [String: KeyBinding] = [:]
     public init() {}
@@ -472,8 +485,9 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "", text: ""),
     ]
 
-    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty, macros, log,
-                                             clock, rttyCore, contest, display, messages, txWindow, shortcuts }
+    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty,
+                                             macros, log, clock, rttyCore, contest, display, messages, txWindow,
+                                             shortcuts, updates }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -501,6 +515,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         contest = c.tolerant(.contest, x.contest, w, s); display = c.tolerant(.display, x.display, w, s)
         messages = c.contains(.messages) ? c.tolerant(.messages, TolerantArray<Macro>(), w, s).items : x.messages
         txWindow = c.tolerant(.txWindow, x.txWindow, w, s)
+        updates = c.tolerant(.updates, x.updates, w, s)
         shortcuts = c.tolerant(.shortcuts, TolerantDict<KeyBinding>(), w, s).items.filter { $0.value.isValid }
     }
 
