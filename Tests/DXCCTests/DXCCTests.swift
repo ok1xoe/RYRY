@@ -73,3 +73,18 @@ func portableCalls(call: String, country: String) throws {
     #expect(db.lookup("VK2ABC")?.continent == "OC")
     #expect(db.lookup("JA1XYZ")?.utcOffsetHours == 9)
 }
+
+// Review I-5: M, R, B jsou prefixy zemí (Anglie, Rusko, Čína), modifikátory jen jako přípona;
+// entity jen pro WAE (*IT9 …) nejsou země DXCC.
+@Test func realCtyPortablePrefixesAndWAE() throws {
+    let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("Resources/cty.dat")
+    let db = try CountryDB(contentsOf: url)
+    #expect(db.lookup("M/DL1ABC")?.name == "England")
+    #expect(db.lookup("R/OK1XOE")?.name == "European Russia")
+    #expect(db.lookup("BY/OK1XOE")?.name == "China")
+    #expect(db.lookup("DL1ABC/M")?.name == "Fed. Rep. of Germany")
+    #expect(db.lookup("DL1ABC/R")?.name == "Fed. Rep. of Germany")
+    #expect(db.lookup("IT9ABC")?.name == "Italy")
+    #expect(db.lookup("OK1XOE/P")?.name == "Czech Republic")
+}

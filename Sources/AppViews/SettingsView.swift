@@ -10,6 +10,7 @@ import SwiftUI
 public struct SettingsView: View {
     @Bindable var model: AppModel
     @State private var draft = AppSettings()
+    @State private var baseline = AppSettings()       // stav, ze kterého koncept vyšel
     @State private var loaded = false
     public init(model: AppModel) { self.model = model }
 
@@ -29,12 +30,16 @@ public struct SettingsView: View {
             HStack {
                 Text("Změny se projeví po Použít (restart zvuku, rigu a API).").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Vrátit") { draft = model.settings }
-                Button("Použít") { let d = draft; Task { await model.applySettings(d) } }.keyboardShortcut(.defaultAction)
+                Button("Vrátit") { draft = model.settings; baseline = draft }
+                Button("Použít") {
+                    let d = draft, b = baseline
+                    Task { await model.applySettings(d, baseline: b); draft = model.settings; baseline = draft }
+                }.keyboardShortcut(.defaultAction)
             }.padding([.horizontal, .bottom])
         }
         .frame(width: 680, height: 560)
-        .onAppear { if !loaded { draft = model.settings; loaded = true } }
+        .onAppear { if !loaded { draft = model.settings; baseline = draft; loaded = true } }
+        .onDisappear { loaded = false }                  // příště načíst aktuální stav
     }
 }
 
@@ -255,7 +260,7 @@ struct ContestTab: View {
             TextField("Kategorie (Cabrillo, oddělit „;“)", text: $s.contest.category)
             Stepper("Další pořadové číslo: \(s.contest.nextSerial)", value: $s.contest.nextSerial, in: 1...99_999)
             TextField("Odesílaná výměna místo čísla (prázdné = číslo)", text: $s.contest.exchange)
-            Text("Makra: %M = odesílané číslo (nebo výměna), %N = přijaté číslo. Export: Log → Exportovat Cabrillo…")
+            Text("Makra: %N = odesílané číslo (nebo výměna), %M = přijaté (jako MMTTY: %r/%N z HisRST, %s/%M z MyRST). Export: Log → Exportovat Cabrillo…")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -265,7 +270,7 @@ struct DisplayTab: View {
     @Binding var s: AppSettings
     static let ranges: [(String, Double, Double)] = [("0–3000 Hz", 0, 3000), ("300–2700 Hz", 300, 2700),
                                                      ("1000–3000 Hz", 1000, 3000), ("1500–2800 Hz", 1500, 2800),
-                                                     ("0–4000 Hz", 0, 4000), ("0–5500 Hz", 0, 5500)]
+                                                     ("0–4000 Hz", 0, 4000)]
     var body: some View {
         Form {
             Section("Spektrum a vodopád") {
@@ -276,7 +281,7 @@ struct DisplayTab: View {
                     ForEach(Self.ranges, id: \.0) { r in Text(r.0).tag("\(Int(r.1))-\(Int(r.2))") }
                 }
                 Toggle("Automatické zesílení", isOn: $s.display.autoGain)
-                Slider(value: $s.display.gainDB, in: -20...20, step: 1) { Text("Zesílení \(Int(s.display.gainDB)) dB") }
+                Slider(value: $s.display.gainDB, in: -30...30, step: 1) { Text("Zesílení \(Int(s.display.gainDB)) dB") }
             }
             Section("Text") {
                 Stepper("Velikost písma: \(Int(s.display.fontSize))", value: $s.display.fontSize, in: 9...32)

@@ -123,7 +123,7 @@ extension JSONRPCServer {
             }
             let from = try date("from"), to = try date("to")
             guard app.log != nil else { throw RPCError(code: -32003, message: "log není k dispozici") }
-            return ["text": await app.cabrillo(from: from, to: to)]
+            return ["text": await app.cabrillo(from: from, to: to, contestOnly: (p["contestOnly"] as? Bool) ?? false)]
         case "log.update":
             var obj: Any? = p["record"]
             if obj == nil, let idS = p["id"] as? String, let fields = p["fields"] as? [String: Any] {

@@ -133,3 +133,18 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Neportováno: MsgList (nahrazuje 16 maker), barvy tlačítek maker, ladicí scope demodulátoru, japonské logy a konverze logů.
 - `cty.dat` v `Contents/Resources` aplikace (ne SPM resource bundle – ten by v kořeni `.app` rozbil podpis).
 - Test RX korekce hodin ověřuje kmitočet AFC, ne dekódování (RTTY snese i 1,5 % chybu hodin).
+
+### Review plánu 7 – opraveno
+- I-4 `%r/%R/%N` = HisRST (report a číslo, které posílám), `%s/%M` = MyRST (přijaté) jako MMTTY; výchozí závodní makra `%N`, staré výchozí makro se převede — macroRSTVariablesFollowMMTTY RED→GREEN.
+- I-3 počet odboček AA6YQ/notch/LMS se zaokrouhlí na sudý (jinak neinicializovaný koeficient) — oddTapCountsRoundedToEven RED→GREEN.
+- I-5 DXCC: modifikátory jen jako přípona (M/, R/ jsou prefixy zemí), entity jen pro WAE (`*`) se přeskočí — realCtyPortablePrefixesAndWAE RED→GREEN.
+- I-1 dialog Nastavení slučuje proti výchozímu stavu dialogu pole po poli (pořadové číslo, zobrazení) — staleDraftKeepsSerialAndDisplayChanges RED→GREEN.
+- I-2 WAV nahrazuje vstup zvukovky, tempo dává vstup, při TX pauza, stop při restartu, čtení mimo hlavní vlákno, limit 2 h — playbackReplacesLiveInputInRealTime, playbackPausesDuringTxAndStops RED→GREEN.
+- I-6 Cabrillo: rozsah dat a „jen závodní spojení“ v exportu, QSO bez kmitočtu jako `X-QSO:`, kategorie bez klíče jako `X-CATEGORY:` — cabrilloContestOnlyAndRange, cabrilloCategoryWithoutKeyIsCommented RED→GREEN.
+- Drobnosti: QSO okno po startu (contestSerialVisibleAfterStart), pořadí parametrů při startu (persistedNotchSurvivesStartupOrder), notch během TX ignorován (notchClickIgnoredDuringTx), rozsah spektra max. 4000 Hz (displayRangeCappedAt4000), posuvník zesílení ±30 dB, v závodě se po zalogování nemaže, co operátor mezitím napsal (Ruling: bez vlastního testu – souběh těžko navodit; cena omylu: ruční Clear).
+
+### Odložené drobnosti
+- měření hodin měří zařízení z uloženého nastavení, ne z konceptu v dialogu
+- země DXCC se nepřepočítá při opravě značky v logu (log.update, editor)
+- WAV: jen PCM16; chybová hláška neříká, které formáty jsou podporované
+- test pllParametersStillDecode nastavuje výchozí hodnoty PLL (nemůže selhat kvůli nim)

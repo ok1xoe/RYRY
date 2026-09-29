@@ -92,7 +92,7 @@ Notifikace (bez `id`, jen odebírané):
 | `macro.list` / `macro.run` / `macro.stop` | – / `{index}` (0–15) / – | makra (syntaxe MMTTY). Makro s `repeatSeconds` se opakuje (CQ smyčka), dokud nepřijde znak, `macro.stop` nebo `engine.rxNow` |
 | `qso.getCurrent` / `qso.setField` / `qso.clear` / `qso.log` | `{name, value}` | QSO okno. `qso.log` vrací záznam |
 | `log.query` | `{call?, from?, to?, limit?}` (ISO 8601) | záznamy od nejnovějšího |
-| `log.exportCabrillo` | `{from?, to?}` (ISO 8601) | `{text}` – Cabrillo 3.0 (hlavička z nastavení stanice a závodu) |
+| `log.exportCabrillo` | `{from?, to?, contestOnly?}` (ISO 8601; `contestOnly` = jen spojení s číslem/výměnou) | `{text}` – Cabrillo 3.0 (hlavička z nastavení stanice a závodu) |
 | `dxcc.lookup` | `{call}` | `{name, prefix, continent, cqZone, ituZone, latitude, longitude, utcOffset}` nebo `null` |
 | `log.update` / `log.delete` | `{record}` nebo `{id, fields:{…}}` / `{id}` | |
 | `spectrum.get` | `{bins?}` | `{binHz, magnitudes}` |

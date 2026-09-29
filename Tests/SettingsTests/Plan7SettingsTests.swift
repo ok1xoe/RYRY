@@ -41,3 +41,14 @@ import Testing
     c.txPPM = -99_999
     #expect(c.clampedTx == -20_000)
 }
+
+// Review I-4: staré výchozí závodní makro s %M (přijaté číslo) → %N (odesílané, jako MMTTY)
+@Test func oldDefaultContestMacroMigrated() throws {
+    let dir = tmp()
+    let old = #"{"macros":[{"name":"Contest","text":"\r\n%c 599 %M %M %c\r\n\\"},{"name":"Mine","text":"%M"}]}"#
+    try old.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+    let s = SettingsStore(directory: dir).load().0
+    #expect(s.macros[0].text == "\r\n%c 599 %N %N %c\r\n\\")
+    #expect(s.macros[1].text == "%M")                         // vlastní makra se nemění
+    #expect(AppSettings.defaultMacros.allSatisfy { !$0.text.contains("%M") })
+}

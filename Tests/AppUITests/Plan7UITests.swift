@@ -163,8 +163,68 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     let url = f.dir.appendingPathComponent("rx.wav")
     try WaveFile.write(samples: conv.process(s) + conv.process([Float](repeating: 0, count: 4096)), sampleRate: 48000, to: url)
     try await f.model.playWAV(url, speed: 0)                    // 0 = co nejrychleji
-    for _ in 0..<50 where !f.model.rxRuns.map(\.text).joined().contains(text) { await f.settle() }
+    #expect(f.model.wavPlaying)
+    for _ in 0..<100 where !f.model.rxRuns.map(\.text).joined().contains(text) { await f.pump(); await f.settle() }
     #expect(f.model.rxRuns.map(\.text).joined().contains(text))
+    for _ in 0..<50 where f.model.wavPlaying { await f.settle(); try? await Task.sleep(for: .milliseconds(20)) }
+    #expect(f.model.wavPlaying == false)
+    // restart (Použít) přehrávání ukončí
+    try await f.model.playWAV(url, speed: 1)
+    await f.model.applySettings(f.model.settings)
     #expect(f.model.wavPlaying == false)
     await f.model.stop()
+}
+
+// Review I-1: dialog otevřený se starými hodnotami nesmí vrátit pořadové číslo ani změny zobrazení z rychlého menu
+@Test @MainActor func staleDraftKeepsSerialAndDisplayChanges() async throws {
+    let f = Fixture()
+    f.configure = { $0.contest.enabled = true; $0.contest.nextSerial = 5 }
+    await f.model.start()
+    let baseline = f.model.settings                       // dialog otevřen
+    await f.model.clearQSO()
+    await f.model.setQSOField("call", "DL1ABC")
+    await f.model.logQSO()
+    await f.settle()
+    #expect(f.model.settings.contest.nextSerial == 6)
+    await f.model.setDisplay { $0.toHz = 4000 }           // rychlé menu u spektra
+    var draft = baseline
+    draft.display.fontSize = 20                            // uživatel v dialogu změnil jen písmo
+    await f.model.applySettings(draft, baseline: baseline)
+    #expect(f.model.settings.contest.nextSerial == 6)
+    #expect(f.model.settings.display.toHz == 4000 && f.model.settings.display.fontSize == 20)
+    // explicitní změna čísla v dialogu platí
+    var d2 = f.model.settings; let b2 = d2
+    d2.contest.nextSerial = 100
+    await f.model.applySettings(d2, baseline: b2)
+    #expect(f.model.settings.contest.nextSerial == 100)
+    await f.model.stop()
+}
+
+// Review minor: QSO okno po startu ukazuje odesílané číslo závodu (bez Clear)
+@Test @MainActor func contestSerialVisibleAfterStart() async throws {
+    let f = Fixture()
+    f.configure = { $0.contest.enabled = true; $0.contest.nextSerial = 42 }
+    await f.model.start()
+    #expect(f.model.qso.serialSent == 42)
+    await f.model.stop()
+}
+
+// Review minor: uložený zářez mimo okno mark–space přežije start bez ohledu na pořadí parametrů
+@Test @MainActor func persistedNotchSurvivesStartupOrder() async throws {
+    let f = Fixture()
+    f.configure = {
+        $0.rtty = ["mark": .double(1275), "shift": .double(170), "lmsType": .string("notch"),
+                   "notchFreq": .int(2200), "notch2Freq": .int(1800), "twoNotch": .bool(true), "lms": .bool(true)]
+    }
+    await f.model.start()
+    #expect(await f.engine.modemParam("notchFreq") == .int(2200))
+    #expect(await f.engine.modemParam("notch2Freq") == .int(1800))
+    await f.model.stop()
+}
+
+@Test func displayRangeCappedAt4000() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("d-\(UUID())")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    try #"{"display":{"fromHz":0,"toHz":5500}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+    #expect(SettingsStore(directory: dir).load().0.display.toHz == 3000)
 }

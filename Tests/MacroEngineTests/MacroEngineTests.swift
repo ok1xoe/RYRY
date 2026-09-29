@@ -5,7 +5,7 @@ import Testing
 func ctx() -> MacroContext {
     var c = MacroContext()
     c.myCall = "OK1XOE"; c.hisCall = "DL1ABC"; c.name = "HANS"; c.qth = "BERLIN"
-    c.rstSent = "599001"; c.rstRcvd = "599012-ZZ"
+    c.myRST = "599001"; c.hisRST = "599012-ZZ"
     c.now = Date(timeIntervalSince1970: 1_790_000_000)   // 2026-09-21 14:13:20 UTC
     return c
 }
@@ -31,7 +31,7 @@ func text(_ r: MacroResult) -> String {
     #expect(text(MacroEngine.expand("%N", context: c)) == "012-ZZ")
     #expect(text(MacroEngine.expand("%M", context: c)) == "001")
     #expect(text(MacroEngine.expand("%x|%y", context: c)) == "012|ZZ")
-    var short = c; short.rstRcvd = "5"
+    var short = c; short.hisRST = "5"
     #expect(text(MacroEngine.expand("%R%N", context: short)) == "599")
 }
 

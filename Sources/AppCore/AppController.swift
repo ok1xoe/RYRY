@@ -96,8 +96,17 @@ public actor AppController {
 
     public nonisolated func events() -> AsyncStream<AppEvent> { broadcaster.subscribe() }
 
+    /// Pořadí uložených parametrů při startu: kmitočty a typ filtru před zářezy
+    /// (CLMS::SetWindow přesune zářez uvnitř okna mark–space do středu).
+    static func startupOrder(_ p: [String: ParameterValue]) -> [(String, ParameterValue)] {
+        let first = ["baud", "mark", "shift", "reverse", "lmsType", "notchTaps", "twoNotch"]
+        let last = ["notchFreq", "notch2Freq", "lms"]
+        func rank(_ k: String) -> Int { first.firstIndex(of: k) ?? (last.firstIndex(of: k).map { 100 + $0 } ?? 50) }
+        return p.sorted { (rank($0.key), $0.key) < (rank($1.key), $1.key) }
+    }
+
     public func start() async throws {
-        for (k, v) in settings.rtty {
+        for (k, v) in Self.startupOrder(settings.rtty) {
             do { try await engine.setModemParam(k, v) } catch { broadcaster.send(.error("parametr \(k): \(error)")) }
         }
         let stream = engine.events()
@@ -146,9 +155,9 @@ public actor AppController {
         var c = MacroContext()
         c.myCall = settings.station.call.uppercased()
         c.hisCall = qso.call; c.name = qso.name; c.qth = qso.qth
-        // jako MMTTY MyRST/HisRST v závodě: „599“ + číslo nebo výměna (%M, %N)
-        c.rstSent = qso.rstSent + (qso.serialSent.map { String(format: "%03d", $0) } ?? qso.exchangeSent)
-        c.rstRcvd = qso.rstRcvd + (qso.serialRcvd.map { String(format: "%03d", $0) } ?? qso.exchangeRcvd)
+        // MMTTY: HisRST = co posílám (%r %N), MyRST = co jsem dostal (%s %M); v závodě „599“ + číslo nebo výměna
+        c.hisRST = qso.rstSent + (qso.serialSent.map { String(format: "%03d", $0) } ?? qso.exchangeSent)
+        c.myRST = qso.rstRcvd + (qso.serialRcvd.map { String(format: "%03d", $0) } ?? qso.exchangeRcvd)
         c.now = Date()
         c.hisUTCOffsetHours = country(for: qso.call)?.utcOffsetHours
         return c
@@ -254,7 +263,12 @@ public actor AppController {
                 settings.contest.nextSerial = n + 1
                 broadcaster.send(.contestSerial(n + 1))
             }
-            clearQSO()                           // závod: rovnou další spojení s dalším číslem
+            // závod: rovnou další spojení s dalším číslem – ale nemazat, co operátor mezitím napsal
+            if self.qso == qso { clearQSO() }
+            else if settings.contest.exchange.isEmpty, self.qso.serialSent == r.serialSent {
+                self.qso.serialSent = settings.contest.nextSerial
+                broadcaster.send(.qsoChanged(self.qso))
+            }
         }
         return r
     }
@@ -263,8 +277,10 @@ public actor AppController {
     public nonisolated func country(for call: String) -> CountryInfo? { countries?.lookup(call) }
 
     /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
-    public func cabrillo(from: Date? = nil, to: Date? = nil) async -> String {
-        let recs = await log?.query(from: from, to: to) ?? []
+    /// `contestOnly` = jen spojení s odeslaným číslem nebo výměnou.
+    public func cabrillo(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
+        var recs = await log?.query(from: from, to: to) ?? []
+        if contestOnly { recs = recs.filter { $0.serialSent != nil || !($0.exchangeSent ?? "").isEmpty } }
         var h = CabrilloHeader(callsign: settings.station.call, contest: settings.contest.name)
         h.categories = settings.contest.category.split(separator: ";").map(String.init)
         h.locator = settings.station.locator; h.name = settings.station.name
@@ -295,6 +311,8 @@ public actor AppController {
     public func modemParams() async -> [String: ParameterValue] { await engine.modemParams() }
     /// Zářez na kmitočtu (pravé tlačítko ve spektru jako MMTTY).
     public func notchClick(hz: Double) async {
+        // MMTTY: během vysílání se kliky do spektra ignorují
+        guard ![.keying, .pttOn, .tx, .drain, .pttOff].contains(await engine.state) else { return }
         await engine.withModem { $0.notchClick(hz: hz) }
         broadcaster.send(.paramsChanged(await engine.modemParams()))
     }

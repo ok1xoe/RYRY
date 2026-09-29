@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import ModemKit
 import DXCC
+import MacroEngine
 import Engine
 import QSOLog
 import RTTYModem
@@ -36,10 +37,10 @@ func makeContestApp(exchange: String = "", next: Int = 7) throws -> Harness {
     let h = try makeContestApp()
     await h.app.clearQSO()
     #expect(await h.app.qso.serialSent == 7)
-    #expect(await h.app.macroContext().rstSent == "599007")
+    #expect(await h.app.macroContext().hisRST == "599007")
     try await h.app.setQSOField("call", "DL1ABC")
     try await h.app.setQSOField("serialRcvd", "15")
-    #expect(await h.app.macroContext().rstRcvd == "599015")
+    #expect(await h.app.macroContext().myRST == "599015")
     let events = h.app.events()
     let r = try await h.app.logQSO()
     #expect(r.serialSent == 7 && r.serialRcvd == 15)
@@ -56,7 +57,7 @@ func makeContestApp(exchange: String = "", next: Int = 7) throws -> Harness {
     await h.app.clearQSO()
     let q = await h.app.qso
     #expect(q.serialSent == nil && q.exchangeSent == "14")
-    #expect(await h.app.macroContext().rstSent == "59914")
+    #expect(await h.app.macroContext().hisRST == "59914")
     try await h.app.setQSOField("call", "DL1ABC")
     _ = try await h.app.logQSO()
     #expect(await h.app.settings.contest.nextSerial == 7)                  // bez čísel se nemění
@@ -102,6 +103,47 @@ func makeDXCCApp() throws -> Harness {
     #expect(await h.app.settings.macros.count == 16)
     try await h.app.runMacro(index: 13)                   // Test CQ (⇧F2)
     await #expect(throws: AppError.badMacro(16)) { try await h.app.runMacro(index: 16) }
+    await h.app.rxNow()
+    await h.app.stop()
+}
+
+// Review I-4: MMTTY HisRST = report, který posílám (%r %R %N), MyRST = přijatý (%s %M)
+@Test func macroRSTVariablesFollowMMTTY() async throws {
+    let h = try makeApp()
+    try await h.app.setQSOField("call", "DL1ABC")
+    try await h.app.setQSOField("rstSent", "579")
+    try await h.app.setQSOField("serialSent", "7")
+    try await h.app.setQSOField("rstRcvd", "559")
+    try await h.app.setQSOField("serialRcvd", "15")
+    let r = MacroEngine.expand("%r %R %N|%s %M", context: await h.app.macroContext())
+    let t = r.outputs.compactMap { if case .text(let s) = $0 { return s } else { return nil } }.joined()
+    #expect(t == "579007 579 007|559015 015")
+}
+
+// Review I-6: export jen závodních spojení (s odeslaným číslem nebo výměnou) v rozsahu
+@Test func cabrilloContestOnlyAndRange() async throws {
+    let h = try makeApp()
+    try await h.app.setQSOField("call", "OK2AAA")
+    _ = try await h.app.logQSO()                          // běžné spojení bez výměny
+    try await h.app.setQSOField("call", "DL1ABC")
+    try await h.app.setQSOField("serialSent", "1")
+    _ = try await h.app.logQSO()
+    let all = await h.app.cabrillo()
+    #expect(all.contains("OK2AAA") && all.contains("DL1ABC"))
+    let contest = await h.app.cabrillo(contestOnly: true)
+    #expect(!contest.contains("OK2AAA") && contest.contains("DL1ABC"))
+    let future = await h.app.cabrillo(from: Date().addingTimeInterval(3600))
+    #expect(!future.contains("DL1ABC"))
+}
+
+// Review minor: MMTTY ignoruje kliky do spektra během TX
+@Test func notchClickIgnoredDuringTx() async throws {
+    let h = try makeApp(ptt: .none)
+    try await h.app.start()
+    try await h.app.tx()
+    await run(h) { await h.engine.state == .tx }
+    await h.app.notchClick(hz: 1650)
+    #expect(await h.app.modemParam("notchFreq") != .int(1650))
     await h.app.rxNow()
     await h.app.stop()
 }

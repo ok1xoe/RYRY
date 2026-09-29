@@ -98,7 +98,7 @@ public final class AppModel {
     public func setDisplay(_ change: (inout DisplaySettings) -> Void) async {
         var d = settings.display
         change(&d)
-        if !(d.fromHz >= 0 && d.toHz <= 5500 && d.toHz - d.fromHz >= 200) { d.fromHz = settings.display.fromHz; d.toHz = settings.display.toHz }
+        if !(d.fromHz >= 0 && d.toHz <= DisplaySettings.maxHz && d.toHz - d.fromHz >= 200) { d.fromHz = settings.display.fromHz; d.toHz = settings.display.toHz }
         d.gainDB = min(30, max(-30, d.gainDB))
         settings.display = d
         syncDisplay()
@@ -197,6 +197,7 @@ public final class AppModel {
         do { try await app.start() }
         catch EngineError.audio(let m) { note("Zvuk nefunguje: \(m) – zkontrolujte zařízení a oprávnění k mikrofonu") }
         catch { note("Start selhal: \(error)") }
+        qso = await app.qso                              // např. odesílané číslo závodu
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
@@ -252,6 +253,7 @@ public final class AppModel {
     }
 
     private func stopNow() async {
+        await stopWAV()
         spectrumTask?.cancel(); spectrumTask = nil
         fldigi?.stop(); json?.stop(); fldigi = nil; json = nil
         await app?.stop()
@@ -264,20 +266,30 @@ public final class AppModel {
     /// Uloží nastavení a restartuje (Engine je jednorázový). Během vysílání nejdřív bezpečně RX.
     /// Sekce z dialogu Nastavení se sloučí do aktuálního nastavení; parametry modemu a makra
     /// (mění se jinde, okamžitě) se nepřepisují starou kopií z dialogu.
-    public func applySettings(_ s: AppSettings) async {
+    /// Použije nastavení z dialogu. `baseline` = stav, ze kterého dialog vyšel: pořadové číslo závodu
+    /// a zobrazení se mění i jinde (log, rychlé menu), proto se převezmou jen pole, která uživatel změnil.
+    public func applySettings(_ s: AppSettings, baseline: AppSettings? = nil) async {
         await serialized { [weak self] in
             guard let self else { return }
-            var merged = self.settings
-            merged.station = s.station; merged.audio = s.audio; merged.ptt = s.ptt; merged.fsk = s.fsk
-            merged.rig = s.rig; merged.api = s.api; merged.log = s.log
-            merged.clock = s.clock; merged.rttyCore = s.rttyCore; merged.display = s.display
-            // pořadové číslo závodu mění log – z dialogu převzít jen, když ho uživatel změnil
-            let serial = merged.contest.nextSerial
-            merged.contest = s.contest
-            if s.contest.nextSerial == self.settings.contest.nextSerial { merged.contest.nextSerial = serial }
-            do { try self.settingsStore.save(merged) } catch { self.note("Nastavení nelze uložit: \(error)") }
+            let base = baseline ?? self.settings
+            func merge(_ cur: AppSettings) -> AppSettings {
+                var m = cur
+                m.station = s.station; m.audio = s.audio; m.ptt = s.ptt; m.fsk = s.fsk
+                m.rig = s.rig; m.api = s.api; m.log = s.log
+                m.clock = s.clock; m.rttyCore = s.rttyCore
+                func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
+                take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
+                take(\.display.timestamps); take(\.display.fontSize)
+                take(\.contest.enabled); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
+                take(\.contest.nextSerial)
+                return m
+            }
+            do { try self.settingsStore.save(merge(self.settings)) } catch { self.note("Nastavení nelze uložit: \(error)") }
             if let app = self.app, await app.engine.state != .rx { await app.rxNow() }
             await self.stopNow()
+            // znovu sloučit: během zastavování mohl přijít .contestSerial (makro s %l)
+            let merged = merge(self.settings)
+            do { try self.settingsStore.save(merged) } catch { self.note("Nastavení nelze uložit: \(error)") }
             self.settings = merged
             self.syncDisplay()
             await self.startNow()
@@ -374,41 +386,50 @@ public final class AppModel {
 
     public private(set) var wavPlaying = false
     private var wavTask: Task<Void, Never>?
+    private var wavToken = UUID()
+    /// Max. délka souboru (vzorky po převzorkování na 11025 Hz ≈ 2 h).
+    nonisolated static let wavMaxSamples = 11025 * 7200
 
-    /// Přehraje WAV (libovolná frekvence, převzorkuje se na 11025 Hz) do demodulátoru.
-    /// `speed` 1 = reálný čas, 2–10 = rychleji, 0 = co nejrychleji (vrátí se až po dohrání).
-    public func playWAV(_ url: URL, speed: Double = 1) async throws {
-        stopWAV()
-        guard let engine = app?.engine else { return }
-        let (raw, rate) = try WaveFile.read(from: url)
-        let samples = rate == 11025 ? raw : try SampleRateConverter(from: Double(rate), to: 11025).process(raw)
-        wavPlaying = true
-        let chunk = 1103                                                  // ≈ 100 ms
-        let t = Task { @MainActor [weak self] in
-            var i = 0
-            while i < samples.count, !Task.isCancelled {
-                let n = min(chunk, samples.count - i)
-                await engine.injectRx(Array(samples[i..<(i + n)]))
-                i += n
-                if speed > 0 { try? await Task.sleep(for: .milliseconds(max(1, Int(100 / speed)))) } else { await Task.yield() }
-            }
-            self?.wavPlaying = false
-        }
-        wavTask = t
-        if speed == 0 { await t.value }
+    public enum WAVError: Error, LocalizedError {
+        case tooLong
+        public var errorDescription: String? { "Soubor je delší než 2 hodiny." }
     }
 
-    public func stopWAV() {
+    /// Přehraje WAV (libovolná frekvence, převzorkuje se na 11025 Hz) místo vstupu zvukovky (MMTTY „Play“).
+    /// `speed` 1 = reálný čas, 2–10 = rychleji, 0 = co nejrychleji. Během TX se pozastaví.
+    public func playWAV(_ url: URL, speed: Double = 1) async throws {
+        await stopWAV()
+        guard let engine = app?.engine else { return }
+        let samples = try await Task.detached(priority: .userInitiated) { () throws -> [Float] in
+            let (raw, rate) = try WaveFile.read(from: url)
+            guard Double(raw.count) / Double(max(1, rate)) * 11025 <= Double(AppModel.wavMaxSamples) else { throw WAVError.tooLong }
+            return rate == 11025 ? raw : try SampleRateConverter(from: Double(rate), to: 11025).process(raw)
+        }.value
+        await engine.startPlayback(samples, speed: speed)
+        wavPlaying = true
+        let token = UUID(); wavToken = token
+        wavTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(200))
+                if await engine.playbackRemaining == 0 { break }
+            }
+            if let self, self.wavToken == token { self.wavPlaying = false }
+        }
+    }
+
+    public func stopWAV() async {
         wavTask?.cancel(); wavTask = nil
+        wavToken = UUID()
         wavPlaying = false
+        await app?.engine.stopPlayback()
     }
 
     /// Země DXCC aktuální značky v QSO okně (nil = neznámá).
     public var dxcc: CountryInfo? { qso.call.isEmpty ? nil : app?.country(for: qso.call) }
 
     /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
-    public func cabrilloText(from: Date? = nil, to: Date? = nil) async -> String {
-        await app?.cabrillo(from: from, to: to) ?? ""
+    public func cabrilloText(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
+        await app?.cabrillo(from: from, to: to, contestOnly: contestOnly) ?? ""
     }
 
     private func refreshLog() async {

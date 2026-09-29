@@ -38,7 +38,9 @@ private func rec(_ call: String, _ time: String, sent: Int?, rcvd: Int?, exS: St
 @Test func cabrilloWithoutFrequencyUsesZeroAndEmptyLog() {
     let t = Cabrillo.export([rec("DL1ABC", "2026-09-29T12:03:00Z", sent: 1, rcvd: nil, freq: nil)],
                             header: CabrilloHeader(callsign: "OK1XOE", contest: ""))
-    #expect(t.contains("QSO:     0 RY 2026-09-29 1203 OK1XOE        599 001    DL1ABC        599"))
+    // bez kmitočtu není platný QSO řádek → X-QSO (vyhodnocovač ho ignoruje, ale v logu zůstane)
+    #expect(t.contains("X-QSO:     0 RY 2026-09-29 1203 OK1XOE        599 001    DL1ABC        599"))
+    #expect(!t.contains("\r\nQSO:"))
     let empty = Cabrillo.export([], header: CabrilloHeader(callsign: "OK1XOE", contest: "X"))
     #expect(!empty.contains("QSO:") && empty.hasSuffix("END-OF-LOG:\r\n"))
 }
@@ -50,4 +52,12 @@ private func rec(_ call: String, _ time: String, sent: Int?, rcvd: Int?, exS: St
     #expect(a.contains("<COUNTRY:5>Japan ") && a.contains("<CONT:2>AS ") && a.contains("<CQZ:2>25 ") && a.contains("<ITUZ:2>45 "))
     let back = ADIF.parse("<EOH>" + a)
     #expect(back.first?["COUNTRY"] == "Japan")
+}
+
+@Test func cabrilloCategoryWithoutKeyIsCommented() {
+    var h = CabrilloHeader(callsign: "OK1XOE", contest: "X")
+    h.categories = ["SINGLE-OP ALL LOW", "POWER: LOW"]
+    let t = Cabrillo.export([], header: h)
+    #expect(t.contains("X-CATEGORY: SINGLE-OP ALL LOW\r\n") && t.contains("CATEGORY-POWER: LOW\r\n"))
+    #expect(!t.contains("CATEGORY-SINGLE-OP"))
 }

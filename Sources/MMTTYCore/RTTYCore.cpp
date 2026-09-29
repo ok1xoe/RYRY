@@ -171,6 +171,8 @@ extern "C" RTTYCoreSignal rttycore_signal(RTTYCore* c) {
 static bool inRange(double v, double lo, double hi) { return std::isfinite(v) && v >= lo && v <= hi; }
 static bool isBool(double v) { return v == 0.0 || v == 1.0; }
 static bool isInt(double v, int lo, int hi) { return inRange(v, lo, hi) && v == std::floor(v); }
+// FIR s lichým počtem odboček: MakeFilter zapíše jen n koeficientů z n+1 → vždy sudé (nahoru).
+static int evenTaps(double v) { int n = int(v); return (n & 1) ? n + 1 : n; }
 
 extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
     if (!c) return RC_ERR_UNKNOWN;
@@ -294,13 +296,13 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
         break;
     case RC_AA6YQ_BPF_TAPS:
         if (!isInt(v, 16, 1024)) return RC_ERR_RANGE;
-        dem.m_AA6YQ.m_bpfTaps = int(v); dem.m_AA6YQ.Create(); break;
+        dem.m_AA6YQ.m_bpfTaps = evenTaps(v); dem.m_AA6YQ.Create(); break;
     case RC_AA6YQ_BPF_FW:
         if (!inRange(v, 5, 500)) return RC_ERR_RANGE;
         dem.m_AA6YQ.m_bpfFW = v; dem.m_AA6YQ.Create(); break;
     case RC_AA6YQ_BEF_TAPS:
         if (!isInt(v, 16, 1024)) return RC_ERR_RANGE;
-        dem.m_AA6YQ.m_befTaps = int(v); dem.m_AA6YQ.Create(); break;
+        dem.m_AA6YQ.m_befTaps = evenTaps(v); dem.m_AA6YQ.Create(); break;
     case RC_AA6YQ_BEF_FW:
         if (!inRange(v, 5, 100)) return RC_ERR_RANGE;
         dem.m_AA6YQ.m_befFW = v; dem.m_AA6YQ.Create(); break;
@@ -318,10 +320,10 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
         c->lms().m_twoNotch = int(v); c->calcBPF(); break;
     case RC_NOTCH_TAPS:
         if (!isInt(v, 8, TAPMAX)) return RC_ERR_RANGE;
-        c->lms().m_NotchTap = int(v); c->calcBPF(); break;
+        c->lms().m_NotchTap = evenTaps(v); c->calcBPF(); break;
     case RC_LMS_TAPS:
         if (!isInt(v, 8, TAPMAX)) return RC_ERR_RANGE;
-        c->lms().m_Tap = int(v); c->calcBPF(); break;
+        c->lms().m_Tap = evenTaps(v); c->calcBPF(); break;
     case RC_LMS_MU2:
         if (!inRange(v, 0, 1)) return RC_ERR_RANGE;
         c->lms().m_lmsMU2 = v; break;

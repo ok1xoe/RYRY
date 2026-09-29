@@ -44,8 +44,9 @@ public struct CountryDB: Sendable {
             func f(_ i: Int) -> String { fields[i].trimmingCharacters(in: .whitespacesAndNewlines) }
             guard let cq = Int(f(1)), let itu = Int(f(2)), let lat = Double(f(4)), let lonW = Double(f(5)),
                   let off = Double(f(6)) else { continue }
-            var primary = f(7)
-            if primary.hasPrefix("*") { primary.removeFirst() }
+            let primary = f(7)
+            // „*“ = entita jen pro WAE/CQ (Sicílie, …), ne země DXCC – prefixy pak spadnou do mateřské země
+            if primary.hasPrefix("*") { continue }
             let idx = ents.count
             ents.append(CountryInfo(name: f(0), primaryPrefix: primary, continent: f(3), cqZone: cq, ituZone: itu,
                                     latitude: lat, longitude: -lonW, utcOffsetHours: -off))
@@ -117,8 +118,10 @@ public struct CountryDB: Sendable {
         if let e = exact[c] { return info(e) }
         var parts = c.split(separator: "/").map(String.init)
         if parts.count > 1, parts.contains(where: Self.noCountry.contains) { return nil }
-        if parts.count > 1 {
-            parts.removeAll { Self.modifiers.contains($0) || ($0.count == 1 && $0.first!.isNumber) }
+        // modifikátory (/P, /M, /QRP, /4 …) jen jako přípony – M/, R/, B/ na začátku jsou prefixy zemí
+        while parts.count > 1, let last = parts.last,
+              Self.modifiers.contains(last) || (last.count == 1 && last.first!.isNumber) {
+            parts.removeLast()
         }
         guard !parts.isEmpty else { return nil }
         if parts.count == 1 { return longestPrefix(parts[0]) }

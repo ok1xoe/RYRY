@@ -60,7 +60,7 @@ struct MacroEditor: View {
                 Text("Opakovat po (s, 0 = ne):")
                 TextField("", value: $repeatSec, format: .number).frame(width: 60)
             }
-            Text("%m moje značka · %c protistanice · %n jméno · %q QTH · %r/%s RST · %R %N %M soutěžní · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX")
+            Text("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %N odesílané číslo · %M přijaté číslo · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()

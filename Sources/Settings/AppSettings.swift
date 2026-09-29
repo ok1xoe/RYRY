@@ -172,11 +172,13 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     public var timestamps = false
     public var fontSize = 14.0
     public init() {}
+    /// FFT jádra pokrývá 0–4000 Hz (TSound m_FFTWINDOW).
+    public static let maxHz = 4000.0
     enum CodingKeys: String, CodingKey { case fromHz, toHz, gainDB, autoGain, timestamps, fontSize }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "display", x = DisplaySettings()
         fromHz = c.tolerant(.fromHz, x.fromHz, w, s); toHz = c.tolerant(.toHz, x.toHz, w, s)
-        if !(fromHz >= 0 && toHz <= 5500 && toHz - fromHz >= 200) { fromHz = x.fromHz; toHz = x.toHz }
+        if !(fromHz >= 0 && toHz <= Self.maxHz && toHz - fromHz >= 200) { fromHz = x.fromHz; toHz = x.toHz }
         gainDB = min(30, max(-30, c.tolerant(.gainDB, x.gainDB, w, s)))
         autoGain = c.tolerant(.autoGain, x.autoGain, w, s); timestamps = c.tolerant(.timestamps, x.timestamps, w, s)
         fontSize = min(40, max(8, c.tolerant(.fontSize, x.fontSize, w, s)))
@@ -205,7 +207,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "CQ", text: "\r\nCQ CQ CQ DE %m %m %m PSE K\r\n\\"),
         Macro(name: "Answer", text: "\r\n%c %c DE %m %m %m K\r\n\\"),
         Macro(name: "Report", text: "\r\n%c DE %m %g TNX FER CALL UR RST %r %r NAME %n\r\nHW? %c DE %m KN\r\n\\"),
-        Macro(name: "Contest", text: "\r\n%c 599 %M %M %c\r\n\\"),
+        Macro(name: "Contest", text: "\r\n%c 599 %N %N %c\r\n\\"),
         Macro(name: "TU", text: "\r\nTU %c DE %m QRZ?\r\n%l\\"),
         Macro(name: "73", text: "\r\n%c DE %m TNX FER QSO 73 73 %c DE %m SK\r\n%l\\"),
         Macro(name: "QRZ", text: "\r\nQRZ? DE %m K\r\n\\"),
@@ -215,7 +217,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "AGN", text: "\r\nAGN? AGN?\r\n\\"),
         Macro(name: "NR?", text: "\r\nNR? NR?\r\n\\"),
         Macro(name: "Test CQ", text: "\r\nCQ TEST CQ TEST DE %m %m TEST\r\n\\"),
-        Macro(name: "Exch", text: "\r\n%c 599 %M %M\r\n\\"),
+        Macro(name: "Exch", text: "\r\n%c 599 %N %N\r\n\\"),
         Macro(name: "", text: ""),
         Macro(name: "", text: ""),
     ]
@@ -230,6 +232,10 @@ public struct AppSettings: Codable, Sendable, Equatable {
         rig = c.tolerant(.rig, x.rig, w, s); api = c.tolerant(.api, x.api, w, s)
         rtty = c.tolerant(.rtty, TolerantDict<ParameterValue>(), w, s).items
         macros = c.contains(.macros) ? c.tolerant(.macros, TolerantArray<Macro>(), w, s).items : x.macros
+        // dřívější výchozí závodní makro mělo %M (v MMTTY přijaté číslo) místo %N (odesílané)
+        for i in macros.indices where macros[i].text == "\r\n%c 599 %M %M %c\r\n\\" {
+            macros[i].text = "\r\n%c 599 %N %N %c\r\n\\"
+        }
         // starší nastavení s 12 makry (nebo zkrácený seznam) doplnit na 16 prázdnými
         while macros.count < Self.macroCount { macros.append(Macro(name: "", text: "")) }
         log = c.tolerant(.log, x.log, w, s)

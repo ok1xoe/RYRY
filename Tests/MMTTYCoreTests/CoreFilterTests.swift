@@ -109,3 +109,17 @@ private func errors(_ got: String, _ want: String) -> Int {
     defer { rttycore_destroy(rx) }
     #expect(decode(rx, slow).contains("RYRYRYRYRY"))
 }
+
+// Review I-3: lichý počet odboček by nechal neinicializovaný koeficient → zaokrouhlit na sudé
+@Test func oddTapCountsRoundedToEven() throws {
+    let core = try #require(makeCore())
+    defer { rttycore_destroy(core) }
+    for p in [RC_AA6YQ_BPF_TAPS, RC_AA6YQ_BEF_TAPS, RC_NOTCH_TAPS, RC_LMS_TAPS] {
+        #expect(rttycore_set_param(core, p, 101) == RC_OK)
+        #expect(rttycore_get_param(core, p) == 102, "\(p)")
+    }
+    #expect(rttycore_set_param(core, RC_NOTCH_TAPS, 511) == RC_OK)
+    #expect(rttycore_get_param(core, RC_NOTCH_TAPS) == 512)
+    #expect(rttycore_set_param(core, RC_AA6YQ, 1) == RC_OK)
+    #expect(decode(core, RTTYSignalGenerator().generate(text: filterText)) == filterText)
+}

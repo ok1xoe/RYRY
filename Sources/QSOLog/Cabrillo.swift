@@ -20,7 +20,9 @@ public enum Cabrillo {
         for c in h.categories {
             let t = c.trimmingCharacters(in: .whitespaces)
             guard !t.isEmpty else { continue }
-            lines.append(t.uppercased().hasPrefix("CATEGORY-") ? t : "CATEGORY-" + t)
+            if t.uppercased().hasPrefix("CATEGORY-") { lines.append(t) }
+            else if t.contains(":") { lines.append("CATEGORY-" + t) }
+            else { lines.append("X-CATEGORY: " + t) }        // bez klíče není platná značka Cabrillo 3.0
         }
         if !h.locator.isEmpty { lines.append("GRID-LOCATOR: \(h.locator.uppercased())") }
         if !h.name.isEmpty { lines.append("NAME: \(h.name)") }
@@ -43,7 +45,8 @@ public enum Cabrillo {
     static func qsoLine(_ r: QSORecord, myCall: String) -> String {
         let khz = r.frequency.map { Int(($0 / 1000).rounded(.down)) } ?? 0
         let freq = String(repeating: " ", count: max(0, 5 - String(khz).count)) + String(khz)
-        var s = "QSO: \(freq) RY \(dateFmt.string(from: r.timeOn)) "
+        // bez kmitočtu není QSO řádek platný – X-QSO vyhodnocovač přeskočí, v logu ale zůstane
+        var s = (r.frequency == nil ? "X-QSO: " : "QSO: ") + "\(freq) RY \(dateFmt.string(from: r.timeOn)) "
         s += pad(myCall, 13) + " " + pad(r.rstSent ?? "599", 3) + " " + pad(exch(r.serialSent, r.exchangeSent), 6) + " "
         s += pad(r.call, 13) + " " + pad(r.rstRcvd ?? "599", 3) + " " + exch(r.serialRcvd, r.exchangeRcvd)
         while s.hasSuffix(" ") { s.removeLast() }

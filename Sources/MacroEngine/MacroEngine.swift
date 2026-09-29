@@ -4,8 +4,10 @@ import Foundation
 
 public struct MacroContext: Sendable, Equatable {
     public var myCall = "", hisCall = "", name = "", qth = ""
-    public var rstSent = "599"          // MMTTY MyRST  (%s, %M)
-    public var rstRcvd = "599"          // MMTTY HisRST (%r, %R, %N, %x, %y)
+    /// MMTTY HisRST: report (a v závodě číslo), které POSÍLÁM protistanici – %r, %R, %N, %x, %y.
+    public var hisRST = "599"
+    /// MMTTY MyRST: report (a číslo), které jsem od protistanice DOSTAL – %s, %M.
+    public var myRST = "599"
     public var now: Date = Date()
     /// Místní čas protistanice = UTC + offset (z DXCC); nil = země neznámá (%g → HELLO, %f → nic).
     public var hisUTCOffsetHours: Double?
@@ -112,16 +114,16 @@ public enum MacroEngine {
         case "c": return c.hisCall
         case "n": return c.name.isEmpty ? "OM" : c.name
         case "q": return c.qth
-        case "r": return c.rstRcvd
-        case "s": return c.rstSent
-        case "R": return c.rstRcvd.count >= 3 ? String(c.rstRcvd.prefix(3)) : "599"
-        case "N": return after3(c.rstRcvd)
-        case "M": return after3(c.rstSent)
+        case "r": return c.hisRST
+        case "s": return c.myRST
+        case "R": return c.hisRST.count >= 3 ? String(c.hisRST.prefix(3)) : "599"
+        case "N": return after3(c.hisRST)
+        case "M": return after3(c.myRST)
         case "x":
-            let n = after3(c.rstRcvd)
+            let n = after3(c.hisRST)
             return n.isEmpty ? "" : String(n.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
         case "y":
-            let n = after3(c.rstRcvd)
+            let n = after3(c.hisRST)
             let parts = n.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
             return parts.count > 1 ? String(parts[1]) : ""
         case "g", "f":

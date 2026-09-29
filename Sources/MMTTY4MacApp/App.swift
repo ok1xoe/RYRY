@@ -69,7 +69,7 @@ struct MMTTY4MacApp: App {
                         Button(sp.1 + "…") { playWAV(speed: sp.0) }
                     }
                 }
-                Button("Zastavit přehrávání WAV") { model.stopWAV() }.disabled(!model.wavPlaying)
+                Button("Zastavit přehrávání WAV") { Task { await model.stopWAV() } }.disabled(!model.wavPlaying)
             }
             CommandGroup(after: .windowArrangement) {
                 Button("Log") { openWindow(id: "log") }.keyboardShortcut("l", modifiers: [.command, .shift])
