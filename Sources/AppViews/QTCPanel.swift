@@ -20,7 +20,10 @@ struct QTCPanel: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: { Text("QTC (WAE)").font(.subheadline.bold()) }
-        .task(id: model.qso.call) { await model.refreshQTC() }
+        .task(id: model.qso.call) {
+            if model.qtcPending == nil { sending = nil }           // seznam patří stanici, pro kterou byl připraven
+            await model.refreshQTC()
+        }
     }
 
     @ViewBuilder var status: some View {
@@ -35,14 +38,16 @@ struct QTCPanel: View {
         }
     }
 
+    var sameContinent: Bool { model.qtcStatus?.differentContinent == false }
+
     var idleButtons: some View {
         HStack {
             Button("QTC?") { Task { await model.qtcPhrase(.ask) } }.help("Zeptat se, zda má protistanice QTC")
             Button("Poslat…") {
                 sending = Array((model.qtcStatus?.available ?? []).prefix(10))
             }
-            .disabled(model.qso.call.isEmpty || (model.qtcStatus?.available.isEmpty ?? true))
-            Button("Přijmout…") { model.startQTCReceive() }.disabled(model.qso.call.isEmpty)
+            .disabled(model.qso.call.isEmpty || sameContinent || (model.qtcStatus?.available.isEmpty ?? true))
+            Button("Přijmout…") { model.startQTCReceive() }.disabled(model.qso.call.isEmpty || sameContinent)
         }
         .controlSize(.small)
     }
@@ -50,7 +55,7 @@ struct QTCPanel: View {
     func sendEditor(_ lines: [QTCLine]) -> some View {
         let n = model.qtcPending?.number ?? model.qtcStatus?.nextSeries ?? 1
         return VStack(alignment: .leading, spacing: 4) {
-            Text("QTC \(n)/\(lines.count) pro \(model.qso.call)").font(.caption.bold())
+            Text("QTC \(n)/\(lines.count) pro \(model.qtcPending?.counterpart ?? model.qso.call)").font(.caption.bold())
             ForEach(Array(lines.enumerated()), id: \.offset) { i, l in
                 HStack {
                     Text("\(i + 1). \(QTCText.line(l))").font(.caption.monospaced())
@@ -69,7 +74,9 @@ struct QTCPanel: View {
                 Button("Poslat vše") { Task { await model.qtcSend(lines) } }.disabled(lines.isEmpty)
             }
             HStack {
-                Button("Potvrzeno – uložit") { Task { await model.qtcConfirmSent(); sending = nil } }
+                Button("Potvrzeno – uložit") {
+                    Task { await model.qtcConfirmSent(); if model.qtcPending == nil { sending = nil } }
+                }
                     .disabled(model.qtcPending == nil)
                     .help("Protistanice potvrdila příjem (R R ALL OK)")
                 Button("Zrušit") { Task { await model.qtcCancelSent(); sending = nil } }
@@ -82,6 +89,7 @@ struct QTCPanel: View {
         let d = model.qtcReceive ?? AppModel.QTCReceiveDraft()
         let rows = d.count ?? max(1, d.lines.lastIndex { $0 != nil }.map { $0 + 1 } ?? 1)
         return VStack(alignment: .leading, spacing: 4) {
+            Text("Od \(d.counterpart)").font(.caption.bold())
             HStack {
                 Text("Série").font(.caption)
                 TextField("n/k", text: Binding(get: { d.number.map { "\($0)/\(d.count ?? 0)" } ?? "" },
@@ -102,8 +110,9 @@ struct QTCPanel: View {
             Text("Klik na slova v příjmu: série n/k, pak čas, značka, číslo.").font(.caption2).foregroundStyle(.secondary)
             HStack {
                 Button("QRV") { Task { await model.qtcPhrase(.qrv) } }
-                Button("R R ALL OK – uložit") {
-                    Task { await model.qtcPhrase(.allOK); await model.qtcSaveReceived() }
+                Button("Uložit – R R ALL OK") {
+                    // nejdřív uložit; potvrzení odeslat jen když se série opravdu zapsala
+                    Task { if await model.qtcSaveReceived() { await model.qtcPhrase(.allOK) } }
                 }
                 .disabled(d.number == nil || !d.lines.contains { $0 != nil })
                 Button("Zrušit") { model.cancelQTCReceive() }

@@ -69,3 +69,42 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     #expect(text.contains("QTC: 21011 RY 2026-11-14 1028 K5XYZ         7/1   DL1XYZ        1332 S59XYZ        112"))
     #expect(text.contains("QTC: 14085 RY 2026-11-14 1028 DL1XYZ        2/1   JA1YY         0915 UA0AA         007"))
 }
+
+// Review plán 12
+@Test func plannerScopedToContestWindowAndRTTYSerials() {
+    var old = q("DL1OLD", "08:00", rcvd: 3); old.timeOn = isoDate("2025-11-15T08:00:00Z")
+    var ssb = q("DL2SSB", "10:30", rcvd: 4); ssb.mode = "SSB"
+    var noSent = q("DL3NS", "10:40", rcvd: 5); noSent.serialSent = nil
+    let now = q("DL4NOW", "11:00", rcvd: 6)
+    let oldSeries = QTCSeries(direction: .sent, number: 22, counterpart: "W1AW", time: isoDate("2025-11-15T09:00:00Z"),
+                              lines: [QTCLine(time: "0800", call: "DL1OLD", serial: 3)])
+    let p = QTCPlanner(records: [old, ssb, noSent, now], series: [oldSeries], since: isoDate("2026-11-14T00:00:00Z"))
+    #expect(p.available(for: "W1AW").map(\.call) == ["DL4NOW"])
+    #expect(p.exchanged(with: "W1AW") == 0 && p.nextSeriesNumber == 1 && p.points == 0)
+}
+
+@Test func parserHandlesAGNIndexHeaderAnchorAndDisagreement() {
+    #expect(QTCText.parseIndexedLine("3 1310 OK2PBR 015 1310 OK2PBR 015").map { [String($0.0), QTCText.line($0.1)] } == ["3", "1310 OK2PBR 015"])
+    #expect(QTCText.parseIndexedLine("1310 OK2PBR 015").map { $0.0 } == nil as Int?)
+    #expect(QTCText.parseHeader("QTC 3/100") == nil)
+    #expect(QTCText.parseLine("1307 DA1AA 481 1307 DA1AA 431") == nil)          // kopie se liší → vyžádat AGN
+}
+
+@Test func storeRecoversFromPartialLastLineAndKeepsDeclaredCount() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("qtc-\(UUID())")
+    let st = try QTCStore(directory: dir)
+    let a = QTCSeries(direction: .sent, number: 1, counterpart: "W1AW", time: Date(), lines: [QTCLine(time: "1307", call: "DA1AA", serial: 431)])
+    try await st.append(a)
+    // havárie: neúplný poslední řádek bez \n
+    let h = try FileHandle(forWritingTo: dir.appendingPathComponent("qtc.jsonl")); try h.seekToEnd(); try h.write(contentsOf: Data("{\"id\":\"brok".utf8)); try h.close()
+    let st2 = try QTCStore(directory: dir)
+    #expect(await st2.warnings.count == 1)
+    var b = QTCSeries(direction: .received, number: 3, counterpart: "K1XX", time: Date(), lines: [QTCLine(time: "0915", call: "JA1YY", serial: 7)])
+    b.declaredCount = 10
+    try await st2.append(b)
+    let st3 = try QTCStore(directory: dir)
+    #expect(await st3.series.count == 2)
+    #expect(await st3.series.last?.declaredCount == 10)
+    let cab = Cabrillo.export([], header: CabrilloHeader(callsign: "OK1XOE", contest: "WAEDC"), qtc: [b])
+    #expect(cab.contains(" 3/10 "))
+}

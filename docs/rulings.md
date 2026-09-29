@@ -185,3 +185,15 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Příjem: „Načíst z příjmu“ rozebere text přijatý od „Přijmout…“; ručně klik na slova (n/k, čas, značka, číslo) nebo úprava řádku.
 - Násobiče a váhy pásem WAE se nepočítají – zobrazují se body za QTC; skóre spočítá vyhodnocení / logger.
 - Série QTC v `qtc.jsonl` v adresáři logu; Cabrillo řádky `QTC:` podle DARC (QTC bez kmitočtu jako `X-QTC:`).
+
+### Review plánu 12 – opraveno
+- Kritické: QTC počítal celý log a všechny série ze všech let – teď jen od začátku závodu (`contest.start`, jinak posledních 72 h), jen RTTY QSO s odeslaným i přijatým číslem — plannerScopedToContestWindowAndRTTYSerials RED→GREEN.
+- `sendQTC` ověří, že řádky jsou povolené (nenahlášené, ne o příjemci), vynucuje jiný kontinent (i u příjmu), pending se nastaví až po předání k vysílání; text QTC jde bez MacroEngine — sendQTCValidatesLinesAndContinent, failedSendLeavesNoPendingSeries.
+- Přijatá série: protistanice z okamžiku „Přijmout…“, uložení před „R R ALL OK“, jen k řádků, k z hlavičky se ukládá (`declaredCount`) a jde do Cabrilla — receivedSeriesUsesExplicitCounterpart, qtcFillPlacesAGNLineAndKeepsCounterpart.
+- Rozbor příjmu: AGN řádek „N …“ na pozici N, poškozený řádek drží místo, rozdílné kopie → nil (vyžádat AGN), hlavička ukotvená (3/100 neplatí) — parserHandlesAGNIndexHeaderAnchorAndDisagreement.
+- Směrování kliků do QTC jen ve formátu WAE, koncept se zruší při změně formátu — qtcRoutingOnlyInWAE.
+- qtc.jsonl: dokončení neúplného posledního řádku před zápisem, varování u nečitelných řádků — storeRecoversFromPartialLastLineAndKeepsDeclaredCount.
+
+### Odložené drobnosti
+- „nahlášeno“ se určuje podle (čas, značka, číslo), ne podle ID záznamu – oprava čísla QSO v logu po nahlášení ho nabídne znovu
+- nejasné, zda vyhodnocovač DARC chce QTC řádky prokládané časově s QSO (teď jsou za QSO)

@@ -57,3 +57,36 @@ import Settings
     #expect(f.model.qtcStatus?.available.map(\.call) == ["DL1ABC"])
     await f.model.stop()
 }
+
+// Review plán 12: AGN řádek na správné místo, jen k řádků, protistanice ze začátku příjmu, směrování jen ve WAE
+@Test @MainActor func qtcFillPlacesAGNLineAndKeepsCounterpart() async throws {
+    let f = await waeFixture()
+    await f.model.setQSOField("call", "W1AW")
+    f.model.startQTCReceive()
+    f.model.appendRx("QTC 4/3 QTC 4/3\r\n0915 JA1YY 007\r\n09#5 UA0AA 012\r\n0931 VK2XX 015\r\n", echo: false)
+    f.model.qtcFillFromRx()
+    #expect(f.model.qtcReceive?.lines[1] == nil && f.model.qtcReceive?.lines[2]?.call == "VK2XX")   // řádky zůstaly zarovnané
+    f.model.appendRx("2 0920 UA0AA 012 0920 UA0AA 012\r\n1111 EXTRA1 001\r\n", echo: false)
+    f.model.qtcFillFromRx()
+    let d = try #require(f.model.qtcReceive)
+    #expect(d.lines[1]?.call == "UA0AA")
+    await f.model.logQSO()                                                    // závod: okno se vyčistí
+    await f.settle()
+    await f.model.qtcSaveReceived()
+    await f.model.refreshQTC()
+    let st = await f.model.app!.qtcStatus(for: "W1AW")
+    #expect(st.exchanged == 3)                                                // jen k = 3 řádky, pod W1AW
+    await f.model.stop()
+}
+
+@Test @MainActor func qtcRoutingOnlyInWAE() async throws {
+    let f = await waeFixture()
+    await f.model.setQSOField("call", "W1AW")
+    f.model.startQTCReceive()
+    var s = f.model.settings; let b = s; s.contest.format = .serial
+    await f.model.applySettings(s, baseline: b)
+    #expect(f.model.qtcReceive == nil)
+    await f.model.insertWord("DL1ABC")
+    #expect(f.model.qso.call == "DL1ABC")
+    await f.model.stop()
+}

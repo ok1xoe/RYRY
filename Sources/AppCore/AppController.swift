@@ -344,7 +344,7 @@ public actor AppController {
     }
 
     private func planner() async -> QTCPlanner {
-        QTCPlanner(records: await log?.records ?? [], series: await qtcStore?.series ?? [])
+        QTCPlanner(records: await log?.records ?? [], series: await qtcStore?.series ?? [], since: settings.contest.effectiveStart)
     }
 
     public func qtcStatus(for call: String) async -> QTCStatus {
@@ -356,16 +356,25 @@ public actor AppController {
     }
 
     /// Odešle sérii QTC stanici v QSO okně (uloží se až po `confirmSentQTC`).
+    /// Kontroluje pravidla: jiný kontinent, limit dvojice, řádky nenahlášené a ne o této stanici.
     public func sendQTC(_ lines: [QTCLine]) async throws {
         guard qtcStore != nil else { throw AppError.qtc("QTC není k dispozici") }
-        guard !qso.call.isEmpty else { throw AppError.qtc("chybí značka protistanice") }
+        let call = qso.call
+        guard !call.isEmpty else { throw AppError.qtc("chybí značka protistanice") }
         guard !lines.isEmpty, lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("série musí mít 1–10 QTC") }
-        let st = await qtcStatus(for: qso.call)
-        guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("s \(qso.call) už vyměněno \(st.exchanged) QTC") }
-        let number = pendingQTC?.counterpart == qso.call ? pendingQTC!.number : st.nextSeries
-        pendingQTC = QTCSeries(direction: .sent, number: number, counterpart: qso.call, time: Date(),
+        let st = await qtcStatus(for: call)
+        if st.differentContinent == false { throw AppError.qtc("\(call) je na stejném kontinentu – v RTTY QTC nelze") }
+        if pendingQTC?.counterpart == call, pendingQTC?.lines == lines {
+            // stejná série znovu (před potvrzením) – číslo i limity už ověřené
+        } else {
+            guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("s \(call) už vyměněno \(st.exchanged) QTC") }
+            guard Set(lines).isSubset(of: Set(st.available)) else { throw AppError.qtc("řádky nejsou pro \(call) povolené (už nahlášené nebo o této stanici)") }
+        }
+        let number = pendingQTC?.counterpart == call ? pendingQTC!.number : st.nextSeries
+        let series = QTCSeries(direction: .sent, number: number, counterpart: call, time: Date(),
                                frequency: await engine.rigStatus?.frequency, lines: lines)
         try await sendPlain(QTCText.body(number: number, lines: lines))
+        pendingQTC = series                          // až po úspěšném předání k vysílání
     }
 
     /// Zopakuje řádek odesílané série (index od 1, na žádost AGN N).
@@ -385,15 +394,18 @@ public actor AppController {
     public func cancelSentQTC() { pendingQTC = nil }
     public var pendingQTCSeries: QTCSeries? { pendingQTC }
 
-    /// Uloží přijatou sérii od stanice v QSO okně.
-    public func saveReceivedQTC(number: Int, lines: [QTCLine]) async throws {
+    /// Uloží přijatou sérii (protistanice se předává explicitně – QSO okno se mezitím mohlo vyčistit).
+    public func saveReceivedQTC(counterpart: String, number: Int, declaredCount: Int?, lines: [QTCLine]) async throws {
         guard let store = qtcStore else { throw AppError.qtc("QTC není k dispozici") }
-        guard !qso.call.isEmpty else { throw AppError.qtc("chybí značka protistanice") }
+        let call = counterpart.uppercased()
+        guard !call.isEmpty else { throw AppError.qtc("chybí značka protistanice") }
         guard number > 0, !lines.isEmpty else { throw AppError.qtc("prázdná série") }
-        let st = await qtcStatus(for: qso.call)
-        guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("s \(qso.call) už vyměněno \(st.exchanged) QTC") }
-        let s = QTCSeries(direction: .received, number: number, counterpart: qso.call, time: Date(),
-                          frequency: await engine.rigStatus?.frequency, lines: lines)
+        let st = await qtcStatus(for: call)
+        if st.differentContinent == false { throw AppError.qtc("\(call) je na stejném kontinentu – v RTTY QTC nelze") }
+        guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("s \(call) už vyměněno \(st.exchanged) QTC") }
+        let s = QTCSeries(direction: .received, number: number, counterpart: call, time: Date(),
+                          frequency: await engine.rigStatus?.frequency, lines: lines,
+                          declaredCount: declaredCount.flatMap { $0 != lines.count ? $0 : nil })
         do { try await store.append(s) } catch { throw AppError.qtc("\(error)") }
         broadcaster.send(.qtcChanged)
     }
@@ -416,8 +428,8 @@ public actor AppController {
     /// Text bez maker: vysílat a po dovysílání RX.
     private func sendPlain(_ text: String) async throws {
         if txDisabled { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
-        // text QTC obsahuje jen písmena, číslice, mezery, „/“ a „?“ – makro bez proměnných, „\“ = RX po dovysílání
-        try await engine.sendMacro(MacroEngine.expand(text + "\\", context: macroContext()))
+        // bez MacroEngine.expand: značky v QTC se nesmí vykládat jako proměnné (%…) ani řídicí znaky
+        try await engine.sendMacro(MacroResult.plain(text, end: .rxAfter))
     }
 
     /// Země DXCC pro značku (nil = neznámá nebo /MM).
@@ -428,8 +440,9 @@ public actor AppController {
     public func cabrillo(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
         var recs = await log?.query(from: from, to: to) ?? []
         if contestOnly { recs = recs.filter { $0.serialSent != nil || !($0.exchangeSent ?? "").isEmpty } }
+        let qtcFrom = from ?? (settings.contest.enabled ? settings.contest.effectiveStart : nil)
         let qtc = await qtcStore?.series.filter { s in
-            (from.map { s.time >= $0 } ?? true) && (to.map { s.time <= $0 } ?? true) } ?? []
+            (qtcFrom.map { s.time >= $0 } ?? true) && (to.map { s.time <= $0 } ?? true) } ?? []
         var h = CabrilloHeader(callsign: settings.station.call, contest: settings.contest.name)
         h.categories = settings.contest.category.split(separator: ";").map(String.init)
         h.locator = settings.station.locator; h.name = settings.station.name

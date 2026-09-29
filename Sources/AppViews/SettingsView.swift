@@ -266,6 +266,14 @@ struct ContestTab: View {
             TextField("Název závodu (Cabrillo CONTEST)", text: $s.contest.name)
             TextField("Kategorie (Cabrillo, oddělit „;“)", text: $s.contest.category)
             Stepper("Další pořadové číslo: \(s.contest.nextSerial)", value: $s.contest.nextSerial, in: 1...99_999)
+            HStack {
+                DatePicker("Začátek závodu (UTC)", selection: Binding(get: { s.contest.start ?? Date() }, set: { s.contest.start = $0 }))
+                    .environment(\.timeZone, TimeZone(identifier: "UTC")!)
+                Button("Teď") { s.contest.start = Date() }
+                Button("Nenastaveno") { s.contest.start = nil }.disabled(s.contest.start == nil)
+            }
+            Text(s.contest.start == nil ? "Bez začátku: QTC počítá spojení za posledních 72 h." : "QTC (WAE) počítá jen spojení a série od začátku závodu.")
+                .font(.caption).foregroundStyle(.secondary)
             TextField("Odesílaná výměna (CQ/RJ: moje zóna/QTH; RST+číslo: místo čísla, prázdné = číslo)", text: $s.contest.exchange)
             Text("BARTG: posílá se číslo a čas začátku QSO, %x = číslo, %y = čas. CQ/RJ: klik na číslo = zóna, na text = QTH. Makra: %N = odesílané číslo (nebo výměna), %M = přijaté (jako MMTTY: %r/%N z HisRST, %s/%M z MyRST). Export: Log → Exportovat Cabrillo…")
                 .font(.caption).foregroundStyle(.secondary)

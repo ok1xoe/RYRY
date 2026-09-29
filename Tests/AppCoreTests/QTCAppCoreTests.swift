@@ -75,12 +75,12 @@ private func logQSO(_ h: Harness, _ call: String, rcvd: Int) async throws {
 @Test func receivedQTCSavedAndInCabrillo() async throws {
     let (h, store) = try makeWAEApp()
     try await h.app.setQSOField("call", "W1AW")
-    try await h.app.saveReceivedQTC(number: 4, lines: [QTCLine(time: "0915", call: "JA1YY", serial: 7)])
+    try await h.app.saveReceivedQTC(counterpart: "W1AW", number: 4, declaredCount: 1, lines: [QTCLine(time: "0915", call: "JA1YY", serial: 7)])
     #expect(await store.series.first?.direction == .received)
     #expect(await h.app.qtcStatus(for: "W1AW").exchanged == 1)
     let cab = await h.app.cabrillo()
     #expect(cab.contains("OK1XOE        4/1   W1AW          0915 JA1YY         007"))
-    await #expect(throws: AppError.self) { try await h.app.saveReceivedQTC(number: 1, lines: []) }
+    await #expect(throws: AppError.self) { try await h.app.saveReceivedQTC(counterpart: "W1AW", number: 1, declaredCount: nil, lines: []) }
 }
 
 func decodeTxAudio(_ samples: [Float]) async throws -> String {
@@ -91,4 +91,40 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
     var t = ""
     for await e in ev { if case .rxText(let c, false) = e { t.append(c) } }
     return t
+}
+
+// Review plán 12: pravidla se kontrolují i při odeslání, kontinent se vynucuje, protistanice se předá explicitně
+@Test func sendQTCValidatesLinesAndContinent() async throws {
+    let (h, store) = try makeWAEApp()
+    try await h.app.start()
+    try await logQSO(h, "K2ZZ", rcvd: 5)
+    try await logQSO(h, "DL1ABC", rcvd: 6)
+    let forW1 = await h.app.qtcStatus(for: "W1AW").available               // obsahuje K2ZZ
+    try await h.app.setQSOField("call", "K2ZZ")
+    await #expect(throws: AppError.self) { try await h.app.sendQTC(forW1) }  // QTC o K2ZZ stanici K2ZZ
+    try await h.app.setQSOField("call", "DL9ZZ")                              // stejný kontinent (EU)
+    let forDL = await h.app.qtcStatus(for: "DL9ZZ").available
+    await #expect(throws: AppError.self) { try await h.app.sendQTC(forDL) }
+    await #expect(throws: AppError.self) { try await h.app.saveReceivedQTC(counterpart: "DL9ZZ", number: 1, declaredCount: 1,
+                                                                          lines: [QTCLine(time: "0915", call: "JA1YY", serial: 7)]) }
+    #expect(await store.series.isEmpty)
+    await h.app.stop()
+}
+
+@Test func failedSendLeavesNoPendingSeries() async throws {
+    let (h, _) = try makeWAEApp()
+    try await logQSO(h, "DL1ABC", rcvd: 5)
+    try await h.app.setQSOField("call", "W1AW")
+    await h.app.setTxDisabled(true)
+    await #expect(throws: (any Error).self) { try await h.app.sendQTC(await h.app.qtcStatus(for: "W1AW").available) }
+    #expect(await h.app.pendingQTCSeries == nil)
+}
+
+@Test func receivedSeriesUsesExplicitCounterpart() async throws {
+    let (h, store) = try makeWAEApp()
+    try await h.app.setQSOField("call", "OK2NEXT")                            // okno už má dalšího
+    try await h.app.saveReceivedQTC(counterpart: "W1AW", number: 2, declaredCount: 10,
+                                    lines: [QTCLine(time: "0915", call: "JA1YY", serial: 7)])
+    let s = try #require(await store.series.first)
+    #expect(s.counterpart == "W1AW" && s.declaredCount == 10)
 }

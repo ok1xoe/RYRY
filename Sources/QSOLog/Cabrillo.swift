@@ -46,7 +46,7 @@ public enum Cabrillo {
         let freq = String(repeating: " ", count: max(0, 5 - String(khz).count)) + String(khz)
         let (rx, tx) = s.direction == .sent ? (s.counterpart, myCall) : (myCall, s.counterpart)
         let head = (s.frequency == nil ? "X-QTC: " : "QTC: ") + "\(freq) RY \(dateFmt.string(from: s.time)) "
-            + pad(rx, 13) + " " + pad("\(s.number)/\(s.count)", 5) + " " + pad(tx, 13) + " "
+            + pad(rx, 13) + " " + pad("\(s.number)/\(s.groupSize)", 5) + " " + pad(tx, 13) + " "
         return s.lines.map { head + $0.time + " " + pad($0.call, 13) + " " + String(format: "%03d", $0.serial) }
     }
 

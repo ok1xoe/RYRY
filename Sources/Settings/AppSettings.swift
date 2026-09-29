@@ -167,16 +167,20 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     public var category = ""               // CATEGORY-… (volný text, jeden řádek na „;“)
     public var nextSerial = 1
     public var exchange = ""               // odesílaná výměna místo čísla (prázdné = pořadové číslo)
+    /// Začátek závodu (UTC) – QTC (WAE) počítá jen spojení a série od tohoto okamžiku; nil = posledních 72 h.
+    public var start: Date?
     public init() {}
+    public var effectiveStart: Date { start ?? Date().addingTimeInterval(-72 * 3600) }
     /// Formát posílá pořadové číslo (ON bez pevné výměny, BARTG).
     public var sendsSerial: Bool { format == .bartg || format == .wae || (format == .serial && exchange.isEmpty) }
-    enum CodingKeys: String, CodingKey { case enabled, format, name, category, nextSerial, exchange }
+    enum CodingKeys: String, CodingKey { case enabled, format, name, category, nextSerial, exchange, start }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "contest", x = ContestSettings()
         enabled = c.tolerant(.enabled, x.enabled, w, s); format = c.tolerant(.format, x.format, w, s)
         name = c.tolerant(.name, x.name, w, s)
         category = c.tolerant(.category, x.category, w, s); nextSerial = max(1, c.tolerant(.nextSerial, x.nextSerial, w, s))
         exchange = c.tolerant(.exchange, x.exchange, w, s)
+        start = c.tolerant(.start, x.start, w, s)
     }
 }
 
