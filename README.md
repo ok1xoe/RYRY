@@ -48,11 +48,12 @@ Podrobnosti: `docs/api.md`. Nastavení: `~/Library/Application Support/mmtty4mac
 
 ## Aplikace (GUI)
 
-    ./scripts/make-app.sh          # sestaví build/mmtty4mac.app (ad-hoc podpis)
+    ./scripts/make-app.sh          # sestaví build/mmtty4mac.app (podpis Developer ID / Apple Development, jinak ad-hoc)
+    ./scripts/make-dmg.sh          # build/mmtty4mac-<verze>.dmg (notarizace: docs/distribution.md)
     open build/mmtty4mac.app
 
 Při prvním spuštění macOS požádá o přístup k mikrofonu (příjem z rádia) – povolte ho.
-Bundle je podepsaný ad-hoc, takže po každém novém sestavení se macOS může zeptat znovu.
+Se stabilním podpisem (Apple Development / Developer ID) si macOS povolení pamatuje; při ad-hoc podpisu (`SIGN_ID=-`) se ptá po každém sestavení.
 Hlavní okno: vodopád (klik = naladit mark), příjem (klik na slovo = značka/jméno/RST do QSO),
 vysílání (po znacích/slovech/řádcích), 16 maker F1–F12 a ⇧F1–⇧F4 (pravé tlačítko = upravit, opakování = CQ smyčka),
 QSO panel s předchozími spojeními a zemí DXCC, okno Log (⇧⌘L), Nastavení (⌘,). Klávesy: ⌘T TX/RX, Esc okamžitě RX, ⌘L zalogovat.
