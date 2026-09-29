@@ -3,6 +3,7 @@ import AppUI
 import QSOLog
 import Settings
 import AppCore
+import Foundation
 import SwiftUI
 import Localization
 
@@ -24,6 +25,25 @@ struct QSOPanel: View {
         case .zone: f = L("RST + CQ zóna")
         }
         return c.name.isEmpty ? L("závod") + " · \(f)" : "\(c.name) · \(f)"
+    }
+
+    static func azimuthInt(_ az: Double) -> Int { Int(az.rounded()) % 360 }
+
+    /// „az 312° · 1 234 km · z lokátoru“ (krátká cesta).
+    static func beamShort(_ b: Geo.Beam) -> String {
+        let src = b.ownSource == .locator && b.remoteSource == .locator ? L("z lokátoru") : L("podle země")
+        return L("az %ld° · %@ km · %@", azimuthInt(b.shortAzimuth), Geo.formatKm(b.shortKm), src)
+    }
+
+    /// Dlouhá cesta (opačný směr, zbytek obvodu Země).
+    static func beamLong(_ b: Geo.Beam) -> String {
+        L("dlouhá cesta %ld° · %@ km", azimuthInt(b.longAzimuth), Geo.formatKm(b.longKm))
+    }
+
+    static func beamHint(_ b: Geo.Beam) -> String {
+        let own = b.ownSource == .locator ? L("z lokátoru ve Stanici") : L("podle země vlastní značky")
+        let remote = b.remoteSource == .locator ? L("z lokátoru protistanice") : L("podle země protistanice (přibližně)")
+        return L("Vlastní poloha %@, protistanice %@", own, remote)
     }
 
     /// Popisek v levém sloupci mřížky.
@@ -86,6 +106,19 @@ struct QSOPanel: View {
                                         .font(.caption).foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                         .gridCellColumns(3)
+                                }
+                            }
+                            if let b = model.beamToRemote {
+                                GridRow {
+                                    label(L("Směr"))
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(Self.beamShort(b)).font(.caption.monospacedDigit())
+                                        Text(Self.beamLong(b)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .hint(Self.beamHint(b))
+                                    .gridCellColumns(3)
                                 }
                             }
                         }

@@ -944,6 +944,7 @@ struct KeysTab: View {
         case .stopMacro: return L("Zastavit opakování makra")
         case .openLog: return L("Otevřít log")
         case .esmMode: return L("ESM: přepnout Run / S&P")
+        case .enterFrequency: return L("Zadat frekvenci")
         }
     }
 }
