@@ -22,6 +22,19 @@ public struct RxRun: Equatable, Sendable, Identifiable {
 
 public enum SendMode: String, CaseIterable, Sendable { case char, word, line }
 
+public extension AppSettings {
+    /// Konfigurace jádra RTTY (vyžaduje nový modem, tj. restart Engine).
+    func modemConfig() -> RTTYModem.Config {
+        var c = RTTYModem.Config()
+        c.codeSet = rttyCore.japanese ? .japanese : .us
+        c.doubleShift = rttyCore.doubleShift
+        c.txUOS = rttyCore.txUOS
+        c.rxClockPPM = clock.clampedRx
+        c.txClockPPM = clock.clampedTx
+        return c
+    }
+}
+
 /// Výchozí parametry modemu (pro rozhodnutí, co ukládat do nastavení).
 enum AppDefaults {
     static let rtty: [String: ParameterValue] = {
@@ -122,8 +135,8 @@ public final class AppModel {
     }
 
     public static let realEngine: EngineFactory = { s, rig in
-        // RTTYModem na 11025 Hz nemůže selhat
-        Engine(modem: try! RTTYModem(), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig())
+        // RTTYModem na 11025 Hz (± 2 % korekce hodin) nemůže selhat
+        Engine(modem: try! RTTYModem(config: s.modemConfig()), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig())
     }
 
     func noteForTesting(_ m: String) { note(m) }
@@ -238,6 +251,11 @@ public final class AppModel {
             var merged = self.settings
             merged.station = s.station; merged.audio = s.audio; merged.ptt = s.ptt; merged.fsk = s.fsk
             merged.rig = s.rig; merged.api = s.api; merged.log = s.log
+            merged.clock = s.clock; merged.rttyCore = s.rttyCore; merged.display = s.display
+            // pořadové číslo závodu mění log – z dialogu převzít jen, když ho uživatel změnil
+            let serial = merged.contest.nextSerial
+            merged.contest = s.contest
+            if s.contest.nextSerial == self.settings.contest.nextSerial { merged.contest.nextSerial = serial }
             do { try self.settingsStore.save(merged) } catch { self.note("Nastavení nelze uložit: \(error)") }
             if let app = self.app, await app.engine.state != .rx { await app.rxNow() }
             await self.stopNow()
@@ -373,6 +391,24 @@ public final class AppModel {
         await refreshParams()
         settings.rtty[id] = v
         try? settingsStore.save(settings)
+    }
+
+    /// Zdroj nominální a skutečné frekvence zařízení (UID, vstup?) – v testech náhrada.
+    public var clockRates: (String?, Bool) -> (nominal: Double, actual: Double)? = { uid, input in
+        ClockCalibration.rates(deviceUID: uid, input: input)
+    }
+
+    /// Změří odchylku hodin vstupního a výstupního zařízení (ppm) – náhrada ClockAdj z MMTTY.
+    /// Zařízení musí běžet (aplikace přijímá); vzorkuje se 2× za sekundu, výsledkem je medián.
+    public func measureClock(seconds: Double) async -> (rx: Double?, tx: Double?) {
+        var rx: [Double] = [], tx: [Double] = [], nomRx = 0.0, nomTx = 0.0
+        let steps = max(1, Int(seconds / 0.5))
+        for i in 0..<steps {
+            if let r = clockRates(settings.audio.inputUID, true) { nomRx = r.nominal; rx.append(r.actual) }
+            if let r = clockRates(settings.audio.outputUID, false) { nomTx = r.nominal; tx.append(r.actual) }
+            if i < steps - 1 { try? await Task.sleep(for: .milliseconds(500)) }
+        }
+        return (ClockCalibration.ppm(actual: rx, nominal: nomRx), ClockCalibration.ppm(actual: tx, nominal: nomTx))
     }
 
     /// Pravé tlačítko ve spektru: zářez (notch) jako MMTTY.

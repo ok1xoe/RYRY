@@ -35,7 +35,7 @@ final class Fixture {
         try? SettingsStore(directory: dir).save(s)
         return AppModel(settingsStore: SettingsStore(directory: dir), profileStore: ProfileStore(directory: dir),
                         engineFactory: { [unowned self] settings, _ in
-                            let e = Engine(modem: try! RTTYModem(), rig: NoRig(), audio: self.audio,
+                            let e = Engine(modem: try! RTTYModem(config: settings.modemConfig()), rig: NoRig(), audio: self.audio,
                                            config: settings.engineConfig(), serialFactory: { _ in FakeSerialPort() },
                                            clock: self.clock, autoRun: false)
                             self.engines.append(e)

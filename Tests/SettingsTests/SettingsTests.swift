@@ -18,7 +18,7 @@ func tmp() -> URL {
     #expect(s.api.fldigiPort == 7362 && s.api.jsonRPCPort == 7363 && !s.api.allowRemote)
     #expect(s.api.fldigiEnabled && s.api.jsonRPCEnabled)
     #expect(s.ptt.method == .none && s.ptt.pttTailMs == 200)
-    #expect(s.macros.count == 12)
+    #expect(s.macros.count == 16)
     #expect(s.rig.type == .none)
 }
 
@@ -54,7 +54,7 @@ func tmp() -> URL {
     #expect(s.api.fldigiPort == 7362)          // neplatné → výchozí
     #expect(s.api.allowRemote == true)          // platné se zachová
     #expect(s.ptt.method == .none)
-    #expect(s.macros.count == 12)               // chybějící sekce → výchozí
+    #expect(s.macros.count == 16)               // chybějící sekce → výchozí
     #expect(w.count >= 2)
 }
 
@@ -107,7 +107,7 @@ func tmp() -> URL {
     """
     try Data(json.utf8).write(to: dir.appendingPathComponent("settings.json"))
     let (s, w) = SettingsStore(directory: dir).load()
-    #expect(s.macros.map(\.name) == ["CQ", "", "73"])
+    #expect(Array(s.macros.map(\.name).prefix(3)) == ["CQ", "", "73"] && s.macros.count == 16)
     #expect(s.macros[0].text == "CQ DE %m\\")
     #expect(s.rtty["baud"] == .double(50))
     #expect(s.rtty["afc"] == nil)

@@ -225,3 +225,34 @@ func largeMarkJumpsKeepShift(from: Double, to: Double) throws {
     #expect(m.get(parameter: "lms") == .bool(true))
     #expect(m.get(parameter: "notchFreq") == .int(1700))
 }
+
+// Plán 7 / T2: kalibrace hodin
+@Test(arguments: [(15_000.0, 2125.0), (0.0, 2125 / 1.015)])
+func rxClockCorrectionKeepsAFCOnTrueFrequency(ppm: Double, expectedMark: Double) async throws {
+    // Zvukovka ve skutečnosti běží o 1,5 % rychleji: tón 2125 Hz se v datech „11025 Hz“ jeví jako 2093,6 Hz.
+    var cfg = RTTYModem.Config()
+    cfg.rxClockPPM = ppm
+    let m = try RTTYModem(config: cfg)
+    #expect(m.sampleRate == 11025)                         // audio převodník zůstává nominální
+    let s = RTTYSignalGenerator(sampleRate: 11025 * 1.015).generate(text: String(repeating: "RYRYRYRY ", count: 10))
+    let stream = m.events
+    s.withUnsafeBufferPointer { m.processRx($0) }
+    m.finishEvents()
+    var last = 2125.0
+    for await e in stream { if case .tuning(let t) = e { last = t.mark } }
+    #expect(abs(last - expectedMark) < 6, "mark \(last)")
+}
+
+@Test func txClockCorrectionShiftsGeneratedTone() throws {
+    var cfg = RTTYModem.Config()
+    cfg.txClockPPM = 10_000                                  // výstup hraje o 1 % rychleji
+    let m = try RTTYModem(config: cfg)
+    try m.set(parameter: "diddle", value: .string("off"))
+    m.beginTx(tune: true)
+    var buf = [Float](repeating: 0, count: 11025)
+    for _ in 0..<2 { _ = buf.withUnsafeMutableBufferPointer { m.generateTx(into: $0) } }
+    var crossings = 0
+    for i in 1..<buf.count where (buf[i - 1] < 0) != (buf[i] < 0) { crossings += 1 }
+    let f = Double(crossings) / 2
+    #expect(abs(f - 2125 / 1.01) < 4, "\(f)")                // v datech nižší, zařízení ho zrychlí na 2125
+}
