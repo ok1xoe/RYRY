@@ -54,6 +54,7 @@ struct MMTTY4MacApp: App {
             }
             CommandGroup(after: .windowArrangement) {
                 Button("Log") { openWindow(id: "log") }.keyboardShortcut("l", modifiers: [.command, .shift])
+                Button("Exportovat Cabrillo…") { exportCabrillo(model) }
             }
         }
         Window("Log", id: "log") { LogWindow(model: model) }

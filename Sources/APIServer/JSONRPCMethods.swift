@@ -110,6 +110,15 @@ extension JSONRPCServer {
             let to = (p["to"] as? String).flatMap(ISODates.parse)
             let recs = await log.query(call: p["call"] as? String, from: from, to: to, limit: (p["limit"] as? NSNumber)?.intValue)
             return recs.map(Self.recordJSON)
+        case "log.exportCabrillo":
+            func date(_ k: String) throws -> Date? {
+                guard let v = p[k] else { return nil }
+                guard let str = v as? String, let d = ISODates.parse(str) else { throw RPCError.params("\(k): ISO 8601") }
+                return d
+            }
+            let from = try date("from"), to = try date("to")
+            guard app.log != nil else { throw RPCError(code: -32003, message: "log není k dispozici") }
+            return ["text": await app.cabrillo(from: from, to: to)]
         case "log.update":
             var obj: Any? = p["record"]
             if obj == nil, let idS = p["id"] as? String, let fields = p["fields"] as? [String: Any] {

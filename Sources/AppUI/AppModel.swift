@@ -284,6 +284,9 @@ public final class AppModel {
             qso = q
             if callChanged { Task { await self.refreshPrevious() } }
         case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious() }
+        case .contestSerial(let n):
+            settings.contest.nextSerial = n
+            do { try settingsStore.save(settings) } catch { note("Nastavení nelze uložit: \(error)") }
         case .qsoUpdated, .qsoDeleted: Task { await self.refreshLog() }
         case .paramsChanged(let p):
             params = p
@@ -334,6 +337,11 @@ public final class AppModel {
     private func refreshPrevious() async {
         guard let log = app?.log, !qso.call.isEmpty else { previousQSOs = []; return }
         previousQSOs = await log.previous(call: qso.call)
+    }
+
+    /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
+    public func cabrilloText(from: Date? = nil, to: Date? = nil) async -> String {
+        await app?.cabrillo(from: from, to: to) ?? ""
     }
 
     private func refreshLog() async {
@@ -440,7 +448,15 @@ public final class AppModel {
 
     public func insertWord(_ w: String) async {
         let word = w.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters.subtracting(CharacterSet(charactersIn: "/"))))
-        switch WordClassifier.classify(word) {
+        let kind = WordClassifier.classify(word)
+        // závod: po zadání značky jdou čísla a výměna do přijatých polí (MMTTY TMmttyWd::PBoxRxMouseDown)
+        if settings.contest.enabled, !qso.call.isEmpty, kind != .call {
+            if let (field, v) = WordClassifier.contestField(word, serialMode: settings.contest.exchange.isEmpty) {
+                await setQSOField(field, v)
+            }
+            return
+        }
+        switch kind {
         case .call: await setQSOField("call", word)
         case .rst: await setQSOField("rstRcvd", word.uppercased())
         case .name: await setQSOField("name", word.uppercased())

@@ -1,7 +1,23 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import AppKit
 import AppUI
 import QSOLog
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// Uloží log ve formátu Cabrillo (dialog pro výběr souboru).
+@MainActor public func exportCabrillo(_ model: AppModel) {
+    Task { @MainActor in
+        let text = await model.cabrilloText()
+        let p = NSSavePanel()
+        let base = model.settings.contest.name.isEmpty ? "log" : model.settings.contest.name
+        p.nameFieldStringValue = "\(model.settings.station.call.isEmpty ? "mmtty4mac" : model.settings.station.call)-\(base).log"
+        p.allowedContentTypes = [.plainText, UTType(filenameExtension: "log") ?? .plainText, UTType(filenameExtension: "cbr") ?? .plainText]
+        guard p.runModal() == .OK, let url = p.url else { return }
+        do { try Data(text.utf8).write(to: url, options: .atomic) }
+        catch { NSAlert(error: error).runModal() }
+    }
+}
 
 public struct LogWindow: View {
     @Bindable var model: AppModel
@@ -25,6 +41,9 @@ public struct LogWindow: View {
                 TableColumn("kHz") { r in Text(r.frequency.map { String(format: "%.1f", $0 / 1000) } ?? "") }.width(70)
                 TableColumn("Mód") { r in Text(r.mode) }.width(50)
                 TableColumn("RST s/r") { r in Text("\(r.rstSent ?? "")/\(r.rstRcvd ?? "")") }.width(70)
+                TableColumn("Nr s/r") { r in
+                    Text("\(r.serialSent.map { String(format: "%03d", $0) } ?? r.exchangeSent ?? "")/\(r.serialRcvd.map { String(format: "%03d", $0) } ?? r.exchangeRcvd ?? "")")
+                }.width(70)
                 TableColumn("Jméno") { r in Text(r.name ?? "") }
                 TableColumn("QTH") { r in Text(r.qth ?? "") }
             }
@@ -39,6 +58,7 @@ public struct LogWindow: View {
             HStack {
                 Text("\(filtered.count) spojení").foregroundStyle(.secondary)
                 Spacer()
+                Button("Exportovat Cabrillo…") { exportCabrillo(model) }
             }.padding(6).font(.caption)
         }
         .searchable(text: $search, prompt: "Značka nebo jméno")

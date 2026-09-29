@@ -43,6 +43,8 @@ public enum AppEvent: Sendable {
     case qsoLogged(QSORecord), qsoUpdated(QSORecord), qsoDeleted(UUID)
     /// Parametry modemu se změnily (GUI, API, profil) – aktuální hodnoty.
     case paramsChanged([String: ParameterValue])
+    /// Závod: další pořadové číslo se změnilo (po zalogování) – klient ho uloží do nastavení.
+    case contestSerial(Int)
     case error(String)
 }
 
@@ -80,6 +82,10 @@ public actor AppController {
 
     public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil) {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
+        if settings.contest.enabled {
+            if settings.contest.exchange.isEmpty { qso.serialSent = settings.contest.nextSerial }
+            else { qso.exchangeSent = settings.contest.exchange }
+        }
     }
 
     public nonisolated func events() -> AsyncStream<AppEvent> { broadcaster.subscribe() }
@@ -134,8 +140,9 @@ public actor AppController {
         var c = MacroContext()
         c.myCall = settings.station.call.uppercased()
         c.hisCall = qso.call; c.name = qso.name; c.qth = qso.qth
-        c.rstSent = qso.rstSent + (qso.serialSent.map { String(format: "%03d", $0) } ?? "")
-        c.rstRcvd = qso.rstRcvd
+        // jako MMTTY MyRST/HisRST v závodě: „599“ + číslo nebo výměna (%M, %N)
+        c.rstSent = qso.rstSent + (qso.serialSent.map { String(format: "%03d", $0) } ?? qso.exchangeSent)
+        c.rstRcvd = qso.rstRcvd + (qso.serialRcvd.map { String(format: "%03d", $0) } ?? qso.exchangeRcvd)
         c.now = Date()
         return c
     }
@@ -201,7 +208,15 @@ public actor AppController {
 
     public func clearQSO() {
         qso = QSOFields()
+        applyContestDefaults()
         broadcaster.send(.qsoChanged(qso))
+    }
+
+    /// Závod: odesílané pořadové číslo (nebo pevná výměna) do prázdného QSO okna.
+    private func applyContestDefaults() {
+        guard settings.contest.enabled else { return }
+        if settings.contest.exchange.isEmpty { qso.serialSent = settings.contest.nextSerial }
+        else { qso.exchangeSent = settings.contest.exchange; qso.serialSent = nil }
     }
 
     @discardableResult
@@ -224,7 +239,23 @@ public actor AppController {
         r.stationCallsign = settings.station.call.isEmpty ? nil : settings.station.call.uppercased()
         do { try await log.append(r) } catch { throw AppError.log("\(error)") }
         broadcaster.send(.qsoLogged(r))
+        if settings.contest.enabled {
+            if let n = r.serialSent, n >= settings.contest.nextSerial {
+                settings.contest.nextSerial = n + 1
+                broadcaster.send(.contestSerial(n + 1))
+            }
+            clearQSO()                           // závod: rovnou další spojení s dalším číslem
+        }
         return r
+    }
+
+    /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
+    public func cabrillo(from: Date? = nil, to: Date? = nil) async -> String {
+        let recs = await log?.query(from: from, to: to) ?? []
+        var h = CabrilloHeader(callsign: settings.station.call, contest: settings.contest.name)
+        h.categories = settings.contest.category.split(separator: ";").map(String.init)
+        h.locator = settings.station.locator; h.name = settings.station.name
+        return Cabrillo.export(recs, header: h)
     }
 
     public func updateQSO(_ r: QSORecord) async throws {

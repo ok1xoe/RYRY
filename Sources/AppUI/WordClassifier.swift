@@ -33,4 +33,20 @@ public enum WordClassifier {
         }
         return .other
     }
+
+    /// Závod (MMTTY „Misc“): slovo z RX textu jako přijaté číslo, RST nebo výměna; nil = nevkládat.
+    /// `serialMode` = výměna je pořadové číslo („599“ + číslo), jinak libovolná výměna (zóna, stát…).
+    public static func contestField(_ word: String, serialMode: Bool) -> (String, String)? {
+        let w = word.uppercased().trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+        guard !w.isEmpty, !stopWords.contains(w) else { return nil }
+        if w == "599" { return ("rstRcvd", w) }
+        var rest = Substring(w)
+        if w.count >= 4, w.hasPrefix("599") { rest = rest.dropFirst(3) }     // 599015 → 015
+        if serialMode {
+            guard !rest.isEmpty, rest.count <= 5, rest.allSatisfy(\.isNumber), let n = Int(rest) else { return nil }
+            return ("serialRcvd", String(n))
+        }
+        guard rest.count <= 8, rest.allSatisfy({ ($0.isLetter || $0.isNumber) && $0.isASCII }) else { return nil }
+        return ("exchangeRcvd", String(rest))
+    }
 }

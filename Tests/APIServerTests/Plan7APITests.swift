@@ -14,3 +14,17 @@ import Testing
     let bad = try await c.call("modem.notch", ["hz": "x"])
     #expect((bad["error"] as? [String: Any])?["code"] as? Int == -32602)
 }
+
+@Test func jsonRPCExportCabrillo() async throws {
+    let h = try await makeAPIHarness()
+    let (srv, port) = try await jsonServer(h)
+    defer { srv.stop() }
+    let c = WSClient(port: port)
+    _ = try await c.call("qso.setField", ["name": "call", "value": "DL1ABC"])
+    _ = try await c.call("qso.log")
+    let r = try await c.call("log.exportCabrillo", ["from": "2000-01-01T00:00:00Z"])
+    let text = (r["result"] as? [String: Any])?["text"] as? String ?? ""
+    #expect(text.hasPrefix("START-OF-LOG: 3.0") && text.contains(" DL1ABC ") && text.hasSuffix("END-OF-LOG:\r\n"))
+    let bad = try await c.call("log.exportCabrillo", ["from": "yesterday"])
+    #expect((bad["error"] as? [String: Any])?["code"] as? Int == -32602)
+}
