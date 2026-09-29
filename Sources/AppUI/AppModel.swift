@@ -1314,6 +1314,69 @@ public final class AppModel {
         await setQSOField("call", spot.call)
     }
 
+    // MARK: Frekvence a pásma (horní lišta)
+
+    /// Výsledek zadání frekvence.
+    public enum TuneOutcome: Equatable, Sendable {
+        case rig            // rig přeladěn
+        case manual         // bez rigu: ruční frekvence QSO
+        case rejectedTX     // během vysílání se rig nepřelaďuje
+        case invalid        // neplatný vstup
+        case failed         // rig frekvenci nepřijal
+    }
+
+    /// Požadavek na otevření zadání frekvence (zkratka / menu); horní lišta ho zobrazí a shodí.
+    public var showFrequencyEntry = false
+
+    /// Nastaví frekvenci v kHz: s rigem přeladí rig (jen v RX, stejně jako `useSpot`), bez rigu zapíše ruční frekvenci QSO.
+    @discardableResult
+    public func setFrequency(kHz: Double) async -> TuneOutcome {
+        guard FrequencyInput.rangeKHz.contains(kHz) else {
+            note(L("Neplatná frekvence – zadejte kHz v rozsahu 100 až 500 000."))
+            return .invalid
+        }
+        if let app, settings.rig.type != .none {
+            if state != .rx {
+                note(L("Během vysílání se rig nepřelaďuje – frekvenci zadejte po přechodu na RX."))
+                return .rejectedTX
+            }
+            do { try await app.setFrequency(kHz * 1000); return .rig }
+            catch {
+                note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", kHz), "\(error)"))
+                return .failed
+            }
+        }
+        await setQSOField("freq", kHz == kHz.rounded() ? String(Int(kHz)) : String(kHz))
+        return .manual
+    }
+
+    /// Zadání z textového pole (kHz, čárka i tečka, volitelně „kHz“ / „MHz“).
+    @discardableResult
+    public func setFrequency(text: String) async -> TuneOutcome {
+        guard let k = FrequencyInput.parseKHz(text) else {
+            note(L("Neplatná frekvence „%@“ – zadejte kHz v rozsahu 100 až 500 000.", text))
+            return .invalid
+        }
+        return await setFrequency(kHz: k)
+    }
+
+    // MARK: Směr a vzdálenost
+
+    /// Vlastní poloha: lokátor ze Stanice, jinak střed země DXCC vlastní značky.
+    public var ownPosition: Geo.Position? {
+        Geo.position(locator: settings.station.locator, country: app?.country(for: settings.station.call))
+    }
+
+    /// Směr a vzdálenost k protistanici: lokátor z QSO okna, jinak střed země její značky.
+    public func beam(call: String, locator: String) -> Geo.Beam? {
+        guard let own = ownPosition else { return nil }
+        let c = call.trimmingCharacters(in: .whitespaces)
+        guard let remote = Geo.position(locator: locator, country: c.isEmpty ? nil : app?.country(for: c)) else { return nil }
+        return Geo.beam(own: own, remote: remote)
+    }
+
+    public var beamToRemote: Geo.Beam? { beam(call: qso.call, locator: qso.locator) }
+
     /// Klik na štítek band map: mark na audio pozici spotu a značka do QSO okna (rig se nepřelaďuje).
     public func bandMapClick(_ marker: BandMapMarker) async {
         await tune(toMarkHz: marker.audioHz)

@@ -121,6 +121,9 @@ struct MMTTY4MacApp: App {
                 Button(model.settings.esm.mode == .run ? L("ESM: přepnout na S&P") : L("ESM: přepnout na Run")) {
                     model.toggleESMMode()
                 }.shortcut(model.settings.binding(for: .esmMode))
+                Divider()
+                Button(L("Zadat frekvenci…")) { model.showFrequencyEntry = true }
+                    .shortcut(model.settings.binding(for: .enterFrequency))
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }

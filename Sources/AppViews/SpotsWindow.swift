@@ -73,6 +73,11 @@ public struct SpotsWindow: View {
                 TableColumn("kHz") { s in Text(String(format: "%.1f", s.frequencyKHz)).monospacedDigit() }.width(70)
                 TableColumn("Call") { s in Text(s.call).fontWeight(.semibold) }.width(90)
                 TableColumn(L("Země")) { s in Text(model.app?.country(for: s.call)?.name ?? "") }.width(min: 90, ideal: 130)
+                TableColumn("Az") { s in
+                    Text(model.beam(call: s.call, locator: "").map { String(QSOPanel.azimuthInt($0.shortAzimuth)) + "°" } ?? "")
+                        .monospacedDigit().foregroundStyle(.secondary)
+                        .hint(L("Azimut krátkou cestou podle země spotu"))
+                }.width(38)
                 TableColumn("Log") { s in
                     let st = index.status(of: s)
                     Text(Self.logLabel(st)).foregroundStyle(st == .workedOnBand ? Color.orange : Color.secondary)
