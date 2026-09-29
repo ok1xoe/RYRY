@@ -15,6 +15,7 @@ import QSOLog
 import RigControl
 import RTTYModem
 import Settings
+import Spots
 import WaveFile
 
 public struct RxRun: Equatable, Sendable, Identifiable {
@@ -119,6 +120,8 @@ public final class AppModel {
     }
 
     public private(set) var app: AppController?
+    /// Spoty z DX clusteru a RBN (síť běží mimo hlavní vlákno, jen když je uživatel zapnul).
+    public let spotFeed = SpotFeed()
     private var fldigi: FldigiXMLRPCServer?
     private var json: JSONRPCServer?
     private var eventTask: Task<Void, Never>?
@@ -214,6 +217,7 @@ public final class AppModel {
         logger.info("start: stav \(st.rawValue, privacy: .public)")
         await startAPIs(app)
         startSpectrum(engine)
+        startSpots()
     }
 
     private func startAPIs(_ app: AppController) async {
@@ -264,6 +268,7 @@ public final class AppModel {
         await stopWAV()
         await stopRecordingWAV()
         spectrumTask?.cancel(); spectrumTask = nil
+        spotFeed.stop()
         fldigi?.stop(); json?.stop(); fldigi = nil; json = nil
         await app?.stop()
         await eventTask?.value
@@ -292,7 +297,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
+                take(\.spots); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
@@ -918,6 +923,50 @@ public final class AppModel {
         if case .int(let n)? = params["notchFreq"], n > 0 { r.append(Double(n)) }
         if params["twoNotch"] == .bool(true), case .int(let n)? = params["notch2Freq"], n > 0 { r.append(Double(n)) }
         return r
+    }
+
+    // MARK: Spoty (DX cluster, RBN)
+
+    /// Konfigurace spotů z nastavení; nil, když je vše vypnuto.
+    func spotFeedConfig() -> SpotFeedConfig? {
+        let p = settings.spots
+        guard p.clusterEnabled || p.rbnEnabled else { return nil }
+        var c = SpotFeedConfig(call: settings.station.call, rttyOnly: p.rttyOnly, maxAgeMinutes: p.maxAgeMinutes)
+        if p.clusterEnabled { c.cluster = SpotEndpoint(host: p.clusterHost, port: UInt16(clamping: p.clusterPort), commands: p.clusterCommands) }
+        if p.rbnEnabled { c.rbn = SpotEndpoint(host: p.rbnHost, port: UInt16(clamping: p.rbnPort)) }
+        return c
+    }
+
+    private func startSpots() {
+        guard let c = spotFeedConfig() else { spotFeed.stop(); return }
+        if settings.station.call.trimmingCharacters(in: .whitespaces).isEmpty { note(L("Spoty: v nastavení Stanice chybí značka pro přihlášení.")) }
+        spotFeed.start(c)
+    }
+
+    /// Změna nastavení spotů z okna (filtr RTTY) – hned uloží; spojení se přenastaví.
+    public func setSpots(_ change: (inout SpotSettings) -> Void) {
+        var p = settings.spots
+        change(&p)
+        guard p != settings.spots else { return }
+        let old = settings.spots
+        settings.spots = p
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        guard app != nil else { return }
+        var onlyFilter = old; onlyFilter.rttyOnly = p.rttyOnly
+        if onlyFilter == p, p.rttyOnly { spotFeed.rttyOnly = true }      // jen zúžení zobrazení, spojení se nemění
+        else { startSpots() }                                            // rozšíření na všechny módy: nová data ze serveru
+    }
+
+    /// Dvojklik na spot: nastaví rig na frekvenci spotu (+ posun) a vloží značku do QSO okna.
+    /// Bez rigu (nebo při chybě rigu) se jen vloží značka.
+    public func useSpot(_ spot: Spot) async {
+        let off = min(max(settings.spots.offsetHz, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound)
+        let hz = spot.frequencyHz + off
+        if let app, settings.rig.type != .none {
+            do { try await app.setFrequency(hz) }
+            catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
+        }
+        await setQSOField("call", spot.call)
     }
 
     public func tune(toMarkHz hz: Double) async {

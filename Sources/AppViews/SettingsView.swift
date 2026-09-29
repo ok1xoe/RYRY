@@ -31,6 +31,7 @@ public struct SettingsView: View {
                 DisplayTab(s: $draft).tabItem { Label(L("Zobrazení"), systemImage: "paintpalette") }.tag(6)
                 APITab(s: $draft).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
                 KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
+                SpotsTab(s: $draft).tabItem { Label("Spoty", systemImage: "dot.radiowaves.left.and.right") }.tag(9)
             }
             Divider()
             HStack {
@@ -395,6 +396,55 @@ struct APITab: View {
                 }
             } header: { Text(L("Záznam příjmu")) } footer: {
                 Text(L("Každý den UTC jeden soubor rx-RRRR-MM-DD.txt. Přepínač je i v menu Soubor. Obsah okna příjmu uložíš přes Soubor → Uložit příjem do souboru…"))
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// Spoty: DX cluster a Reverse Beacon Network (telnet).
+struct SpotsTab: View {
+    @Binding var s: AppSettings
+    var commands: Binding<String> {
+        Binding(get: { s.spots.clusterCommands.joined(separator: "\n") },
+                set: { s.spots.clusterCommands = Array($0.split(separator: "\n", omittingEmptySubsequences: true)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.prefix(SpotSettings.maxCommands)) })
+    }
+    var body: some View {
+        Form {
+            Section {
+                Toggle(L("Zapnout DX cluster"), isOn: $s.spots.clusterEnabled)
+                TextField(L("Server"), text: $s.spots.clusterHost).disabled(!s.spots.clusterEnabled)
+                LabeledContent(L("Port")) {
+                    TextField("", value: $s.spots.clusterPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                }.disabled(!s.spots.clusterEnabled)
+                LabeledContent(L("Příkazy po přihlášení")) {
+                    TextEditor(text: commands).font(.system(.body, design: .monospaced)).frame(width: 260, height: 54)
+                        .border(Color.secondary.opacity(0.3))
+                }.disabled(!s.spots.clusterEnabled)
+            } header: { Text("DX cluster") } footer: {
+                Text(L("Přihlášení značkou ze záložky Stanice. Příklady serverů: dxc.ve7cc.net:23, dxfun.com:8000. Příkazy, jeden na řádek: set/skimmer, sh/dx 30."))
+            }
+            Section {
+                Toggle(L("Zapnout RBN"), isOn: $s.spots.rbnEnabled)
+                TextField(L("Server"), text: $s.spots.rbnHost).disabled(!s.spots.rbnEnabled)
+                LabeledContent(L("Port")) {
+                    TextField("", value: $s.spots.rbnPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                }.disabled(!s.spots.rbnEnabled)
+            } header: { Text("RBN") } footer: {
+                Text(L("Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat „Jen RTTY“."))
+            }
+            Section {
+                Toggle(L("Jen RTTY"), isOn: $s.spots.rttyOnly)
+                NumberRow(title: L("Stáří spotů"), value: $s.spots.maxAgeMinutes, range: SpotSettings.ageRange, unit: "min")
+                LabeledContent(L("Posun frekvence rigu")) {
+                    HStack {
+                        TextField("", value: $s.spots.offsetHz, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                        Text("Hz")
+                    }
+                }
+            } header: { Text(L("Spoty")) } footer: {
+                Text(L("Rig se nastaví na frekvenci spotu (u RTTY je to mark) + posun. Rádio v režimu LSB/AFSK s mark 2125 Hz potřebuje posun +2125 Hz. Síť se používá jen u zapnutých služeb; změny po Použít."))
             }
         }
         .formStyle(.grouped)
