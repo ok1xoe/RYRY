@@ -13,6 +13,10 @@ public struct WaterfallRenderer: Sendable {
     public let width: Int, height: Int
     private var pixels: [UInt32]           // bajty v paměti R,G,B,A (UInt32 little-endian 0xAABBGGRR)
     private var peak: Float = 1
+    private var floor: Float?               // odhad šumového dna (20. percentil, vyhlazený)
+    /// Minimální dynamika automatického zesílení (jednotky FFT jádra, ≈ 3,4/dB → ~18 dB):
+    /// když špička po konci signálu klesne k šumu, šum se nesmí roztáhnout na plný jas.
+    static let minRange: Float = 60
     public private(set) var lastRow: [Float] = []   // spektrum posledního řádku (0…1)
     /// Vyhlazené čárové spektrum (0…1): rychlý náběh, pomalejší doznívání – jako FFT okno MMTTY.
     public private(set) var spectrumLine: [Float] = []
@@ -60,9 +64,18 @@ public struct WaterfallRenderer: Sendable {
             row[x] = m
         }
         let frameMax = row.max() ?? 0
-        peak = max(frameMax, peak * 0.995, 1)      // pomalu klesající automatické zesílení
-        let scale = Float(pow(10, gainDB / 20)) / (autoGain ? peak : Self.fixedReference)
-        lastRow = row.map { $0 * scale }
+        let sorted = row.sorted()
+        let p20 = sorted[sorted.count / 5]
+        floor = floor.map { $0 * 0.9 + p20 * 0.1 } ?? p20
+        let fl = floor ?? 0
+        peak = max(frameMax, fl + (peak - fl) * 0.995, 1)   // pomalu klesající automatické zesílení
+        let g = Float(pow(10, gainDB / 20))
+        if autoGain {
+            let range = max(peak - fl, Self.minRange)
+            lastRow = row.map { ($0 - fl) / range * g }
+        } else {
+            lastRow = row.map { $0 / Self.fixedReference * g }
+        }
         for x in 0..<width { pixels[x] = Self.color(lastRow[x]) }
         if spectrumLine.count != width { spectrumLine = lastRow }
         else {
