@@ -95,3 +95,13 @@ func makeDXCCApp() throws -> Harness {
     try await h.app.setQSOField("call", "ZZ9ZZ")
     #expect(await h.app.macroContext().hisUTCOffsetHours == nil)
 }
+
+@Test func sixteenMacrosRunnable() async throws {
+    let h = try makeApp()
+    try await h.app.start()
+    #expect(await h.app.settings.macros.count == 16)
+    try await h.app.runMacro(index: 13)                   // Test CQ (⇧F2)
+    await #expect(throws: AppError.badMacro(16)) { try await h.app.runMacro(index: 16) }
+    await h.app.rxNow()
+    await h.app.stop()
+}

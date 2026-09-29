@@ -13,13 +13,13 @@ struct MacroBar: View {
         Grid(horizontalSpacing: 4, verticalSpacing: 4) {
             ForEach(0..<2) { row in
                 GridRow {
-                    ForEach(0..<6) { col in
-                        let i = row * 6 + col
+                    ForEach(0..<8) { col in
+                        let i = row * 8 + col
                         let name = i < macros.count ? macros[i].name : ""
                         Button { Task { await model.runMacro(i) } } label: {
-                            Text("F\(i + 1) \(name)").lineLimit(1).frame(maxWidth: .infinity)
+                            Text("\(Self.keyName(i)) \(name)").lineLimit(1).frame(maxWidth: .infinity)
                         }
-                        .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF1FunctionKey + i)!)), modifiers: [])
+                        .keyboardShortcut(Self.key(i), modifiers: i < 12 ? [] : .shift)
                         .contextMenu { Button("Upravit…") { editing = i } }
                         .disabled(i >= macros.count || macros[i].text.isEmpty)
                     }
@@ -30,6 +30,14 @@ struct MacroBar: View {
         .sheet(item: Binding(get: { editing.map { EditIndex(id: $0) } }, set: { editing = $0?.id })) { e in
             MacroEditor(model: model, index: e.id)
         }
+    }
+}
+
+extension MacroBar {
+    /// Makra 1–12 = F1–F12, 13–16 = ⇧F1–⇧F4 (MMTTY má 16 tlačítek).
+    static func keyName(_ i: Int) -> String { i < 12 ? "F\(i + 1)" : "⇧F\(i - 11)" }
+    static func key(_ i: Int) -> KeyEquivalent {
+        KeyEquivalent(Character(UnicodeScalar(NSF1FunctionKey + (i < 12 ? i : i - 12))!))
     }
 }
 
@@ -45,7 +53,7 @@ struct MacroEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Makro F\(index + 1)").font(.headline)
+            Text("Makro \(MacroBar.keyName(index))").font(.headline)
             TextField("Název", text: $name)
             TextEditor(text: $text).font(.system(.body, design: .monospaced)).frame(minHeight: 120)
             HStack {
