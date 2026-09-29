@@ -33,3 +33,14 @@ private func sourceKeys() throws -> Set<String> {
         #expect(Localizer.placeholders(k) == Localizer.placeholders(v), "zástupné znaky: \(k) → \(v)")
     }
 }
+
+
+// Přibalená čeština obsahuje všechny texty rozhraní
+@Test func czechCatalogIsComplete() throws {
+    let keys = try sourceKeys()
+    let cs = try LanguagePack.decode(Data(contentsOf: root.appendingPathComponent("Resources/Languages/cs.json")))
+    #expect(cs.code == "cs")
+    let missing = keys.filter { (cs.strings[$0] ?? "").isEmpty }.sorted()
+    #expect(missing.isEmpty, "chybí (scripts/i18n-extract.py --update): \(missing.prefix(20))")
+    #expect(cs.strings.keys.filter { !keys.contains($0) }.isEmpty)
+}

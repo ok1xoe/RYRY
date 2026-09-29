@@ -16,7 +16,7 @@ struct LanguageSection: View {
         Section {
             Picker(L("Jazyk rozhraní"), selection: Binding(get: { Localizer.shared.code },
                                                          set: { library.select($0) })) {
-                Text("Čeština").tag(Localizer.baseCode)
+                if !packs.contains(where: { $0.code == Localizer.baseCode }) { Text("Čeština").tag(Localizer.baseCode) }
                 ForEach(packs, id: \.code) { p in Text(p.name).tag(p.code) }
             }
             LabeledContent(L("Vlastní překlad")) {
@@ -30,7 +30,7 @@ struct LanguageSection: View {
             }
             if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
         } header: { Text(L("Jazyk")) } footer: {
-            Text(L("Nový překlad: ulož šablonu, přelož hodnoty v „strings“, nastav „code“ a „name“ a soubor nahraj. Chybějící texty zůstanou česky."))
+            Text(L("Jazykové soubory (cs.json, en.json…) jsou ve složce jazyků a lze je upravit; změna se projeví po novém výběru jazyka nebo restartu. Nový překlad: ulož šablonu, přelož hodnoty v „strings“, nastav „code“ a „name“ a soubor nahraj."))
         }
         .onAppear { packs = library.available() }
     }

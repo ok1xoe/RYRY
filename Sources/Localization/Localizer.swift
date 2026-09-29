@@ -15,6 +15,14 @@ public struct LanguagePack: Codable, Sendable, Equatable {
         self.code = code; self.name = name; self.version = version; self.strings = strings
     }
 
+    enum CodingKeys: String, CodingKey { case code, name, version, strings }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self)
+        code = try c.decode(String.self, forKey: .code); name = try c.decode(String.self, forKey: .name)
+        version = (try? c.decodeIfPresent(Int.self, forKey: .version)) ?? 1          // nepovinné
+        strings = try c.decode([String: String].self, forKey: .strings)
+    }
+
     public static func decode(_ data: Data) throws -> LanguagePack {
         let p: LanguagePack
         do { p = try JSONDecoder().decode(LanguagePack.self, from: data) } catch {
@@ -24,7 +32,6 @@ public struct LanguagePack: Codable, Sendable, Equatable {
         guard !code.isEmpty, !p.name.trimmingCharacters(in: .whitespaces).isEmpty else {
             throw PackError.invalid(L("Chybí kód nebo název jazyka."))
         }
-        guard code != Localizer.baseCode else { throw PackError.invalid(L("Čeština je vestavěná, nelze ji nahradit.")) }
         guard code.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }) else {
             throw PackError.invalid(L("Neplatný kód jazyka „%@“.", code))
         }
