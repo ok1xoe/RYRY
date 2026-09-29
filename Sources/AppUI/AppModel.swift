@@ -85,7 +85,7 @@ public final class AppModel {
     public private(set) var mark = 2125.0
     public private(set) var space = 2295.0
     public private(set) var fig = false
-    public private(set) var rig: RigStatus?
+    public internal(set) var rig: RigStatus?
     public private(set) var qso = QSOFields()
     public private(set) var previousQSOs: [QSORecord] = []
     public private(set) var logRecords: [QSORecord] = []
@@ -1156,7 +1156,9 @@ public final class AppModel {
         settings.spots = p
         do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
         guard app != nil else { return }
-        var onlyFilter = old; onlyFilter.rttyOnly = p.rttyOnly
+        var noReconnect = old; noReconnect.showInWaterfall = p.showInWaterfall
+        if noReconnect == p { return }                                   // jen zobrazení štítků, spojení se nemění
+        var onlyFilter = old; onlyFilter.rttyOnly = p.rttyOnly; onlyFilter.showInWaterfall = p.showInWaterfall
         if onlyFilter == p, p.rttyOnly { spotFeed.rttyOnly = true }      // jen zúžení zobrazení, spojení se nemění
         else { startSpots() }                                            // rozšíření na všechny módy: nová data ze serveru
     }
@@ -1178,6 +1180,12 @@ public final class AppModel {
             await setQSOField("freq", String(format: "%.1f", spot.frequencyHz / 1000))   // bez rigu: frekvence spotu do logu
         }
         await setQSOField("call", spot.call)
+    }
+
+    /// Klik na štítek band map: mark na audio pozici spotu a značka do QSO okna (rig se nepřelaďuje).
+    public func bandMapClick(_ marker: BandMapMarker) async {
+        await tune(toMarkHz: marker.audioHz)
+        await setQSOField("call", marker.spot.call)
     }
 
     public func tune(toMarkHz hz: Double) async {
