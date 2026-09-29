@@ -29,3 +29,11 @@ private let t0 = ISO8601DateFormatter().date(from: "2026-09-29T12:03:05Z")!
     let b = try String(contentsOf: dir.appendingPathComponent("rx-2026-09-30.txt"), encoding: .utf8)
     #expect(b == "12:03:05 X")                   // nový den = nový soubor od začátku řádku
 }
+
+// Odeslání textového souboru (MMTTY „Send Text“): konce řádků CR LF, tabulátor = mezera, bez řídicích znaků
+@Test func fileTextNormalization() throws {
+    #expect(try AppController.fileText(Data("CQ\tTEST\nDE OK1XOE\r\nK\u{07}".utf8)) == "CQ TEST\r\nDE OK1XOE\r\nK")
+    #expect(try AppController.fileText(Data([0x50, 0xF8, 0x0A])) == "Pø\r\n")          // Latin-1 náhradou
+    #expect(throws: AppController.FileTextError.self) { try AppController.fileText(Data()) }
+    #expect(throws: AppController.FileTextError.self) { try AppController.fileText(Data(repeating: 65, count: 20_001)) }
+}

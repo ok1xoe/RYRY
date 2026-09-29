@@ -265,6 +265,7 @@ public final class AppModel {
 
     private func stopNow() async {
         await stopWAV()
+        await stopRecordingWAV()
         spectrumTask?.cancel(); spectrumTask = nil
         fldigi?.stop(); json?.stop(); fldigi = nil; json = nil
         await app?.stop()
@@ -452,22 +453,93 @@ public final class AppModel {
             return rate == 11025 ? raw : try SampleRateConverter(from: Double(rate), to: 11025).process(raw)
         }.value
         await engine.startPlayback(samples, speed: speed)
-        wavPlaying = true
+        wavPlaying = true; wavPaused = false; wavProgress = 0
+        wavDuration = Double(samples.count) / 11025
         let token = UUID(); wavToken = token
         wavTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(200))
                 if await engine.playbackRemaining == 0 { break }
+                if let self, self.wavToken == token { await self.updateWAVProgress(engine) }
             }
-            if let self, self.wavToken == token { self.wavPlaying = false }
+            if let self, self.wavToken == token { self.wavPlaying = false; self.wavPaused = false; self.wavProgress = 0 }
         }
     }
 
     public func stopWAV() async {
         wavTask?.cancel(); wavTask = nil
         wavToken = UUID()
-        wavPlaying = false
+        wavPlaying = false; wavPaused = false; wavProgress = 0
         await app?.engine.stopPlayback()
+    }
+
+    /// Stav přehrávání pro ovládací lištu (pauza, pozice 0…1, délka v s).
+    public private(set) var wavPaused = false
+    public private(set) var wavProgress = 0.0
+    public private(set) var wavDuration = 0.0
+
+    public func pauseWAV(_ p: Bool) async {
+        guard let engine = app?.engine else { return }
+        await engine.setPlaybackPaused(p)
+        wavPaused = await engine.playbackPaused
+    }
+
+    /// Posun na část souboru 0…1 (0 = převinout na začátek).
+    public func seekWAV(_ fraction: Double) async {
+        guard let engine = app?.engine else { return }
+        await engine.seekPlayback(toFraction: fraction)
+        await updateWAVProgress(engine)
+    }
+
+    private func updateWAVProgress(_ engine: Engine) async {
+        let total = await engine.playbackTotal
+        guard total > 0 else { return }
+        wavProgress = Double(await engine.playbackPosition) / Double(total)
+        wavDuration = Double(total) / 11025
+    }
+
+    // MARK: Nahrávání příjmu do WAV (MMTTY „Record WAVE“)
+
+    public private(set) var recordingURL: URL?
+    public private(set) var recordingSeconds = 0.0
+    private var recorder: WaveWriter?
+    private var recordTask: Task<Void, Never>?
+
+    /// Nahrává vstup zvukovky (po převzorkování na 11025 Hz, mono 16 bit) do souboru.
+    public func startRecordingWAV(to url: URL) async throws {
+        await stopRecordingWAV()
+        guard let engine = app?.engine else { return }
+        let w = try WaveWriter(url: url, sampleRate: 11025)
+        recorder = w; recordingURL = url; recordingSeconds = 0
+        await engine.setRecording(true)
+        recordTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(250))
+                await self?.flushRecording(engine)
+            }
+        }
+    }
+
+    private func flushRecording(_ engine: Engine) async {
+        guard let w = recorder else { return }
+        let s = await engine.drainRecording()
+        do { try w.append(s) } catch {
+            note(L("Nahrávání WAV selhalo: %@", "\(error)"))
+            await stopRecordingWAV()
+            return
+        }
+        recordingSeconds = Double(w.sampleCount) / 11025
+    }
+
+    public func stopRecordingWAV() async {
+        recordTask?.cancel(); recordTask = nil
+        guard let w = recorder else { return }
+        if let engine = app?.engine {
+            await flushRecording(engine)
+            await engine.setRecording(false)
+        }
+        recorder = nil; recordingURL = nil
+        do { try w.close() } catch { note(L("Nahrávání WAV selhalo: %@", "\(error)")) }
     }
 
     // MARK: QTC (WAE DX Contest)
@@ -694,6 +766,15 @@ public final class AppModel {
         let out = part.replacingOccurrences(of: "\n", with: "\r\n")
         lastSentForTesting = out
         await app.send(text: out)
+    }
+
+    /// Vyšle obsah textového souboru (MMTTY „Send Text…“).
+    public func sendTextFile(_ url: URL) async {
+        guard let app else { return }
+        await run(L("Odeslat soubor")) {
+            let d = try Data(contentsOf: url)
+            try await app.sendFileText(d)
+        }
     }
 
     public func param(_ id: String) -> ParameterValue? { params[id] }

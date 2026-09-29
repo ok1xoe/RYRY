@@ -304,8 +304,30 @@ public actor Engine {
     public func startPlayback(_ samples: [Float], speed: Double) {
         playback = samples; playbackPos = 0; playbackSpeed = max(0, speed)
     }
-    public func stopPlayback() { playback = []; playbackPos = 0 }
+    public func stopPlayback() { playback = []; playbackPos = 0; playbackPaused = false }
     public var playbackRemaining: Int { playback.count - playbackPos }
+    public var playbackPosition: Int { playbackPos }
+    public var playbackTotal: Int { playback.count }
+    /// Pauza přehrávání (vstup zvukovky se dál zahazuje, jako MMTTY „Pause“).
+    public private(set) var playbackPaused = false
+    public func setPlaybackPaused(_ p: Bool) { playbackPaused = p && !playback.isEmpty }
+    /// Posun na část souboru 0…1 (0 = převinout na začátek).
+    public func seekPlayback(toFraction f: Double) {
+        guard !playback.isEmpty else { return }
+        playbackPos = min(playback.count - 1, max(0, Int((Double(playback.count) * f).rounded(.down))))
+    }
+
+    // MARK: Nahrávání vstupu (MMTTY „Record WAVE“) – vzorky na frekvenci modemu odebírá aplikace
+
+    private var recording: [Float]?
+    public var isRecording: Bool { recording != nil }
+    public func setRecording(_ on: Bool) { recording = on ? (recording ?? []) : nil }
+    /// Odebere dosud nahrané vzorky.
+    public func drainRecording() -> [Float] {
+        guard let r = recording else { return [] }
+        recording = []
+        return r
+    }
 
     private func feedPlayback(_ k: Int) {
         let end = min(playback.count, playbackPos + max(0, k))
@@ -325,13 +347,14 @@ public actor Engine {
             let n = audio.readRx(into: &rxBuf)
             if n == 0 { break }
             if playbackRemaining > 0 {
-                if state == .rx, playbackSpeed > 0 { feedPlayback(Int((Double(n) * playbackSpeed).rounded())) }
+                if state == .rx, playbackSpeed > 0, !playbackPaused { feedPlayback(Int((Double(n) * playbackSpeed).rounded())) }
             } else {
+                if recording != nil { recording!.append(contentsOf: rxBuf[0..<n]) }
                 rxBuf.withUnsafeBufferPointer { modem.processRx(UnsafeBufferPointer(rebasing: $0[0..<n])) }
             }
             if n < rxBuf.count { break }
         }
-        if playbackRemaining > 0, playbackSpeed == 0, state == .rx { feedPlayback(Int(modem.sampleRate * 10)) }
+        if playbackRemaining > 0, playbackSpeed == 0, state == .rx, !playbackPaused { feedPlayback(Int(modem.sampleRate * 10)) }
         let now = clock.now()
 
         let keyed: Set<EngineState> = [.pttOn, .tx, .drain, .pttOff]
