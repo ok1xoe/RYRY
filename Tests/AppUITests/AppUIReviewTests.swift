@@ -154,17 +154,20 @@ import WaveFile
     let f = Fixture()
     f.configure = { $0.contest = ContestSettings.preset(.cqwpxRTTY, year: 2026); $0.contest.start = Date().addingTimeInterval(-3600) }
     await f.model.start()
+    /// Čeká na podmínku (asynchronní aktualizace modelu) místo pevné prodlevy – stabilní i při zátěži.
+    func until(_ c: () -> Bool) async { for _ in 0..<300 where !c() { try? await Task.sleep(for: .milliseconds(10)) } }
     await f.model.setQSOField("freq", "14080")
     await f.model.setQSOField("call", "DL1ABC")
-    await f.model.logQSO(); await f.settle()
+    await f.model.logQSO()
+    await until { f.model.settings.log.manualFrequency == 14_080_000 && f.model.scpCount > 0 }
     #expect(f.model.settings.log.manualFrequency == 14_080_000)
-    await f.model.setQSOField("call", "1AB"); await f.settle()
+    await f.model.setQSOField("call", "1AB"); await until { f.model.scpPartial == ["DL1ABC"] }
     #expect(f.model.scpPartial == ["DL1ABC"])
-    await f.model.setQSOField("call", "DL1ABX"); await f.settle()
+    await f.model.setQSOField("call", "DL1ABX"); await until { f.model.scpNear == ["DL1ABC"] }
     #expect(f.model.scpNear == ["DL1ABC"])
-    await f.model.setQSOField("call", "DL1ABC"); await f.settle()
+    await f.model.setQSOField("call", "DL1ABC"); await until { f.model.isDupe }
     #expect(f.model.isDupe)
-    await f.model.setQSOField("freq", "7040"); await f.settle()
+    await f.model.setQSOField("freq", "7040"); await until { !f.model.isDupe }
     #expect(!f.model.isDupe)
     await f.model.stop()
 }
