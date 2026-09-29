@@ -5,12 +5,23 @@ import SwiftUI
 
 struct QSOPanel: View {
     @Bindable var model: AppModel
+    /// Místní čas protistanice (hh:mm).
+    static let hm: DateFormatter = {
+        let f = DateFormatter(); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm 'místně'"; return f
+    }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("QSO").font(.headline)
             Form {
                 QSOField(model: model, label: "Call", field: "call").font(.title3.monospaced())
+                if let c = model.dxcc {
+                    let local = Date().addingTimeInterval(c.utcOffsetHours * 3600)
+                    LabeledContent("Země") {
+                        Text("\(c.name) · \(c.continent) · CQ \(c.cqZone) · ITU \(c.ituZone) · \(Self.hm.string(from: local))")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                }
                 QSOField(model: model, label: "Name", field: "name")
                 QSOField(model: model, label: "QTH", field: "qth")
                 QSOField(model: model, label: "Locator", field: "locator")

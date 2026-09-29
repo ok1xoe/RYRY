@@ -293,16 +293,45 @@ public actor Engine {
 
     // MARK: DSP krok
 
+    // MARK: Přehrání WAV (MMTTY TSound::Execute: soubor nahrazuje vstup zvukovky)
+
+    private var playback: [Float] = []
+    private var playbackPos = 0
+    private var playbackSpeed = 1.0
+
+    /// Přehraje vzorky (na frekvenci modemu) místo vstupu zvukovky. Tempo dává vstup (`speed`× reálný čas),
+    /// `speed` 0 = co nejrychleji. Během vysílání se přehrávání pozastaví.
+    public func startPlayback(_ samples: [Float], speed: Double) {
+        playback = samples; playbackPos = 0; playbackSpeed = max(0, speed)
+    }
+    public func stopPlayback() { playback = []; playbackPos = 0 }
+    public var playbackRemaining: Int { playback.count - playbackPos }
+
+    private func feedPlayback(_ k: Int) {
+        let end = min(playback.count, playbackPos + max(0, k))
+        while playbackPos < end {
+            let n = min(1024, end - playbackPos)
+            playback.withUnsafeBufferPointer { modem.processRx(UnsafeBufferPointer(rebasing: $0[playbackPos..<(playbackPos + n)])) }
+            playbackPos += n
+        }
+        if playbackPos >= playback.count { stopPlayback() }
+    }
+
     /// Jeden krok zpracování: RX, TX generování, časovače stavového automatu.
     public func pump() async {
         guard state != .stopped else { return }
-        // RX
+        // RX (při přehrávání WAV se vstup jen odebere a zahodí; určuje tempo)
         while true {
             let n = audio.readRx(into: &rxBuf)
             if n == 0 { break }
-            rxBuf.withUnsafeBufferPointer { modem.processRx(UnsafeBufferPointer(rebasing: $0[0..<n])) }
+            if playbackRemaining > 0 {
+                if state == .rx, playbackSpeed > 0 { feedPlayback(Int((Double(n) * playbackSpeed).rounded())) }
+            } else {
+                rxBuf.withUnsafeBufferPointer { modem.processRx(UnsafeBufferPointer(rebasing: $0[0..<n])) }
+            }
             if n < rxBuf.count { break }
         }
+        if playbackRemaining > 0, playbackSpeed == 0, state == .rx { feedPlayback(Int(modem.sampleRate * 10)) }
         let now = clock.now()
 
         let keyed: Set<EngineState> = [.pttOn, .tx, .drain, .pttOff]

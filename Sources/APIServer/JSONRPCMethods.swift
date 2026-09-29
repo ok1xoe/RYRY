@@ -56,6 +56,16 @@ extension JSONRPCServer {
                 do { try await app.setModemParam(k, pv) } catch { throw RPCError(code: -32602, message: "\(k): \(error)") }
             }
             return (await app.modemParams()).mapValues(Self.toJSON)
+        case "dxcc.lookup":
+            guard let call = p["call"] as? String, !call.isEmpty else { throw RPCError.params("chybí 'call'") }
+            guard let ci = app.country(for: call) else { return NSNull() }
+            return ["name": ci.name, "prefix": ci.primaryPrefix, "continent": ci.continent, "cqZone": ci.cqZone,
+                    "ituZone": ci.ituZone, "latitude": ci.latitude, "longitude": ci.longitude, "utcOffset": ci.utcOffsetHours]
+        case "modem.notch":
+            let hz = try num(p, "hz")
+            guard hz >= 0, hz <= 3000 else { throw RPCError.params("hz: 0–3000") }
+            await app.notchClick(hz: hz)
+            return (await app.modemParams()).mapValues(Self.toJSON)
         case "modem.describeParams": return await engine.parameterDescriptors().map(Self.descriptorJSON)
         // profily
         case "profile.list":
@@ -105,6 +115,15 @@ extension JSONRPCServer {
             let to = (p["to"] as? String).flatMap(ISODates.parse)
             let recs = await log.query(call: p["call"] as? String, from: from, to: to, limit: (p["limit"] as? NSNumber)?.intValue)
             return recs.map(Self.recordJSON)
+        case "log.exportCabrillo":
+            func date(_ k: String) throws -> Date? {
+                guard let v = p[k] else { return nil }
+                guard let str = v as? String, let d = ISODates.parse(str) else { throw RPCError.params("\(k): ISO 8601") }
+                return d
+            }
+            let from = try date("from"), to = try date("to")
+            guard app.log != nil else { throw RPCError(code: -32003, message: "log není k dispozici") }
+            return ["text": await app.cabrillo(from: from, to: to, contestOnly: (p["contestOnly"] as? Bool) ?? false)]
         case "log.update":
             var obj: Any? = p["record"]
             if obj == nil, let idS = p["id"] as? String, let fields = p["fields"] as? [String: Any] {

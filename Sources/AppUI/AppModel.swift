@@ -2,6 +2,7 @@
 import APIServer
 import AVFoundation
 import AppCore
+import DXCC
 import AudioIO
 import Engine
 import Foundation
@@ -13,6 +14,7 @@ import QSOLog
 import RigControl
 import RTTYModem
 import Settings
+import WaveFile
 
 public struct RxRun: Equatable, Sendable, Identifiable {
     public let id: Int
@@ -21,6 +23,19 @@ public struct RxRun: Equatable, Sendable, Identifiable {
 }
 
 public enum SendMode: String, CaseIterable, Sendable { case char, word, line }
+
+public extension AppSettings {
+    /// Konfigurace jádra RTTY (vyžaduje nový modem, tj. restart Engine).
+    func modemConfig() -> RTTYModem.Config {
+        var c = RTTYModem.Config()
+        c.codeSet = rttyCore.japanese ? .japanese : .us
+        c.doubleShift = rttyCore.doubleShift
+        c.txUOS = rttyCore.txUOS
+        c.rxClockPPM = clock.clampedRx
+        c.txClockPPM = clock.clampedTx
+        return c
+    }
+}
 
 /// Výchozí parametry modemu (pro rozhodnutí, co ukládat do nastavení).
 enum AppDefaults {
@@ -76,8 +91,24 @@ public final class AppModel {
     var lastSentForTesting = ""
     private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
     static let micWaitMessage = "Čekám na povolení přístupu k mikrofonu (systémový dialog)…"
-    public var waterfallFromHz = 0.0
-    public var waterfallToHz = 3000.0
+    public var waterfallFromHz: Double { settings.display.fromHz }
+    public var waterfallToHz: Double { settings.display.toHz }
+
+    /// Zobrazení (rozsah, zesílení, písmo, časové značky) – bez restartu, hned uloží.
+    public func setDisplay(_ change: (inout DisplaySettings) -> Void) async {
+        var d = settings.display
+        change(&d)
+        if !(d.fromHz >= 0 && d.toHz <= DisplaySettings.maxHz && d.toHz - d.fromHz >= 200) { d.fromHz = settings.display.fromHz; d.toHz = settings.display.toHz }
+        d.gainDB = min(30, max(-30, d.gainDB))
+        settings.display = d
+        syncDisplay()
+        do { try settingsStore.save(settings) } catch { note("Nastavení nelze uložit: \(error)") }
+    }
+
+    private func syncDisplay() {
+        waterfall.gainDB = settings.display.gainDB
+        waterfall.autoGain = settings.display.autoGain
+    }
 
     public private(set) var app: AppController?
     private var fldigi: FldigiXMLRPCServer?
@@ -102,6 +133,7 @@ public final class AppModel {
         let (s, w) = settingsStore.load()
         settings = s
         messages = w
+        syncDisplay()
     }
 
     /// Stav oprávnění k mikrofonu; při prvním spuštění se zeptá (asynchronně).
@@ -122,8 +154,8 @@ public final class AppModel {
     }
 
     public static let realEngine: EngineFactory = { s, rig in
-        // RTTYModem na 11025 Hz nemůže selhat
-        Engine(modem: try! RTTYModem(), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig())
+        // RTTYModem na 11025 Hz (± 2 % korekce hodin) nemůže selhat
+        Engine(modem: try! RTTYModem(config: s.modemConfig()), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig())
     }
 
     func noteForTesting(_ m: String) { note(m) }
@@ -165,6 +197,7 @@ public final class AppModel {
         do { try await app.start() }
         catch EngineError.audio(let m) { note("Zvuk nefunguje: \(m) – zkontrolujte zařízení a oprávnění k mikrofonu") }
         catch { note("Start selhal: \(error)") }
+        qso = await app.qso                              // např. odesílané číslo závodu
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
@@ -220,6 +253,7 @@ public final class AppModel {
     }
 
     private func stopNow() async {
+        await stopWAV()
         spectrumTask?.cancel(); spectrumTask = nil
         fldigi?.stop(); json?.stop(); fldigi = nil; json = nil
         await app?.stop()
@@ -232,16 +266,32 @@ public final class AppModel {
     /// Uloží nastavení a restartuje (Engine je jednorázový). Během vysílání nejdřív bezpečně RX.
     /// Sekce z dialogu Nastavení se sloučí do aktuálního nastavení; parametry modemu a makra
     /// (mění se jinde, okamžitě) se nepřepisují starou kopií z dialogu.
-    public func applySettings(_ s: AppSettings) async {
+    /// Použije nastavení z dialogu. `baseline` = stav, ze kterého dialog vyšel: pořadové číslo závodu
+    /// a zobrazení se mění i jinde (log, rychlé menu), proto se převezmou jen pole, která uživatel změnil.
+    public func applySettings(_ s: AppSettings, baseline: AppSettings? = nil) async {
         await serialized { [weak self] in
             guard let self else { return }
-            var merged = self.settings
-            merged.station = s.station; merged.audio = s.audio; merged.ptt = s.ptt; merged.fsk = s.fsk
-            merged.rig = s.rig; merged.api = s.api; merged.log = s.log
-            do { try self.settingsStore.save(merged) } catch { self.note("Nastavení nelze uložit: \(error)") }
+            let base = baseline ?? self.settings
+            func merge(_ cur: AppSettings) -> AppSettings {
+                var m = cur
+                m.station = s.station; m.audio = s.audio; m.ptt = s.ptt; m.fsk = s.fsk
+                m.rig = s.rig; m.api = s.api; m.log = s.log
+                m.clock = s.clock; m.rttyCore = s.rttyCore
+                func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
+                take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
+                take(\.display.timestamps); take(\.display.fontSize)
+                take(\.contest.enabled); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
+                take(\.contest.nextSerial)
+                return m
+            }
+            do { try self.settingsStore.save(merge(self.settings)) } catch { self.note("Nastavení nelze uložit: \(error)") }
             if let app = self.app, await app.engine.state != .rx { await app.rxNow() }
             await self.stopNow()
+            // znovu sloučit: během zastavování mohl přijít .contestSerial (makro s %l)
+            let merged = merge(self.settings)
+            do { try self.settingsStore.save(merged) } catch { self.note("Nastavení nelze uložit: \(error)") }
             self.settings = merged
+            self.syncDisplay()
             await self.startNow()
         }
     }
@@ -251,7 +301,13 @@ public final class AppModel {
     private func handle(_ e: AppEvent) {
         switch e {
         case .engine(.state(let s)):
+            let prev = state
             state = s
+            // MMTTY „Time stamp“: UTC čas při přepnutí na TX a zpět
+            if settings.display.timestamps, prev != s {
+                if prev == .rx, s != .stopped { appendRx("\r\n[\(Self.stampFmt.string(from: Date())) UTC TX]\r\n", echo: true) }
+                else if s == .rx, prev != .stopped { appendRx("\r\n[\(Self.stampFmt.string(from: Date())) UTC RX]\r\n", echo: false) }
+            }
             if s == .tx, !txDraft.isEmpty { Task { await self.sendDraft(mode: self.sendMode) } }   // rozepsaný text hned vysílat
         case .engine(.modem(.rxText(let c, let echo))): appendRx(String(c), echo: echo)
         case .engine(.modem(.signal(let l, let sq))): signalLevel = l; squelchOpen = sq
@@ -266,6 +322,9 @@ public final class AppModel {
             qso = q
             if callChanged { Task { await self.refreshPrevious() } }
         case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious() }
+        case .contestSerial(let n):
+            settings.contest.nextSerial = n
+            do { try settingsStore.save(settings) } catch { note("Nastavení nelze uložit: \(error)") }
         case .qsoUpdated, .qsoDeleted: Task { await self.refreshLog() }
         case .paramsChanged(let p):
             params = p
@@ -316,6 +375,61 @@ public final class AppModel {
     private func refreshPrevious() async {
         guard let log = app?.log, !qso.call.isEmpty else { previousQSOs = []; return }
         previousQSOs = await log.previous(call: qso.call)
+    }
+
+    static let stampFmt: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm:ss"; return f
+    }()
+
+    // MARK: Přehrání WAV do příjmu (MMTTY „Play“)
+
+    public private(set) var wavPlaying = false
+    private var wavTask: Task<Void, Never>?
+    private var wavToken = UUID()
+    /// Max. délka souboru (vzorky po převzorkování na 11025 Hz ≈ 2 h).
+    nonisolated static let wavMaxSamples = 11025 * 7200
+
+    public enum WAVError: Error, LocalizedError {
+        case tooLong
+        public var errorDescription: String? { "Soubor je delší než 2 hodiny." }
+    }
+
+    /// Přehraje WAV (libovolná frekvence, převzorkuje se na 11025 Hz) místo vstupu zvukovky (MMTTY „Play“).
+    /// `speed` 1 = reálný čas, 2–10 = rychleji, 0 = co nejrychleji. Během TX se pozastaví.
+    public func playWAV(_ url: URL, speed: Double = 1) async throws {
+        await stopWAV()
+        guard let engine = app?.engine else { return }
+        let samples = try await Task.detached(priority: .userInitiated) { () throws -> [Float] in
+            let (raw, rate) = try WaveFile.read(from: url)
+            guard Double(raw.count) / Double(max(1, rate)) * 11025 <= Double(AppModel.wavMaxSamples) else { throw WAVError.tooLong }
+            return rate == 11025 ? raw : try SampleRateConverter(from: Double(rate), to: 11025).process(raw)
+        }.value
+        await engine.startPlayback(samples, speed: speed)
+        wavPlaying = true
+        let token = UUID(); wavToken = token
+        wavTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(200))
+                if await engine.playbackRemaining == 0 { break }
+            }
+            if let self, self.wavToken == token { self.wavPlaying = false }
+        }
+    }
+
+    public func stopWAV() async {
+        wavTask?.cancel(); wavTask = nil
+        wavToken = UUID()
+        wavPlaying = false
+        await app?.engine.stopPlayback()
+    }
+
+    /// Země DXCC aktuální značky v QSO okně (nil = neznámá).
+    public var dxcc: CountryInfo? { qso.call.isEmpty ? nil : app?.country(for: qso.call) }
+
+    /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
+    public func cabrilloText(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
+        await app?.cabrillo(from: from, to: to, contestOnly: contestOnly) ?? ""
     }
 
     private func refreshLog() async {
@@ -375,6 +489,40 @@ public final class AppModel {
         try? settingsStore.save(settings)
     }
 
+    /// Zdroj nominální a skutečné frekvence zařízení (UID, vstup?) – v testech náhrada.
+    public var clockRates: (String?, Bool) -> (nominal: Double, actual: Double)? = { uid, input in
+        ClockCalibration.rates(deviceUID: uid, input: input)
+    }
+
+    /// Změří odchylku hodin vstupního a výstupního zařízení (ppm) – náhrada ClockAdj z MMTTY.
+    /// Zařízení musí běžet (aplikace přijímá); vzorkuje se 2× za sekundu, výsledkem je medián.
+    public func measureClock(seconds: Double) async -> (rx: Double?, tx: Double?) {
+        var rx: [Double] = [], tx: [Double] = [], nomRx = 0.0, nomTx = 0.0
+        let steps = max(1, Int(seconds / 0.5))
+        for i in 0..<steps {
+            if let r = clockRates(settings.audio.inputUID, true) { nomRx = r.nominal; rx.append(r.actual) }
+            if let r = clockRates(settings.audio.outputUID, false) { nomTx = r.nominal; tx.append(r.actual) }
+            if i < steps - 1 { try? await Task.sleep(for: .milliseconds(500)) }
+        }
+        return (ClockCalibration.ppm(actual: rx, nominal: nomRx), ClockCalibration.ppm(actual: tx, nominal: nomTx))
+    }
+
+    /// Pravé tlačítko ve spektru: zářez (notch) jako MMTTY.
+    public func notchClick(hz: Double) async {
+        guard let app else { return }
+        await app.notchClick(hz: hz)
+        await refreshParams()
+    }
+
+    /// Kmitočty aktivních zářezů pro vykreslení (prázdné, když je LMS/notch vypnutý).
+    public var notchMarkers: [Double] {
+        guard params["lms"] == .bool(true), params["lmsType"] == .string("notch") else { return [] }
+        var r: [Double] = []
+        if case .int(let n)? = params["notchFreq"], n > 0 { r.append(Double(n)) }
+        if params["twoNotch"] == .bool(true), case .int(let n)? = params["notch2Freq"], n > 0 { r.append(Double(n)) }
+        return r
+    }
+
     public func tune(toMarkHz hz: Double) async {
         await setParam("mark", .double((hz * 10).rounded() / 10))
     }
@@ -388,7 +536,15 @@ public final class AppModel {
 
     public func insertWord(_ w: String) async {
         let word = w.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters.subtracting(CharacterSet(charactersIn: "/"))))
-        switch WordClassifier.classify(word) {
+        let kind = WordClassifier.classify(word)
+        // závod: po zadání značky jdou čísla a výměna do přijatých polí (MMTTY TMmttyWd::PBoxRxMouseDown)
+        if settings.contest.enabled, !qso.call.isEmpty, kind != .call {
+            if let (field, v) = WordClassifier.contestField(word, serialMode: settings.contest.exchange.isEmpty) {
+                await setQSOField(field, v)
+            }
+            return
+        }
+        switch kind {
         case .call: await setQSOField("call", word)
         case .rst: await setQSOField("rstRcvd", word.uppercased())
         case .name: await setQSOField("name", word.uppercased())

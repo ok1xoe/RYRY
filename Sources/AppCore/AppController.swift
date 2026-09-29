@@ -1,4 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import DXCC
 import Engine
 import Foundation
 import MacroEngine
@@ -43,6 +44,8 @@ public enum AppEvent: Sendable {
     case qsoLogged(QSORecord), qsoUpdated(QSORecord), qsoDeleted(UUID)
     /// Parametry modemu se změnily (GUI, API, profil) – aktuální hodnoty.
     case paramsChanged([String: ParameterValue])
+    /// Závod: další pořadové číslo se změnilo (po zalogování) – klient ho uloží do nastavení.
+    case contestSerial(Int)
     case error(String)
 }
 
@@ -78,14 +81,32 @@ public actor AppController {
     private var eventTask: Task<Void, Never>?
     private var repeatTask: Task<Void, Never>?
 
-    public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil) {
+    /// Databáze zemí DXCC (cty.dat); nil = bez zjišťování zemí.
+    public nonisolated let countries: CountryDB?
+
+    public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil,
+                countries: CountryDB? = CountryDB.shared) {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
+        self.countries = countries
+        if settings.contest.enabled {
+            if settings.contest.exchange.isEmpty { qso.serialSent = settings.contest.nextSerial }
+            else { qso.exchangeSent = settings.contest.exchange }
+        }
     }
 
     public nonisolated func events() -> AsyncStream<AppEvent> { broadcaster.subscribe() }
 
+    /// Pořadí uložených parametrů při startu: kmitočty a typ filtru před zářezy
+    /// (CLMS::SetWindow přesune zářez uvnitř okna mark–space do středu).
+    static func startupOrder(_ p: [String: ParameterValue]) -> [(String, ParameterValue)] {
+        let first = ["baud", "mark", "shift", "reverse", "lmsType", "notchTaps", "twoNotch"]
+        let last = ["notchFreq", "notch2Freq", "lms"]
+        func rank(_ k: String) -> Int { first.firstIndex(of: k) ?? (last.firstIndex(of: k).map { 100 + $0 } ?? 50) }
+        return p.sorted { (rank($0.key), $0.key) < (rank($1.key), $1.key) }
+    }
+
     public func start() async throws {
-        for (k, v) in settings.rtty {
+        for (k, v) in Self.startupOrder(settings.rtty) {
             do { try await engine.setModemParam(k, v) } catch { broadcaster.send(.error("parametr \(k): \(error)")) }
         }
         let stream = engine.events()
@@ -134,9 +155,11 @@ public actor AppController {
         var c = MacroContext()
         c.myCall = settings.station.call.uppercased()
         c.hisCall = qso.call; c.name = qso.name; c.qth = qso.qth
-        c.rstSent = qso.rstSent + (qso.serialSent.map { String(format: "%03d", $0) } ?? "")
-        c.rstRcvd = qso.rstRcvd
+        // MMTTY: HisRST = co posílám (%r %N), MyRST = co jsem dostal (%s %M); v závodě „599“ + číslo nebo výměna
+        c.hisRST = qso.rstSent + (qso.serialSent.map { String(format: "%03d", $0) } ?? qso.exchangeSent)
+        c.myRST = qso.rstRcvd + (qso.serialRcvd.map { String(format: "%03d", $0) } ?? qso.exchangeRcvd)
         c.now = Date()
+        c.hisUTCOffsetHours = country(for: qso.call)?.utcOffsetHours
         return c
     }
 
@@ -201,7 +224,15 @@ public actor AppController {
 
     public func clearQSO() {
         qso = QSOFields()
+        applyContestDefaults()
         broadcaster.send(.qsoChanged(qso))
+    }
+
+    /// Závod: odesílané pořadové číslo (nebo pevná výměna) do prázdného QSO okna.
+    private func applyContestDefaults() {
+        guard settings.contest.enabled else { return }
+        if settings.contest.exchange.isEmpty { qso.serialSent = settings.contest.nextSerial }
+        else { qso.exchangeSent = settings.contest.exchange; qso.serialSent = nil }
     }
 
     @discardableResult
@@ -222,9 +253,38 @@ public actor AppController {
         r.exchangeRcvd = qso.exchangeRcvd.isEmpty ? nil : qso.exchangeRcvd
         r.comment = qso.notes.isEmpty ? nil : qso.notes
         r.stationCallsign = settings.station.call.isEmpty ? nil : settings.station.call.uppercased()
+        if let ci = country(for: qso.call) {
+            r.country = ci.name; r.continent = ci.continent; r.cqZone = ci.cqZone; r.ituZone = ci.ituZone
+        }
         do { try await log.append(r) } catch { throw AppError.log("\(error)") }
         broadcaster.send(.qsoLogged(r))
+        if settings.contest.enabled {
+            if let n = r.serialSent, n >= settings.contest.nextSerial {
+                settings.contest.nextSerial = n + 1
+                broadcaster.send(.contestSerial(n + 1))
+            }
+            // závod: rovnou další spojení s dalším číslem – ale nemazat, co operátor mezitím napsal
+            if self.qso == qso { clearQSO() }
+            else if settings.contest.exchange.isEmpty, self.qso.serialSent == r.serialSent {
+                self.qso.serialSent = settings.contest.nextSerial
+                broadcaster.send(.qsoChanged(self.qso))
+            }
+        }
         return r
+    }
+
+    /// Země DXCC pro značku (nil = neznámá nebo /MM).
+    public nonisolated func country(for call: String) -> CountryInfo? { countries?.lookup(call) }
+
+    /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
+    /// `contestOnly` = jen spojení s odeslaným číslem nebo výměnou.
+    public func cabrillo(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
+        var recs = await log?.query(from: from, to: to) ?? []
+        if contestOnly { recs = recs.filter { $0.serialSent != nil || !($0.exchangeSent ?? "").isEmpty } }
+        var h = CabrilloHeader(callsign: settings.station.call, contest: settings.contest.name)
+        h.categories = settings.contest.category.split(separator: ";").map(String.init)
+        h.locator = settings.station.locator; h.name = settings.station.name
+        return Cabrillo.export(recs, header: h)
     }
 
     public func updateQSO(_ r: QSORecord) async throws {
@@ -249,6 +309,13 @@ public actor AppController {
         broadcaster.send(.paramsChanged(await engine.modemParams()))
     }
     public func modemParams() async -> [String: ParameterValue] { await engine.modemParams() }
+    /// Zářez na kmitočtu (pravé tlačítko ve spektru jako MMTTY).
+    public func notchClick(hz: Double) async {
+        // MMTTY: během vysílání se kliky do spektra ignorují
+        guard ![.keying, .pttOn, .tx, .drain, .pttOff].contains(await engine.state) else { return }
+        await engine.withModem { $0.notchClick(hz: hz) }
+        broadcaster.send(.paramsChanged(await engine.modemParams()))
+    }
 
     // MARK: Profily
 

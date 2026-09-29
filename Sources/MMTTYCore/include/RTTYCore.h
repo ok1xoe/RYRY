@@ -57,6 +57,35 @@ typedef enum {
     RC_RX_LMS,              /* 0/1 LMS/notch */
     RC_TX_OUTPUT_GAIN,      /* 0 .. 32768 (CFSKMOD m_OutputGain) */
     RC_NET,                 /* 0/1: při tx_begin převezme TX kmitočty z RX (po AFC), výchozí 1 */
+    /* Plán 7: filtry a parametry z dialogu Setup MMTTY */
+    RC_AA6YQ,               /* 0/1 filtr AA6YQ (BPF mark..space + BEF ve středu), CFSKDEM::m_AA6YQ */
+    RC_AA6YQ_BPF_TAPS,      /* 16 .. 1024 (výchozí 512) */
+    RC_AA6YQ_BPF_FW,        /* 5 .. 500 Hz přesah BPF (výchozí 35) */
+    RC_AA6YQ_BEF_TAPS,      /* 16 .. 1024 (výchozí 256) */
+    RC_AA6YQ_BEF_FW,        /* 5 .. 100 Hz polovina šířky BEF (výchozí 15) */
+    RC_LMS_TYPE,            /* 0 LMS, 1 notch (CLMS::m_Type, výchozí 1) */
+    RC_NOTCH_FREQ,          /* 0 .. 3000 Hz (0 nebo uvnitř mark..space = střed) */
+    RC_NOTCH2_FREQ,         /* 0 .. 3000 Hz druhý zářez (jen s RC_TWO_NOTCH) */
+    RC_TWO_NOTCH,           /* 0/1 */
+    RC_NOTCH_TAPS,          /* 8 .. 512 (výchozí 72) */
+    RC_LMS_TAPS,            /* 8 .. 512 (výchozí 56) */
+    RC_LMS_MU2,             /* 0 .. 1 (výchozí 0.003) */
+    RC_LMS_GAMMA,           /* 0 .. 1 (výchozí 0.9999) */
+    RC_LMS_DELAY,           /* 0 .. 512 */
+    RC_LMS_AGC,             /* 0/1 */
+    RC_LMS_INV,             /* 0/1 */
+    RC_LMS_BPF,             /* 0/1 (výchozí 1) */
+    RC_PLL_VCO_GAIN,        /* (0, 100] (výchozí 3) */
+    RC_PLL_LOOP_ORDER,      /* 1 .. 31 (výchozí 2) */
+    RC_PLL_LOOP_FC,         /* 1 .. 2500 Hz (výchozí 250) */
+    RC_PLL_OUT_ORDER,       /* 1 .. 31 (výchozí 4) */
+    RC_PLL_OUT_FC,          /* 1 .. 2500 Hz (výchozí 200) */
+    RC_TX_BPF,              /* 0/1 TX BPF (výchozí 1) */
+    RC_TX_LPF,              /* 0/1 TX LPF (tvarování) */
+    RC_TX_LPF_FREQ,         /* 10 .. 1000 Hz (výchozí 100) */
+    RC_TX_CHAR_WAIT,        /* 0 .. 50 (MMTTY TXCharWait) */
+    RC_TX_CHAR_WAIT_DIDDLE, /* 0/1 čekání vyplnit diddle */
+    RC_TX_RANDOM_DIDDLE,    /* 0/1 náhodný diddle */
     RC_PARAM_COUNT
 } RTTYCoreParam;
 
@@ -113,6 +142,9 @@ int    rttycore_tick(RTTYCore* core);
    Po přečtení se sběr další dávky spustí znovu. */
 void   rttycore_set_xy(RTTYCore* core, int on);
 size_t rttycore_read_xy(RTTYCore* core, float* x, float* y, size_t max);
+/* Pravé tlačítko ve spektru MMTTY: s typem notch nastaví zářez na hz (a zapne LMS/notch),
+   při už zapnutém posune předchozí zářez do druhého. S typem LMS nedělá nic. */
+void   rttycore_notch_click(RTTYCore* core, double hz);
 /* Poslední spektrum (CFFT::m_fft), vrací počet binů; *binHz = šířka binu. */
 size_t rttycore_spectrum(RTTYCore* core, float* out, size_t max, double* binHz);
 

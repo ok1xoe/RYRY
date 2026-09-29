@@ -54,5 +54,13 @@ Podrobnosti: `docs/api.md`. Nastavení: `~/Library/Application Support/mmtty4mac
 Při prvním spuštění macOS požádá o přístup k mikrofonu (příjem z rádia) – povolte ho.
 Bundle je podepsaný ad-hoc, takže po každém novém sestavení se macOS může zeptat znovu.
 Hlavní okno: vodopád (klik = naladit mark), příjem (klik na slovo = značka/jméno/RST do QSO),
-vysílání (po znacích/slovech/řádcích), makra F1–F12 (pravé tlačítko = upravit, opakování = CQ smyčka),
-QSO panel s předchozími spojeními, okno Log (⇧⌘L), Nastavení (⌘,). Klávesy: ⌘T TX/RX, Esc okamžitě RX, ⌘L zalogovat.
+vysílání (po znacích/slovech/řádcích), 16 maker F1–F12 a ⇧F1–⇧F4 (pravé tlačítko = upravit, opakování = CQ smyčka),
+QSO panel s předchozími spojeními a zemí DXCC, okno Log (⇧⌘L), Nastavení (⌘,). Klávesy: ⌘T TX/RX, Esc okamžitě RX, ⌘L zalogovat.
+
+Z MMTTY dále:
+- filtry BPF, AA6YQ a notch/LMS (pravé tlačítko ve spektru = zářez, jako v MMTTY), parametry PLL, TX filtry, čekání mezi znaky, náhodný diddle;
+- kalibrace hodin zvukové karty v ppm (Nastavení → Zvuk → Změřit; Core Audio měří skutečnou frekvenci proti hodinám systému);
+- závodní režim: pořadová čísla, klik na číslo v příjmu = přijaté číslo, export Cabrillo 3.0 (Log → Exportovat Cabrillo…);
+- rozsah a zesílení spektra/vodopádu (menu v rohu spektra), indikátor LTRS/FIGS, UOS, J-BELL, časové značky, velikost písma;
+- DXCC z `cty.dat` (AD1C; vlastní verzi lze dát do `~/Library/Application Support/mmtty4mac/cty.dat`), pozdrav `%g` podle místního času protistanice;
+- přehrání WAV do příjmu (Soubor → Přehrát WAV do příjmu).

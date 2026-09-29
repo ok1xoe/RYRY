@@ -3,6 +3,7 @@ import AppKit
 import AppUI
 import AppViews
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -29,6 +30,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 @main
 struct MMTTY4MacApp: App {
+    @MainActor func playWAV(speed: Double) {
+        let p = NSOpenPanel()
+        p.allowedContentTypes = [.wav]
+        guard p.runModal() == .OK, let url = p.url else { return }
+        Task { @MainActor in
+            do { try await model.playWAV(url, speed: speed) }
+            catch { NSAlert(error: error).runModal() }
+        }
+    }
+
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var model = AppModel()
     @Environment(\.openWindow) private var openWindow
@@ -52,8 +63,17 @@ struct MMTTY4MacApp: App {
                 Button("Vymazat QSO") { Task { await model.clearQSO() } }
                 Button("Vymazat příjem") { model.clearRx() }.keyboardShortcut("k", modifiers: .command)
             }
+            CommandGroup(after: .newItem) {
+                Menu("Přehrát WAV do příjmu") {
+                    ForEach([(1.0, "Reálný čas"), (4.0, "4× rychleji"), (0.0, "Co nejrychleji")], id: \.0) { sp in
+                        Button(sp.1 + "…") { playWAV(speed: sp.0) }
+                    }
+                }
+                Button("Zastavit přehrávání WAV") { Task { await model.stopWAV() } }.disabled(!model.wavPlaying)
+            }
             CommandGroup(after: .windowArrangement) {
                 Button("Log") { openWindow(id: "log") }.keyboardShortcut("l", modifiers: [.command, .shift])
+                Button("Exportovat Cabrillo…") { exportCabrillo(model) }
             }
         }
         Window("Log", id: "log") { LogWindow(model: model) }

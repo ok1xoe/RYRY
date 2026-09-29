@@ -5,7 +5,7 @@ import Testing
 func ctx() -> MacroContext {
     var c = MacroContext()
     c.myCall = "OK1XOE"; c.hisCall = "DL1ABC"; c.name = "HANS"; c.qth = "BERLIN"
-    c.rstSent = "599001"; c.rstRcvd = "599012-ZZ"
+    c.myRST = "599001"; c.hisRST = "599012-ZZ"
     c.now = Date(timeIntervalSince1970: 1_790_000_000)   // 2026-09-21 14:13:20 UTC
     return c
 }
@@ -31,14 +31,30 @@ func text(_ r: MacroResult) -> String {
     #expect(text(MacroEngine.expand("%N", context: c)) == "012-ZZ")
     #expect(text(MacroEngine.expand("%M", context: c)) == "001")
     #expect(text(MacroEngine.expand("%x|%y", context: c)) == "012|ZZ")
-    var short = c; short.rstRcvd = "5"
+    var short = c; short.hisRST = "5"
     #expect(text(MacroEngine.expand("%R%N", context: short)) == "599")
 }
 
 @Test func dateTimeAndGreeting() {
     let c = ctx()
     #expect(text(MacroEngine.expand("%D %T %t", context: c)) == "2026-SEP-21 14:13 1413")
-    #expect(text(MacroEngine.expand("%g/%f", context: c)) == "GOOD AFTERNOON/GA")
+    var utc = c; utc.hisUTCOffsetHours = 0
+    #expect(text(MacroEngine.expand("%g/%f", context: utc)) == "GOOD AFTERNOON/GA")
+}
+
+// MMTTY SetGreetingString: podle místního času protistanice (země z DXCC); neznámá země → HELLO / nic
+@Test func greetingUsesHisLocalTime() {
+    var c = ctx()                                     // 14:13 UTC
+    c.hisUTCOffsetHours = 9                            // JA: 23:13
+    #expect(text(MacroEngine.expand("%g/%f", context: c)) == "GOOD EVENING/GE")
+    c.hisUTCOffsetHours = -8                           // W6: 06:13
+    #expect(text(MacroEngine.expand("%g/%f", context: c)) == "GOOD MORNING/GM")
+    c.hisUTCOffsetHours = 5.5                          // VU: 19:43
+    #expect(text(MacroEngine.expand("%g", context: c)) == "GOOD EVENING")
+    c.hisUTCOffsetHours = -14.5                        // přes půlnoc zpět: 23:43 předchozího dne
+    #expect(text(MacroEngine.expand("%f", context: c)) == "GE")
+    c.hisUTCOffsetHours = nil
+    #expect(text(MacroEngine.expand("[%g][%f]", context: c)) == "[HELLO][]")
 }
 
 @Test func shiftCodesAreRaw() {

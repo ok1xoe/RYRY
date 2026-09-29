@@ -119,6 +119,72 @@ public struct LogSettings: Codable, Sendable, Equatable {
     }
 }
 
+/// Korekce hodin zvukové karty v ppm (MMTTY „Clock“/„TX offset“).
+public struct ClockSettings: Codable, Sendable, Equatable {
+    public var rxPPM = 0.0, txPPM = 0.0
+    public init() {}
+    public static let limit = 20_000.0                 // jádro přijme ± 2 %
+    public var clampedRx: Double { min(Self.limit, max(-Self.limit, rxPPM.isFinite ? rxPPM : 0)) }
+    public var clampedTx: Double { min(Self.limit, max(-Self.limit, txPPM.isFinite ? txPPM : 0)) }
+    enum CodingKeys: String, CodingKey { case rxPPM, txPPM }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "clock", x = ClockSettings()
+        rxPPM = c.tolerant(.rxPPM, x.rxPPM, w, s); txPPM = c.tolerant(.txPPM, x.txPPM, w, s)
+    }
+}
+
+/// Nastavení jádra RTTY, která vyžadují restart modemu (MMTTY sys.m_CodeSet, m_dblsft, m_txuos).
+public struct RTTYCoreSettings: Codable, Sendable, Equatable {
+    public var japanese = false            // J-BELL místo US (S-BELL)
+    public var doubleShift = false         // LTRS/FIGS posílat 2×
+    public var txUOS = true                // unshift on space při vysílání
+    public init() {}
+    enum CodingKeys: String, CodingKey { case japanese, doubleShift, txUOS }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "rttyCore", x = RTTYCoreSettings()
+        japanese = c.tolerant(.japanese, x.japanese, w, s); doubleShift = c.tolerant(.doubleShift, x.doubleShift, w, s)
+        txUOS = c.tolerant(.txUOS, x.txUOS, w, s)
+    }
+}
+
+/// Závodní režim: pořadová čísla a hlavička Cabrillo.
+public struct ContestSettings: Codable, Sendable, Equatable {
+    public var enabled = false
+    public var name = ""                   // CONTEST: v Cabrillu
+    public var category = ""               // CATEGORY-… (volný text, jeden řádek na „;“)
+    public var nextSerial = 1
+    public var exchange = ""               // odesílaná výměna místo čísla (prázdné = pořadové číslo)
+    public init() {}
+    enum CodingKeys: String, CodingKey { case enabled, name, category, nextSerial, exchange }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "contest", x = ContestSettings()
+        enabled = c.tolerant(.enabled, x.enabled, w, s); name = c.tolerant(.name, x.name, w, s)
+        category = c.tolerant(.category, x.category, w, s); nextSerial = max(1, c.tolerant(.nextSerial, x.nextSerial, w, s))
+        exchange = c.tolerant(.exchange, x.exchange, w, s)
+    }
+}
+
+/// Zobrazení: rozsah a zesílení spektra/vodopádu, písmo, časové značky.
+public struct DisplaySettings: Codable, Sendable, Equatable {
+    public var fromHz = 0.0, toHz = 3000.0
+    public var gainDB = 0.0
+    public var autoGain = true
+    public var timestamps = false
+    public var fontSize = 14.0
+    public init() {}
+    /// FFT jádra pokrývá 0–4000 Hz (TSound m_FFTWINDOW).
+    public static let maxHz = 4000.0
+    enum CodingKeys: String, CodingKey { case fromHz, toHz, gainDB, autoGain, timestamps, fontSize }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "display", x = DisplaySettings()
+        fromHz = c.tolerant(.fromHz, x.fromHz, w, s); toHz = c.tolerant(.toHz, x.toHz, w, s)
+        if !(fromHz >= 0 && toHz <= Self.maxHz && toHz - fromHz >= 200) { fromHz = x.fromHz; toHz = x.toHz }
+        gainDB = min(30, max(-30, c.tolerant(.gainDB, x.gainDB, w, s)))
+        autoGain = c.tolerant(.autoGain, x.autoGain, w, s); timestamps = c.tolerant(.timestamps, x.timestamps, w, s)
+        fontSize = min(40, max(8, c.tolerant(.fontSize, x.fontSize, w, s)))
+    }
+}
+
 public struct AppSettings: Codable, Sendable, Equatable {
     public var schemaVersion = 1
     public var station = Station()
@@ -130,13 +196,18 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var rtty: [String: ParameterValue] = [:]
     public var macros: [Macro] = AppSettings.defaultMacros
     public var log = LogSettings()
+    public var clock = ClockSettings()
+    public var rttyCore = RTTYCoreSettings()
+    public var contest = ContestSettings()
+    public var display = DisplaySettings()
     public init() {}
+    public static let macroCount = 16
 
     public static let defaultMacros: [Macro] = [
         Macro(name: "CQ", text: "\r\nCQ CQ CQ DE %m %m %m PSE K\r\n\\"),
         Macro(name: "Answer", text: "\r\n%c %c DE %m %m %m K\r\n\\"),
         Macro(name: "Report", text: "\r\n%c DE %m %g TNX FER CALL UR RST %r %r NAME %n\r\nHW? %c DE %m KN\r\n\\"),
-        Macro(name: "Contest", text: "\r\n%c 599 %M %M %c\r\n\\"),
+        Macro(name: "Contest", text: "\r\n%c 599 %N %N %c\r\n\\"),
         Macro(name: "TU", text: "\r\nTU %c DE %m QRZ?\r\n%l\\"),
         Macro(name: "73", text: "\r\n%c DE %m TNX FER QSO 73 73 %c DE %m SK\r\n%l\\"),
         Macro(name: "QRZ", text: "\r\nQRZ? DE %m K\r\n\\"),
@@ -144,10 +215,15 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "RYRY", text: "RYRYRYRYRYRYRYRYRYRY\r\n#"),
         Macro(name: "CW ID", text: "%{DE %m}\\"),
         Macro(name: "AGN", text: "\r\nAGN? AGN?\r\n\\"),
+        Macro(name: "NR?", text: "\r\nNR? NR?\r\n\\"),
+        Macro(name: "Test CQ", text: "\r\nCQ TEST CQ TEST DE %m %m TEST\r\n\\"),
+        Macro(name: "Exch", text: "\r\n%c 599 %N %N\r\n\\"),
+        Macro(name: "", text: ""),
         Macro(name: "", text: ""),
     ]
 
-    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, rtty, macros, log }
+    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, rtty, macros, log,
+                                             clock, rttyCore, contest, display }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "settings", x = AppSettings()
         schemaVersion = c.tolerant(.schemaVersion, x.schemaVersion, w, s)
@@ -156,7 +232,15 @@ public struct AppSettings: Codable, Sendable, Equatable {
         rig = c.tolerant(.rig, x.rig, w, s); api = c.tolerant(.api, x.api, w, s)
         rtty = c.tolerant(.rtty, TolerantDict<ParameterValue>(), w, s).items
         macros = c.contains(.macros) ? c.tolerant(.macros, TolerantArray<Macro>(), w, s).items : x.macros
+        // dřívější výchozí závodní makro mělo %M (v MMTTY přijaté číslo) místo %N (odesílané)
+        for i in macros.indices where macros[i].text == "\r\n%c 599 %M %M %c\r\n\\" {
+            macros[i].text = "\r\n%c 599 %N %N %c\r\n\\"
+        }
+        // starší nastavení s 12 makry (nebo zkrácený seznam) doplnit na 16 prázdnými
+        while macros.count < Self.macroCount { macros.append(Macro(name: "", text: "")) }
         log = c.tolerant(.log, x.log, w, s)
+        clock = c.tolerant(.clock, x.clock, w, s); rttyCore = c.tolerant(.rttyCore, x.rttyCore, w, s)
+        contest = c.tolerant(.contest, x.contest, w, s); display = c.tolerant(.display, x.display, w, s)
     }
 
     /// Konfigurace Engine z nastavení.

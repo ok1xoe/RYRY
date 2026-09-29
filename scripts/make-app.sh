@@ -11,5 +11,6 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/MMTTY4MacApp"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp COPYING COPYING.LESSER "$APP/Contents/Resources/"
+cp Resources/cty.dat "$APP/Contents/Resources/"      # DXCC (AD1C country file)
 codesign --force --sign - --entitlements Resources/mmtty4mac.entitlements --options runtime "$APP"
 echo "Hotovo: $APP"

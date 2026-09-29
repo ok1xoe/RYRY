@@ -1,7 +1,36 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import AppKit
 import AppUI
 import QSOLog
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// Uloží log ve formátu Cabrillo: dialog s rozsahem (UTC, výchozí posledních 48 h) a volbou „jen závodní spojení“.
+@MainActor public func exportCabrillo(_ model: AppModel) {
+    let p = NSSavePanel()
+    let base = model.settings.contest.name.isEmpty ? "log" : model.settings.contest.name
+    p.nameFieldStringValue = "\(model.settings.station.call.isEmpty ? "mmtty4mac" : model.settings.station.call)-\(base).log"
+    p.allowedContentTypes = [UTType(filenameExtension: "log") ?? .plainText, UTType(filenameExtension: "cbr") ?? .plainText, .plainText]
+    func picker(_ d: Date) -> NSDatePicker {
+        let dp = NSDatePicker(); dp.datePickerStyle = .textFieldAndStepper
+        dp.datePickerElements = [.yearMonthDay, .hourMinute]; dp.timeZone = TimeZone(identifier: "UTC"); dp.dateValue = d
+        return dp
+    }
+    let from = picker(Date().addingTimeInterval(-48 * 3600)), to = picker(Date().addingTimeInterval(3600))
+    let only = NSButton(checkboxWithTitle: "Jen závodní spojení (s číslem nebo výměnou)", target: nil, action: nil)
+    only.state = model.settings.contest.enabled ? .on : .off
+    let row1 = NSStackView(views: [NSTextField(labelWithString: "Od (UTC):"), from, NSTextField(labelWithString: "do:"), to])
+    let box = NSStackView(views: [row1, only]); box.orientation = .vertical; box.alignment = .leading
+    box.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+    p.accessoryView = box
+    guard p.runModal() == .OK, let url = p.url else { return }
+    let f = from.dateValue, t = to.dateValue, c = only.state == .on
+    Task { @MainActor in
+        let text = await model.cabrilloText(from: f, to: t, contestOnly: c)
+        do { try Data(text.utf8).write(to: url, options: .atomic) }
+        catch { NSAlert(error: error).runModal() }
+    }
+}
 
 public struct LogWindow: View {
     @Bindable var model: AppModel
@@ -25,8 +54,12 @@ public struct LogWindow: View {
                 TableColumn("kHz") { r in Text(r.frequency.map { String(format: "%.1f", $0 / 1000) } ?? "") }.width(70)
                 TableColumn("Mód") { r in Text(r.mode) }.width(50)
                 TableColumn("RST s/r") { r in Text("\(r.rstSent ?? "")/\(r.rstRcvd ?? "")") }.width(70)
+                TableColumn("Nr s/r") { r in
+                    Text("\(r.serialSent.map { String(format: "%03d", $0) } ?? r.exchangeSent ?? "")/\(r.serialRcvd.map { String(format: "%03d", $0) } ?? r.exchangeRcvd ?? "")")
+                }.width(70)
                 TableColumn("Jméno") { r in Text(r.name ?? "") }
                 TableColumn("QTH") { r in Text(r.qth ?? "") }
+                TableColumn("Země") { r in Text(r.country ?? "") }
             }
             .contextMenu(forSelectionType: QSORecord.ID.self) { ids in
                 if let id = ids.first, let r = model.logRecords.first(where: { $0.id == id }) {
@@ -39,6 +72,7 @@ public struct LogWindow: View {
             HStack {
                 Text("\(filtered.count) spojení").foregroundStyle(.secondary)
                 Spacer()
+                Button("Exportovat Cabrillo…") { exportCabrillo(model) }
             }.padding(6).font(.caption)
         }
         .searchable(text: $search, prompt: "Značka nebo jméno")

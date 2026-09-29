@@ -12,6 +12,9 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         public var doubleShift = false
         public var txUOS = true
         public var txOffset = 0.0
+        /// Korekce hodin zvukové karty v ppm (kladná = zařízení běží rychleji než nominálně).
+        public var rxClockPPM = 0.0
+        public var txClockPPM = 0.0
         public init() {}
     }
     public enum Error: Swift.Error, Equatable {
@@ -48,11 +51,13 @@ public final class RTTYModem: Modem, @unchecked Sendable {
 
     public init(sampleRate: Double = 11025, config: Config = .init()) throws(Error) {
         var cfg = rttycore_default_config()
-        cfg.sampleRate = sampleRate
+        // Jako MMTTY SampFreq/TxOffset: jádro počítá s kalibrovanou frekvencí, audio zůstává nominální.
+        let rxRate = sampleRate * (1 + config.rxClockPPM / 1e6)
+        cfg.sampleRate = rxRate
         cfg.codeSet = config.codeSet == .us ? 0 : 1
         cfg.doubleShift = config.doubleShift ? 1 : 0
         cfg.txUOS = config.txUOS ? 1 : 0
-        cfg.txOffset = config.txOffset
+        cfg.txOffset = config.txOffset + sampleRate * (1 + config.txClockPPM / 1e6) - rxRate
         guard let c = rttycore_create(&cfg) else { throw .unsupportedSampleRate(sampleRate) }
         core = c
         self.sampleRate = sampleRate
@@ -217,6 +222,8 @@ public final class RTTYModem: Modem, @unchecked Sendable {
 
     /// XY scope (mark/space) – zapnout sběr.
     public func setXYScope(_ on: Bool) { rttycore_set_xy(core, on ? 1 : 0) }
+
+    public func notchClick(hz: Double) { rttycore_notch_click(core, hz) }
 
     /// Poslední plná dávka bodů XY scope (x = mark, y = space), nebo nil.
     public func xyScope() -> [XYPoint]? {
