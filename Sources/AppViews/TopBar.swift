@@ -26,7 +26,7 @@ struct TopBar: View {
                 Button("Stop") { Task { await model.rxNow() } }.fixedSize()
                     .keyboardShortcut(.escape, modifiers: [])
                     .help("Okamžitě RX (Esc)")
-                Text(model.state.rawValue.uppercased())
+                Text(Self.stateLabel(model.state))
                     .font(.system(.body, design: .monospaced).bold()).lineLimit(1).fixedSize()
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
@@ -74,6 +74,19 @@ struct TopBar: View {
             .controlSize(.small)
         }
         .padding(8)
+    }
+
+    /// Krátký štítek stavu (dlouhé názvy by v úzkém okně vytlačily lištu).
+    static func stateLabel(_ s: EngineState) -> String {
+        switch s {
+        case .stopped: return "STOP"
+        case .rx: return "RX"
+        case .keying: return "PTT…"
+        case .pttOn: return "PTT"
+        case .tx: return "TX"
+        case .drain: return "TX…"
+        case .pttOff: return "PTT↓"
+        }
     }
 
     var baudBinding: Binding<Double> {
