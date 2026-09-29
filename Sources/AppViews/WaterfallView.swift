@@ -4,8 +4,23 @@ import AppUI
 import ModemKit
 import SwiftUI
 
+/// Zářezy (notch) – červené čárkované čáry.
+@MainActor func drawNotches(_ ctx: GraphicsContext, _ size: CGSize, _ model: AppModel) {
+    for hz in model.notchMarkers {
+        let xx = CGFloat((hz - model.waterfallFromHz) / (model.waterfallToHz - model.waterfallFromHz)) * size.width
+        var p = Path()
+        p.move(to: CGPoint(x: xx, y: 0)); p.addLine(to: CGPoint(x: xx, y: size.height))
+        ctx.stroke(p, with: .color(.red.opacity(0.9)), style: StrokeStyle(lineWidth: 1.5, dash: [2, 2]))
+    }
+}
+
 struct WaterfallView: View {
     @Bindable var model: AppModel
+
+    func notch(_ fraction: Double) {
+        let hz = model.waterfallFromHz + fraction * (model.waterfallToHz - model.waterfallFromHz)
+        Task { await model.notchClick(hz: hz) }
+    }
 
     func x(_ hz: Double, _ w: CGFloat) -> CGFloat {
         CGFloat((hz - model.waterfallFromHz) / (model.waterfallToHz - model.waterfallFromHz)) * w
@@ -26,6 +41,7 @@ struct WaterfallView: View {
                         p.move(to: CGPoint(x: xx, y: 0)); p.addLine(to: CGPoint(x: xx, y: size.height))
                         ctx.stroke(p, with: .color(color.opacity(0.85)), lineWidth: 1)
                     }
+                    drawNotches(ctx, size, model)
                     // stupnice po 500 Hz
                     var hz = (model.waterfallFromHz / 500).rounded(.up) * 500
                     while hz < model.waterfallToHz {
@@ -40,8 +56,9 @@ struct WaterfallView: View {
                     let hz = model.waterfallFromHz + Double(loc.x / g.size.width) * (model.waterfallToHz - model.waterfallFromHz)
                     Task { await model.tune(toMarkHz: hz) }
                 }
-                .help("Klik = naladit mark · kolečko = úroveň squelche")
-                .overlay(ScrollWheelCatcher { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } })
+                .help("Klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = úroveň squelche")
+                .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
+                                            onRightClick: { f in notch(f) }))
                 if model.xyEnabled {
                     XYScopeView(points: model.xyPoints)
                         .frame(width: min(g.size.height, 160), height: min(g.size.height, 160))
@@ -61,8 +78,15 @@ struct WaterfallView: View {
 /// Zachytí kolečko myši (SwiftUI na macOS 14 nemá onScrollWheel); kliky propouští.
 struct ScrollWheelCatcher: NSViewRepresentable {
     let onScroll: (CGFloat) -> Void
+    /// Pravé tlačítko: poměr x (0…1) v šířce pohledu.
+    var onRightClick: ((Double) -> Void)? = nil
     final class V: NSView {
         var onScroll: ((CGFloat) -> Void)?
+        var onRightClick: ((Double) -> Void)?
+        override func rightMouseDown(with e: NSEvent) {
+            let p = convert(e.locationInWindow, from: nil)
+            if bounds.width > 0 { onRightClick?(Double(p.x / bounds.width)) }
+        }
         private var acc: CGFloat = 0
         override func scrollWheel(with e: NSEvent) {
             if !e.momentumPhase.isEmpty { return }                 // setrvačnost trackpadu ignorovat
@@ -75,12 +99,12 @@ struct ScrollWheelCatcher: NSViewRepresentable {
         }
         override func hitTest(_ p: NSPoint) -> NSView? {
             // kliky nechat projít do SwiftUI, kolečko zachytit
-            if let e = NSApp.currentEvent, e.type == .scrollWheel { return self }
+            if let e = NSApp.currentEvent, e.type == .scrollWheel || (e.type == .rightMouseDown && onRightClick != nil) { return self }
             return nil
         }
     }
-    func makeNSView(context: Context) -> V { let v = V(); v.onScroll = onScroll; return v }
-    func updateNSView(_ v: V, context: Context) { v.onScroll = onScroll }
+    func makeNSView(context: Context) -> V { let v = V(); v.onScroll = onScroll; v.onRightClick = onRightClick; return v }
+    func updateNSView(_ v: V, context: Context) { v.onScroll = onScroll; v.onRightClick = onRightClick }
 }
 
 /// XY scope: mark na ose X, space na ose Y (správně naladěný signál = kříž).
@@ -141,14 +165,19 @@ struct SpectrumView: View {
                     p.move(to: CGPoint(x: xx, y: 0)); p.addLine(to: CGPoint(x: xx, y: size.height))
                     ctx.stroke(p, with: .color(color.opacity(0.9)), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 }
+                drawNotches(ctx, size, model)
             }
             .contentShape(Rectangle())
             .onTapGesture { loc in
                 let hz = model.waterfallFromHz + Double(loc.x / g.size.width) * (model.waterfallToHz - model.waterfallFromHz)
                 Task { await model.tune(toMarkHz: hz) }
             }
-            .overlay(ScrollWheelCatcher { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } })
-            .help("Spektrum · klik = naladit mark · kolečko = squelch")
+            .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
+                                        onRightClick: { f in
+                let hz = model.waterfallFromHz + f * (model.waterfallToHz - model.waterfallFromHz)
+                Task { await model.notchClick(hz: hz) }
+            }))
+            .help("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch")
         }
     }
 }

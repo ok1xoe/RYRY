@@ -249,6 +249,11 @@ public actor AppController {
         broadcaster.send(.paramsChanged(await engine.modemParams()))
     }
     public func modemParams() async -> [String: ParameterValue] { await engine.modemParams() }
+    /// Zářez na kmitočtu (pravé tlačítko ve spektru jako MMTTY).
+    public func notchClick(hz: Double) async {
+        await engine.withModem { $0.notchClick(hz: hz) }
+        broadcaster.send(.paramsChanged(await engine.modemParams()))
+    }
 
     // MARK: Profily
 

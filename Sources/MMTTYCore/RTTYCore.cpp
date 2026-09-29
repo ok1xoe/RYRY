@@ -275,13 +275,104 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
         c->bpffw = v; c->calcBPF(); break;
     case RC_RX_LMS:
         if (!isBool(v)) return RC_ERR_RANGE;
-        c->lmsOn = int(v); break;
+        c->lmsOn = int(v);
+        if (v == 0 && c->lms().m_twoNotch) c->lms().m_lmsNotch = c->lms().m_lmsNotch2 = 0;   // SBLMSClick
+        else c->calcBPF();
+        break;
     case RC_TX_OUTPUT_GAIN:
         if (!inRange(v, 0, 32768)) return RC_ERR_RANGE;
         mod.SetOutputGain(v); break;
     case RC_NET:
         if (!isBool(v)) return RC_ERR_RANGE;
         c->net = int(v); break;
+    case RC_AA6YQ:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        if (dem.m_AA6YQ.m_fEnabled != int(v)) {
+            dem.m_AA6YQ.m_fEnabled = int(v);
+            if (v != 0) dem.m_AA6YQ.Create();       // jako TOptionDlg (CBAA6YQ)
+        }
+        break;
+    case RC_AA6YQ_BPF_TAPS:
+        if (!isInt(v, 16, 1024)) return RC_ERR_RANGE;
+        dem.m_AA6YQ.m_bpfTaps = int(v); dem.m_AA6YQ.Create(); break;
+    case RC_AA6YQ_BPF_FW:
+        if (!inRange(v, 5, 500)) return RC_ERR_RANGE;
+        dem.m_AA6YQ.m_bpfFW = v; dem.m_AA6YQ.Create(); break;
+    case RC_AA6YQ_BEF_TAPS:
+        if (!isInt(v, 16, 1024)) return RC_ERR_RANGE;
+        dem.m_AA6YQ.m_befTaps = int(v); dem.m_AA6YQ.Create(); break;
+    case RC_AA6YQ_BEF_FW:
+        if (!inRange(v, 5, 100)) return RC_ERR_RANGE;
+        dem.m_AA6YQ.m_befFW = v; dem.m_AA6YQ.Create(); break;
+    case RC_LMS_TYPE:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        c->lms().m_Type = int(v); c->calcBPF(); break;
+    case RC_NOTCH_FREQ:
+        if (!isInt(v, 0, 3000)) return RC_ERR_RANGE;
+        c->lms().m_lmsNotch = int(v); c->calcBPF(); break;
+    case RC_NOTCH2_FREQ:
+        if (!isInt(v, 0, 3000)) return RC_ERR_RANGE;
+        c->lms().m_lmsNotch2 = int(v); c->calcBPF(); break;
+    case RC_TWO_NOTCH:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        c->lms().m_twoNotch = int(v); c->calcBPF(); break;
+    case RC_NOTCH_TAPS:
+        if (!isInt(v, 8, TAPMAX)) return RC_ERR_RANGE;
+        c->lms().m_NotchTap = int(v); c->calcBPF(); break;
+    case RC_LMS_TAPS:
+        if (!isInt(v, 8, TAPMAX)) return RC_ERR_RANGE;
+        c->lms().m_Tap = int(v); c->calcBPF(); break;
+    case RC_LMS_MU2:
+        if (!inRange(v, 0, 1)) return RC_ERR_RANGE;
+        c->lms().m_lmsMU2 = v; break;
+    case RC_LMS_GAMMA:
+        if (!inRange(v, 0, 1)) return RC_ERR_RANGE;
+        c->lms().m_lmsGM = v; break;
+    case RC_LMS_DELAY:
+        if (!isInt(v, 0, 512)) return RC_ERR_RANGE;
+        c->lms().m_lmsDelay = int(v); break;
+    case RC_LMS_AGC:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        c->lms().m_lmsAGC = int(v); break;
+    case RC_LMS_INV:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        c->lms().m_lmsInv = int(v); break;
+    case RC_LMS_BPF:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        c->lms().m_bpf = int(v); c->calcBPF(); break;
+    case RC_PLL_VCO_GAIN:
+        if (!inRange(v, 1e-6, 100)) return RC_ERR_RANGE;
+        dem.m_pll.SetVcoGain(v); break;
+    case RC_PLL_LOOP_ORDER:
+        if (!isInt(v, 1, 31)) return RC_ERR_RANGE;
+        dem.m_pll.m_loopOrder = int(v); dem.m_pll.MakeLoopLPF(); break;
+    case RC_PLL_LOOP_FC:
+        if (!inRange(v, 1, 2500)) return RC_ERR_RANGE;
+        dem.m_pll.m_loopFC = v; dem.m_pll.MakeLoopLPF(); break;
+    case RC_PLL_OUT_ORDER:
+        if (!isInt(v, 1, 31)) return RC_ERR_RANGE;
+        dem.m_pll.m_outOrder = int(v); dem.m_pll.MakeOutLPF(); break;
+    case RC_PLL_OUT_FC:
+        if (!inRange(v, 1, 2500)) return RC_ERR_RANGE;
+        dem.m_pll.m_outFC = v; dem.m_pll.MakeOutLPF(); break;
+    case RC_TX_BPF:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        mod.m_bpf = int(v); break;
+    case RC_TX_LPF:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        mod.m_lpf = int(v); break;
+    case RC_TX_LPF_FREQ:
+        if (!inRange(v, 10, 1000)) return RC_ERR_RANGE;
+        mod.SetLPFFreq(v); break;
+    case RC_TX_CHAR_WAIT:
+        if (!isInt(v, 0, 50)) return RC_ERR_RANGE;
+        mod.m_CharWait = int(v); break;
+    case RC_TX_CHAR_WAIT_DIDDLE:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        mod.m_CharWaitDiddle = int(v); break;
+    case RC_TX_RANDOM_DIDDLE:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        mod.m_RandomDiddle = int(v); break;
     default:
         return RC_ERR_UNKNOWN;
     }
@@ -328,8 +419,53 @@ extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
     case RC_RX_LMS: return c->lmsOn;
     case RC_TX_OUTPUT_GAIN: return mod.GetOutputGain();
     case RC_NET: return c->net;
+    case RC_AA6YQ: return dem.m_AA6YQ.m_fEnabled;
+    case RC_AA6YQ_BPF_TAPS: return dem.m_AA6YQ.m_bpfTaps;
+    case RC_AA6YQ_BPF_FW: return dem.m_AA6YQ.m_bpfFW;
+    case RC_AA6YQ_BEF_TAPS: return dem.m_AA6YQ.m_befTaps;
+    case RC_AA6YQ_BEF_FW: return dem.m_AA6YQ.m_befFW;
+    case RC_LMS_TYPE: return c->lms().m_Type;
+    case RC_NOTCH_FREQ: return c->lms().m_lmsNotch;
+    case RC_NOTCH2_FREQ: return c->lms().m_lmsNotch2;
+    case RC_TWO_NOTCH: return c->lms().m_twoNotch;
+    case RC_NOTCH_TAPS: return c->lms().m_NotchTap;
+    case RC_LMS_TAPS: return c->lms().m_Tap;
+    case RC_LMS_MU2: return c->lms().m_lmsMU2;
+    case RC_LMS_GAMMA: return c->lms().m_lmsGM;
+    case RC_LMS_DELAY: return c->lms().m_lmsDelay;
+    case RC_LMS_AGC: return c->lms().m_lmsAGC;
+    case RC_LMS_INV: return c->lms().m_lmsInv;
+    case RC_LMS_BPF: return c->lms().m_bpf;
+    case RC_PLL_VCO_GAIN: return dem.m_pll.m_vcogain;
+    case RC_PLL_LOOP_ORDER: return dem.m_pll.m_loopOrder;
+    case RC_PLL_LOOP_FC: return dem.m_pll.m_loopFC;
+    case RC_PLL_OUT_ORDER: return dem.m_pll.m_outOrder;
+    case RC_PLL_OUT_FC: return dem.m_pll.m_outFC;
+    case RC_TX_BPF: return mod.m_bpf;
+    case RC_TX_LPF: return mod.m_lpf;
+    case RC_TX_LPF_FREQ: return mod.GetLPFFreq();
+    case RC_TX_CHAR_WAIT: return mod.m_CharWait;
+    case RC_TX_CHAR_WAIT_DIDDLE: return mod.m_CharWaitDiddle;
+    case RC_TX_RANDOM_DIDDLE: return mod.m_RandomDiddle;
     default: return NAN;
     }
+}
+
+// TMmttyWd::PBoxFFTINMouseDown, pravé tlačítko + SBLMSClick.
+extern "C" void rttycore_notch_click(RTTYCore* c, double hz) {
+    if (!c || !std::isfinite(hz) || hz < 0 || hz > 3000) return;
+    CoreScope scope(&c->ctx);
+    CLMS& l = c->lms();
+    if (!l.m_Type) return;
+    if (!c->lmsOn) {
+        l.m_lmsNotch2 = 0;
+        l.m_lmsNotch = int(hz + 0.5);
+        c->lmsOn = 1;
+    } else {
+        l.m_lmsNotch2 = l.m_lmsNotch;
+        l.m_lmsNotch = int(hz + 0.5);
+    }
+    c->calcBPF();
 }
 
 // --- Vysílání (podle TMmttyWd::XMIT, ToRX a TX větve TSound::Execute) ---

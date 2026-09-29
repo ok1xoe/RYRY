@@ -56,6 +56,11 @@ extension JSONRPCServer {
                 do { try await app.setModemParam(k, pv) } catch { throw RPCError(code: -32602, message: "\(k): \(error)") }
             }
             return (await app.modemParams()).mapValues(Self.toJSON)
+        case "modem.notch":
+            let hz = try num(p, "hz")
+            guard hz >= 0, hz <= 3000 else { throw RPCError.params("hz: 0–3000") }
+            await app.notchClick(hz: hz)
+            return (await app.modemParams()).mapValues(Self.toJSON)
         case "modem.describeParams": return await engine.parameterDescriptors().map(Self.descriptorJSON)
         // profily
         case "profile.list":

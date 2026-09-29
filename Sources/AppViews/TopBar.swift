@@ -50,7 +50,24 @@ struct TopBar: View {
                 Picker("Shift", selection: model.doubleBinding("shift")) {
                     ForEach([170.0, 200, 425, 850], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
                 }.fixedSize()
+                Text(model.fig ? "FIGS" : "LTRS")
+                    .font(.caption.monospaced().bold()).padding(.horizontal, 4).padding(.vertical, 2)
+                    .background((model.fig ? Color.orange : Color.secondary).opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
+                    .help("Stav přijímače LTRS/FIGS")
+                Toggle("UOS", isOn: model.boolBinding("uos")).toggleStyle(.button)
+                    .help("Unshift on space – po mezeře zpět na písmena")
                 Spacer()
+                Toggle("BPF", isOn: model.boolBinding("bpf")).toggleStyle(.button).help("Vstupní pásmová propust")
+                Toggle(model.param("lmsType") == .string("lms") ? "LMS" : "NOT", isOn: model.boolBinding("lms"))
+                    .toggleStyle(.button)
+                    .help("Zářez (notch) nebo LMS filtr · pravé tlačítko ve spektru = zářez · kontextová nabídka = typ")
+                    .contextMenu {
+                        Button("Notch (zářez)") { Task { await model.setParam("lmsType", .string("notch")) } }
+                        Button("LMS") { Task { await model.setParam("lmsType", .string("lms")) } }
+                        Toggle("Dva zářezy", isOn: model.boolBinding("twoNotch"))
+                    }
+                Toggle("AA6YQ", isOn: model.boolBinding("aa6yq")).toggleStyle(.button)
+                    .help("Filtr AA6YQ (BPF mark–space + zádrž mezi nimi)")
                 Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
                     .toggleStyle(.button).help("XY scope (křížový indikátor ladění)")
                 Toggle("AFC", isOn: model.boolBinding("afc")).toggleStyle(.button)

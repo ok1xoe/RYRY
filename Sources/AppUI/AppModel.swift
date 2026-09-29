@@ -375,6 +375,22 @@ public final class AppModel {
         try? settingsStore.save(settings)
     }
 
+    /// Pravé tlačítko ve spektru: zářez (notch) jako MMTTY.
+    public func notchClick(hz: Double) async {
+        guard let app else { return }
+        await app.notchClick(hz: hz)
+        await refreshParams()
+    }
+
+    /// Kmitočty aktivních zářezů pro vykreslení (prázdné, když je LMS/notch vypnutý).
+    public var notchMarkers: [Double] {
+        guard params["lms"] == .bool(true), params["lmsType"] == .string("notch") else { return [] }
+        var r: [Double] = []
+        if case .int(let n)? = params["notchFreq"], n > 0 { r.append(Double(n)) }
+        if params["twoNotch"] == .bool(true), case .int(let n)? = params["notch2Freq"], n > 0 { r.append(Double(n)) }
+        return r
+    }
+
     public func tune(toMarkHz hz: Double) async {
         await setParam("mark", .double((hz * 10).rounded() / 10))
     }

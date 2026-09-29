@@ -218,6 +218,8 @@ public final class RTTYModem: Modem, @unchecked Sendable {
     /// XY scope (mark/space) – zapnout sběr.
     public func setXYScope(_ on: Bool) { rttycore_set_xy(core, on ? 1 : 0) }
 
+    public func notchClick(hz: Double) { rttycore_notch_click(core, hz) }
+
     /// Poslední plná dávka bodů XY scope (x = mark, y = space), nebo nil.
     public func xyScope() -> [XYPoint]? {
         var x = [Float](repeating: 0, count: 512), y = x

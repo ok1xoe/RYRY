@@ -204,3 +204,24 @@ func largeMarkJumpsKeepShift(from: Double, to: Double) throws {
     #expect(m.get(parameter: "mark") == .double(to))
     #expect(m.get(parameter: "shift") == .double(170))
 }
+
+// Plán 7 / T1
+@Test func plan7FilterParametersExposed() throws {
+    let m = try RTTYModem()
+    let ids = Set(m.parameters.map(\.id))
+    for id in ["aa6yq", "aa6yqBpfTaps", "aa6yqBpfWidth", "aa6yqBefTaps", "aa6yqBefWidth", "lmsType", "notchFreq",
+               "notch2Freq", "twoNotch", "notchTaps", "lmsTaps", "lmsMu2", "lmsGamma", "lmsDelay", "lmsAGC",
+               "lmsInvert", "lmsBPF", "pllVcoGain", "pllLoopOrder", "pllLoopFc", "pllOutOrder", "pllOutFc",
+               "txBPF", "txLPF", "txLPFFreq", "charWait", "charWaitDiddle", "randomDiddle"] {
+        #expect(ids.contains(id), "\(id)")
+    }
+    try m.set(parameter: "aa6yq", value: .bool(true))
+    #expect(m.get(parameter: "aa6yq") == .bool(true))
+}
+
+@Test func notchClickThroughModem() throws {
+    let m = try RTTYModem()
+    m.notchClick(hz: 1700)
+    #expect(m.get(parameter: "lms") == .bool(true))
+    #expect(m.get(parameter: "notchFreq") == .int(1700))
+}

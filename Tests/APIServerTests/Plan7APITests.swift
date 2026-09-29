@@ -1,0 +1,16 @@
+import Foundation
+import Testing
+@testable import APIServer
+
+@Test func jsonRPCNotchMethod() async throws {
+    let h = try await makeAPIHarness()
+    let (srv, port) = try await jsonServer(h)
+    defer { srv.stop() }
+    let c = WSClient(port: port)
+    let r = try await c.call("modem.notch", ["hz": 1800])
+    let p = r["result"] as? [String: Any]
+    #expect(p?["notchFreq"] as? Int == 1800)
+    #expect(p?["lms"] as? Bool == true)
+    let bad = try await c.call("modem.notch", ["hz": "x"])
+    #expect((bad["error"] as? [String: Any])?["code"] as? Int == -32602)
+}
