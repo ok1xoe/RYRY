@@ -86,6 +86,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     }
 
     public var isRunning: Bool { lock.withLock { process?.isRunning ?? false } }
+    public var isIdle: Bool { !isRunning }
 
     private func startProcess() throws {
         if isRunning { return }

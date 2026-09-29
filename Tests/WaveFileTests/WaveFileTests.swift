@@ -89,3 +89,13 @@ func readsMoreWaveFormats(format: UInt16, bits: UInt16, ext: Bool) throws {
     #expect(rate == 11025 && s.count == 6)
     for (x, y) in zip(s, a + b) { #expect(abs(x - y) < 0.0001) }
 }
+
+// Review (odloženo): hlavička se průběžně aktualizuje – nahrávka přerušená pádem jde přečíst
+@Test func streamingWriterHeaderWithoutClose() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("rec-\(UUID()).wav")
+    let w = try WaveWriter(url: url, sampleRate: 11025)
+    try w.append([Float](repeating: 0.5, count: 1000))
+    let (s, _) = try WaveFile.read(from: url)            // bez close()
+    #expect(s.count == 1000)
+    try w.close()
+}

@@ -246,3 +246,9 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Výchozí jazyk rozhraní (bez uložené volby) je angličtina (`LanguageLibrary.defaultCode`); klíče překladů zůstávají české. Výslovně zvolená čeština se pamatuje v UserDefaults `language`.
 - Čeština má vlastní soubor `cs.json` (hodnota = klíč; bez souboru funguje vestavěná). Při startu se přibalené `cs.json`/`en.json` kopírují do `Application Support/mmtty4mac/Languages`; neupravená kopie se s novou verzí obnoví (otisk SHA-256 v `.<kód>.json.seeded`), upravenou aplikace nepřepíše. Soubor ve složce má přednost, chybějící/prázdné texty doplní přibalená verze.
 - Složku jazyků hlídá `LanguageWatcher` (DispatchSource na adresáři, prodleva 250 ms): uložený soubor aktivního jazyka se hned znovu načte na hlavní frontě; rozbitý soubor jazyk nezmění. Ověřeno v běžící aplikaci (okna, Nastavení i lišta menu se přepnou živě).
+
+## Plán 15 (DUPE, pásmo bez rigu, Super Check Partial, odložené drobnosti)
+- DUPE: stejná základní značka (bez /P…), pásmo a mód od začátku závodu (`contest.effectiveStart`); jen upozornění (červený štítek u Call), zalogovat lze. Bez známého pásma se porovná značka a mód.
+- Pásmo bez rigu: pole `freq` v QSO okně (kHz) + nabídka pásem s obvyklými RTTY kmitočty; do logu jde frekvence rigu (online), jinak ruční. Ruční frekvence zůstává po Clear/zalogování a pamatuje se v `log.manualFrequency`.
+- Super Check Partial: MASTER.SCP v Application Support (stahuje se jen tlačítkem v Nastavení → Závod) + značky z otevřeného logu; návrhy od 3 znaků, `?` = libovolný znak, „≈“ = jedna úprava (záměna/vložení/smazání); max. 30 návrhů, zobrazí se 12.
+- Odložené drobnosti opraveny: pojistné CAT „RX“ při PTT RTS/DTR jen otevřenému rigu (`Rig.isIdle`) s čekáním max. 0,3 s; zalamování během TX počítá odvysílaný text (`txSentColumn`); selhání záznamu příjmu vypne přepínač; hlavička WAV se aktualizuje po každém zápisu; zápis na port CAT má limit 1 s (`cserial_write_timeout`).

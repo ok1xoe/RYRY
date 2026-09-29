@@ -37,7 +37,7 @@ let package = Package(
         .target(name: "XMLRPC"),
         .testTarget(name: "XMLRPCTests", dependencies: ["XMLRPC"]),
         .target(name: "RigControl", dependencies: ["XMLRPC", "CSerial"]),
-        .testTarget(name: "RigControlTests", dependencies: ["RigControl", "XMLRPC"]),
+        .testTarget(name: "RigControlTests", dependencies: ["RigControl", "XMLRPC", "CSerial"]),
         .target(name: "CSerial"),
         .target(name: "Keying", dependencies: ["CSerial", "RigControl"]),
         .target(name: "TestSupport", dependencies: ["Keying", "AudioIO"]),

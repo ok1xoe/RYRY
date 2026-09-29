@@ -27,7 +27,7 @@ public struct SettingsView: View {
                 PTTTab(s: $draft).tabItem { Label("PTT / FSK", systemImage: "cable.connector") }.tag(2)
                 RigTab(s: $draft).tabItem { Label("Rig", systemImage: "antenna.radiowaves.left.and.right") }.tag(3)
                 ModemTab(model: model, s: $draft).tabItem { Label("Modem", systemImage: "slider.horizontal.3") }.tag(4)
-                ContestTab(s: $draft).tabItem { Label(L("Závod"), systemImage: "trophy") }.tag(5)
+                ContestTab(s: $draft, model: model).tabItem { Label(L("Závod"), systemImage: "trophy") }.tag(5)
                 DisplayTab(s: $draft).tabItem { Label(L("Zobrazení"), systemImage: "paintpalette") }.tag(6)
                 APITab(s: $draft).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
                 KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
@@ -567,6 +567,9 @@ struct ModemTab: View {
 
 struct ContestTab: View {
     @Binding var s: AppSettings
+    @Bindable var model: AppModel
+    @State private var scpStatus: String?
+    @State private var downloading = false
 
     /// Vybraná předvolba; výběr závodu nastaví jeho nejbližší termín, „Vlastní“ nechá hodnoty k ruční úpravě.
     var presetBinding: Binding<ContestPreset?> {
@@ -640,6 +643,25 @@ struct ContestTab: View {
             Section {
                 Text(L("%N odesílané číslo nebo výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST")).font(.callout)
             } header: { Text(L("Makra")) }
+            Section {
+                Toggle(L("Návrhy značek pod polem Call"), isOn: $s.log.superCheck)
+                LabeledContent(L("Databáze značek")) {
+                    HStack {
+                        Text(L("%ld značek", model.scpCount)).foregroundStyle(.secondary).monospacedDigit()
+                        Button(downloading ? L("Stahuji…") : L("Stáhnout MASTER.SCP")) {
+                            downloading = true; scpStatus = nil
+                            Task {
+                                do { scpStatus = L("Staženo %ld značek.", try await model.downloadSuperCheck()) }
+                                catch { scpStatus = error.localizedDescription }
+                                downloading = false
+                            }
+                        }.disabled(downloading)
+                    }
+                }
+                if let scpStatus { Text(scpStatus).font(.caption).foregroundStyle(.secondary) }
+            } header: { Text("Super Check Partial") } footer: {
+                Text(L("Při psaní značky nabízí známé značky z MASTER.SCP (supercheckpartial.com) a z vašeho logu; „≈“ = značky lišící se o jeden znak (oprava chybně přijaté značky). V závodě červené DUPE upozorní na opakované spojení na stejném pásmu a módu."))
+            }
         }
         .formStyle(.grouped)
     }

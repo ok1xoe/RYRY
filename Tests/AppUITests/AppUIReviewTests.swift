@@ -148,3 +148,36 @@ import WaveFile
     #expect(f.model.settings.log.name == "cizi")                     // dialog log nevrátil
     await f.model.stop()
 }
+
+// Bod 1, 2, 4: návrhy značek z logu, DUPE v závodě, ruční frekvence se pamatuje v nastavení
+@Test @MainActor func scpDupeAndManualFrequency() async throws {
+    let f = Fixture()
+    f.configure = { $0.contest = ContestSettings.preset(.cqwpxRTTY, year: 2026); $0.contest.start = Date().addingTimeInterval(-3600) }
+    await f.model.start()
+    await f.model.setQSOField("freq", "14080")
+    await f.model.setQSOField("call", "DL1ABC")
+    await f.model.logQSO(); await f.settle()
+    #expect(f.model.settings.log.manualFrequency == 14_080_000)
+    await f.model.setQSOField("call", "1AB"); await f.settle()
+    #expect(f.model.scpPartial == ["DL1ABC"])
+    await f.model.setQSOField("call", "DL1ABX"); await f.settle()
+    #expect(f.model.scpNear == ["DL1ABC"])
+    await f.model.setQSOField("call", "DL1ABC"); await f.settle()
+    #expect(f.model.isDupe)
+    await f.model.setQSOField("freq", "7040"); await f.settle()
+    #expect(!f.model.isDupe)
+    await f.model.stop()
+}
+
+// Review (odloženo): selhání záznamu příjmu vypne i přepínač (menu neukazuje „zapnuto“)
+@Test @MainActor func rxLogFailureTurnsToggleOff() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let blocker = URL(fileURLWithPath: f.model.settings.log.directory).appendingPathComponent("rx")
+    try FileManager.default.createDirectory(at: blocker.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data("x".utf8).write(to: blocker)               // místo složky rx soubor → zápis selže
+    f.model.setRxTextLog(true)
+    f.model.appendRx("CQ", echo: false)
+    #expect(!f.model.settings.log.rxText && !f.model.rxLogActive)
+    await f.model.stop()
+}

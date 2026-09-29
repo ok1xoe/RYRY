@@ -2,6 +2,7 @@
 import AppUI
 import QSOLog
 import Settings
+import AppCore
 import SwiftUI
 import Localization
 
@@ -48,8 +49,27 @@ struct QSOPanel: View {
                         case .single(let field, let title):
                             GridRow {
                                 label(title)
-                                QSOField(model: model, label: "", field: field)
-                                    .font(field == "call" ? .title3.monospaced() : .body).gridCellColumns(3)
+                                if field == "call" {
+                                    HStack(spacing: 6) {
+                                        QSOField(model: model, label: "", field: field,
+                                                 onTyping: { model.superCheckPreview($0) })
+                                            .font(.title3.monospaced())
+                                        if model.isDupe {
+                                            Text("DUPE").font(.caption.bold()).foregroundStyle(.white)
+                                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                                .background(.red, in: RoundedRectangle(cornerRadius: 4))
+                                                .hint(L("Duplicita: se stanicí už je v tomto závodě spojení na stejném pásmu a módu"))
+                                        }
+                                    }.gridCellColumns(3)
+                                } else {
+                                    QSOField(model: model, label: "", field: field).gridCellColumns(3)
+                                }
+                            }
+                            if field == "call", !model.scpPartial.isEmpty || !model.scpNear.isEmpty {
+                                GridRow {
+                                    Color.clear.frame(width: 1, height: 1)
+                                    SuperCheckList(model: model).gridCellColumns(3)
+                                }
                             }
                         case .pair(let f1, let t1, let f2, let t2):
                             GridRow {
@@ -70,6 +90,7 @@ struct QSOPanel: View {
                         }
                     }
                 }
+                FrequencyRow(model: model)
                 HStack {
                     Button("Log") { Task { await model.logQSO() } }.hint(L("Zalogovat (⌘L)"))
                     Button("Clear") { Task { await model.clearQSO() } }
@@ -97,6 +118,8 @@ struct QSOField: View {
     @Bindable var model: AppModel
     let label: String
     let field: String
+    /// Volá se při každé změně textu (Super Check Partial u značky).
+    var onTyping: ((String) -> Void)? = nil
     @State private var text = ""
     @FocusState private var focused: Bool
 
@@ -106,6 +129,7 @@ struct QSOField: View {
             .focused($focused)
             .onSubmit { commit() }
             .onChange(of: focused) { if !focused { commit() } }
+            .onChange(of: text) { _, t in if focused { onTyping?(t) } }
             .onChange(of: model.qso.value(field) ?? "") { _, v in if !focused { text = v } }
             .onAppear { text = model.qso.value(field) ?? "" }
     }
@@ -114,5 +138,60 @@ struct QSOField: View {
         guard text != (model.qso.value(field) ?? "") else { return }
         let v = text
         Task { await model.setQSOField(field, v) }
+    }
+}
+
+/// Návrhy značek (Super Check Partial): klik vloží značku do QSO okna.
+struct SuperCheckList: View {
+    @Bindable var model: AppModel
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if !model.scpPartial.isEmpty { chips(model.scpPartial, color: .secondary) }
+            if !model.scpNear.isEmpty {
+                HStack(spacing: 4) {
+                    Text("≈").font(.caption.bold()).foregroundStyle(.orange).hint(L("Značky lišící se o jeden znak"))
+                    chips(model.scpNear, color: .orange)
+                }
+            }
+        }
+    }
+
+    func chips(_ calls: [String], color: Color) -> some View {
+        // jednoduchý zalamovaný seznam (ViewThatFits by nestačil) – po řádcích max. 4 značky
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(stride(from: 0, to: min(calls.count, 12), by: 4)), id: \.self) { i in
+                HStack(spacing: 4) {
+                    ForEach(calls[i..<min(i + 4, calls.count, 12)], id: \.self) { c in
+                        Button(c) { Task { await model.setQSOField("call", c) } }
+                            .buttonStyle(.borderless).font(.caption.monospaced()).foregroundStyle(color)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Pásmo a frekvence: z rigu, nebo ručně (bez CAT) – zapíše se do logu.
+struct FrequencyRow: View {
+    @Bindable var model: AppModel
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(L("Pásmo")).font(.callout).foregroundStyle(.secondary)
+            if let f = model.rig?.frequency, model.rig?.online == true {
+                Text("\(Bands.band(forHz: f) ?? "?") · \(QSOFields.kHzString(f)) kHz").monospacedDigit()
+                Text("(rig)").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Menu(Bands.band(forHz: model.qso.frequency) ?? L("zvolit")) {
+                    ForEach(AppModel.bandPresets, id: \.0) { b in
+                        Button("\(b.0) (\(Int(b.1)) kHz)") { Task { await model.setQSOField("freq", String(b.1)) } }
+                    }
+                    Divider()
+                    Button(L("Bez frekvence")) { Task { await model.setQSOField("freq", "") } }
+                }.fixedSize()
+                QSOField(model: model, label: "kHz", field: "freq").frame(width: 90)
+                Text("kHz").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .hint(L("Bez rigu zadejte pásmo nebo frekvenci ručně – zapíše se do logu"))
     }
 }

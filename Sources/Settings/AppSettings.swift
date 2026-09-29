@@ -151,6 +151,10 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public var name = "mmtty4mac"
     /// Naposledy otevřené logy (cesty k ADIF), nejnovější první.
     public var recent: [String] = []
+    /// Ručně zadaná frekvence (Hz) pro spojení bez rigu – pamatuje se mezi spuštěními.
+    public var manualFrequency: Double?
+    /// Super Check Partial (MASTER.SCP + značky z logu) pod polem Call.
+    public var superCheck = true
     public static let recentLimit = 8
     public mutating func remember(_ path: String) {
         recent.removeAll { $0 == path }
@@ -166,12 +170,15 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public var rxTimestamps = true
     public init() {}
     public var rxDirectory: URL { URL(fileURLWithPath: directory).appendingPathComponent("rx") }
-    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps }
+    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps, manualFrequency, superCheck }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), x = LogSettings()
         directory = c.tolerant(.directory, x.directory, d.warningSink, "log")
         let n = c.tolerant(.name, x.name, d.warningSink, "log"); name = Self.validName(n) ? n : x.name
         recent = Array(c.tolerant(.recent, TolerantArray<String>(), d.warningSink, "log").items.prefix(Self.recentLimit))
+        let mf: Double? = c.tolerant(.manualFrequency, nil, d.warningSink, "log")
+        manualFrequency = mf.flatMap { $0.isFinite && $0 > 10_000 && $0 < 10e9 ? $0 : nil }
+        superCheck = c.tolerant(.superCheck, x.superCheck, d.warningSink, "log")
         rxText = c.tolerant(.rxText, x.rxText, d.warningSink, "log")
         rxTimestamps = c.tolerant(.rxTimestamps, x.rxTimestamps, d.warningSink, "log")
     }

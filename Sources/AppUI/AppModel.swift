@@ -95,6 +95,8 @@ public final class AppModel {
     private var sqTarget: Double?
     private var sqChain: Task<Void, Never>?
     var lastSentForTesting = ""
+    /// Sloupec odvysílaného textu v aktuálním řádku (pro zalamování během TX); po přechodu na RX 0.
+    public private(set) var txSentColumn = 0
     private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
     static var micWaitMessage: String { L("Čekám na povolení přístupu k mikrofonu (systémový dialog)…") }
     public var waterfallFromHz: Double { settings.display.fromHz }
@@ -207,6 +209,8 @@ public final class AppModel {
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
+        await loadSuperCheck()
+        await refreshDupe()
         profileNames = profileStore.load().map { $0?.name }
         if xyEnabled { await engine.setXYScope(true) }
         if demodScopeEnabled { await engine.setDemodScope(true) }
@@ -292,7 +296,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
+                take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
@@ -318,6 +322,7 @@ public final class AppModel {
         case .engine(.state(let s)):
             let prev = state
             state = s
+            if s == .rx { txSentColumn = 0 }
             // MMTTY „Time stamp“: UTC čas při přepnutí na TX a zpět
             if settings.display.timestamps, prev != s {
                 if prev == .rx, s != .stopped { appendRx("\r\n[\(Self.stampFmt.string(from: Date())) UTC TX]\r\n", echo: true) }
@@ -333,10 +338,18 @@ public final class AppModel {
         case .engine(.pttTimeout): note(L("PTT časovač vypnul vysílání"))
         case .error(let m): note(m)
         case .qsoChanged(let q):
-            let callChanged = q.call != qso.call
+            let callChanged = q.call != qso.call, freqChanged = q.frequency != qso.frequency
             qso = q
-            if callChanged { Task { await self.refreshPrevious(); await self.refreshQTC() } }
-        case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious(); await self.refreshQTC() }
+            if callChanged { updateSuperCheck(); Task { await self.refreshPrevious(); await self.refreshQTC() } }
+            if callChanged || freqChanged { Task { await self.refreshDupe() } }
+            if q.frequency != settings.log.manualFrequency {
+                settings.log.manualFrequency = q.frequency
+                try? settingsStore.save(settings)
+            }
+        case .qsoLogged(let r):
+            logRecords.insert(r, at: 0)
+            if historyCalls.insert(r.call).inserted { rebuildSuperCheck() }
+            Task { await self.refreshPrevious(); await self.refreshQTC(); await self.refreshDupe() }
         case .qtcChanged: Task { await self.refreshQTC(); await self.refreshQTCSeries() }
         case .contestSerial(let n):
             settings.contest.nextSerial = n
@@ -358,6 +371,8 @@ public final class AppModel {
         if let rxLog {
             do { try rxLog.append(s) } catch {
                 self.rxLog = nil
+                settings.log.rxText = false                      // přepínač v menu nesmí lhát
+                try? settingsStore.save(settings)
                 note(L("Záznam příjmu do souboru selhal: %@", "\(error)"))
             }
         }
@@ -420,6 +435,69 @@ public final class AppModel {
             .write(to: url, options: .atomic)
     }
     public func clearRx() { rxTrimmedTotal += rxCharCount; rxRuns.removeAll(); rxCharCount = 0 }
+
+    // MARK: Duplicita a Super Check Partial
+
+    /// Značka v QSO okně je v závodě duplicita (stejné pásmo a mód).
+    public private(set) var isDupe = false
+    /// Návrhy pod polem Call: značky obsahující zadanou část a značky lišící se o jeden znak.
+    public private(set) var scpPartial: [String] = []
+    public private(set) var scpNear: [String] = []
+    public private(set) var scpCount = 0
+    private var scpMaster: [String] = []
+    private var historyCalls: Set<String> = []
+    private var superCheck = SuperCheck(calls: [])
+
+    func refreshDupe() async { isDupe = await app?.dupe() ?? false }
+
+    /// Soubor MASTER.SCP (Application Support/mmtty4mac).
+    public static var scpURL: URL {
+        (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory).appendingPathComponent("mmtty4mac/MASTER.SCP")
+    }
+
+    /// Načte MASTER.SCP a značky z logu (po startu a po přepnutí logu).
+    func loadSuperCheck() async {
+        let url = Self.scpURL
+        scpMaster = await Task.detached { (try? String(contentsOf: url, encoding: .utf8)).map(SuperCheck.parse) ?? [] }.value
+        historyCalls = Set(logRecords.map(\.call))
+        rebuildSuperCheck()
+    }
+
+    private func rebuildSuperCheck() {
+        superCheck = SuperCheck(calls: scpMaster + Array(historyCalls))
+        scpCount = superCheck.count
+        updateSuperCheck()
+    }
+
+    private func updateSuperCheck() { superCheckPreview(qso.call) }
+
+    /// Návrhy pro rozepsanou značku (volá se při psaní, ještě před potvrzením pole).
+    public func superCheckPreview(_ text: String) {
+        guard settings.log.superCheck else { scpPartial = []; scpNear = []; return }
+        let t = text.trimmingCharacters(in: .whitespaces).uppercased()
+        scpPartial = superCheck.partial(t).filter { $0 != t }
+        scpNear = superCheck.near(t)
+    }
+
+    /// Běžné RTTY kmitočty pásem (kHz) pro ruční volbu bez rigu.
+    public static let bandPresets: [(String, Double)] = [("160m", 1838), ("80m", 3590), ("40m", 7040), ("30m", 10140),
+        ("20m", 14080), ("17m", 18100), ("15m", 21080), ("12m", 24920), ("10m", 28080), ("6m", 50300)]
+
+    /// Stáhne aktuální MASTER.SCP (supercheckpartial.com) – jen na pokyn uživatele.
+    public func downloadSuperCheck() async throws -> Int {
+        let src = URL(string: "https://www.supercheckpartial.com/MASTER.SCP")!
+        let (data, resp) = try await URLSession.shared.data(from: src)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200, let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1)
+        else { throw QSOLogError.io(L("MASTER.SCP se nepodařilo stáhnout.")) }
+        let calls = SuperCheck.parse(text)
+        guard calls.count > 1000 else { throw QSOLogError.io(L("MASTER.SCP se nepodařilo stáhnout.")) }
+        try FileManager.default.createDirectory(at: Self.scpURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: Self.scpURL, options: .atomic)
+        scpMaster = calls
+        rebuildSuperCheck()
+        return calls.count
+    }
 
     private func refreshPrevious() async {
         guard let log = app?.log, !qso.call.isEmpty else { previousQSOs = []; return }
@@ -861,6 +939,7 @@ public final class AppModel {
         guard !part.isEmpty else { return }
         txDraft = String(txDraft[cut...])
         let out = part.replacingOccurrences(of: "\n", with: "\r\n")
+        txSentColumn = TxWrap.column(afterSending: out, from: txSentColumn)
         lastSentForTesting = out
         await app.send(text: out)
     }

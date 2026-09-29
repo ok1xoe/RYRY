@@ -83,3 +83,24 @@ int cserial_read(int fd, unsigned char* buf, unsigned long n, int timeout_ms, lo
 }
 
 int cserial_flush_input(int fd) { return tcflush(fd, TCIFLUSH) < 0 ? errno : 0; }
+
+/* Zápis s celkovým limitem (zaseknutý USB CDC nesmí zablokovat vlákno natrvalo): ETIMEDOUT po limitu. */
+int cserial_write_timeout(int fd, const unsigned char* buf, unsigned long n, int timeout_ms) {
+    unsigned long done = 0;
+    int left = timeout_ms;
+    while (done < n) {
+        struct pollfd p = { .fd = fd, .events = POLLOUT };
+        int r = poll(&p, 1, left > 0 ? left : 0);
+        if (r < 0) { if (errno == EINTR) continue; return errno; }
+        if (r == 0) return ETIMEDOUT;
+        if (p.revents & (POLLHUP | POLLNVAL | POLLERR)) return EIO;
+        int flags = fcntl(fd, F_GETFL);
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);             /* nezablokovat, když se vejde jen část */
+        ssize_t k = write(fd, buf + done, n - done);
+        int e = errno;
+        fcntl(fd, F_SETFL, flags);
+        if (k < 0) { if (e == EAGAIN || e == EINTR) { left -= 10; if (left <= 0) return ETIMEDOUT; usleep(10000); continue; } return e; }
+        done += (unsigned long)k;
+    }
+    return 0;
+}

@@ -16,10 +16,21 @@ public struct QSOFields: Codable, Sendable, Equatable {
     public var serialSent: Int?, serialRcvd: Int?
     public var exchangeSent = "", exchangeRcvd = "", notes = ""
     public var timeOn: Date?
+    /// Ručně zadaná frekvence v Hz (bez rigu); zůstává i pro další spojení.
+    public var frequency: Double?
     public init() {}
 
     public static let fieldNames = ["call", "name", "qth", "locator", "rstSent", "rstRcvd",
-                                    "serialSent", "serialRcvd", "exchangeSent", "exchangeRcvd", "notes"]
+                                    "serialSent", "serialRcvd", "exchangeSent", "exchangeRcvd", "notes", "freq"]
+
+    /// Frekvence v kHz pro zobrazení (bez zbytečných nul).
+    public static func kHzString(_ hz: Double?) -> String {
+        guard let hz else { return "" }
+        var s = String(format: "%.3f", hz / 1000)
+        while s.hasSuffix("0") { s.removeLast() }
+        if s.hasSuffix(".") { s.removeLast() }
+        return s
+    }
     public func value(_ name: String) -> String? {
         switch name {
         case "call": return call; case "name": return name_
@@ -29,6 +40,7 @@ public struct QSOFields: Codable, Sendable, Equatable {
         case "serialRcvd": return serialRcvd.map(String.init) ?? ""
         case "exchangeSent": return exchangeSent; case "exchangeRcvd": return exchangeRcvd
         case "notes": return notes
+        case "freq": return Self.kHzString(frequency)
         default: return nil
         }
     }
@@ -36,7 +48,7 @@ public struct QSOFields: Codable, Sendable, Equatable {
 }
 
 public enum AppError: Error, Equatable, Sendable {
-    case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String), qtc(String)
+    case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String), qtc(String), badValue(String)
 }
 
 public enum AppEvent: Sendable {
@@ -97,6 +109,7 @@ public actor AppController {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
         self.countries = countries; self.qtcStore = qtc
         qso = Self.contestDefaults(settings.contest)
+        qso.frequency = settings.log.manualFrequency
         if settings.contest.enabled, settings.contest.sendsOwnZone, qso.exchangeSent.isEmpty,
            let z = countries?.lookup(settings.station.call)?.cqZone {
             qso.exchangeSent = String(z)
@@ -287,13 +300,20 @@ public actor AppController {
         case "exchangeSent": qso.exchangeSent = v
         case "exchangeRcvd": qso.exchangeRcvd = v
         case "notes": qso.notes = v
+        case "freq":
+            if v.isEmpty { qso.frequency = nil; break }
+            guard let k = Double(v.replacingOccurrences(of: ",", with: ".")), k.isFinite, k > 10, k < 10_000_000
+            else { throw AppError.badValue(L("Neplatná frekvence „%@“ (zadejte kHz, např. 14080).", v)) }
+            qso.frequency = (k * 1000).rounded()
         default: throw AppError.unknownField(name)
         }
         broadcaster.send(.qsoChanged(qso))
     }
 
     public func clearQSO() {
+        let f = qso.frequency
         qso = QSOFields()
+        qso.frequency = f                                // pásmo zůstává pro další spojení
         applyContestDefaults()
         broadcaster.send(.qsoChanged(qso))
     }
@@ -308,6 +328,23 @@ public actor AppController {
         }
     }
 
+    /// Frekvence pro log: rig online, jinak ručně zadaná.
+    func currentFrequency(manual: Double?) async -> Double? {
+        if let st = await engine.rigStatus, st.online, let f = st.frequency { return f }
+        return manual
+    }
+
+    /// Duplicita v závodě pro značku v QSO okně (stejná stanice, pásmo a mód od začátku závodu).
+    public func dupe() async -> Bool {
+        guard settings.contest.enabled, !qso.call.isEmpty, let log else { return false }
+        let band = Bands.band(forHz: await currentFrequency(manual: qso.frequency))
+        let mode = await engine.currentMode().adifMode
+        return DupeCheck.isDupe(call: qso.call, band: band, mode: mode, records: await log.previous(call: qso.call),
+                                since: settings.contest.effectiveStart)
+    }
+
+    func updateSettingsForTesting(_ s: AppSettings) { settings = s }
+
     @discardableResult
     public func logQSO() async throws -> QSORecord {
         guard let log else { throw AppError.noLog }
@@ -317,7 +354,7 @@ public actor AppController {
         let now = Date()
         var r = QSORecord(call: qso.call, timeOn: qso.timeOn ?? now, mode: await engine.currentMode().adifMode)
         r.timeOff = now
-        r.frequency = await engine.rigStatus?.frequency
+        r.frequency = await currentFrequency(manual: qso.frequency)
         r.rstSent = qso.rstSent; r.rstRcvd = qso.rstRcvd
         r.name = qso.name.isEmpty ? nil : qso.name
         r.qth = qso.qth.isEmpty ? nil : qso.qth
