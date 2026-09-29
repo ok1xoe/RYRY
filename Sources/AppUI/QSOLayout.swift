@@ -1,4 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import Localization
 import Settings
 
 /// Která pole QSO okna se nabízejí – podle toho, zda je zapnutý závod a jakého formátu.
@@ -20,11 +21,11 @@ public enum QSOLayout {
         switch c.format {
         case .serial:
             return base + [c.exchange.isEmpty ? serial : .pair("exchangeSent", "Exch s", "exchangeRcvd", "Exch r"), notes]
-        case .cqrj: return base + [.pair("exchangeSent", "Zóna/QTH s", "exchangeRcvd", "Zóna/QTH r"), notes]
-        case .bartg: return base + [serial, .pair("exchangeSent", "Čas s", "exchangeRcvd", "Čas r"), notes]
+        case .cqrj: return base + [.pair("exchangeSent", L("Zóna/QTH s"), "exchangeRcvd", L("Zóna/QTH r")), notes]
+        case .bartg: return base + [serial, .pair("exchangeSent", L("Čas s"), "exchangeRcvd", L("Čas r")), notes]
         case .ped: return base + [notes]
         case .wae: return base + [serial, notes]
-        case .zone: return base + [.pair("exchangeSent", "Zóna s", "exchangeRcvd", "Zóna r"), notes]
+        case .zone: return base + [.pair("exchangeSent", L("Zóna s"), "exchangeRcvd", L("Zóna r")), notes]
         }
     }
 

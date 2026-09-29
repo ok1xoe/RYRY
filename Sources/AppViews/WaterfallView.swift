@@ -3,6 +3,7 @@ import AppKit
 import AppUI
 import ModemKit
 import SwiftUI
+import Localization
 
 /// Zářezy (notch) – červené čárkované čáry.
 @MainActor func drawNotches(_ ctx: GraphicsContext, _ size: CGSize, _ model: AppModel) {
@@ -56,7 +57,7 @@ struct WaterfallView: View {
                     let hz = model.waterfallFromHz + Double(loc.x / g.size.width) * (model.waterfallToHz - model.waterfallFromHz)
                     Task { await model.tune(toMarkHz: hz) }
                 }
-                .help("Klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = úroveň squelche")
+                .help(L("Klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = úroveň squelche"))
                 .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
                                             onRightClick: { f in notch(f) }))
                 if model.xyEnabled {
@@ -177,7 +178,7 @@ struct SpectrumView: View {
                 let hz = model.waterfallFromHz + f * (model.waterfallToHz - model.waterfallFromHz)
                 Task { await model.notchClick(hz: hz) }
             }))
-            .help("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch")
+            .help(L("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch"))
             .overlay(alignment: .topLeading) { SpectrumMenu(model: model).padding(4) }
         }
     }
@@ -188,18 +189,18 @@ struct SpectrumMenu: View {
     @Bindable var model: AppModel
     var body: some View {
         Menu {
-            Section("Rozsah") {
+            Section(L("Rozsah")) {
                 ForEach(DisplayTab.ranges, id: \.0) { r in
                     Button((model.waterfallFromHz == r.1 && model.waterfallToHz == r.2 ? "✓ " : "") + r.0) {
                         Task { await model.setDisplay { $0.fromHz = r.1; $0.toHz = r.2 } }
                     }
                 }
             }
-            Section("Zesílení (\(Int(model.settings.display.gainDB)) dB)") {
+            Section(L("Zesílení (%ld dB)", Int(model.settings.display.gainDB))) {
                 Button("+3 dB") { Task { await model.setDisplay { $0.gainDB += 3 } } }
                 Button("−3 dB") { Task { await model.setDisplay { $0.gainDB -= 3 } } }
                 Button("0 dB") { Task { await model.setDisplay { $0.gainDB = 0 } } }
-                Button((model.settings.display.autoGain ? "✓ " : "") + "Automatické zesílení") {
+                Button((model.settings.display.autoGain ? "✓ " : "") + L("Automatické zesílení")) {
                     Task { await model.setDisplay { $0.autoGain.toggle() } }
                 }
             }
@@ -211,6 +212,6 @@ struct SpectrumMenu: View {
                 .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 3))
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-        .help("Rozsah a zesílení spektra a vodopádu")
+        .help(L("Rozsah a zesílení spektra a vodopádu"))
     }
 }

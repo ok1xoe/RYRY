@@ -2,6 +2,7 @@
 import AudioIO
 import Engine
 import Foundation
+import Localization
 import Keying
 import ModemKit
 
@@ -217,15 +218,15 @@ public enum ContestPreset: String, CaseIterable, Codable, Sendable {
     /// Termín a výměna jedním řádkem (pro nabídku a popisek v Nastavení).
     public var summary: String {
         switch self {
-        case .arrlRoundup: return "1. celý víkend v lednu · RST + číslo (W/VE stát)"
-        case .cqwpxRTTY: return "2. celý víkend v únoru · RST + číslo"
-        case .bartgHF: return "3. celý víkend v březnu · RST + číslo + čas"
-        case .sartgRTTY: return "3. celý víkend v srpnu · RST + číslo, tři etapy"
-        case .cqwwRTTY: return "poslední celý víkend v září · RST + CQ zóna (W/VE + stát)"
-        case .makrothen: return "2. celý víkend v říjnu · RST + lokátor (4 znaky), tři etapy"
-        case .jartsRTTY: return "3. celý víkend v říjnu · RST + věk operátora (YL 00)"
-        case .waeRTTY: return "2. celý víkend v listopadu · RST + číslo, QTC"
-        case .okDXRTTY: return "3. celý víkend v prosinci · RST + CQ zóna"
+        case .arrlRoundup: return L("1. celý víkend v lednu · RST + číslo (W/VE stát)")
+        case .cqwpxRTTY: return L("2. celý víkend v únoru · RST + číslo")
+        case .bartgHF: return L("3. celý víkend v březnu · RST + číslo + čas")
+        case .sartgRTTY: return L("3. celý víkend v srpnu · RST + číslo, tři etapy")
+        case .cqwwRTTY: return L("poslední celý víkend v září · RST + CQ zóna (W/VE + stát)")
+        case .makrothen: return L("2. celý víkend v říjnu · RST + lokátor (4 znaky), tři etapy")
+        case .jartsRTTY: return L("3. celý víkend v říjnu · RST + věk operátora (YL 00)")
+        case .waeRTTY: return L("2. celý víkend v listopadu · RST + číslo, QTC")
+        case .okDXRTTY: return L("3. celý víkend v prosinci · RST + CQ zóna")
         }
     }
     /// Předvolba odpovídající nastavení (podle názvu a formátu); nil = vlastní nastavení.

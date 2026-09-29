@@ -2,6 +2,7 @@
 import DXCC
 import Engine
 import Foundation
+import Localization
 import MacroEngine
 import ModemKit
 import QSOLog
@@ -167,12 +168,12 @@ public actor AppController {
 
     public func setTxDisabled(_ on: Bool) { txDisabled = on }
     public func tx() async throws {
-        if txDisabled { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        if txDisabled { throw EngineError.pttUnavailable(L("TX zakázáno (rx_only)")) }
         lockBARTGTime()
         try await engine.tx()
     }
     public func tune() async throws {
-        if txDisabled { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        if txDisabled { throw EngineError.pttUnavailable(L("TX zakázáno (rx_only)")) }
         try await engine.tune()
     }
     public func rx() async { await engine.rx() }
@@ -223,7 +224,7 @@ public actor AppController {
         guard settings.macros.indices.contains(index) else { throw AppError.badMacro(index) }
         lockBARTGTime()
         let m = MacroEngine.expand(settings.macros[index].text, context: macroContext())
-        if txDisabled, m.mode == .send { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        if txDisabled, m.mode == .send { throw EngineError.pttUnavailable(L("TX zakázáno (rx_only)")) }
         try await engine.sendMacro(m)
     }
 
@@ -256,7 +257,7 @@ public actor AppController {
         stopMacroRepeat()
         lockBARTGTime()
         let m = MacroEngine.expand(settings.messages[index].text, context: macroContext())
-        if txDisabled, m.mode == .send { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        if txDisabled, m.mode == .send { throw EngineError.pttUnavailable(L("TX zakázáno (rx_only)")) }
         try await engine.sendMacro(m)
     }
     public func setStation(_ st: Station) { settings.station = st }
@@ -312,7 +313,7 @@ public actor AppController {
         guard let log else { throw AppError.noLog }
         lockBARTGTime()
         let qso = self.qso                      // snímek – během await se pole mohou změnit
-        guard !qso.call.isEmpty else { throw AppError.log("chybí značka") }
+        guard !qso.call.isEmpty else { throw AppError.log(L("chybí značka")) }
         let now = Date()
         var r = QSORecord(call: qso.call, timeOn: qso.timeOn ?? now, mode: await engine.currentMode().adifMode)
         r.timeOff = now
@@ -372,17 +373,17 @@ public actor AppController {
     /// Odešle sérii QTC stanici v QSO okně (uloží se až po `confirmSentQTC`).
     /// Kontroluje pravidla: jiný kontinent, limit dvojice, řádky nenahlášené a ne o této stanici.
     public func sendQTC(_ lines: [QTCLine]) async throws {
-        guard qtcStore != nil else { throw AppError.qtc("QTC není k dispozici") }
+        guard qtcStore != nil else { throw AppError.qtc(L("QTC není k dispozici")) }
         let call = qso.call
-        guard !call.isEmpty else { throw AppError.qtc("chybí značka protistanice") }
-        guard !lines.isEmpty, lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("série musí mít 1–10 QTC") }
+        guard !call.isEmpty else { throw AppError.qtc(L("chybí značka protistanice")) }
+        guard !lines.isEmpty, lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc(L("série musí mít 1–10 QTC")) }
         let st = await qtcStatus(for: call)
-        if st.differentContinent == false { throw AppError.qtc("\(call) je na stejném kontinentu – v RTTY QTC nelze") }
+        if st.differentContinent == false { throw AppError.qtc(L("%@ je na stejném kontinentu – v RTTY QTC nelze", call)) }
         if pendingQTC?.counterpart == call, pendingQTC?.lines == lines {
             // stejná série znovu (před potvrzením) – číslo i limity už ověřené
         } else {
-            guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("s \(call) už vyměněno \(st.exchanged) QTC") }
-            guard Set(lines).isSubset(of: Set(st.available)) else { throw AppError.qtc("řádky nejsou pro \(call) povolené (už nahlášené nebo o této stanici)") }
+            guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc(L("s %@ už vyměněno %ld QTC", call, st.exchanged)) }
+            guard Set(lines).isSubset(of: Set(st.available)) else { throw AppError.qtc(L("řádky nejsou pro %@ povolené (už nahlášené nebo o této stanici)", call)) }
         }
         let number = pendingQTC?.counterpart == call ? pendingQTC!.number : st.nextSeries
         let series = QTCSeries(direction: .sent, number: number, counterpart: call, time: Date(),
@@ -393,13 +394,13 @@ public actor AppController {
 
     /// Zopakuje řádek odesílané série (index od 1, na žádost AGN N).
     public func repeatQTC(index: Int) async throws {
-        guard let p = pendingQTC, (1...p.count).contains(index) else { throw AppError.qtc("není co opakovat") }
+        guard let p = pendingQTC, (1...p.count).contains(index) else { throw AppError.qtc(L("není co opakovat")) }
         try await sendPlain(QTCText.repeatLine(p.lines[index - 1], index: index))
     }
 
     /// Příjemce potvrdil – série se zaloguje.
     public func confirmSentQTC() async throws {
-        guard let p = pendingQTC, let store = qtcStore else { throw AppError.qtc("žádná odeslaná série") }
+        guard let p = pendingQTC, let store = qtcStore else { throw AppError.qtc(L("žádná odeslaná série")) }
         do { try await store.append(p) } catch { throw AppError.qtc("\(error)") }
         pendingQTC = nil
         broadcaster.send(.qtcChanged)
@@ -410,13 +411,13 @@ public actor AppController {
 
     /// Uloží přijatou sérii (protistanice se předává explicitně – QSO okno se mezitím mohlo vyčistit).
     public func saveReceivedQTC(counterpart: String, number: Int, declaredCount: Int?, lines: [QTCLine]) async throws {
-        guard let store = qtcStore else { throw AppError.qtc("QTC není k dispozici") }
+        guard let store = qtcStore else { throw AppError.qtc(L("QTC není k dispozici")) }
         let call = counterpart.uppercased()
-        guard !call.isEmpty else { throw AppError.qtc("chybí značka protistanice") }
-        guard number > 0, !lines.isEmpty else { throw AppError.qtc("prázdná série") }
+        guard !call.isEmpty else { throw AppError.qtc(L("chybí značka protistanice")) }
+        guard number > 0, !lines.isEmpty else { throw AppError.qtc(L("prázdná série")) }
         let st = await qtcStatus(for: call)
-        if st.differentContinent == false { throw AppError.qtc("\(call) je na stejném kontinentu – v RTTY QTC nelze") }
-        guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("s \(call) už vyměněno \(st.exchanged) QTC") }
+        if st.differentContinent == false { throw AppError.qtc(L("%@ je na stejném kontinentu – v RTTY QTC nelze", call)) }
+        guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc(L("s %@ už vyměněno %ld QTC", call, st.exchanged)) }
         let s = QTCSeries(direction: .received, number: number, counterpart: call, time: Date(),
                           frequency: await engine.rigStatus?.frequency, lines: lines,
                           declaredCount: declaredCount.flatMap { $0 != lines.count ? $0 : nil })
@@ -426,16 +427,16 @@ public actor AppController {
 
     /// Oprava uložené série (okno Log → QTC).
     public func updateQTCSeries(_ s: QTCSeries) async throws {
-        guard let store = qtcStore else { throw AppError.qtc("QTC není k dispozici") }
+        guard let store = qtcStore else { throw AppError.qtc(L("QTC není k dispozici")) }
         guard !s.counterpart.isEmpty, !s.lines.isEmpty, s.lines.count <= QTCPlanner.maxPerPair else {
-            throw AppError.qtc("série musí mít protistanici a 1–10 řádků")
+            throw AppError.qtc(L("série musí mít protistanici a 1–10 řádků"))
         }
         do { try await store.update(s) } catch { throw AppError.qtc("\(error)") }
         broadcaster.send(.qtcChanged)
     }
 
     public func deleteQTCSeries(_ id: UUID) async throws {
-        guard let store = qtcStore else { throw AppError.qtc("QTC není k dispozici") }
+        guard let store = qtcStore else { throw AppError.qtc(L("QTC není k dispozici")) }
         do { try await store.delete(id: id) } catch { throw AppError.qtc("\(error)") }
         broadcaster.send(.qtcChanged)
     }
@@ -457,7 +458,7 @@ public actor AppController {
 
     /// Text bez maker: vysílat a po dovysílání RX.
     private func sendPlain(_ text: String) async throws {
-        if txDisabled { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        if txDisabled { throw EngineError.pttUnavailable(L("TX zakázáno (rx_only)")) }
         // bez MacroEngine.expand: značky v QTC se nesmí vykládat jako proměnné (%…) ani řídicí znaky
         try await engine.sendMacro(MacroResult.plain(text, end: .rxAfter))
     }
@@ -518,15 +519,15 @@ public actor AppController {
     // MARK: Profily
 
     public func loadProfile(_ slot: Int) async throws {
-        guard let profiles else { throw AppError.profile("bez úložiště profilů") }
+        guard let profiles else { throw AppError.profile(L("bez úložiště profilů")) }
         let all = profiles.load()
-        guard all.indices.contains(slot), let p = all[slot] else { throw AppError.profile("slot \(slot) je prázdný") }
+        guard all.indices.contains(slot), let p = all[slot] else { throw AppError.profile(L("slot %ld je prázdný", slot)) }
         for (k, v) in p.rtty { try await engine.setModemParam(k, v) }
         broadcaster.send(.paramsChanged(await engine.modemParams()))
     }
 
     public func saveProfile(_ slot: Int, name: String) async throws {
-        guard let profiles else { throw AppError.profile("bez úložiště profilů") }
+        guard let profiles else { throw AppError.profile(L("bez úložiště profilů")) }
         do { try profiles.save(Profile(name: name, rtty: await engine.modemParams()), slot: slot) }
         catch { throw AppError.profile("\(error)") }
     }
@@ -534,7 +535,7 @@ public actor AppController {
     public func profileList() -> [Profile?] { profiles?.load() ?? [] }
 
     public func deleteProfile(_ slot: Int) throws {
-        guard let profiles else { throw AppError.profile("bez úložiště profilů") }
+        guard let profiles else { throw AppError.profile(L("bez úložiště profilů")) }
         do { try profiles.save(nil, slot: slot) } catch { throw AppError.profile("\(error)") }
     }
 }

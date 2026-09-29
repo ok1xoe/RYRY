@@ -2,6 +2,7 @@
 import AppUI
 import Engine
 import SwiftUI
+import Localization
 
 struct TopBar: View {
     @Bindable var model: AppModel
@@ -21,21 +22,21 @@ struct TopBar: View {
                     Text(model.state == .rx || model.state == .stopped ? "TX" : "RX")
                         .font(.headline).frame(width: 44)
                 }
-                .help("Přepnout TX/RX (⌘T)")
+                .help(L("Přepnout TX/RX (⌘T)"))
                 Button("Tune") { Task { await model.tune() } }.fixedSize()
                 Button("Stop") { Task { await model.rxNow() } }.fixedSize()
                     .keyboardShortcut(.escape, modifiers: [])
-                    .help("Okamžitě RX (Esc)")
+                    .help(L("Okamžitě RX (Esc)"))
                 Text(Self.stateLabel(model.state))
                     .font(.system(.body, design: .monospaced).bold()).lineLimit(1).fixedSize()
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
                 if model.wavPlaying {
-                    Button("▶ WAV ■") { Task { await model.stopWAV() } }.help("Přehrává se WAV – kliknutím zastavit")
+                    Button("▶ WAV ■") { Task { await model.stopWAV() } }.help(L("Přehrává se WAV – kliknutím zastavit"))
                 }
                 Picker("Demod", selection: model.choiceBinding("demodType")) {
                     ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
-                }.labelsHidden().fixedSize().help("Demodulátor")
+                }.labelsHidden().fixedSize().help(L("Demodulátor"))
                 Button("HAM") { Task { await model.hamShift() } }.fixedSize().help("Shift 170 Hz")
                 ProfileMenu(model: model)
                 Spacer()
@@ -43,7 +44,7 @@ struct TopBar: View {
                     .font(.system(.title3, design: .monospaced))
                     .lineLimit(1).fixedSize()
                     .foregroundStyle(model.rig?.online == true ? .primary : .secondary)
-                    .help(model.rig?.online == true ? "Rig online" : "Rig offline")
+                    .help(model.rig?.online == true ? L("Rig online") : L("Rig offline"))
                 SignalMeter(level: model.signalLevel, open: model.squelchOpen).frame(width: 56, height: 12)
             }
             HStack(spacing: 6) {
@@ -57,18 +58,18 @@ struct TopBar: View {
                     .font(.caption.monospaced().bold()).lineLimit(1).fixedSize()
                     .padding(.horizontal, 4).padding(.vertical, 2)
                     .background((model.fig ? Color.orange : Color.secondary).opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
-                    .help("Stav přijímače LTRS/FIGS")
+                    .help(L("Stav přijímače LTRS/FIGS"))
                 FilterMenu(model: model)
                 Spacer(minLength: 4)
                 Group {
                     Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
-                        .help("XY scope (křížový indikátor ladění)")
+                        .help(L("XY scope (křížový indikátor ladění)"))
                     Toggle("AFC", isOn: model.boolBinding("afc"))
-                        .help("AFC · kontextová nabídka: vazba na squelch, omezení rozsahu")
+                        .help(L("AFC · kontextová nabídka: vazba na squelch, omezení rozsahu"))
                         .contextMenu {
-                            Toggle("Jen při otevřeném squelchi", isOn: model.boolBinding("afcGate"))
-                            Picker("Max. odchylka od naladění", selection: model.doubleBinding("afcMaxDev")) {
-                                Text("bez omezení").tag(0.0)
+                            Toggle(L("Jen při otevřeném squelchi"), isOn: model.boolBinding("afcGate"))
+                            Picker(L("Max. odchylka od naladění"), selection: model.doubleBinding("afcMaxDev")) {
+                                Text(L("bez omezení")).tag(0.0)
                                 ForEach([25.0, 50, 100, 200], id: \.self) { Text("± \(Int($0)) Hz").tag($0) }
                             }
                         }
@@ -112,24 +113,24 @@ struct FilterMenu: View {
         if model.param("lms") == .bool(true) { a.append(model.param("lmsType") == .string("lms") ? "LMS" : "NOT") }
         if model.param("aa6yq") == .bool(true) { a.append("AA6YQ") }
         if model.param("uos") == .bool(true) { a.append("UOS") }
-        return a.isEmpty ? "Filtry" : a.joined(separator: "+")
+        return a.isEmpty ? L("Filtry") : a.joined(separator: "+")
     }
     var body: some View {
         Menu {
-            Toggle("BPF – vstupní pásmová propust", isOn: model.boolBinding("bpf"))
-            Toggle("Zářez (notch) / LMS", isOn: model.boolBinding("lms"))
-            Picker("Typ", selection: model.choiceBinding("lmsType")) {
-                Text("Notch (zářez)").tag("notch"); Text("LMS").tag("lms")
+            Toggle(L("BPF – vstupní pásmová propust"), isOn: model.boolBinding("bpf"))
+            Toggle(L("Zářez (notch) / LMS"), isOn: model.boolBinding("lms"))
+            Picker(L("Typ"), selection: model.choiceBinding("lmsType")) {
+                Text(L("Notch (zářez)")).tag("notch"); Text("LMS").tag("lms")
             }
-            Toggle("Dva zářezy", isOn: model.boolBinding("twoNotch"))
-            Toggle("AA6YQ (BPF mark–space + zádrž)", isOn: model.boolBinding("aa6yq"))
+            Toggle(L("Dva zářezy"), isOn: model.boolBinding("twoNotch"))
+            Toggle(L("AA6YQ (BPF mark–space + zádrž)"), isOn: model.boolBinding("aa6yq"))
             Divider()
-            Toggle("UOS – unshift on space", isOn: model.boolBinding("uos"))
+            Toggle(L("UOS – unshift on space"), isOn: model.boolBinding("uos"))
         } label: {
             Text(active).lineLimit(1)
         }
         .fixedSize()
-        .help("Filtry příjmu (pravé tlačítko ve spektru = zářez) a UOS")
+        .help(L("Filtry příjmu (pravé tlačítko ve spektru = zářez) a UOS"))
     }
 }
 
@@ -144,7 +145,7 @@ struct SignalMeter: View {
                     .frame(width: g.size.width * min(1, max(0, log10(max(level, 1)) / 4)))
             }
         }
-        .help(String(format: "Signál %.0f", level))
+        .help(L("Signál %.0f", level))
     }
 }
 
@@ -155,25 +156,25 @@ struct ProfileMenu: View {
     @State private var name = ""
 
     var body: some View {
-        Menu("Profily") {
-            Section("Načíst") {
+        Menu(L("Profily")) {
+            Section(L("Načíst")) {
                 ForEach(0..<16, id: \.self) { i in
                     let n = i < model.profileNames.count ? model.profileNames[i] : nil
                     Button("\(i + 1): \(n ?? "—")") { Task { await model.loadProfile(i) } }.disabled(n == nil)
                 }
             }
-            Section("Uložit aktuální do") {
+            Section(L("Uložit aktuální do")) {
                 ForEach(0..<16, id: \.self) { i in
                     let n = i < model.profileNames.count ? model.profileNames[i] : nil
-                    Button("\(i + 1): \(n ?? "prázdný")") { name = n ?? ""; saveSlot = i }
+                    Button("\(i + 1): \(n ?? L("prázdný"))") { name = n ?? ""; saveSlot = i }
                 }
             }
         }
         .fixedSize()
-        .alert("Název profilu", isPresented: Binding(get: { saveSlot != nil }, set: { if !$0 { saveSlot = nil } })) {
-            TextField("Název", text: $name)
-            Button("Uložit") { if let s = saveSlot { let n = name; Task { await model.saveProfile(s, name: n.isEmpty ? "Profil \(s + 1)" : n) } }; saveSlot = nil }
-            Button("Zrušit", role: .cancel) { saveSlot = nil }
+        .alert(L("Název profilu"), isPresented: Binding(get: { saveSlot != nil }, set: { if !$0 { saveSlot = nil } })) {
+            TextField(L("Název"), text: $name)
+            Button(L("Uložit")) { if let s = saveSlot { let n = name; Task { await model.saveProfile(s, name: n.isEmpty ? L("Profil %ld", s + 1) : n) } }; saveSlot = nil }
+            Button(L("Zrušit"), role: .cancel) { saveSlot = nil }
         }
     }
 }

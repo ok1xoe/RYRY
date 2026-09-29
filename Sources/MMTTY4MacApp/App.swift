@@ -4,6 +4,7 @@ import AppUI
 import AppViews
 import SwiftUI
 import UniformTypeIdentifiers
+import Localization
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -29,13 +30,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @MainActor func showAbout() {
-    let credits = """
-    RTTY pro macOS – nativní přepis MMTTY s API pro loggery (fldigi XML-RPC, JSON-RPC).
-
-    Jádro demodulátoru a modulátoru: MMTTY © 2000–2013 Makoto Mori (JE3HHT), Nobuyuki Oba.
-    mmtty4mac © 2026 OK1XOE. Licence GNU LGPL v3 (COPYING, COPYING.LESSER).
-    DXCC: cty.dat – Jim Reisert AD1C (country-files.com).
-    """
+    let credits = [
+        L("RTTY pro macOS – nativní přepis MMTTY s API pro loggery (fldigi XML-RPC, JSON-RPC)."),
+        "",
+        L("Jádro demodulátoru a modulátoru: MMTTY © 2000–2013 Makoto Mori (JE3HHT), Nobuyuki Oba."),
+        L("mmtty4mac © 2026 OK1XOE. Licence GNU LGPL v3 (COPYING, COPYING.LESSER)."),
+        L("DXCC: cty.dat – Jim Reisert AD1C (country-files.com)."),
+    ].joined(separator: "\n")
     let para = NSMutableParagraphStyle(); para.alignment = .center
     NSApp.orderFrontStandardAboutPanel(options: [
         .credits: NSAttributedString(string: credits, attributes: [.font: NSFont.systemFont(ofSize: 11), .paragraphStyle: para]),
@@ -60,6 +61,9 @@ struct MMTTY4MacApp: App {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
+    /// Jazyk rozhraní z minulého spuštění (spouštěcí parametr -language en přepíše volbu).
+    init() { LanguageLibrary.standard().restore() }
+
     var body: some Scene {
         Window("mmtty4mac", id: "main") {
             MainView(model: model)
@@ -71,35 +75,35 @@ struct MMTTY4MacApp: App {
                 }
         }
         .commands {
-            CommandMenu("Vysílání") {
+            CommandMenu(L("Vysílání")) {
                 Button("TX / RX") { Task { await model.toggleTx() } }.keyboardShortcut("t", modifiers: .command)
-                Button("Okamžitě RX") { Task { await model.rxNow() } }.keyboardShortcut(".", modifiers: .command)
-                Button("Ladění (tune)") { Task { await model.tune() } }
-                Button("Zastavit opakování makra") { Task { await model.stopMacro() } }
+                Button(L("Okamžitě RX")) { Task { await model.rxNow() } }.keyboardShortcut(".", modifiers: .command)
+                Button(L("Ladění (tune)")) { Task { await model.tune() } }
+                Button(L("Zastavit opakování makra")) { Task { await model.stopMacro() } }
                 Divider()
-                Button("Zalogovat QSO") { Task { await model.logQSO() } }.keyboardShortcut("l", modifiers: .command)
-                Button("Vymazat QSO") { Task { await model.clearQSO() } }
-                Button("Vymazat příjem") { model.clearRx() }.keyboardShortcut("k", modifiers: .command)
+                Button(L("Zalogovat QSO")) { Task { await model.logQSO() } }.keyboardShortcut("l", modifiers: .command)
+                Button(L("Vymazat QSO")) { Task { await model.clearQSO() } }
+                Button(L("Vymazat příjem")) { model.clearRx() }.keyboardShortcut("k", modifiers: .command)
             }
             CommandGroup(replacing: .appInfo) {
-                Button("O aplikaci mmtty4mac") { showAbout() }
+                Button(L("O aplikaci mmtty4mac")) { showAbout() }
             }
             CommandGroup(after: .newItem) {
-                Menu("Přehrát WAV do příjmu") {
-                    ForEach([(1.0, "Reálný čas"), (4.0, "4× rychleji"), (0.0, "Co nejrychleji")], id: \.0) { sp in
+                Menu(L("Přehrát WAV do příjmu")) {
+                    ForEach([(1.0, L("Reálný čas")), (4.0, L("4× rychleji")), (0.0, L("Co nejrychleji"))], id: \.0) { sp in
                         Button(sp.1 + "…") { playWAV(speed: sp.0) }
                     }
                 }
-                Button("Zastavit přehrávání WAV") { Task { await model.stopWAV() } }.disabled(!model.wavPlaying)
+                Button(L("Zastavit přehrávání WAV")) { Task { await model.stopWAV() } }.disabled(!model.wavPlaying)
             }
             CommandGroup(after: .windowArrangement) {
                 Button("Log") { openWindow(id: "log") }.keyboardShortcut("l", modifiers: [.command, .shift])
-                Button("Exportovat Cabrillo…") { exportCabrillo(model) }
-                Button("Scope demodulátoru") { openWindow(id: "scope") }
+                Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
+                Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
             }
         }
         Window("Log", id: "log") { LogWindow(model: model) }
-        Window("Scope demodulátoru", id: "scope") { ScopeWindow(model: model) }
+        Window(L("Scope demodulátoru"), id: "scope") { ScopeWindow(model: model) }
         Settings { SettingsView(model: model) }
     }
 }
