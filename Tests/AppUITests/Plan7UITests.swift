@@ -228,3 +228,21 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     try #"{"display":{"fromHz":0,"toHz":5500}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     #expect(SettingsStore(directory: dir).load().0.display.toHz == 3000)
 }
+
+// Plán 8 / T3: scope v AppModel (dotazování jen když je zapnutý)
+@Test @MainActor func demodScopeInModel() async throws {
+    let f = Fixture()
+    await f.model.start()
+    f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
+    await f.pump(30)
+    await f.model.pollDemodScope()
+    #expect(f.model.demodScope == nil)                   // vypnutý
+    await f.model.setDemodScope(true)
+    f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
+    await f.pump(30)
+    await f.model.pollDemodScope()
+    #expect(f.model.demodScope?.bit.count == 8192)
+    f.model.scopeSource = 1
+    #expect(f.model.scopeSource == 1)
+    await f.model.stop()
+}

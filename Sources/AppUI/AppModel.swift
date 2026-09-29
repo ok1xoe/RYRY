@@ -86,6 +86,11 @@ public final class AppModel {
     public private(set) var profileNames: [String?] = []
     public private(set) var xyPoints: [XYPoint] = []
     public private(set) var xyEnabled = false
+    /// Scope demodulátoru (okno „Scope“): poslední dávka, zdroj 0–3, zmrazení (jednorázový záznam).
+    public private(set) var demodScope: DemodScope?
+    public private(set) var demodScopeEnabled = false
+    public var scopeSource = 2
+    public var scopeFrozen = false
     private var sqTarget: Double?
     private var sqChain: Task<Void, Never>?
     var lastSentForTesting = ""
@@ -203,6 +208,7 @@ public final class AppModel {
         if let log { logRecords = await log.query() }
         profileNames = profileStore.load().map { $0?.name }
         if xyEnabled { await engine.setXYScope(true) }
+        if demodScopeEnabled { await engine.setDemodScope(true) }
         let st = await engine.state
         logger.info("start: stav \(st.rawValue, privacy: .public)")
         await startAPIs(app)
@@ -233,6 +239,7 @@ public final class AppModel {
                 if let f = await engine.spectrum(), let self {
                     self.waterfall.push(f, fromHz: self.waterfallFromHz, toHz: self.waterfallToHz)
                     if self.xyEnabled, let pts = await engine.xyScope() { self.xyPoints = pts }
+                    await self.pollDemodScope()
                 }
                 try? await Task.sleep(for: .milliseconds(interval))
             }
@@ -601,6 +608,18 @@ public final class AppModel {
         xyEnabled = on
         if !on { xyPoints = [] }
         await app?.engine.setXYScope(on)
+    }
+
+    public func setDemodScope(_ on: Bool) async {
+        demodScopeEnabled = on
+        if !on { demodScope = nil }
+        await app?.engine.setDemodScope(on)
+    }
+
+    /// Jedno načtení dávky scope (volá smyčka spektra; pro testy ručně). Zmrazený scope se nepřepisuje.
+    public func pollDemodScope() async {
+        guard demodScopeEnabled, !scopeFrozen, let d = await app?.engine.demodScope(source: scopeSource) else { return }
+        demodScope = d
     }
 
     /// Jedno načtení XY bodů (volá smyčka spektra; pro testy ručně).

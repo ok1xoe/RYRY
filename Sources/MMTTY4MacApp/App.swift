@@ -74,9 +74,11 @@ struct MMTTY4MacApp: App {
             CommandGroup(after: .windowArrangement) {
                 Button("Log") { openWindow(id: "log") }.keyboardShortcut("l", modifiers: [.command, .shift])
                 Button("Exportovat Cabrillo…") { exportCabrillo(model) }
+                Button("Scope demodulátoru") { openWindow(id: "scope") }
             }
         }
         Window("Log", id: "log") { LogWindow(model: model) }
+        Window("Scope demodulátoru", id: "scope") { ScopeWindow(model: model) }
         Settings { SettingsView(model: model) }
     }
 }

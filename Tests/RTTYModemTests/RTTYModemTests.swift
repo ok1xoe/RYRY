@@ -266,3 +266,15 @@ func rxClockCorrectionKeepsAFCOnTrueFrequency(ppm: Double, expectedMark: Double)
         #expect(m.get(parameter: "shift") == .double(170), "mark \(mk)")
     }
 }
+
+// Plán 8 / T3
+@Test func demodScopeThroughModem() throws {
+    let m = try RTTYModem()
+    #expect(m.demodScope(source: 2) == nil)
+    m.setDemodScope(true)
+    let s = RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12))
+    s.withUnsafeBufferPointer { m.processRx($0) }
+    let d = try #require(m.demodScope(source: 2))
+    #expect(d.mark.count == 8192 && d.space.count == 8192 && d.bit.count == 8192 && d.sync.count == 8192)
+    #expect(RTTYModem.scopeSources == ["Filtr", "Det.", "LPF", "ATC"])
+}
