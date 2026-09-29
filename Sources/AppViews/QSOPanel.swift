@@ -10,50 +10,64 @@ struct QSOPanel: View {
         let f = DateFormatter(); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm 'místně'"; return f
     }()
 
+    /// Popisek v levém sloupci mřížky.
+    func label(_ t: String) -> some View {
+        Text(t).font(.callout).foregroundStyle(.secondary).gridColumnAlignment(.trailing).lineLimit(1).fixedSize()
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("QSO").font(.headline)
-            Form {
-                QSOField(model: model, label: "Call", field: "call").font(.title3.monospaced())
-                if let c = model.dxcc {
-                    let local = Date().addingTimeInterval(c.utcOffsetHours * 3600)
-                    LabeledContent("Země") {
-                        Text("\(c.name) · \(c.continent) · CQ \(c.cqZone) · ITU \(c.ituZone) · \(Self.hm.string(from: local))")
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        // Posuvný sloupec: obsah (příjem QTC s 10 řádky, předchozí spojení) se nesmí vytlačit mimo okno,
+        // a do šířky se přizpůsobuje – dlouhé texty se zalamují místo ořezu.
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("QSO").font(.headline)
+                Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
+                    GridRow {
+                        label("Call")
+                        QSOField(model: model, label: "", field: "call").font(.title3.monospaced()).gridCellColumns(3)
+                    }
+                    if let c = model.dxcc {
+                        let local = Date().addingTimeInterval(c.utcOffsetHours * 3600)
+                        GridRow {
+                            label("Země")
+                            Text("\(c.name) · \(c.continent) · CQ \(c.cqZone) · ITU \(c.ituZone) · \(Self.hm.string(from: local))")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .gridCellColumns(3)
+                        }
+                    }
+                    GridRow { label("Name"); QSOField(model: model, label: "", field: "name").gridCellColumns(3) }
+                    GridRow { label("QTH"); QSOField(model: model, label: "", field: "qth").gridCellColumns(3) }
+                    GridRow { label("Locator"); QSOField(model: model, label: "", field: "locator").gridCellColumns(3) }
+                    GridRow {
+                        label("RST s"); QSOField(model: model, label: "599", field: "rstSent")
+                        label("RST r"); QSOField(model: model, label: "599", field: "rstRcvd")
+                    }
+                    GridRow {
+                        label("Nr s"); QSOField(model: model, label: "", field: "serialSent")
+                        label("Nr r"); QSOField(model: model, label: "", field: "serialRcvd")
+                    }
+                    GridRow { label("Exch r"); QSOField(model: model, label: "", field: "exchangeRcvd").gridCellColumns(3) }
+                    GridRow { label("Notes"); QSOField(model: model, label: "", field: "notes").gridCellColumns(3) }
+                }
+                HStack {
+                    Button("Log") { Task { await model.logQSO() } }.help("Zalogovat (⌘L)")
+                    Button("Clear") { Task { await model.clearQSO() } }
+                }
+                if model.qtcEnabled { QTCPanel(model: model) }
+                if !model.previousQSOs.isEmpty {
+                    Text("Předchozí spojení (\(model.previousQSOs.count))").font(.subheadline.bold())
+                    ForEach(model.previousQSOs.prefix(20)) { r in
+                        VStack(alignment: .leading) {
+                            Text(r.timeOn.formatted(date: .abbreviated, time: .shortened)).font(.caption)
+                            Text("\(r.band ?? "?") \(r.mode) \(r.name ?? "")").font(.caption2).foregroundStyle(.secondary)
+                        }
                     }
                 }
-                QSOField(model: model, label: "Name", field: "name")
-                QSOField(model: model, label: "QTH", field: "qth")
-                QSOField(model: model, label: "Locator", field: "locator")
-                HStack {
-                    QSOField(model: model, label: "RST s", field: "rstSent")
-                    QSOField(model: model, label: "RST r", field: "rstRcvd")
-                }
-                HStack {
-                    QSOField(model: model, label: "Nr s", field: "serialSent")
-                    QSOField(model: model, label: "Nr r", field: "serialRcvd")
-                }
-                QSOField(model: model, label: "Exch r", field: "exchangeRcvd")
-                QSOField(model: model, label: "Notes", field: "notes")
             }
-            HStack {
-                Button("Log") { Task { await model.logQSO() } }.help("Zalogovat (⌘L)")
-                Button("Clear") { Task { await model.clearQSO() } }
-            }
-            if model.qtcEnabled { QTCPanel(model: model) }
-            if !model.previousQSOs.isEmpty {
-                Text("Předchozí spojení (\(model.previousQSOs.count))").font(.subheadline.bold())
-                List(model.previousQSOs.prefix(20)) { r in
-                    VStack(alignment: .leading) {
-                        Text(r.timeOn.formatted(date: .abbreviated, time: .shortened)).font(.caption)
-                        Text("\(r.band ?? "?") \(r.mode) \(r.name ?? "")").font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-                .frame(minHeight: 80)
-            }
-            Spacer()
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(10)
     }
 }
 
@@ -68,6 +82,7 @@ struct QSOField: View {
 
     var body: some View {
         TextField(label, text: $text)
+            .textFieldStyle(.roundedBorder)
             .focused($focused)
             .onSubmit { commit() }
             .onChange(of: focused) { if !focused { commit() } }

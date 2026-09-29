@@ -21,7 +21,7 @@ public struct MainView: View {
                 StatusBar(model: model)
             }
             .frame(minWidth: 640)
-            QSOPanel(model: model).frame(minWidth: 250, idealWidth: 280, maxWidth: 340)
+            QSOPanel(model: model).frame(minWidth: 270, idealWidth: 310, maxWidth: 420)
         }
         .frame(minWidth: 900, minHeight: 600)
     }

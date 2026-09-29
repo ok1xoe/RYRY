@@ -21,8 +21,8 @@ struct MacroBar: View {
                                 .foregroundStyle(Self.textColor(i < macros.count ? macros[i].color : nil))
                         }
                         .keyboardShortcut(Self.key(i), modifiers: i < 12 ? [] : .shift)
-                        .tint(i < macros.count ? Color(hex: macros[i].color) : nil)
-                        .buttonStyle(.borderedProminentIf(i < macros.count && macros[i].color != nil))
+                        .buttonStyle(.borderedProminentIf(i < macros.count && macros[i].color != nil,
+                                                          color: i < macros.count ? Color(hex: macros[i].color) : nil))
                         .contextMenu { Button("Upravit…") { editing = i } }
                         .disabled(i >= macros.count || macros[i].text.isEmpty)
                     }
@@ -100,13 +100,29 @@ struct MacroEditor: View {
     }
 }
 
-/// Obarvené makro = výrazné tlačítko v barvě, ostatní běžná.
+/// Obarvené makro = tlačítko vyplněné vlastní barvou (drží se i v neaktivním okně), ostatní běžná.
 struct BorderedProminentIf: PrimitiveButtonStyle {
     let on: Bool
+    var color: Color? = nil
     func makeBody(configuration: Configuration) -> some View {
-        if on { Button(configuration).buttonStyle(.borderedProminent) } else { Button(configuration).buttonStyle(.automatic) }
+        if on, let color {
+            Button(configuration).buttonStyle(ColorFillButtonStyle(color: color))
+        } else {
+            Button(configuration).buttonStyle(.automatic)
+        }
+    }
+}
+
+struct ColorFillButtonStyle: ButtonStyle {
+    let color: Color
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.vertical, 4).padding(.horizontal, 8)
+            .background(RoundedRectangle(cornerRadius: 6).fill(color.opacity(configuration.isPressed ? 0.7 : 1)))
+            .opacity(enabled ? 1 : 0.45)
     }
 }
 extension PrimitiveButtonStyle where Self == BorderedProminentIf {
-    static func borderedProminentIf(_ on: Bool) -> BorderedProminentIf { BorderedProminentIf(on: on) }
+    static func borderedProminentIf(_ on: Bool, color: Color? = nil) -> BorderedProminentIf { BorderedProminentIf(on: on, color: color) }
 }
