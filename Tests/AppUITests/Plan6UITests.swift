@@ -66,3 +66,16 @@ import Settings
     #expect(!f.model.messages.contains { $0.contains("Čekám na povolení") })
     await f.model.stop()
 }
+
+/// Rychlé události kolečka se nesmí ztratit ani přeházet.
+@Test @MainActor func rapidWheelStepsAccumulate() async throws {
+    let f = Fixture()
+    await f.model.start()
+    await f.model.setParam("squelchLevel", .double(100))
+    async let a: Void = f.model.adjustSquelch(steps: 1)
+    async let b: Void = f.model.adjustSquelch(steps: 1)
+    async let c: Void = f.model.adjustSquelch(steps: 1)
+    _ = await (a, b, c)
+    #expect(f.model.param("squelchLevel") == .double(148))
+    await f.model.stop()
+}

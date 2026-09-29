@@ -77,17 +77,24 @@ enum RTTYParameters {
         case (.shift, .double(let d)):
             try set(RC_SPACE, rttycore_get_param(core, RC_MARK) + d)
         case (.mark, .double(let d)):
-            let shift = rttycore_get_param(core, RC_SPACE) - rttycore_get_param(core, RC_MARK)
-            // pořadí tak, aby mezistav nebyl mimo povolený shift; při velkém skoku přes neutrální mezikrok
-            let oldMark = rttycore_get_param(core, RC_MARK)
-            if rttycore_set_param(core, RC_MARK, d) == RC_OK {
-                try set(RC_SPACE, d + shift)
-            } else if rttycore_set_param(core, RC_SPACE, d + shift) == RC_OK {
-                try set(RC_MARK, d)
-            } else {
-                // obě pořadí selhala (mezistav mimo 20..2000 Hz shift) → přes mezistav
-                try set(RC_SPACE, min(3000, max(d, oldMark) + 20))
-                try set(RC_MARK, d); try set(RC_SPACE, d + shift)
+            // posun mark se zachováním shiftu; velké skoky po krocích ≤ 1500 Hz (shift musí zůstat 20..2000 Hz),
+            // při chybě obnovit původní stav
+            let oldM = rttycore_get_param(core, RC_MARK), oldS = rttycore_get_param(core, RC_SPACE)
+            let shift = oldS - oldM
+            func move(_ t: Double) throws(ParameterError) {
+                if rttycore_set_param(core, RC_MARK, t) == RC_OK { try set(RC_SPACE, t + shift) }
+                else { try set(RC_SPACE, t + shift); try set(RC_MARK, t) }
+            }
+            do {
+                var cur = oldM
+                while abs(d - cur) > 1e-9 {
+                    cur += max(-1500, min(1500, d - cur))
+                    try move(cur)
+                }
+            } catch {
+                if rttycore_set_param(core, RC_MARK, oldM) != RC_OK { _ = rttycore_set_param(core, RC_SPACE, oldS) }
+                _ = rttycore_set_param(core, RC_MARK, oldM); _ = rttycore_set_param(core, RC_SPACE, oldS)
+                throw error
             }
         default:
             throw .typeMismatch(id)

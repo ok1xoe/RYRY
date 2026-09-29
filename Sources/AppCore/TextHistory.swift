@@ -22,6 +22,9 @@ public final class TextHistory: @unchecked Sendable {
         }
     }
 
+    /// Absolutní počet znaků od startu (nemění se při clear) – pro detekci nového textu.
+    public var absoluteEnd: Int { lock.withLock { offset + buf.count } }
+
     /// Délka od posledního clear() (fldigi text.get_rx_length).
     public var totalLength: Int { lock.withLock { offset + buf.count - base } }
 

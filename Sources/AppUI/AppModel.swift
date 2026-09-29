@@ -61,6 +61,8 @@ public final class AppModel {
     public private(set) var profileNames: [String?] = []
     public private(set) var xyPoints: [XYPoint] = []
     public private(set) var xyEnabled = false
+    private var sqTarget: Double?
+    private var sqChain: Task<Void, Never>?
     var lastSentForTesting = ""
     private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
     static let micWaitMessage = "Čekám na povolení přístupu k mikrofonu (systémový dialog)…"
@@ -408,8 +410,17 @@ public final class AppModel {
     /// Kolečko myši ve vodopádu: squelch level po krocích 16 (MMTTY 0–1024).
     public func adjustSquelch(steps: Int) async {
         guard case .double(let v)? = param("squelchLevel") else { return }
-        let n = min(1024, max(0, v + Double(steps) * 16))
-        await setParam("squelchLevel", .double(n))
+        // cíl se počítá synchronně (rychlé události kolečka se sčítají) a zapisuje postupně
+        let target = min(1024, max(0, (sqTarget ?? v) + Double(steps) * 16))
+        sqTarget = target
+        let prev = sqChain
+        let t = Task { @MainActor in
+            await prev?.value
+            if let latest = self.sqTarget { await self.setParam("squelchLevel", .double(latest)) }
+        }
+        sqChain = t
+        await t.value
+        if sqChain == t { sqTarget = nil; sqChain = nil }
     }
 
     public func setXYScope(_ on: Bool) async {

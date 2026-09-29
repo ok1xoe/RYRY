@@ -10,6 +10,8 @@ import TestSupport
     let ptt = PTTController(method: .rts, port: FakeSerialPort(), rig: rig)
     try await ptt.prepare()
     await ptt.forceOff()
+    // při PTT přes RTS se CAT odesílá asynchronně (bez čekání) – počkat, až dorazí
+    for _ in 0..<50 where rig.ptt.last != false { try await Task.sleep(for: .milliseconds(10)) }
     #expect(rig.ptt.last == false)
 }
 
@@ -29,4 +31,25 @@ import TestSupport
     let t0 = Date()
     await ptt.forceOff()
     #expect(Date().timeIntervalSince(t0) < 5)          // limit 2 s + rezerva na zatížený stroj
+}
+
+/// Při PTT přes RTS se na nedostupný CAT nečeká (jen se odešle).
+@Test func forceOffWithRTSDoesNotWaitForCAT() async throws {
+    final class SlowRig: Rig, @unchecked Sendable {
+        var name: String { "slow" }
+        func connect() async throws {}
+        func disconnect() async {}
+        func frequency() async throws -> Double { 0 }
+        func setFrequency(_ hz: Double) async throws {}
+        func mode() async throws -> String { "" }
+        func setMode(_ mode: String) async throws {}
+        func setPTT(_ on: Bool) async throws { try? await Task.sleep(for: .seconds(5)) }
+    }
+    let port = FakeSerialPort()
+    let ptt = PTTController(method: .rts, port: port, rig: SlowRig())
+    try await ptt.prepare()
+    let t0 = Date()
+    await ptt.forceOff()
+    #expect(Date().timeIntervalSince(t0) < 0.5)
+    #expect(port.events.contains(.rts(false)))
 }

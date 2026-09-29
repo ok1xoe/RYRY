@@ -19,3 +19,12 @@ import Testing
     #expect(t.range(start: 4000, length: 1000).count == 1000)
     #expect(t.range(start: 0, length: 10) == "")
 }
+
+@Test func absoluteEndSurvivesClear() {
+    let t = TextHistory()
+    t.append("HELLO")
+    let mark = t.absoluteEnd
+    t.clear()
+    t.append("R")
+    #expect(t.absoluteEnd > mark)                     // odpověď po clear se pozná
+}

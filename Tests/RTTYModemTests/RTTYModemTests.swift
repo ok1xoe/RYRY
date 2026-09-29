@@ -195,3 +195,12 @@ func collectText(_ m: RTTYModem, _ samples: [Float]) async -> String {
     let pts = try #require(m.xyScope())
     #expect(pts.count == 512)
 }
+
+@Test(arguments: [(2800.0, 300.0), (200.0, 2400.0), (300.0, 2800.0)])
+func largeMarkJumpsKeepShift(from: Double, to: Double) throws {
+    let m = try RTTYModem()
+    try m.set(parameter: "mark", value: .double(from))
+    try m.set(parameter: "mark", value: .double(to))
+    #expect(m.get(parameter: "mark") == .double(to))
+    #expect(m.get(parameter: "shift") == .double(170))
+}

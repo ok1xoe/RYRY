@@ -158,9 +158,9 @@ public actor AppController {
         repeatTask = Task { [weak self] in
             while !Task.isCancelled {
                 while await engine.state != .rx, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(50)) }
-                let mark = rx.totalLength
+                let mark = rx.absoluteEnd                 // absolutní – text.clear_rx ji nesníží
                 try? await Task.sleep(for: .milliseconds(Int(sec * 1000)))
-                if Task.isCancelled || rx.totalLength > mark { break }
+                if Task.isCancelled || rx.absoluteEnd > mark { break }
                 guard await engine.state == .rx else { continue }
                 do { try await self?.runMacroOnce(index) } catch { break }
             }

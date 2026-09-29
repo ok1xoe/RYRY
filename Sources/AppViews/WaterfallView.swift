@@ -63,8 +63,15 @@ struct ScrollWheelCatcher: NSViewRepresentable {
     let onScroll: (CGFloat) -> Void
     final class V: NSView {
         var onScroll: ((CGFloat) -> Void)?
+        private var acc: CGFloat = 0
         override func scrollWheel(with e: NSEvent) {
-            if abs(e.scrollingDeltaY) > 0.5 { onScroll?(e.scrollingDeltaY) }
+            if !e.momentumPhase.isEmpty { return }                 // setrvačnost trackpadu ignorovat
+            if e.hasPreciseScrollingDeltas {                        // trackpad: krok po 12 bodech
+                acc += e.scrollingDeltaY
+                while abs(acc) >= 12 { onScroll?(acc > 0 ? 1 : -1); acc -= acc > 0 ? 12 : -12 }
+            } else if abs(e.scrollingDeltaY) > 0.1 {               // kolečko myši: krok za událost
+                onScroll?(e.scrollingDeltaY)
+            }
         }
         override func hitTest(_ p: NSPoint) -> NSView? {
             // kliky nechat projít do SwiftUI, kolečko zachytit
