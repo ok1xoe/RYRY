@@ -550,8 +550,14 @@ public final class AppModel {
         let word = w.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters.subtracting(CharacterSet(charactersIn: "/"))))
         let kind = WordClassifier.classify(word)
         // závod: po zadání značky jdou čísla a výměna do přijatých polí (MMTTY TMmttyWd::PBoxRxMouseDown)
+        // PED: každé kliknuté slovo je značka protistanice
+        if settings.contest.enabled, settings.contest.format == .ped {
+            if !word.isEmpty { await setQSOField("call", String(word.uppercased().prefix(16))) }
+            return
+        }
         if settings.contest.enabled, !qso.call.isEmpty, kind != .call {
-            if let (field, v) = WordClassifier.contestField(word, serialMode: settings.contest.exchange.isEmpty) {
+            for (field, v) in WordClassifier.contestUpdate(word, format: settings.contest.format,
+                                                           serialMode: settings.contest.exchange.isEmpty, current: qso) {
                 await setQSOField(field, v)
             }
             return

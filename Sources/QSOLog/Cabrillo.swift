@@ -40,7 +40,10 @@ public enum Cabrillo {
     }()
 
     static func pad(_ s: String, _ n: Int) -> String { s.count >= n ? s : s + String(repeating: " ", count: n - s.count) }
-    static func exch(_ serial: Int?, _ text: String?) -> String { serial.map { String(format: "%03d", $0) } ?? text ?? "" }
+    /// Výměna: číslo a/nebo text (BARTG „015 1203“, CQ/RJ „14 OH“).
+    static func exch(_ serial: Int?, _ text: String?) -> String {
+        [serial.map { String(format: "%03d", $0) }, text].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+    }
 
     static func qsoLine(_ r: QSORecord, myCall: String) -> String {
         let khz = r.frequency.map { Int(($0 / 1000).rounded(.down)) } ?? 0

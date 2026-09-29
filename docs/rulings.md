@@ -148,3 +148,13 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - země DXCC se nepřepočítá při opravě značky v logu (log.update, editor)
 - WAV: jen PCM16; chybová hláška neříká, které formáty jsou podporované
 - test pllParametersStillDecode nastavuje výchozí hodnoty PLL (nemůže selhat kvůli nim)
+
+## Plán 8 (seznam zpráv, barvy maker, scope, závodní formáty)
+
+### Rozhodnutí
+- Seznam zpráv se odesílá stejnou cestou jako makro (MMTTY má u zpráv stejné řídicí znaky); výchozí zprávy podle MMTTY bez údajů autora (OSAKA, MAKO → „...“).
+- Barva makra jen `#RRGGBB` jako výrazné (prominent) tlačítko; neplatná hodnota → bez barvy.
+- Scope: zdroje Filtr / Det. / LPF / ATC jako MMTTY TTScope; mark a space se zobrazují jako absolutní hodnota se společnou automatickou stupnicí; posun a šířka místo tlačítek ←/→/+/−.
+- CQ/RJ a BARTG ukládají přijatou výměnu do `exchangeRcvd` („ZZ QTH“, resp. „HHMM“) a `serialRcvd` místo MMTTY formátu v poli MyRST; makra dostávají MMTTY tvar „599NNN-HHMM“ (%N, %x, %y).
+- BARTG: 4 číslice s platným časem = čas, jinak číslo (MMTTY StoreUTC → StoreNR).
+- HTTPServerTests občas selžou pod vysokou zátěží systému (load ~7 z jiných projektů); samostatně procházejí – neřešeno.

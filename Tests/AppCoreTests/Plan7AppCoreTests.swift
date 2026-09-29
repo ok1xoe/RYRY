@@ -160,3 +160,43 @@ func makeDXCCApp() throws -> Harness {
     await #expect(throws: AppError.badMessage(5)) { try await h.app.runMessage(index: 5) }
     await h.app.stop()
 }
+
+func makeFormatApp(_ f: ContestFormat, exchange: String = "") throws -> Harness {
+    var s = AppSettings()
+    s.station.call = "OK1XOE"; s.ptt.method = .cat
+    s.contest.enabled = true; s.contest.format = f; s.contest.exchange = exchange; s.contest.nextSerial = 15
+    let audio = FakeAudioBackend(), clock = ManualClock(), rig = FakeRig2()
+    let engine = Engine(modem: try RTTYModem(), rig: rig, audio: audio, config: s.engineConfig(),
+                        serialFactory: { _ in FakeSerialPort() }, clock: clock, autoRun: false)
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("app-\(UUID())")
+    let app = AppController(settings: s, engine: engine, log: try QSOLogStore(directory: dir), profiles: nil)
+    return Harness(app: app, engine: engine, audio: audio, clock: clock, rig: rig, dir: dir)
+}
+
+// Plán 8 / T5: BARTG = číslo + čas začátku QSO (MMTTY SetHisUTC), %x číslo, %y čas
+@Test func bartgSendsSerialAndStartTime() async throws {
+    let h = try makeFormatApp(.bartg)
+    try await h.app.setQSOField("call", "DL1ABC")
+    let q = await h.app.qso
+    #expect(q.serialSent == 15 && q.exchangeSent.count == 4 && Int(q.exchangeSent) != nil)
+    let c = await h.app.macroContext()
+    #expect(c.hisRST == "599015-" + q.exchangeSent)
+    let t = MacroEngine.expand("%x %y", context: c).outputs.compactMap { if case .text(let s) = $0 { return s } else { return nil } }.joined()
+    #expect(t == "015 " + q.exchangeSent)
+    try await h.app.setQSOField("serialRcvd", "7"); try await h.app.setQSOField("exchangeRcvd", "1159")
+    #expect(await h.app.macroContext().myRST == "599007-1159")
+    let r = try await h.app.logQSO()
+    #expect(r.serialSent == 15 && r.exchangeSent == q.exchangeSent)
+    #expect(await h.app.settings.contest.nextSerial == 16)
+}
+
+@Test func cqrjAndPedSendNoSerials() async throws {
+    let cq = try makeFormatApp(.cqrj, exchange: "15")
+    await cq.app.clearQSO()
+    let q = await cq.app.qso
+    #expect(q.serialSent == nil && q.exchangeSent == "15")
+    let ped = try makeFormatApp(.ped)
+    await ped.app.clearQSO()
+    let p = await ped.app.qso
+    #expect(p.serialSent == nil && p.exchangeSent.isEmpty)
+}

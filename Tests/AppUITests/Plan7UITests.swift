@@ -259,3 +259,39 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     await f.model.rxNow()
     await f.model.stop()
 }
+
+// Plán 8 / T5: klik na slovo v závodních formátech (MMTTY StoreZone/StoreQTH/StoreNR/StoreUTC)
+func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = true) -> [String: String] {
+    var q = QSOFields(); q.call = "DL1ABC"; q.exchangeRcvd = exch
+    return Dictionary(uniqueKeysWithValues: WordClassifier.contestUpdate(w, format: f, serialMode: serialMode, current: q))
+}
+
+@Test func contestUpdateCQRJ() {
+    #expect(cu("14", .cqrj) == ["exchangeRcvd": "14"])
+    #expect(cu("59914", .cqrj) == ["exchangeRcvd": "14"])
+    #expect(cu("OH", .cqrj, exch: "14") == ["exchangeRcvd": "14 OH"])
+    #expect(cu("15", .cqrj, exch: "14 OH") == ["exchangeRcvd": "15 OH"])
+    #expect(cu("NY", .cqrj, exch: "05 OH") == ["exchangeRcvd": "05 NY"])
+    #expect(cu("599", .cqrj) == ["rstRcvd": "599"])
+    #expect(cu("TU", .cqrj).isEmpty)
+}
+
+@Test func contestUpdateBARTG() {
+    #expect(cu("015", .bartg) == ["serialRcvd": "15"])
+    #expect(cu("599015", .bartg) == ["serialRcvd": "15"])
+    #expect(cu("1203", .bartg) == ["exchangeRcvd": "1203"])
+    #expect(cu("12:03", .bartg) == ["exchangeRcvd": "1203"])
+    #expect(cu("2599", .bartg) == ["serialRcvd": "2599"])          // neplatný čas → číslo (MMTTY StoreUTC → StoreNR)
+    #expect(cu("TU", .bartg).isEmpty)
+}
+
+@Test @MainActor func pedClickAlwaysSetsCall() async throws {
+    let f = Fixture()
+    f.configure = { $0.contest.enabled = true; $0.contest.format = .ped }
+    await f.model.start()
+    await f.model.insertWord("DL1ABC")
+    await f.model.insertWord("OK2PBR")                       // i když značka už je vyplněná
+    await f.settle()
+    #expect(f.model.qso.call == "OK2PBR" && f.model.qso.serialSent == nil)
+    await f.model.stop()
+}
