@@ -92,3 +92,8 @@ func text(_ r: MacroResult) -> String {
 @Test func plainTextPreview() {
     #expect(MacroEngine.expand("CQ %{%m} K", context: ctx()).plainText == "CQ [CW ID] K")
 }
+
+@Test func shiftCodesInsideCWIDAreSevenCarrierOff() {
+    guard case .raw(let codes)? = MacroEngine.expand("%{%L}", context: ctx()).outputs.first else { Issue.record("raw"); return }
+    #expect(codes == [0xFD, 0xFE] + [UInt8](repeating: 0xFE, count: 7))
+}

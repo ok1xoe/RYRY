@@ -173,3 +173,25 @@ func collectText(_ m: RTTYModem, _ samples: [Float]) async -> String {
     }
     #expect(codes == [0x1F, 0x0A, 0x15])
 }
+
+@Test func intBaudUpdatesCurrentMode() throws {
+    let m = try RTTYModem()
+    try m.set(parameter: "baud", value: .int(50))
+    #expect(m.currentMode.id == "RTTY-50")
+}
+
+@Test func markFarBelowCurrentIsReachable() throws {
+    let m = try RTTYModem()
+    try m.set(parameter: "mark", value: .double(200))
+    #expect(m.get(parameter: "mark") == .double(200))
+    #expect(m.get(parameter: "shift") == .double(170))
+}
+
+@Test func modemXYScope() throws {
+    let m = try RTTYModem()
+    m.setXYScope(true)
+    let s = RTTYSignalGenerator().generate(text: "RYRY", leadIn: 0.5)
+    s.withUnsafeBufferPointer { m.processRx($0) }
+    let pts = try #require(m.xyScope())
+    #expect(pts.count == 512)
+}

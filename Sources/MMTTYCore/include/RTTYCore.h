@@ -109,6 +109,10 @@ size_t rttycore_read_fsk_codes(RTTYCore* core, uint8_t* out, size_t max);
 /* Volat po každých ~100 ms zpracovaných vzorků: spočítá FFT a provede AFC.
    Vrací 1, když AFC změnilo mark/space. */
 int    rttycore_tick(RTTYCore* core);
+/* XY scope (MMTTY): zapnout/vypnout sběr; číst dávku bodů (mark, space) – 0, dokud není dávka plná.
+   Po přečtení se sběr další dávky spustí znovu. */
+void   rttycore_set_xy(RTTYCore* core, int on);
+size_t rttycore_read_xy(RTTYCore* core, float* x, float* y, size_t max);
 /* Poslední spektrum (CFFT::m_fft), vrací počet binů; *binHz = šířka binu. */
 size_t rttycore_spectrum(RTTYCore* core, float* out, size_t max, double* binHz);
 

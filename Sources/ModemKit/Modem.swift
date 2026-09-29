@@ -33,7 +33,8 @@ public protocol Modem: AnyObject {
     func stopTx()
     /// Okamžitě ukončí vysílání.
     func abortTx()
-    /// Počet znaků/kódů čekajících na odvysílání (fronta modemu + jádro).
+    /// Množství dat čekajících na odvysílání (RTTY: bajty textu ve frontě modemu + Baudot kódy v jádře).
+    /// Jednotky nejsou jednotné – spolehlivé je jen porovnání s nulou (vše odvysíláno).
     var txPending: Int { get }
     /// Poslední spektrum pro vodopád a AFC.
     func spectrum() -> SpectrumFrame?
@@ -41,9 +42,14 @@ public protocol Modem: AnyObject {
     func takeFskCodes() -> [UInt8]
     /// Ukončí proud `events` (po doručení čekajících událostí). Modem pak už nic nehlásí.
     func finishEvents()
+    /// XY scope: zapnout sběr a číst dávky bodů (modemy bez XY vrací nil).
+    func setXYScope(_ on: Bool)
+    func xyScope() -> [XYPoint]?
 }
 
 public extension Modem {
     func takeFskCodes() -> [UInt8] { [] }
     func queueTxRaw(_ codes: [UInt8]) {}
+    func setXYScope(_ on: Bool) {}
+    func xyScope() -> [XYPoint]? { nil }
 }

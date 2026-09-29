@@ -84,7 +84,9 @@ public enum MacroEngine {
                 var codes: [UInt8] = [diddleOff, carrierOff]
                 while p < chars.count, chars[p] != "}" {
                     if chars[p] == "%", p + 1 < chars.count {
-                        for x in variable(chars[p + 1], c).unicodeScalars { codes += cw(x) }
+                        // %L/%F v CW ID: MMTTY vloží řídicí znak, StoreCWID ho vyšle jako neznámý (5× ticho + mezera)
+                        let v = chars[p + 1] == "L" ? "\u{1F}" : chars[p + 1] == "F" ? "\u{1B}" : variable(chars[p + 1], c)
+                        for x in v.unicodeScalars { codes += cw(x) }
                         p += 2
                     } else {
                         codes += cw(chars[p]); p += 1

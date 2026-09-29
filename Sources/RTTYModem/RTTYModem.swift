@@ -83,8 +83,8 @@ public final class RTTYModem: Modem, @unchecked Sendable {
             let v = try d.validate(value)
             try RTTYParameters.apply(id: id, value: v, core: core)
         } catch { throw Error.parameter(error) }
-        if id == "baud", case .double(let b) = value,
-           let m = modes.first(where: { Self.modeBaud[$0.id] == b }) { currentMode = m }
+        if id == "baud", case .double(let b)? = get(parameter: "baud"),
+           let m = modes.first(where: { abs((Self.modeBaud[$0.id] ?? 0) - b) < 0.01 }) { currentMode = m }
         publishTuningIfChanged()
     }
 
@@ -213,6 +213,17 @@ public final class RTTYModem: Modem, @unchecked Sendable {
             out += buf[0..<n]
         }
         return out
+    }
+
+    /// XY scope (mark/space) – zapnout sběr.
+    public func setXYScope(_ on: Bool) { rttycore_set_xy(core, on ? 1 : 0) }
+
+    /// Poslední plná dávka bodů XY scope (x = mark, y = space), nebo nil.
+    public func xyScope() -> [XYPoint]? {
+        var x = [Float](repeating: 0, count: 512), y = x
+        let n = rttycore_read_xy(core, &x, &y, 512)
+        guard n > 0 else { return nil }
+        return (0..<n).map { XYPoint(x: x[$0], y: y[$0]) }
     }
 
     public func spectrum() -> SpectrumFrame? {

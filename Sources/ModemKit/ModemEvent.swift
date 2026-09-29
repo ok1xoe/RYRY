@@ -30,3 +30,9 @@ public enum ModemEvent: Sendable, Equatable {
 }
 
 public enum TxStatus: Sendable, Equatable { case active, finished }
+
+/// Bod XY scope (mark, space), přibližně ±1.
+public struct XYPoint: Sendable, Equatable {
+    public let x: Float, y: Float
+    public init(x: Float, y: Float) { self.x = x; self.y = y }
+}

@@ -19,7 +19,7 @@ template <class T> using ZeroedPtr = std::unique_ptr<T, ZeroedDeleter<T>>;
 template <class T> static ZeroedPtr<T> makeZeroed() {
     void* mem = ::operator new(sizeof(T));
     memset(mem, 0, sizeof(T));
-    return ZeroedPtr<T>(new (mem) T());
+    try { return ZeroedPtr<T>(new (mem) T()); } catch (...) { ::operator delete(mem); throw; }
 }
 
 struct RTTYCore {
@@ -47,6 +47,7 @@ struct RTTYCore {
     int    tuning = 0;
     long   echoHold = 0;          // po konci TX ještě chvíli značit znaky jako echo (echo=1)
     std::vector<double> txBlock;
+    std::vector<double> echoTail;     // předalokované ticho pro doběh echa
     static constexpr int kBufSize = 1024;   // MMTTY m_BuffSize při 11025 Hz
     int    overflowLatched = 0;
     std::vector<double> block;
@@ -73,6 +74,7 @@ extern "C" const char* rttycore_version(void) { return "MMTTYCore 0.1 (MMTTY 1.7
 
 extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     if (!cfg || !validRate(cfg->sampleRate)) return nullptr;
+    try {
     auto* c = new RTTYCore();
     CoreScope scope(&c->ctx);
     // Kontext MUSÍ být nastavený PŘED konstrukcí CFSKDEM/CFSKMOD/CFFT (konstruktory ho čtou).
@@ -98,7 +100,9 @@ extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     memset(c->HBPF, 0, sizeof(c->HBPF));
     memset(c->ZBPF, 0, sizeof(c->ZBPF));
     c->calcBPF();
+    c->echoTail.assign(size_t(SampFreq * 0.2), 0.0);
     return c;
+    } catch (...) { return nullptr; }          // bad_alloc nesmí projít přes extern "C"
 }
 
 extern "C" void rttycore_destroy(RTTYCore* c) {
@@ -152,6 +156,7 @@ extern "C" size_t rttycore_read_chars(RTTYCore* c, RTTYCoreChar* out, size_t max
 extern "C" RTTYCoreSignal rttycore_signal(RTTYCore* c) {
     RTTYCoreSignal r{};
     if (!c) return r;
+    CoreScope scope(&c->ctx);
     r.level = c->dem->m_avgdeff;
     // Stejný práh jako CFSKDEM::DoFSK: při příjmu (m_Limit) SQLevel × 10.
     double thr = c->dem->m_Limit ? c->dem->GetSQLevel() * 10.0 : c->dem->GetSQLevel();
@@ -404,8 +409,8 @@ extern "C" size_t rttycore_generate_tx(RTTYCore* c, float* out, size_t n) {
                 if (c->echo == 1) {
                     // doběh: TX vzorky tohoto bloku + 0,2 s ticha, aby demodulátor dokončil poslední znak
                     if (i > 0) rxPipeline(c, c->txBlock.data(), i);
-                    std::vector<double> tail(size_t(SampFreq * 0.2), 0.0);
-                    rxPipeline(c, tail.data(), tail.size());
+                    std::fill(c->echoTail.begin(), c->echoTail.end(), 0.0);   // rxPipeline buffer mění (BPF/LMS)
+                    rxPipeline(c, c->echoTail.data(), c->echoTail.size());
                     for (size_t k = i; k < n; k++) out[k] = 0.0f;
                     return i;
                 }
@@ -487,4 +492,27 @@ extern "C" size_t rttycore_read_fsk_codes(RTTYCore* c, uint8_t* out, size_t max)
         out[k++] = uint8_t(d & 0x1F);
     }
     return k;
+}
+
+// --- XY scope (CFSKDEM::m_XYScopeMark/Space, sběr po dávkách jako v TMmttyWd::UpdateXYScope) ---
+static const int kXYSize = 512;
+
+extern "C" void rttycore_set_xy(RTTYCore* c, int on) {
+    if (!c) return;
+    CoreScope scope(&c->ctx);
+    c->dem->m_XYScope = on ? 1 : 0;
+    if (on) { c->dem->m_XYScopeMark.Collect(kXYSize); c->dem->m_XYScopeSpace.Collect(kXYSize); }
+}
+
+extern "C" size_t rttycore_read_xy(RTTYCore* c, float* x, float* y, size_t max) {
+    if (!c || !x || !y || !c->dem->m_XYScope) return 0;
+    CoreScope scope(&c->ctx);
+    CScope& mx = c->dem->m_XYScopeMark;
+    CScope& sy = c->dem->m_XYScopeSpace;
+    if (!mx.GetFlag() || !sy.GetFlag()) return 0;
+    size_t n = size_t(std::min(mx.m_ScopeSize, sy.m_ScopeSize));
+    if (n > max) n = max;
+    for (size_t i = 0; i < n; i++) { x[i] = float(mx.pScopeData[i] / 32768.0); y[i] = float(sy.pScopeData[i] / 32768.0); }
+    mx.Collect(kXYSize); sy.Collect(kXYSize);
+    return n;
 }

@@ -78,11 +78,16 @@ enum RTTYParameters {
             try set(RC_SPACE, rttycore_get_param(core, RC_MARK) + d)
         case (.mark, .double(let d)):
             let shift = rttycore_get_param(core, RC_SPACE) - rttycore_get_param(core, RC_MARK)
-            // pořadí tak, aby mezistav nebyl mimo povolený shift
-            if d < rttycore_get_param(core, RC_MARK) {
-                try set(RC_MARK, d); try set(RC_SPACE, d + shift)
+            // pořadí tak, aby mezistav nebyl mimo povolený shift; při velkém skoku přes neutrální mezikrok
+            let oldMark = rttycore_get_param(core, RC_MARK)
+            if rttycore_set_param(core, RC_MARK, d) == RC_OK {
+                try set(RC_SPACE, d + shift)
+            } else if rttycore_set_param(core, RC_SPACE, d + shift) == RC_OK {
+                try set(RC_MARK, d)
             } else {
-                try set(RC_SPACE, d + shift); try set(RC_MARK, d)
+                // obě pořadí selhala (mezistav mimo 20..2000 Hz shift) → přes mezistav
+                try set(RC_SPACE, min(3000, max(d, oldMark) + 20))
+                try set(RC_MARK, d); try set(RC_SPACE, d + shift)
             }
         default:
             throw .typeMismatch(id)
