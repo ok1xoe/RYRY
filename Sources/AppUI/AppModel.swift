@@ -339,6 +339,8 @@ public final class AppModel {
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 take(\.decoders.secondEnabled); take(\.decoders.secondDemod); take(\.decoders.channelsEnabled)
                 take(\.decoders.maxChannels); take(\.decoders.channelTimeoutS); take(\.decoders.showChannelMarks)
+                take(\.esm.enabled); take(\.esm.mode); take(\.esm.runCQ); take(\.esm.runExchange); take(\.esm.runTU)
+                take(\.esm.spMyCall); take(\.esm.spExchange); take(\.esm.agn)
                 return m
             }
             do { try self.settingsStore.save(merge(self.settings)) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
@@ -383,6 +385,7 @@ public final class AppModel {
         case .qsoChanged(let q):
             let callChanged = q.call != qso.call, freqChanged = q.frequency != qso.frequency
             qso = q
+            if q.call.isEmpty { esmProgress = ESM.Progress() }     // nové spojení (Clear, zalogováno)
             if callChanged { updateSuperCheck(); Task { await self.refreshPrevious(); await self.refreshQTC() }; scheduleCallbook() }
             if callChanged || freqChanged { Task { await self.refreshDupe() } }
             if q.frequency != settings.log.manualFrequency {
@@ -1076,7 +1079,65 @@ public final class AppModel {
 
     public func rxNow() async { await app?.rxNow() }
     public func tune() async { guard let app else { return }; await run("Tune") { try await app.tune() } }
-    public func runMacro(_ i: Int) async { guard let app else { return }; await run(L("Makro F%ld", i + 1)) { try await app.runMacro(index: i) } }
+    /// Spustí makro; true = odesláno. Výměna / moje značka se počítá jako odeslaná i pro ESM.
+    @discardableResult
+    public func runMacro(_ i: Int) async -> Bool {
+        guard let app else { return false }
+        var ok = false
+        await run(L("Makro F%ld", i + 1)) { try await app.runMacro(index: i); ok = true }
+        if ok, !qso.call.isEmpty {
+            var p = esmProgress.forCall(qso.call)
+            if i == settings.esm.runExchange || i == settings.esm.spExchange { p.exchangeSent = true }
+            if i == settings.esm.spMyCall { p.myCallSent = true }
+            esmProgress = p
+        }
+        return ok
+    }
+
+    // MARK: ESM (Enter Sends Message)
+
+    /// Co už v aktuálním spojení odešlo (výměna, moje značka).
+    public private(set) var esmProgress = ESM.Progress()
+    /// Požadavek na přesun fokusu v QSO panelu (název pole); pohled ho po provedení vynuluje.
+    public var esmFocusField: String?
+    var lastESMMacroForTesting: Int?
+
+    /// ESM je v provozu (zapnuté a závod zapnutý).
+    public var esmActive: Bool { settings.esm.enabled && settings.contest.enabled }
+
+    /// Co by teď poslal Enter (pro nápovědu v QSO panelu).
+    public var esmStep: ESM.Step {
+        guard settings.esm.enabled else { return .none }
+        return ESM.step(mode: settings.esm.mode, contest: settings.contest, qso: qso, progress: esmProgress,
+                        transmitting: state != .rx)
+    }
+
+    /// Přepnutí Run / S&P (QSO panel, zkratka) – uloží se hned.
+    public func setESMMode(_ m: ESMMode) {
+        guard settings.esm.mode != m else { return }
+        settings.esm.mode = m
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+    }
+    public func toggleESMMode() { setESMMode(settings.esm.mode == .run ? .sp : .run) }
+
+    /// Enter v QSO okně: pošle makro podle režimu a stavu spojení (během TX nic – makro by se přidalo
+    /// do právě vysílaného textu). Vrací pole, kam přesunout fokus (nil = ESM neaktivní nebo TX).
+    @discardableResult
+    public func esmEnter() async -> String? {
+        guard esmActive, app != nil, state == .rx else { return nil }
+        let step = esmStep
+        guard let i = ESM.macro(for: step, settings.esm), settings.macros.indices.contains(i) else {
+            return ESM.nextFocus(after: step, qso: qso, contest: settings.contest)
+        }
+        let text = settings.macros[i].text
+        guard await runMacro(i) else { return nil }
+        lastESMMacroForTesting = i
+        if ESM.needsExplicitLog(step, macroText: text) {
+            await logQSO()                          // makro je už rozvinuté – značka a výměna jsou odeslané
+            if let app { qso = await app.qso }
+        }
+        return ESM.nextFocus(after: step, qso: qso, contest: settings.contest)
+    }
     public func stopMacro() async { await app?.stopMacroRepeat() }
     public func runMessage(_ i: Int) async {
         guard let app else { return }

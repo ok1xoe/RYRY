@@ -117,6 +117,10 @@ struct MMTTY4MacApp: App {
                 Button(L("Zalogovat QSO")) { Task { await model.logQSO() } }.shortcut(model.settings.binding(for: .logQSO))
                 Button(L("Vymazat QSO")) { Task { await model.clearQSO() } }.shortcut(model.settings.binding(for: .clearQSO))
                 Button(L("Vymazat příjem")) { model.clearRx() }.shortcut(model.settings.binding(for: .clearRx))
+                Divider()
+                Button(model.settings.esm.mode == .run ? L("ESM: přepnout na S&P") : L("ESM: přepnout na Run")) {
+                    model.toggleESMMode()
+                }.shortcut(model.settings.binding(for: .esmMode))
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }

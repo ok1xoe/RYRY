@@ -510,6 +510,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
     /// DX cluster a RBN spoty.
     public var spots = SpotSettings()
     public var decoders = DecoderSettings()
+    /// Enter Sends Message (Run / S&P) v závodě.
+    public var esm = ESMSettings()
     public init() {}
     public static let macroCount = 16
 
@@ -528,13 +530,13 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "NR?", text: "\r\nNR? NR?\r\n\\"),
         Macro(name: "Test CQ", text: "\r\nCQ TEST CQ TEST DE %m %m TEST\r\n\\"),
         Macro(name: "Exch", text: "\r\n%c 599 %N %N\r\n\\"),
-        Macro(name: "", text: ""),
+        Macro(name: "My call", text: "\r\n%m %m\r\n\\"),          // ESM S&P
         Macro(name: "", text: ""),
     ]
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty,
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
-                                             shortcuts, updates, upload, spots, decoders }
+                                             shortcuts, updates, upload, spots, decoders, esm }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -567,6 +569,11 @@ public struct AppSettings: Codable, Sendable, Equatable {
         upload = c.tolerant(.upload, x.upload, w, s)
         spots = c.tolerant(.spots, x.spots, w, s)
         decoders = c.tolerant(.decoders, x.decoders, w, s)
+        // starší nastavení bez ESM: prázdný ⇧F3 dostane výchozí makro „My call“ (S&P)
+        if !c.contains(.esm), macros.indices.contains(14), macros[14].name.isEmpty, macros[14].text.isEmpty {
+            macros[14] = Self.defaultMacros[14]
+        }
+        esm = c.tolerant(.esm, x.esm, w, s)
     }
 
     /// Konfigurace Engine z nastavení.

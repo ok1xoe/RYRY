@@ -42,6 +42,7 @@ struct QSOPanel: View {
                         Text(Self.contestTitle(model.settings.contest)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                if model.esmActive { ESMBar(model: model) }
                 Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
                     // pole podle závodu (bez závodu běžné QSO, v závodě jen výměna daného formátu)
                     ForEach(Array(QSOLayout.rows(for: model.settings.contest).enumerated()), id: \.offset) { _, row in
@@ -51,7 +52,7 @@ struct QSOPanel: View {
                                 label(title)
                                 if field == "call" {
                                     HStack(spacing: 6) {
-                                        QSOField(model: model, label: "", field: field,
+                                        QSOField(model: model, label: "", field: field, esm: true,
                                                  onTyping: { model.superCheckPreview($0) })
                                             .font(.title3.monospaced())
                                         if model.isDupe {
@@ -73,8 +74,8 @@ struct QSOPanel: View {
                             }
                         case .pair(let f1, let t1, let f2, let t2):
                             GridRow {
-                                label(t1); QSOField(model: model, label: "", field: f1)
-                                label(t2); QSOField(model: model, label: "", field: f2)
+                                label(t1); QSOField(model: model, label: "", field: f1, esm: true)
+                                label(t2); QSOField(model: model, label: "", field: f2, esm: true)
                             }
                         case .country:
                             if let c = model.dxcc {
@@ -112,6 +113,44 @@ struct QSOPanel: View {
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // Enter s fokusem v panelu mimo textové pole (pole Enter zpracují samy)
+        .onKeyPress(.return) {
+            guard model.esmActive else { return .ignored }
+            Task { if let f = await model.esmEnter() { model.esmFocusField = f } }
+            return .handled
+        }
+    }
+}
+
+/// ESM: přepínač Run / S&P a nápověda, co pošle Enter.
+struct ESMBar: View {
+    @Bindable var model: AppModel
+    var body: some View {
+        HStack(spacing: 8) {
+            Picker("", selection: Binding(get: { model.settings.esm.mode }, set: { model.setESMMode($0) })) {
+                Text("Run").tag(ESMMode.run)
+                Text("S&P").tag(ESMMode.sp)
+            }
+            .pickerStyle(.segmented).labelsHidden().fixedSize()
+            .hint(L("Režim ESM: Run (volám CQ) / S&P (odpovídám) – %@", model.settings.binding(for: .esmMode).display))
+            let step = model.esmStep
+            let macro = ESM.macro(for: step, model.settings.esm)
+            let key = macro.map { " (" + model.settings.binding(for: .macro($0)).display + ")" } ?? ""
+            Text("Enter → " + ESM.title(step) + key)
+                .font(.callout.bold().monospaced())
+                .foregroundStyle(step == .none ? Color.secondary : Color.white)
+                .padding(.horizontal, 8).padding(.vertical, 2)
+                .background(step == .none ? Color.clear : color(step), in: RoundedRectangle(cornerRadius: 4))
+                .hint(model.state == .rx ? L("Co pošle Enter v poli Call nebo výměny") : L("Během vysílání Enter nic neposílá"))
+        }
+    }
+
+    func color(_ s: ESM.Step) -> Color {
+        switch s {
+        case .tu, .exchangeAndLog: .green
+        case .agn: .orange
+        default: .accentColor
+        }
     }
 }
 
@@ -121,6 +160,8 @@ struct QSOField: View {
     @Bindable var model: AppModel
     let label: String
     let field: String
+    /// Enter spouští ESM (pole Call a výměny).
+    var esm = false
     /// Volá se při každé změně textu (Super Check Partial u značky).
     var onTyping: ((String) -> Void)? = nil
     @State private var text = ""
@@ -130,11 +171,26 @@ struct QSOField: View {
         TextField(label, text: $text)
             .textFieldStyle(.roundedBorder)
             .focused($focused)
-            .onSubmit { commit() }
+            .onSubmit { submit() }
             .onChange(of: focused) { if !focused { commit() } }
             .onChange(of: text) { _, t in if focused { onTyping?(t) } }
             .onChange(of: model.qso.value(field) ?? "") { _, v in if !focused { text = v } }
             .onAppear { text = model.qso.value(field) ?? "" }
+            .onChange(of: model.esmFocusField) { _, f in
+                if f == field { focused = true; model.esmFocusField = nil }
+            }
+    }
+
+    /// Enter: potvrdit pole, pak (ESM) poslat makro a přesunout fokus na další prázdné pole.
+    private func submit() {
+        guard esm, model.esmActive else { commit(); return }
+        let changed = text != (model.qso.value(field) ?? ""), v = text
+        Task {
+            if changed { await model.setQSOField(field, v) }
+            let next = await model.esmEnter()
+            text = model.qso.value(field) ?? ""          // po zalogování prázdné – odchod z pole nesmí vrátit starou hodnotu
+            if let next { model.esmFocusField = next }
+        }
     }
 
     private func commit() {
