@@ -89,6 +89,15 @@ public final class AppModel {
     public private(set) var qso = QSOFields()
     public private(set) var previousQSOs: [QSORecord] = []
     public private(set) var logRecords: [QSORecord] = []
+    /// Index logu pro zvýrazňování značek a hlídání (viz RxAlerts.swift, AppModel+Alerts.swift).
+    public internal(set) var logIndex = LogIndex()
+    /// Zvýšení znamená změnu stavu ovlivňující styl značek (log, pásmo, nastavení) – okno příjmu přestyluje konec textu.
+    public internal(set) var highlightVersion = 0
+    var highlightBand: String?
+    public var alertSink: AlertSink
+    let alertClock: () -> Date
+    var alertThrottle = AlertThrottle()
+    var rxScanner = RxWordScanner()
     public private(set) var messages: [String] = []
     public private(set) var apiStatus = ""
     /// Nenápadná informace pro QSO panel: „callbook: QRZ.com“ nebo chyba (prázdné = nic).
@@ -160,7 +169,9 @@ public final class AppModel {
     public init(settingsStore: SettingsStore = SettingsStore(), profileStore: ProfileStore = ProfileStore(),
                 engineFactory: EngineFactory? = nil, spectrumFPS: Double = 15,
                 secrets: SecretStore = KeychainSecretStore(), callbookFetcher: @escaping HTTPFetcher = CallbookFactory.liveFetcher,
-                callbookDelay: Duration = .milliseconds(800)) {
+                callbookDelay: Duration = .milliseconds(800),
+                alertSink: AlertSink = NullAlertSink(), alertClock: @escaping () -> Date = { Date() }) {
+        self.alertSink = alertSink; self.alertClock = alertClock
         self.secrets = secrets; self.callbookFetcher = callbookFetcher; self.callbookDelay = callbookDelay
         self.settingsStore = settingsStore; self.profileStore = profileStore
         self.engineFactory = engineFactory ?? AppModel.realEngine
@@ -169,6 +180,7 @@ public final class AppModel {
         settings = s
         messages = w
         syncDisplay()
+        spotFeed.onNewSpot = { [weak self] spot in self?.checkSpotNeeded(spot) }
     }
 
     /// Stav oprávnění k mikrofonu; při prvním spuštění se zeptá (asynchronně).
@@ -196,7 +208,7 @@ public final class AppModel {
 
     func noteForTesting(_ m: String) { note(m) }
 
-    private func note(_ m: String) {
+    func note(_ m: String) {
         logger.notice("\(m, privacy: .public)")
         messages.append(m)
         if messages.count > 50 { messages.removeFirst(messages.count - 50) }
@@ -242,6 +254,7 @@ public final class AppModel {
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
+        rebuildLogIndex()
         backupLogIfDue()
         await loadSuperCheck()
         await refreshDupe()
@@ -333,6 +346,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
+                take(\.display.highlightCalls); take(\.alerts)
                 take(\.callbook); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
@@ -349,7 +363,10 @@ public final class AppModel {
             // znovu sloučit: během zastavování mohl přijít .contestSerial (makro s %l)
             let merged = merge(self.settings)
             do { try self.settingsStore.save(merged) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
+            let wasNotifying = self.settings.alerts.wantsNotifications
             self.settings = merged
+            if merged.alerts.wantsNotifications, !wasNotifying { self.alertSink.requestNotificationAuthorization() }
+            self.highlightVersion &+= 1
             self.syncDisplay()
             if !self.qtcEnabled { self.qtcReceive = nil; self.qtcPendingCache = nil }
             await self.startNow()
@@ -378,6 +395,7 @@ public final class AppModel {
         case .engine(.rig(let r)):
             let bandChanged = Bands.band(forHz: r.frequency) != Bands.band(forHz: rig?.frequency)
             rig = r
+            updateHighlightBand()
             if bandChanged, !qso.call.isEmpty { Task { await self.refreshDupe() } }   // QSY na jiné pásmo
         case .engine(.error(let err)): note("\(err)")
         case .engine(.pttTimeout): note(L("PTT časovač vypnul vysílání"))
@@ -385,6 +403,7 @@ public final class AppModel {
         case .qsoChanged(let q):
             let callChanged = q.call != qso.call, freqChanged = q.frequency != qso.frequency
             qso = q
+            if freqChanged { updateHighlightBand() }
             if q.call.isEmpty { esmProgress = ESM.Progress() }     // nové spojení (Clear, zalogováno)
             if callChanged { updateSuperCheck(); Task { await self.refreshPrevious(); await self.refreshQTC() }; scheduleCallbook() }
             if callChanged || freqChanged { Task { await self.refreshDupe() } }
@@ -394,6 +413,7 @@ public final class AppModel {
             }
         case .qsoLogged(let r):
             logRecords.insert(r, at: 0)
+            addToLogIndex(r)
             backupLogIfDue()
             if historyCalls.insert(r.call).inserted { rebuildSuperCheck() }
             Task { await self.refreshPrevious(); await self.refreshQTC(); await self.refreshDupe() }
@@ -433,6 +453,7 @@ public final class AppModel {
         }
         rxCharCount += s.count
         rxAppendedTotal += s.count
+        scanRxForAlerts(s, echo: echo)
         while rxCharCount > Self.rxLimit, !rxRuns.isEmpty {
             let over = rxCharCount - Self.rxLimit
             if rxRuns[0].text.count <= over {
@@ -1066,6 +1087,7 @@ public final class AppModel {
     private func refreshLog() async {
         guard let log = app?.log else { return }
         logRecords = await log.query()
+        rebuildLogIndex()
     }
 
     private func refreshParams() async {

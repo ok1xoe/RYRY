@@ -77,6 +77,13 @@ public struct SpotsWindow: View {
                     let st = index.status(of: s)
                     Text(Self.logLabel(st)).foregroundStyle(st == .workedOnBand ? Color.orange : Color.secondary)
                 }.width(56)
+                TableColumn(L("Potřeba")) { s in
+                    let needed = model.neededReasons(for: s)
+                    if !needed.isEmpty {
+                        Label(L("potřebné"), systemImage: "star.fill").labelStyle(.titleAndIcon).font(.caption)
+                            .foregroundStyle(.pink).help(AppModel.neededText(needed))
+                    }
+                }.width(74)
                 TableColumn(L("Komentář")) { s in Text(s.comment).lineLimit(1) }
                 TableColumn("Spotter") { s in Text(s.spotter).foregroundStyle(.secondary) }.width(90)
             }
