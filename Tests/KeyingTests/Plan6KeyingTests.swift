@@ -74,5 +74,6 @@ import TestSupport
     #expect(idle.ptt.isEmpty)                         // neotvírat port / nespouštět rigctld jen kvůli RX
     let active = IdleRig(idle: false)
     await PTTController(method: .rts, port: FakeSerialPort(), rig: active).forceOff()
-    #expect(active.ptt == [false])                    // doběhlo před návratem (ne až po odpojení rigu)
+    for _ in 0..<50 where active.ptt.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(active.ptt == [false])                    // na pozadí, bez čekání
 }

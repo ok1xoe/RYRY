@@ -187,3 +187,13 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     #expect(Date().timeIntervalSince(t0) < 1)
     close(fds[0]); close(fds[1])
 }
+
+// Po výslovném odpojení (stop engine) rig port znovu neotevře – pozdě doběhlý příkaz jen hlásí offline
+@Test func catStaysClosedAfterDisconnect() async throws {
+    let t = FakeCATTransport { _ in Array("FA00014085000;".utf8) }
+    let rig = SerialCATRig(transport: t, protocol: .text(.kenwood), timeout: .milliseconds(100))
+    #expect(try await rig.frequency() == 14_085_000)
+    await rig.disconnect()
+    await #expect(throws: RigError.offline) { try await rig.setPTT(false) }
+    #expect(!t.opened && rig.isIdle)
+}

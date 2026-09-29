@@ -75,3 +75,12 @@ private let listing = """
     #expect(!b.isRunning)
     await a.disconnect()
 }
+
+@Test func managedRigctldStaysStoppedAfterDisconnect() async throws {
+    guard let bin = ManagedHamlibRig.findRigctld() else { return }
+    let rig = ManagedHamlibRig(binary: bin, model: 1, serialPort: "", baud: 0, tcpPort: UInt16(44_000 + Int.random(in: 0..<900)))
+    #expect(try await rig.frequency() > 0)
+    await rig.disconnect()
+    await #expect(throws: RigError.offline) { try await rig.setPTT(false) }
+    #expect(!rig.isRunning && rig.startCount == 1)
+}

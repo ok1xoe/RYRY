@@ -29,6 +29,8 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
     private let timeout: Duration
     private let queue = DispatchQueue(label: "mmtty4mac.cat")
     private var isOpen = false
+    /// Po výslovném disconnect() se port znovu neotevírá (dokud nepřijde connect()).
+    private var closedByOwner = false
     /// Počet číslic frekvence podle poslední odpovědi rádia (starší Yaesu mají 8).
     private var faDigits: Int?
 
@@ -46,6 +48,7 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
 
     public func connect() async throws {
         try await onQueue { [self] in
+            closedByOwner = false
             if isOpen { return }
             do { try transport.open() } catch { throw RigError.protocolError("\(error)") }
             isOpen = true
@@ -53,11 +56,12 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
     }
 
     public func disconnect() async {
-        _ = try? await onQueue { [self] in transport.close(); isOpen = false }
+        _ = try? await onQueue { [self] in transport.close(); isOpen = false; closedByOwner = true }
     }
 
     private func ensureOpen() throws {
         if isOpen { return }
+        if closedByOwner { throw RigError.offline }
         do { try transport.open(); isOpen = true } catch { throw RigError.offline }
     }
 

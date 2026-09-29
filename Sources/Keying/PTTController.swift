@@ -64,13 +64,16 @@ public final class PTTController: @unchecked Sendable {
         // CAT vypnout vždy, když je rig (i při RTS/DTR PTT – rig mohl být zaklíčován jinudy).
         // Čeká max. 2 s a nečeká na úkol, který zrušení ignoruje.
         // PTT přes RTS/DTR: CAT jen pro jistotu a jen otevřenému rigu (neotvírat kvůli tomu port / nespouštět rigctld),
-        // s krátkým čekáním – aby příkaz nedoběhl až po odpojení rigu.
-        guard let rig, method == .cat || !rig.isIdle else { return }
-        let limit: Duration = method == .cat ? .seconds(2) : .milliseconds(300)
+        // bez čekání. Pozdě doběhlý příkaz po odpojení rigu nic neotevře (rig po disconnect() hlásí offline).
+        guard let rig else { return }
+        if method != .cat {
+            if !rig.isIdle { Task { try? await rig.setPTT(false) } }
+            return
+        }
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             let once = Once()
             Task { try? await rig.setPTT(false); if once.first() { cont.resume() } }
-            Task { try? await Task.sleep(for: limit); if once.first() { cont.resume() } }
+            Task { try? await Task.sleep(for: .seconds(2)); if once.first() { cont.resume() } }
         }
     }
 }
