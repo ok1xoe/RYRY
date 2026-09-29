@@ -115,3 +115,36 @@ import WaveFile
     #expect(f.model.settings.log.rxText && f.model.rxLogActive)
     await f.model.stop()
 }
+
+// Správa logu: nový log, uložit jako, otevřít cizí ADIF; Použít ze starší kopie dialogu log nepřepne zpět
+@Test @MainActor func logManagement() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let draft = f.model.settings
+    await f.model.setQSOField("call", "OK1AAA")
+    await f.model.logQSO(); await f.settle()
+    #expect(f.model.logRecords.count == 1)
+
+    let newURL = f.dir.appendingPathComponent("zavody/cq-ww.adi")
+    try await f.model.newLog(file: newURL)
+    #expect(f.model.settings.log.name == "cq-ww" && f.model.logRecords.isEmpty)
+    #expect(f.model.settings.log.recent.first == newURL.standardizedFileURL.path)
+
+    await f.model.setQSOField("call", "OK2BBB")
+    await f.model.logQSO(); await f.settle()
+    await #expect(throws: (any Error).self) { try await f.model.newLog(file: newURL) }   // už existuje
+    let copyURL = f.dir.appendingPathComponent("kopie.adi")
+    try await f.model.saveLogAs(file: copyURL)
+    #expect(f.model.settings.log.name == "kopie" && f.model.logRecords.map(\.call) == ["OK2BBB"])
+
+    let foreign = f.dir.appendingPathComponent("cizi.adi")
+    try "<EOH>\n<CALL:5>W1ABC <QSO_DATE:8>20251012 <TIME_ON:4>1203 <MODE:4>RTTY <EOR>\n".write(to: foreign, atomically: true, encoding: .utf8)
+    let msg = try await f.model.openLog(file: foreign)
+    #expect(msg.contains("1"))
+    #expect(f.model.settings.log.name == "cizi" && f.model.logRecords.map(\.call) == ["W1ABC"])
+
+    var d = draft; d.station.call = "OK9ZZZ"
+    await f.model.applySettings(d, baseline: draft)
+    #expect(f.model.settings.log.name == "cizi")                     // dialog log nevrátil
+    await f.model.stop()
+}

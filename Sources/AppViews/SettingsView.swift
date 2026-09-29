@@ -378,7 +378,10 @@ struct APITab: View {
                         }
                     }
                 }
-            } header: { Text("Log") } footer: { Text(L("Spojení (JSONL + ADIF) a série QTC se ukládají do tohoto adresáře.")) }
+                LabeledContent(L("Otevřený log")) {
+                    Text(s.log.name + ".adi").foregroundStyle(.secondary)
+                }
+            } header: { Text("Log") } footer: { Text(L("Spojení (JSONL + ADIF) a série QTC se ukládají do tohoto adresáře. Jiný log založíte nebo otevřete v menu Soubor (Nový log…, Otevřít log…).")) }
             Section {
                 Toggle(L("Průběžně zapisovat příjem do souboru"), isOn: $s.log.rxText)
                 Toggle(L("Časová značka UTC na začátku řádku"), isOn: $s.log.rxTimestamps).disabled(!s.log.rxText)

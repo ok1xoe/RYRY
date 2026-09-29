@@ -131,6 +131,18 @@
 <figure><a href="../img/en-log.png"><img src="../img/en-log.png" alt="Log window" loading="lazy"></a>
   <figcaption>Log window (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): search, edit by double-click, delete, ADIF import and Cabrillo export. The QTC tab lists QTC series from the WAE contest.</figcaption></figure>
 <p>The log is stored in <code>~/Documents/mmtty4mac</code> as JSONL and also as ADIF (<code>mmtty4mac.adi</code>) that any logger can read. For an old MMTTY log, export it to ADIF in MMTTY and import it in mmtty4mac – duplicates are skipped.</p>
+<h3>Log management</h3>
+<p>Each log is a separate file – for example one for everyday operating and one per contest. In the <b>File</b> menu:</p>
+<table>
+  <tr><th>Command</th><th>What it does</th></tr>
+  <tr><td>New Log… <kbd>⌘</kbd><kbd>N</kbd></td><td>creates an empty log with the chosen name and location; contest serial numbers start at 1</td></tr>
+  <tr><td>Open Log… <kbd>⌘</kbd><kbd>O</kbd></td><td>opens an mmtty4mac log or an ADIF file from another program (it is converted, the original stays as <code>.adi.orig</code>)</td></tr>
+  <tr><td>Open Recent Log</td><td>the last 8 logs</td></tr>
+  <tr><td>Save Log As… <kbd>⇧</kbd><kbd>⌘</kbd><kbd>S</kbd></td><td>saves a copy under a new name and continues in it</td></tr>
+  <tr><td>Export ADIF…</td><td>a copy of the ADIF elsewhere; the log stays open</td></tr>
+  <tr><td>Import ADIF…</td><td>adds QSOs from ADIF to the open log (duplicates are skipped)</td></tr>
+</table>
+<p>Every QSO is saved the moment it is logged, so there is no separate “Save”. The name of the open log is in the Log window title.</p>
 </section>
 
 <section id="contests">

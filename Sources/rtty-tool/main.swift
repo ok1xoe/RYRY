@@ -225,7 +225,7 @@ case "live":
     let rig: Rig = RigFactory.make(settings.rig)
     let engine = Engine(modem: m, rig: rig, audio: CoreAudioBackend(), config: settings.engineConfig())
     let log: QSOLogStore?
-    do { log = try QSOLogStore(directory: URL(fileURLWithPath: settings.log.directory)) }
+    do { log = try QSOLogStore(directory: URL(fileURLWithPath: settings.log.directory), baseName: settings.log.name) }
     catch { log = nil; FileHandle.standardError.write(Data("[log] nedostupný: \(error)\n".utf8)) }
     let app = AppController(settings: settings, engine: engine, log: log, profiles: ProfileStore(directory: store.url.deletingLastPathComponent()))
     let events = app.events()

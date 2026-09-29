@@ -77,6 +77,8 @@ Proměnné v makrech:
 - Log se ukládá do `~/Documents/mmtty4mac` (JSONL + ADIF `mmtty4mac.adi`, který přečte každý logger).
 - Starý log z MMTTY: v MMTTY ho exportujte do ADIF a v mmtty4mac importujte (duplicity se přeskočí).
 
+Správa logu (menu Soubor): **Nový log…** (⌘N; pořadová čísla závodu od 1), **Otevřít log…** (⌘O; log mmtty4mac nebo ADIF z jiného programu – převede se, originál zůstane jako `.adi.orig`), **Otevřít nedávný log**, **Uložit log jako…** (⇧⌘S; kopie, dál se pracuje v ní), **Exportovat ADIF…**, **Importovat ADIF…**. Spojení se ukládá hned při zalogování.
+
 ## 7. Závody
 
 Nastavení → Závod: zapněte **Závodní režim** a vyberte **Předvolbu** (ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE, OK DX RTTY). Předvolba nastaví název pro Cabrillo, formát výměny a nejbližší termín – termín vždy ověřte v pravidlech závodu.

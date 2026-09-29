@@ -107,6 +107,21 @@ struct MMTTY4MacApp: App {
             CommandGroup(replacing: .help) {
                 Button(L("Příručka mmtty4mac")) { openManual() }.keyboardShortcut("?", modifiers: .command)
             }
+            CommandGroup(replacing: .newItem) {
+                Button(L("Nový log…")) { FileActions.newLog(model) }.keyboardShortcut("n", modifiers: .command)
+                Button(L("Otevřít log…")) { FileActions.openLog(model) }.keyboardShortcut("o", modifiers: .command)
+                Menu(L("Otevřít nedávný log")) {
+                    ForEach(model.settings.log.recent, id: \.self) { p in
+                        Button((p as NSString).lastPathComponent + " — " + ((p as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath) {
+                            FileActions.openLog(model, url: URL(fileURLWithPath: p))
+                        }.disabled(p == model.logLocation.displayPath)
+                    }
+                }.disabled(model.settings.log.recent.isEmpty)
+                Button(L("Uložit log jako…")) { FileActions.saveLogAs(model) }.keyboardShortcut("s", modifiers: [.command, .shift])
+                Button(L("Exportovat ADIF…")) { FileActions.exportADIF(model) }
+                Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
+                Divider()
+            }
             CommandGroup(after: .newItem) {
                 Button(L("Uložit příjem do souboru…")) { FileActions.saveRxWindow(model) }
                 Toggle(L("Průběžně zapisovat příjem do souboru"),
@@ -128,8 +143,6 @@ struct MMTTY4MacApp: App {
                     Button(L("Zastavit nahrávání WAV")) { Task { await model.stopRecordingWAV() } }
                 }
                 Divider()
-                Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
-                Divider()
                 Button(L("Nastavení zvuku systému…")) { FileActions.openSoundSettings() }
                 Button(L("Audio MIDI Setup…")) { FileActions.openAudioMIDISetup() }
             }
@@ -139,7 +152,7 @@ struct MMTTY4MacApp: App {
                 Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
             }
         }
-        Window("Log", id: "log") { LogWindow(model: model).environment(\.showHints, model.settings.display.showHints) }
+        Window("Log – " + model.settings.log.name, id: "log") { LogWindow(model: model).environment(\.showHints, model.settings.display.showHints) }
         Window(L("Scope demodulátoru"), id: "scope") {
             ScopeWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }

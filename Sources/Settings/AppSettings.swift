@@ -147,16 +147,31 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
 
 public struct LogSettings: Codable, Sendable, Equatable {
     public var directory: String = NSHomeDirectory() + "/Documents/mmtty4mac"
+    /// Název logu (soubory `<název>.jsonl`, `<název>.adi`).
+    public var name = "mmtty4mac"
+    /// Naposledy otevřené logy (cesty k ADIF), nejnovější první.
+    public var recent: [String] = []
+    public static let recentLimit = 8
+    public mutating func remember(_ path: String) {
+        recent.removeAll { $0 == path }
+        recent.insert(path, at: 0)
+        if recent.count > Self.recentLimit { recent.removeLast(recent.count - Self.recentLimit) }
+    }
+    static func validName(_ n: String) -> Bool {
+        !n.isEmpty && n.count <= 200 && !n.contains("/") && !n.contains(":") && !n.hasPrefix(".")
+    }
     /// Průběžný záznam přijatého textu do `<directory>/rx/rx-YYYY-MM-DD.txt` (MMTTY „Log Rx file“).
     public var rxText = false
     /// Časová značka UTC na začátku řádku záznamu příjmu.
     public var rxTimestamps = true
     public init() {}
     public var rxDirectory: URL { URL(fileURLWithPath: directory).appendingPathComponent("rx") }
-    enum CodingKeys: String, CodingKey { case directory, rxText, rxTimestamps }
+    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), x = LogSettings()
         directory = c.tolerant(.directory, x.directory, d.warningSink, "log")
+        let n = c.tolerant(.name, x.name, d.warningSink, "log"); name = Self.validName(n) ? n : x.name
+        recent = Array(c.tolerant(.recent, TolerantArray<String>(), d.warningSink, "log").items.prefix(Self.recentLimit))
         rxText = c.tolerant(.rxText, x.rxText, d.warningSink, "log")
         rxTimestamps = c.tolerant(.rxTimestamps, x.rxTimestamps, d.warningSink, "log")
     }

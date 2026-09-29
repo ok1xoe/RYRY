@@ -131,6 +131,18 @@
 <figure><a href="../img/cs-log.png"><img src="../img/cs-log.png" alt="Okno Log" loading="lazy"></a>
   <figcaption>Okno Log (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): hledání, oprava dvojklikem, mazání, import ADIF a export Cabrillo. Záložka QTC ukazuje série QTC ze závodu WAE.</figcaption></figure>
 <p>Log se ukládá do <code>~/Documents/mmtty4mac</code> jako JSONL a zároveň jako ADIF (<code>mmtty4mac.adi</code>), který přečte každý logger. Starý log z MMTTY v MMTTY exportujte do ADIF a v mmtty4mac importujte – duplicity se přeskočí.</p>
+<h3>Správa logu</h3>
+<p>Každý log je samostatný soubor – třeba jeden pro běžný provoz a jeden pro každý závod. V menu <b>Soubor</b>:</p>
+<table>
+  <tr><th>Příkaz</th><th>Co dělá</th></tr>
+  <tr><td>Nový log… <kbd>⌘</kbd><kbd>N</kbd></td><td>založí prázdný log se zvoleným názvem a umístěním; pořadová čísla závodu začnou od 1</td></tr>
+  <tr><td>Otevřít log… <kbd>⌘</kbd><kbd>O</kbd></td><td>otevře log mmtty4mac nebo ADIF z jiného programu (ten se převede, originál zůstane jako <code>.adi.orig</code>)</td></tr>
+  <tr><td>Otevřít nedávný log</td><td>posledních 8 logů</td></tr>
+  <tr><td>Uložit log jako… <kbd>⇧</kbd><kbd>⌘</kbd><kbd>S</kbd></td><td>uloží kopii pod jiným názvem a dál se pracuje v ní</td></tr>
+  <tr><td>Exportovat ADIF…</td><td>kopie ADIF jinam, log zůstane otevřený</td></tr>
+  <tr><td>Importovat ADIF…</td><td>přidá spojení z ADIF do otevřeného logu (duplicity se přeskočí)</td></tr>
+</table>
+<p>Každé spojení se ukládá hned při zalogování, samostatné „Uložit“ proto není potřeba. Název otevřeného logu je v titulku okna Log.</p>
 </section>
 
 <section id="zavody">
