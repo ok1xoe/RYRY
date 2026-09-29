@@ -40,6 +40,8 @@ public actor Engine {
     private var epoch = 0
     private var lastQueued = 0
     private var lastProgressAt: UInt64 = 0
+    private var lastReportedPending = -1
+    private var lastPendingReportAt: UInt64 = 0
     private static let stallNs: UInt64 = 2_000_000_000   // výstup bez pohybu 2 s = zaseknuté zařízení
     private var everStarted = false
 
@@ -322,6 +324,11 @@ public actor Engine {
                 await generate(now: now)
             }
         case .tx, .drain:
+            let pend = modem.txPending
+            if pend != lastReportedPending, now - lastPendingReportAt >= 200_000_000 || pend == 0 {
+                lastReportedPending = pend; lastPendingReportAt = now
+                broadcaster.send(.txProgress(pend))
+            }
             if state == .drain, !stopRequested, modem.txPending == 0 {
                 modem.stopTx(); stopRequested = true
             }

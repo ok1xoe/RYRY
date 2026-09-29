@@ -7,7 +7,11 @@ mmtty4mac nabízí dvě API vrstvy. Každou lze v nastavení zapnout nebo vypnou
 | fldigi XML-RPC (kompatibilní s fldigi) | `http://127.0.0.1:7362/RPC2` | `fldigiEnabled`, `fldigiPort` |
 | JSON-RPC 2.0 přes WebSocket | `ws://127.0.0.1:7363/v1` | `jsonRPCEnabled`, `jsonRPCPort` |
 
-**Bezpečnost:** API umí zapnout vysílač. Ve výchozím stavu naslouchá jen na `127.0.0.1`. Síťový přístup je potřeba výslovně povolit volbou `allowRemote: true`.
+**Bezpečnost:** API umí zapnout vysílač.
+- Ve výchozím stavu naslouchá jen na `127.0.0.1`.
+- **Požadavky z webového prohlížeče se odmítají.** HTTP s hlavičkou `Origin` dostane 403 a WebSocket handshake s `Origin` se odmítne. Webová stránka otevřená v prohlížeči tak nemůže ovládat vysílač. Nativní programy `Origin` neposílají.
+- API nemá autentizaci. `allowRemote: true` (naslouchání na všech rozhraních) zapínejte jen v důvěryhodné síti.
+- Limity: tělo HTTP a zpráva WebSocket max. 1 MB, max. 64 HTTP spojení, 10 s na dokončení požadavku.
 
 ---
 
@@ -22,14 +26,14 @@ Loggery, které umí ovládat fldigi (RUMlogNG, MacLoggerDX, Log4OM a další), 
 | `main.get_trx_status` | `s:n` | `rx`, `tx` nebo `tune` |
 | `main.tx`, `main.rx`, `main.tune`, `main.abort` | `n:n` | TX. `main.rx` = RX po dovysílání, `main.abort` = okamžitě RX |
 | `main.rx_only`, `main.rx_tx` | `n:n` | zakázat nebo povolit vysílání |
-| `main.get_frequency`, `main.set_frequency` | `d:n`, `d:d` | frekvence rigu v Hz (`set` vrací starou) |
+| `main.get_frequency`, `main.set_frequency` | `d:n`, `d:d` | frekvence rigu v Hz (`set` vrací starou). Bez rigu se `set` tiše ignoruje |
 | `rig.get_frequency`, `rig.set_frequency` | `d:n`, `d:d` | totéž |
 | `main.get_afc` / `set_afc`, `main.get_reverse` / `set_reverse`, `main.get_squelch` / `set_squelch` | `b:n` / `b:b` | přepínače demodulátoru |
 | `main.get_squelch_level` / `set_squelch_level` | `d:n` / `d:d` | úroveň squelche 0–100 (↔ MMTTY 0–1024) |
 | `modem.get_name`, `modem.get_names`, `modem.set_by_name` | | `RTTY` |
 | `modem.get_carrier` / `set_carrier` | `i:n` / `i:i` | střed mezi mark a space v Hz (`set` zachová shift) |
 | `rig.get_mode`, `rig.set_mode`, `rig.get_modes`, `rig.get_name` | | mód a název rigu |
-| `text.add_tx`, `text.add_tx_bytes`, `text.clear_tx` | | text do vysílací fronty |
+| `text.add_tx`, `text.add_tx_bytes`, `text.clear_tx` | | text do vysílací fronty. `^r` / `^R` v textu = po odvysílání RX (jako fldigi) |
 | `text.get_rx_length`, `text.get_rx(start, len)`, `text.clear_rx` | | historie přijatého textu (base64) |
 | `rx.get_data`, `tx.get_data` | `6:n` | přijatý nebo odvysílaný text od posledního volání (base64) |
 | `log.get_*` / `log.set_*` | | pole QSO okna: `call`, `name`, `qth`, `locator`, `rst_in`, `rst_out`, `serial_number`, `serial_number_sent`, `exchange`, `notes` |
@@ -77,17 +81,17 @@ Notifikace (bez `id`, jen odebírané):
 | `tx.sendRaw` | `{codes:[int]}` | Baudot kódy v pořadí MMTTY a řídicí `0xFC`–`0xFF` |
 | `tx.clear` / `tx.pending` | – | |
 | `modem.list` | – | `[{id, modes:[{id,name,adif}], current}]` |
-| `modem.select` | `{mode}` | např. `RTTY-75` |
+| `modem.select` | `{mode}` (volitelně `{id: "rtty", mode}`) | např. `RTTY-75` |
 | `modem.getParams` | – | `{baud: 45.45, mark: 2125, shift: 170, afc: true, …}` |
 | `modem.setParams` | `{params:{…}}` | aktuální parametry. Neplatná hodnota → `-32602` |
 | `modem.describeParams` | – | `[{id, label, type, min, max, unit, options, default}]` |
 | `profile.list` / `load` / `save` / `delete` | `{slot}` / `{slot, name}` | 16 slotů |
 | `rig.status` / `rig.getFreq` | – | `{online, frequency, mode}` |
 | `rig.setFreq` / `rig.setMode` | `{hz}` / `{mode}` | chyba rigu `-32002` |
-| `macro.list` / `macro.run` | – / `{index}` | makra (syntaxe MMTTY) |
+| `macro.list` / `macro.run` / `macro.stop` | – / `{index}` / – | makra (syntaxe MMTTY). Makro s `repeatSeconds` se opakuje (CQ smyčka), dokud nepřijde znak, `macro.stop` nebo `engine.rxNow` |
 | `qso.getCurrent` / `qso.setField` / `qso.clear` / `qso.log` | `{name, value}` | QSO okno. `qso.log` vrací záznam |
 | `log.query` | `{call?, from?, to?, limit?}` (ISO 8601) | záznamy od nejnovějšího |
-| `log.update` / `log.delete` | `{record}` / `{id}` | |
+| `log.update` / `log.delete` | `{record}` nebo `{id, fields:{…}}` / `{id}` | |
 | `spectrum.get` | `{bins?}` | `{binHz, magnitudes}` |
 | `spectrum.stream` / `stopStream` | `{fps≤20, bins?}` | notifikace `spectrum` |
 | `events.subscribe` / `unsubscribe` | `{events:[…]}` | `"*"` = vše |
@@ -97,6 +101,7 @@ Notifikace (bez `id`, jen odebírané):
 | Název | Parametry |
 |---|---|
 | `rx.char` | `{char, echo}` |
+| `tx.progress` | `{pending}`: znaky čekající na odvysílání (max. 5/s) |
 | `engine.state` | `{state}`: `stopped`, `rx`, `keying`, `pttOn`, `tx`, `drain`, `pttOff` |
 | `signal.level` | `{level, squelchOpen}` (max. 10/s) |
 | `afc.changed` | `{mark, space}` |
@@ -121,7 +126,8 @@ Notifikace (bez `id`, jen odebírané):
 | `-32002` | rig |
 | `-32003` | log |
 
-Klient, který nestíhá číst (fronta přes 1000 zpráv), se odpojí.
+Klient, který nestíhá číst (fronta přes 1000 zpráv), se odpojí. Požadavky jednoho klienta se zpracovávají postupně v pořadí příchodu.
+Když se odpojí klient, který zahájil vysílání (`engine.tx`, `engine.tune`, `macro.run`), vysílání se okamžitě ukončí.
 
 ### Příklad (Python)
 

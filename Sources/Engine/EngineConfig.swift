@@ -40,6 +40,8 @@ public enum EngineEvent: Sendable {
     case pttTimeout
     /// Makro obsahovalo %l – klient (GUI/API) má zalogovat aktuální spojení.
     case logRequested
+    /// Počet znaků/kódů čekajících na odvysílání (při změně, max. 5×/s).
+    case txProgress(Int)
 }
 
 /// Rozesílá události více odběratelům (každý dostane vlastní AsyncStream).

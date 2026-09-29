@@ -131,3 +131,29 @@ func run(_ h: Harness, until: () async -> Bool) async {
     #expect(await h.app.modemParam("baud") == .double(75))
     await h.app.stop()
 }
+
+/// Makro s opakováním (CQ smyčka) se opakuje, dokud ho nezastaví stopMacroRepeat.
+@Test func macroRepeatRunsUntilStopped() async throws {
+    let h = try makeApp()
+    var macros = AppSettings.defaultMacros
+    macros[0] = Macro(name: "CQ", text: "CQ DE %m K\\", repeatSeconds: 0.3)
+    await h.app.setMacros(macros)
+    try await h.app.start()
+    try await h.app.runMacro(index: 0)
+    var transmissions = 0, wasTx = false
+    let end = Date().addingTimeInterval(4)
+    while Date() < end && transmissions < 3 {
+        h.clock.advance(ms: 50)
+        await h.engine.pump()
+        let tx = await h.engine.state != .rx
+        if tx && !wasTx { transmissions += 1 }
+        wasTx = tx
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(transmissions >= 3)
+    await h.app.stopMacroRepeat()
+    await h.app.rxNow()
+    for _ in 0..<40 { h.clock.advance(ms: 50); await h.engine.pump(); try await Task.sleep(for: .milliseconds(20)) }
+    #expect(await h.engine.state == .rx)
+    await h.app.stop()
+}

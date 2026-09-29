@@ -24,13 +24,19 @@ public final class HTTPServer: @unchecked Sendable {
     private let host: String
     private let port: UInt16
     private let maxBody: Int
+    private let maxConnections: Int
+    private let headerTimeout: Duration
     private let handler: @Sendable (HTTPRequest) async -> HTTPResponse
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "HTTPServer")
+    private let lock = NSLock()
+    private var connections: [ObjectIdentifier: HTTPConnection] = [:]
 
-    public init(host: String, port: UInt16, maxBody: Int = 1 << 20,
+    public init(host: String, port: UInt16, maxBody: Int = 1 << 20, maxConnections: Int = 64,
+                headerTimeout: Duration = .seconds(10),
                 handler: @escaping @Sendable (HTTPRequest) async -> HTTPResponse) {
-        self.host = host; self.port = port; self.maxBody = maxBody; self.handler = handler
+        self.host = host; self.port = port; self.maxBody = maxBody
+        self.maxConnections = maxConnections; self.headerTimeout = headerTimeout; self.handler = handler
     }
 
     /// Spustí server; vrací skutečný port (port 0 = náhodný).
@@ -38,15 +44,24 @@ public final class HTTPServer: @unchecked Sendable {
         let l = try makeListener(host: host, port: port)
         listener = l
         l.newConnectionHandler = { [weak self] c in self?.accept(c) }
-        let port = try await startListener(l, queue: queue)
-        return port
+        return try await startListener(l, queue: queue)
     }
 
-    public func stop() { listener?.cancel(); listener = nil }
+    /// Zastaví listener i všechna otevřená spojení.
+    public func stop() {
+        listener?.cancel(); listener = nil
+        let all = lock.withLock { () -> [HTTPConnection] in defer { connections.removeAll() }; return Array(connections.values) }
+        all.forEach { $0.cancel() }
+    }
 
     private func accept(_ c: NWConnection) {
-        let conn = HTTPConnection(c, maxBody: maxBody, handler: handler)
-        conn.start(queue: queue)
+        let full = lock.withLock { connections.count >= maxConnections }
+        let conn = HTTPConnection(c, maxBody: maxBody, headerTimeout: headerTimeout, queue: queue, handler: handler)
+        if full { conn.rejectBusy(); return }
+        let id = ObjectIdentifier(conn)
+        lock.withLock { connections[id] = conn }
+        conn.onClose = { [weak self] in self?.lock.withLock { _ = self?.connections.removeValue(forKey: id) } }
+        conn.start()
     }
 }
 
@@ -54,6 +69,14 @@ func makeListener(host: String, port: UInt16, ws: Bool = false) throws -> NWList
     let params: NWParameters = ws ? {
         let p = NWParameters.tcp
         let o = NWProtocolWebSocket.Options(); o.autoReplyPing = true
+        o.maximumMessageSize = 1 << 20
+        // Prohlížeč posílá Origin – webová stránka nesmí ovládat vysílač (nativní klienti Origin neposílají).
+        o.setClientRequestHandler(DispatchQueue(label: "ws-handshake")) { _, headers in
+            if headers.contains(where: { $0.name.lowercased() == "origin" }) {
+                return NWProtocolWebSocket.Response(status: .reject, subprotocol: nil)
+            }
+            return NWProtocolWebSocket.Response(status: .accept, subprotocol: nil)
+        }
         p.defaultProtocolStack.applicationProtocols.insert(o, at: 0)
         return p
     }() : .tcp
@@ -83,33 +106,73 @@ func startListener(_ l: NWListener, queue: DispatchQueue) async throws -> UInt16
     }
 }
 
-/// Jedno HTTP spojení: inkrementální parser, keep-alive.
+/// Jedno HTTP spojení: inkrementální parser, keep-alive. Veškerý stav se mění na `queue`.
 final class HTTPConnection: @unchecked Sendable {
     private let c: NWConnection
     private let maxBody: Int
+    private let headerTimeout: Duration
+    private let queue: DispatchQueue
     private let handler: @Sendable (HTTPRequest) async -> HTTPResponse
     private var buf = Data()
     private let remote: String
+    private var sentContinue = false
+    private var closed = false
+    private var timer: DispatchWorkItem?
+    var onClose: (@Sendable () -> Void)?
 
-    init(_ c: NWConnection, maxBody: Int, handler: @escaping @Sendable (HTTPRequest) async -> HTTPResponse) {
-        self.c = c; self.maxBody = maxBody; self.handler = handler
+    init(_ c: NWConnection, maxBody: Int, headerTimeout: Duration, queue: DispatchQueue,
+         handler: @escaping @Sendable (HTTPRequest) async -> HTTPResponse) {
+        self.c = c; self.maxBody = maxBody; self.headerTimeout = headerTimeout; self.queue = queue; self.handler = handler
         remote = "\(c.endpoint)"
     }
 
-    func start(queue: DispatchQueue) {
+    func start() {
+        c.stateUpdateHandler = { [weak self] st in
+            switch st { case .failed, .cancelled: self?.finish(); default: break }
+        }
         c.start(queue: queue)
+        armTimer()
         receive()
     }
 
+    /// Server je plný – odpovědět 503 a zavřít.
+    func rejectBusy() {
+        c.start(queue: queue)
+        let body = Data("too many connections".utf8)
+        c.send(content: Data("HTTP/1.1 503 Service Unavailable\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n".utf8) + body,
+               completion: .contentProcessed { [c] _ in c.cancel() })
+    }
+
+    func cancel() { queue.async { self.c.cancel() } }
+
+    private func finish() {
+        guard !closed else { return }
+        closed = true
+        timer?.cancel()
+        onClose?()
+    }
+
+    /// Časový limit na dokončení požadavku (hlavičky i tělo) a na nečinnost keep-alive.
+    private func armTimer() {
+        timer?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.fail(408, "request timeout") }
+        timer = w
+        let c = headerTimeout.components
+        let ns = Int(c.seconds) * 1_000_000_000 + Int(c.attoseconds / 1_000_000_000)
+        queue.asyncAfter(deadline: .now() + .nanoseconds(ns), execute: w)
+    }
+
     private func receive() {
-        c.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [self] data, _, done, err in
-            if let data { buf.append(data) }
-            if err != nil { c.cancel(); return }
-            processBuffer(eof: done)
+        c.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, done, err in
+            guard let self else { return }
+            if let data { self.buf.append(data) }
+            if err != nil { self.c.cancel(); return }
+            self.processBuffer(eof: done)
         }
     }
 
     private func fail(_ status: Int, _ msg: String) {
+        timer?.cancel()
         send(HTTPResponse(status: status, headers: ["Connection": "close"], body: Data(msg.utf8)), close: true)
     }
 
@@ -123,11 +186,14 @@ final class HTTPConnection: @unchecked Sendable {
         var lines = head.components(separatedBy: "\r\n")
         let reqLine = lines.removeFirst().split(separator: " ")
         guard reqLine.count >= 3, reqLine[2].hasPrefix("HTTP/1.") else { fail(400, "bad request"); return }
+        let http11 = reqLine[2] != "HTTP/1.0"
         var headers: [String: String] = [:]
         for l in lines {
             guard let i = l.firstIndex(of: ":") else { continue }
             headers[l[..<i].lowercased()] = l[l.index(after: i)...].trimmingCharacters(in: .whitespaces)
         }
+        // Požadavek z prohlížeče (webová stránka) nesmí ovládat vysílač.
+        if headers["origin"] != nil { fail(403, "browser requests are not allowed"); return }
         let method = String(reqLine[0])
         var length = 0
         if let cl = headers["content-length"] {
@@ -139,25 +205,36 @@ final class HTTPConnection: @unchecked Sendable {
         if length > maxBody { fail(413, "payload too large"); return }
         let bodyStart = headerEnd.upperBound
         guard buf.count - (bodyStart - buf.startIndex) >= length else {
+            if headers["expect"]?.lowercased() == "100-continue", !sentContinue {
+                sentContinue = true
+                c.send(content: Data("HTTP/1.1 100 Continue\r\n\r\n".utf8), completion: .contentProcessed { _ in })
+            }
             if eof { c.cancel(); return }
             receive(); return
         }
+        timer?.cancel()
+        sentContinue = false
         let body = buf[bodyStart..<(bodyStart + length)]
         buf.removeSubrange(buf.startIndex..<(bodyStart + length))
         let req = HTTPRequest(method: method, path: String(reqLine[1]), headers: headers, body: Data(body), remote: remote)
-        let keepAlive = headers["connection"]?.lowercased() != "close"
+        let conn = headers["connection"]?.lowercased()
+        let keepAlive = http11 ? conn != "close" : conn == "keep-alive"
         let h = handler
-        Task { [self] in
+        Task {
             let resp = await h(req)
-            self.send(resp, close: !keepAlive) {
-                if keepAlive { self.processBuffer(eof: false) }
+            self.queue.async {
+                self.send(resp, close: !keepAlive) {
+                    guard keepAlive else { return }
+                    self.queue.async { self.armTimer(); self.processBuffer(eof: false) }
+                }
             }
         }
     }
 
     private func send(_ r: HTTPResponse, close: Bool, then: (@Sendable () -> Void)? = nil) {
-        let reason = [200: "OK", 400: "Bad Request", 404: "Not Found", 411: "Length Required",
-                      413: "Payload Too Large", 431: "Request Header Fields Too Large"][r.status] ?? "Status"
+        let reason = [200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 408: "Request Timeout",
+                      411: "Length Required", 413: "Payload Too Large", 431: "Request Header Fields Too Large",
+                      503: "Service Unavailable"][r.status] ?? "Status"
         var h = "HTTP/1.1 \(r.status) \(reason)\r\nContent-Length: \(r.body.count)\r\nServer: mmtty4mac\r\n"
         for (k, v) in r.headers where k.lowercased() != "content-length" { h += "\(k): \(v)\r\n" }
         if close && r.headers["Connection"] == nil { h += "Connection: close\r\n" }

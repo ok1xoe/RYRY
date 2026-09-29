@@ -14,6 +14,7 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
     private let host: String, port: UInt16
     private let lock = NSLock()
     private var rxCursor = 0, txCursor = 0
+    private var rxAfterTx = false          // fldigi ^r v text.add_tx před main.tx
 
     public init(app: AppController, host: String = "127.0.0.1", port: UInt16 = 7362) {
         self.app = app; self.host = host; self.port = port
@@ -84,7 +85,7 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
         ("text.add_tx_bytes", "n:6", "Adds a byte string to the TX text widget"),
         ("text.clear_tx", "n:n", "Clears the TX text widget"),
         ("text.get_rx_length", "i:n", "Returns the number of characters in the RX widget"),
-        ("text.get_rx", "6:i", "Returns a range of characters (start, length) from the RX text widget"),
+        ("text.get_rx", "6:ii", "Returns a range of characters (start, length) from the RX text widget"),
         ("text.clear_rx", "n:n", "Clears the RX text widget"),
         ("rx.get_data", "6:n", "Returns all RX data received since last query."),
         ("tx.get_data", "6:n", "Returns all TX data transmitted since last query."),
@@ -101,6 +102,8 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
         ("log.get_exchange", "s:n", "Returns the contest exchange field contents"),
         ("log.set_exchange", "n:s", "Sets the contest exchange field contents"),
         ("log.get_notes", "s:n", "Returns the Notes field contents"),
+        ("log.set_notes", "n:s", "Sets the Notes field contents"),
+        ("log.set_serial_number_sent", "n:s", "Sets the serial number (sent) field contents"),
         ("log.get_frequency", "s:n", "Returns the Frequency field contents"),
         ("log.get_band", "s:n", "Returns the current band name"),
         ("log.get_time_on", "s:n", "Returns the Time-On field contents"),
@@ -154,7 +157,10 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
             let st = await engine.state
             if await engine.isTuning { return .string("tune") }
             return .string([.rx, .stopped].contains(st) ? "rx" : "tx")
-        case "main.tx": try await tx { try await app.tx() }; return .nil_
+        case "main.tx":
+            try await tx { try await app.tx() }
+            if lock.withLock({ defer { rxAfterTx = false }; return rxAfterTx }) { await app.rx() }
+            return .nil_
         case "main.tune": try await tx { try await app.tune() }; return .nil_
         case "main.rx": await app.rx(); return .nil_
         case "main.abort": await app.rxNow(); return .nil_
@@ -167,7 +173,8 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
             let f = try dbl(p, m)
             guard f.isFinite, f > 0 else { throw Self.badParams(m) }
             let old = await engine.rigStatus?.frequency ?? 0
-            do { try await app.setFrequency(f) } catch { throw Fault(code: -32002, msg: "rig: \(error)") }
+            // bez rigu (nebo offline) tiše jako fldigi – loggery volají set_frequency při každé změně pásma
+            try? await app.setFrequency(f)
             return .double(old)
 
         case "main.get_afc": return .bool(await boolParam("afc"))
@@ -207,7 +214,19 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
         case "rig.get_modes": return .array(["USB", "LSB", "FSK", "PKTUSB"].map { .string($0) })
         case "rig.get_name": return .string(await engine.rigName)
 
-        case "text.add_tx": await app.send(text: try str(p, m)); return .nil_
+        case "text.add_tx":
+            // fldigi: ^r / ^R = po odvysílání textu přejít na RX
+            var text = try str(p, m)
+            var rxAfter = false
+            for marker in ["^r", "^R"] where text.contains(marker) {
+                rxAfter = true; text = text.replacingOccurrences(of: marker, with: "")
+            }
+            await app.send(text: text)
+            if rxAfter {
+                if [.keying, .pttOn, .tx].contains(await engine.state) { await app.rx() }
+                else { lock.withLock { rxAfterTx = true } }
+            }
+            return .nil_
         case "text.add_tx_bytes":
             guard case .base64(let d)? = p.first else { throw Self.badParams(m) }
             await app.send(text: String(decoding: d, as: UTF8.self)); return .nil_
@@ -218,14 +237,10 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
             return .base64(Data(app.rxText.range(start: s, length: l).utf8))
         case "text.clear_rx": app.rxText.clear(); return .nil_
         case "rx.get_data":
-            var c = lock.withLock { rxCursor }
-            let t = app.rxText.takeNew(cursor: &c)
-            lock.withLock { rxCursor = c }
+            let t = lock.withLock { app.rxText.takeNew(cursor: &rxCursor) }
             return .base64(Data(t.utf8))
         case "tx.get_data":
-            var c = lock.withLock { txCursor }
-            let t = app.txText.takeNew(cursor: &c)
-            lock.withLock { txCursor = c }
+            let t = lock.withLock { app.txText.takeNew(cursor: &txCursor) }
             return .base64(Data(t.utf8))
 
         case "log.clear": await app.clearQSO(); return .nil_

@@ -74,6 +74,7 @@ public actor AppController {
     public private(set) var txDisabled = false
     private let broadcaster = AppBroadcaster()
     private var eventTask: Task<Void, Never>?
+    private var repeatTask: Task<Void, Never>?
 
     public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil) {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
@@ -93,6 +94,7 @@ public actor AppController {
     }
 
     public func stop() async {
+        stopMacroRepeat()
         await engine.stop()
         await eventTask?.value
         eventTask = nil
@@ -121,7 +123,7 @@ public actor AppController {
         try await engine.tune()
     }
     public func rx() async { await engine.rx() }
-    public func rxNow() async { await engine.rxNow() }
+    public func rxNow() async { stopMacroRepeat(); await engine.rxNow() }
     public func send(text: String) async { await engine.send(text: text) }
     public func clearTx() async { await engine.clearTx() }
     public var state: EngineState { get async { await engine.state } }
@@ -137,10 +139,36 @@ public actor AppController {
     }
 
     public func runMacro(index: Int) async throws {
+        stopMacroRepeat()
+        try await runMacroOnce(index)
+        if let sec = settings.macros[index].repeatSeconds, sec > 0 { startRepeat(index, every: sec) }
+    }
+
+    private func runMacroOnce(_ index: Int) async throws {
         guard settings.macros.indices.contains(index) else { throw AppError.badMacro(index) }
         let m = MacroEngine.expand(settings.macros[index].text, context: macroContext())
         if txDisabled, m.mode == .send { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
         try await engine.sendMacro(m)
+    }
+
+    /// CQ smyčka (MMTTY UserTimer): po návratu do RX počkat `every` s a makro zopakovat.
+    /// Zastaví ji přijatý znak (někdo odpověděl), stopMacroRepeat() nebo rxNow().
+    private func startRepeat(_ index: Int, every sec: Double) {
+        let engine = self.engine, rx = rxText
+        repeatTask = Task { [weak self] in
+            while !Task.isCancelled {
+                while await engine.state != .rx, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(50)) }
+                let mark = rx.totalLength
+                try? await Task.sleep(for: .milliseconds(Int(sec * 1000)))
+                if Task.isCancelled || rx.totalLength > mark { break }
+                guard await engine.state == .rx else { continue }
+                do { try await self?.runMacroOnce(index) } catch { break }
+            }
+        }
+    }
+
+    public func stopMacroRepeat() {
+        repeatTask?.cancel(); repeatTask = nil
     }
 
     public func setMacros(_ m: [Macro]) { settings.macros = m }

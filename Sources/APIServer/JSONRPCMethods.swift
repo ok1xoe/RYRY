@@ -13,7 +13,10 @@ extension JSONRPCServer {
         guard let v = p[k] as? NSNumber, CFGetTypeID(v) != CFBooleanGetTypeID() else { throw RPCError.params("chybí '\(k)' (number)") }
         return v.doubleValue
     }
-    private func int(_ p: [String: Any], _ k: String) throws -> Int { Int(try num(p, k)) }
+    private func int(_ p: [String: Any], _ k: String) throws -> Int {
+        guard let i = Int(exactly: try num(p, k).rounded(.towardZero)) else { throw RPCError.params("'\(k)' mimo rozsah") }
+        return i
+    }
 
     private func txCall(_ f: () async throws -> Void) async throws {
         do { try await f() } catch { throw RPCError(code: -32001, message: "TX odmítnuto: \(error)") }
@@ -27,8 +30,8 @@ extension JSONRPCServer {
             return ["state": (await engine.state).rawValue, "tuning": await engine.isTuning,
                     "txPending": await engine.txPending, "mode": (await engine.currentMode()).id,
                     "rig": Self.rigJSON(await engine.rigStatus)] as [String: Any]
-        case "engine.tx": try await txCall { try await app.tx() }; return true
-        case "engine.tune": try await txCall { try await app.tune() }; return true
+        case "engine.tx": try await txCall { try await app.tx() }; s.startedTx = true; return true
+        case "engine.tune": try await txCall { try await app.tune() }; s.startedTx = true; return true
         case "engine.rx": await app.rx(); return true
         case "engine.rxNow": await app.rxNow(); return true
         // tx
@@ -84,7 +87,9 @@ extension JSONRPCServer {
             let i = try int(p, "index")
             do { try await app.runMacro(index: i) } catch AppError.badMacro(let n) { throw RPCError.params("makro \(n) neexistuje") }
             catch { throw RPCError(code: -32001, message: "TX odmítnuto: \(error)") }
+            s.startedTx = true
             return true
+        case "macro.stop": await app.stopMacroRepeat(); return true
         // QSO okno
         case "qso.getCurrent": return Self.encodable(await app.qso)
         case "qso.setField":
@@ -101,7 +106,17 @@ extension JSONRPCServer {
             let recs = await log.query(call: p["call"] as? String, from: from, to: to, limit: (p["limit"] as? NSNumber)?.intValue)
             return recs.map(Self.recordJSON)
         case "log.update":
-            guard let obj = p["record"], let d = try? JSONSerialization.data(withJSONObject: obj) else { throw RPCError.params("chybí 'record'") }
+            var obj: Any? = p["record"]
+            if obj == nil, let idS = p["id"] as? String, let fields = p["fields"] as? [String: Any] {
+                // {id, fields}: sloučit se stávajícím záznamem
+                guard let log = app.log, let id = UUID(uuidString: idS),
+                      let cur = await log.records.first(where: { $0.id == id }),
+                      var base = Self.recordJSON(cur) as? [String: Any] else { throw RPCError(code: -32003, message: "záznam nenalezen") }
+                for (k, v) in fields { base[k] = v }
+                base.removeValue(forKey: "band")
+                obj = base
+            }
+            guard let obj, let d = try? JSONSerialization.data(withJSONObject: obj) else { throw RPCError.params("chybí 'record' nebo {id, fields}") }
             let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
             guard let r = try? dec.decode(QSORecord.self, from: d) else { throw RPCError.params("neplatný záznam") }
             do { try await app.updateQSO(r) } catch { throw RPCError(code: -32003, message: "\(error)") }

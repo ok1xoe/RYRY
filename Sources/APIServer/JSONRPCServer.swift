@@ -28,6 +28,8 @@ final class ClientSession: @unchecked Sendable {
     let inboxContinuation: AsyncStream<String>.Continuation
     var worker: Task<Void, Never>?
     var lastSignal = Date.distantPast
+    /// Klient zahájil vysílání – při jeho pádu se TX ukončí (spec 12).
+    var startedTx = false
     var onClose: (@Sendable () -> Void)?
 
     init(sink: WSSink, maxQueue: Int) {
@@ -127,7 +129,13 @@ public final class JSONRPCServer: @unchecked Sendable {
 
     private func accept(_ c: NWConnection) {
         let session = ClientSession(sink: NWSink(c), maxQueue: maxQueue)
-        session.onClose = { [weak self] in self?.lock.withLock { _ = self?.clients.removeValue(forKey: session.id) } }
+        let app = self.app
+        session.onClose = { [weak self, weak session] in
+            self?.lock.withLock { _ = session.map { self?.clients.removeValue(forKey: $0.id) } }
+            if session?.startedTx == true {
+                Task { if await app.engine.state != .rx { await app.rxNow() } }
+            }
+        }
         lock.withLock { clients[session.id] = session }
         let inbox = session.inbox
         session.worker = Task { [weak self, weak session] in
@@ -191,7 +199,9 @@ public final class JSONRPCServer: @unchecked Sendable {
         var name: String?, params: Any = [:]
         switch e {
         case .engine(.modem(.rxText(let c, let echo))): name = "rx.char"; params = ["char": String(c), "echo": echo]
-        case .engine(.state(let st)): name = "engine.state"; params = ["state": st.rawValue]
+        case .engine(.state(let st)):
+            if st == .rx { for s in sessions { s.startedTx = false } }   // vysílání skončilo
+            name = "engine.state"; params = ["state": st.rawValue]
         case .engine(.modem(.signal(let lvl, let sq))):
             let now = Date()
             for s in sessions where now.timeIntervalSince(s.lastSignal) >= 0.1 {
@@ -208,6 +218,7 @@ public final class JSONRPCServer: @unchecked Sendable {
             return
         case .engine(.error(let err)): name = "error"; params = ["message": "\(err)"]
         case .engine(.pttTimeout): name = "error"; params = ["message": "PTT timeout"]
+        case .engine(.txProgress(let pending)): name = "tx.progress"; params = ["pending": pending]
         case .error(let m): name = "error"; params = ["message": m]
         case .qsoLogged(let r): name = "qso.logged"; params = Self.recordJSON(r)
         case .qsoUpdated(let r): name = "qso.updated"; params = Self.recordJSON(r)

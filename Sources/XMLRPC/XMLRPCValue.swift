@@ -40,7 +40,7 @@ public extension XMLRPCValue {
         switch self {
         case .int(let i): return i
         case .bool(let b): return b ? 1 : 0
-        case .double(let d): return d.isFinite ? Int(d) : nil
+        case .double(let d): return Int(exactly: d.rounded(.towardZero))
         case .string(let s): return Int(s.trimmingCharacters(in: .whitespaces))
         default: return nil
         }

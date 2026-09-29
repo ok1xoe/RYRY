@@ -25,7 +25,10 @@ public final class TextHistory: @unchecked Sendable {
     /// Znaky [start, start+length) – co už bylo oříznuto, vynechá.
     public func range(start: Int, length: Int) -> String {
         lock.withLock {
-            let lo = max(start, offset), hi = min(start + max(0, length), offset + buf.count)
+            let end = offset + buf.count
+            let lo = max(start, offset)
+            let (sum, overflow) = start.addingReportingOverflow(max(0, length))
+            let hi = min(overflow ? end : sum, end)
             guard lo < hi else { return "" }
             return String(buf[(lo - offset)..<(hi - offset)])
         }
