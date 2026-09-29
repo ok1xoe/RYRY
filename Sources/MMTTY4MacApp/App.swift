@@ -138,6 +138,8 @@ struct MMTTY4MacApp: App {
                 Button(L("Uložit log jako…")) { FileActions.saveLogAs(model) }.keyboardShortcut("s", modifiers: [.command, .shift])
                 Button(L("Exportovat ADIF…")) { FileActions.exportADIF(model) }
                 Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
+                Button(L("Zálohovat log teď")) { FileActions.backupLog(model) }
+                Button(L("Otevřít složku záloh")) { FileActions.openBackups(model) }
                 Divider()
             }
             CommandGroup(after: .newItem) {

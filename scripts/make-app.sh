@@ -6,11 +6,21 @@
 #                 Se stabilním podpisem si macOS pamatuje povolení mikrofonu i po novém sestavení.
 #   SIGN_ID=-   → ad-hoc (macOS se na mikrofon zeptá po každém sestavení).
 #   SIGN_ID="Developer ID Application: …" → konkrétní identita.
+#
+# Architektury (ARCHS): výchozí „arm64 x86_64“ = univerzální aplikace (Apple Silicon i Intel, lipo).
+#   ARCHS=arm64 → rychlé sestavení jen pro Apple Silicon (vývoj).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
-swift build -c release --product MMTTY4MacApp
-BIN="$(swift build -c release --show-bin-path)/MMTTY4MacApp"
+ARCHS=(${=ARCHS:-arm64 x86_64})
+PARTS=()
+for a in $ARCHS; do
+    swift build -c release --arch "$a" --product MMTTY4MacApp
+    PARTS+=("$(swift build -c release --arch "$a" --show-bin-path)/MMTTY4MacApp")
+done
+BIN=build/MMTTY4MacApp.universal
+mkdir -p build
+lipo -create "${PARTS[@]}" -output "$BIN"
 APP=build/mmtty4mac.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

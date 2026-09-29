@@ -436,6 +436,8 @@ struct APITab: View {
                 LabeledContent(L("Otevřený log")) {
                     Text(s.log.name + ".adi").foregroundStyle(.secondary)
                 }
+                Toggle(L("Denní záloha logu"), isOn: $s.log.backup)
+                NumberRow(title: L("Počet záloh"), value: $s.log.backupKeep, range: 1...100).disabled(!s.log.backup)
             } header: { Text("Log") } footer: { Text(L("Spojení (JSONL + ADIF) a série QTC se ukládají do tohoto adresáře. Jiný log založíte nebo otevřete v menu Soubor (Nový log…, Otevřít log…).")) }
             Section {
                 Toggle(L("Průběžně zapisovat příjem do souboru"), isOn: $s.log.rxText)

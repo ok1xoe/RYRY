@@ -172,6 +172,9 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public var manualFrequency: Double?
     /// Super Check Partial (MASTER.SCP + značky z logu) pod polem Call.
     public var superCheck = true
+    /// Automatická denní záloha logu (složka backup vedle logu) a kolik záloh držet.
+    public var backup = true
+    public var backupKeep = 10
     public static let recentLimit = 8
     public mutating func remember(_ path: String) {
         recent.removeAll { $0 == path }
@@ -187,7 +190,8 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public var rxTimestamps = true
     public init() {}
     public var rxDirectory: URL { URL(fileURLWithPath: directory).appendingPathComponent("rx") }
-    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps, manualFrequency, superCheck }
+    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps, manualFrequency, superCheck, backup,
+                                             backupKeep }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), x = LogSettings()
         directory = c.tolerant(.directory, x.directory, d.warningSink, "log")
@@ -196,6 +200,8 @@ public struct LogSettings: Codable, Sendable, Equatable {
         let mf: Double? = c.tolerant(.manualFrequency, nil, d.warningSink, "log")
         manualFrequency = mf.flatMap { $0.isFinite && $0 > 10_000 && $0 < 10e9 ? $0 : nil }
         superCheck = c.tolerant(.superCheck, x.superCheck, d.warningSink, "log")
+        backup = c.tolerant(.backup, x.backup, d.warningSink, "log")
+        backupKeep = min(100, max(1, c.tolerant(.backupKeep, x.backupKeep, d.warningSink, "log")))
         rxText = c.tolerant(.rxText, x.rxText, d.warningSink, "log")
         rxTimestamps = c.tolerant(.rxTimestamps, x.rxTimestamps, d.warningSink, "log")
     }

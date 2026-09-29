@@ -242,6 +242,7 @@ public final class AppModel {
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
+        backupLogIfDue()
         await loadSuperCheck()
         await refreshDupe()
         profileNames = profileStore.load().map { $0?.name }
@@ -332,7 +333,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.callbook); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.updates.autoCheck); take(\.spots)
+                take(\.callbook); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
@@ -390,6 +391,7 @@ public final class AppModel {
             }
         case .qsoLogged(let r):
             logRecords.insert(r, at: 0)
+            backupLogIfDue()
             if historyCalls.insert(r.call).inserted { rebuildSuperCheck() }
             Task { await self.refreshPrevious(); await self.refreshQTC(); await self.refreshDupe() }
             for t in UploadTarget.allCases where UploadCoordinator.isAuto(t, settings.upload) {
@@ -905,6 +907,33 @@ public final class AppModel {
     /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
     public func cabrilloText(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
         await app?.cabrillo(from: from, to: to, contestOnly: contestOnly) ?? ""
+    }
+
+    // MARK: Zálohy a statistika logu
+
+    /// Denní záloha (při startu a po zalogování, když od poslední uběhlo 24 h) – na pozadí.
+    func backupLogIfDue() {
+        guard settings.log.backup else { return }
+        let loc = logLocation, keep = settings.log.backupKeep
+        Task.detached { [weak self] in
+            guard LogBackup.isDue(loc) else { return }
+            do { try LogBackup.backup(loc, keep: keep) }
+            catch LogBackup.BackupError.nothingToBackup { }
+            catch { await self?.note(L("Záloha logu selhala: %@", "\(error)")) }
+        }
+    }
+
+    /// Ruční záloha (menu Soubor); vrací složku zálohy.
+    @discardableResult
+    public func backupLogNow() throws -> URL {
+        try LogBackup.backup(logLocation, keep: settings.log.backupKeep)
+    }
+
+    public var backupDirectory: URL { LogBackup.directory(for: logLocation) }
+
+    /// Statistika logu; v závodě jen od začátku závodu.
+    public var logStats: LogStats {
+        LogStats(records: logRecords, since: settings.contest.enabled ? settings.contest.effectiveStart : nil)
     }
 
     // MARK: Správa logu (nový, otevřít, uložit jako)

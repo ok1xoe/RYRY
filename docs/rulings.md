@@ -295,3 +295,8 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 ## Závěrečná kontrola plánu 15
 - Opraveno: přepis logu (označení nahrání, oprava, mazání, import) nejdřív znovu načte JSONL, pokud ho mezitím změnila jiná instance (velikost + čas změny) – nahrávání přes restart po Použít už nesmaže nová QSO; dvojklik na spot během TX rig nepřelaďuje; s nastaveným rigem, který neodpovídá, se do logu nezapíše stará uložená ruční frekvence (jen zadaná v této relaci); spot bez rigu zapíše frekvenci spotu; DUPE se přepočítá po QSY; `SerialCATRig.isIdle` bez blokování; hesla Online se ukládají při potvrzení/opuštění pole a chyba Klíčenky se zobrazí; po zastavení doplňkových dekodérů se zbylé bloky zahodí; lokalizované chybové texty aktualizací a Klíčenky; release.sh vynechá nečíselné číslo sestavení.
 - Odloženo (minor): heslo callbooku se čte z Klíčenky při každém vyhledání (bez cache).
+
+## Plán 16: zálohy, statistika, univerzální aplikace
+- Záloha logu: kopie JSONL/ADIF/QTC do `<složka logu>/backup/<název>-RRRRMMDD-HHMMSS` (UTC), denně (při startu a po zalogování, když je poslední starší než 24 h), drží se posledních `log.backupKeep` (výchozí 10); ručně menu Soubor → Zálohovat log teď.
+- Statistika: rychlost = spojení za posledních 10 min × 6 a za 60 min (spojení/h), v závodě od začátku závodu; ve stavovém řádku jen při zapnutém závodě; počty podle pásem v okně Log.
+- Univerzální aplikace: `make-app.sh` sestaví arm64 i x86_64 zvlášť (`swift build --arch`) a spojí je `lipo`; `ARCHS=arm64` pro rychlé vývojové sestavení. Ověřeno spuštěním x86_64 části přes Rosettu včetně příjmu.

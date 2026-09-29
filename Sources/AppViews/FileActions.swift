@@ -106,6 +106,20 @@ import UniformTypeIdentifiers
         run { try await model.exportADIF(to: url); return nil }
     }
 
+    /// Záloha logu teď (menu Soubor).
+    public static func backupLog(_ model: AppModel) {
+        do {
+            let dir = try model.backupLogNow()
+            let a = NSAlert(); a.messageText = "Log"
+            a.informativeText = L("Záloha uložena: %@", (dir.path as NSString).abbreviatingWithTildeInPath); a.runModal()
+        } catch { NSAlert(error: error).runModal() }
+    }
+
+    public static func openBackups(_ model: AppModel) {
+        try? FileManager.default.createDirectory(at: model.backupDirectory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(model.backupDirectory)
+    }
+
     /// Otevře nastavení zvuku systému (úroveň vstupu a výstupu zvukovky).
     public static func openSoundSettings() {
         if let u = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") { NSWorkspace.shared.open(u) }
