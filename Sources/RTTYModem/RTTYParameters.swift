@@ -141,7 +141,8 @@ enum RTTYParameters {
             let d = rttycore_get_param(core, p)
             guard let i = vals.firstIndex(of: d) else { return nil }
             return .string(names[i])
-        case .shift: return .double(rttycore_get_param(core, RC_SPACE) - rttycore_get_param(core, RC_MARK))
+        case .shift:   // space − mark bez chyby plovoucí čárky (jinak 169.99999… nesedí na volby v GUI)
+            return .double(((rttycore_get_param(core, RC_SPACE) - rttycore_get_param(core, RC_MARK)) * 1e6).rounded() / 1e6)
         case .mark: return .double(rttycore_get_param(core, RC_MARK))
         }
     }
