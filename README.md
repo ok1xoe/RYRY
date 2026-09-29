@@ -4,6 +4,7 @@ Nativní macOS aplikace pro RTTY vycházející z MMTTY (JE3HHT, Makoto Mori).
 
 - Původní zdrojáky: https://github.com/n5ac/mmtty (viz http://mm-open.org)
 - Licence: GNU LGPL v3 (viz COPYING a COPYING.LESSER)
+- Uživatelská příručka: docs/prirucka.md (English: docs/manual.md)
 - Návrh: docs/superpowers/specs/2026-09-28-mmtty4mac-design.md
 
 ## Vývoj
