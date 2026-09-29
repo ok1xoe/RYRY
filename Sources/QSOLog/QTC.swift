@@ -141,11 +141,14 @@ public enum QTCText {
         return (idx, l)
     }
 
-    /// Řádek vypadá jako pokus o QTC (začíná čtyřmi znaky s číslicí a má aspoň 3 slova) – pro zachování pořadí řádků.
+    /// Řádek vypadá jako (poškozený) pokus o QTC: aspoň 3 slova, první 2–5 znaků převážně číslic (čas),
+    /// druhé se znaky jako značka – pro zachování pořadí řádků.
     public static func looksLikeLine(_ s: String) -> Bool {
+        guard !s.uppercased().contains("QTC") else { return false }
         let tok = tokens(s)
-        guard tok.count >= 3, let f = tok.first, f.count == 4 else { return false }
-        return f.filter(\.isNumber).count >= 2 && !s.uppercased().contains("QTC")
+        guard tok.count >= 3, (2...5).contains(tok[0].count), tok[0].filter(\.isNumber).count >= 2,
+              tok[1].count >= 3, tok[1].contains(where: \.isLetter) else { return false }
+        return true
     }
 }
 
