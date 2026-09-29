@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 import AppCore
@@ -156,4 +157,25 @@ final class Fixture {
     w.push(SpectrumFrame(binHz: 5, magnitudes: [Float](repeating: 0, count: 600)), fromHz: 0, toHz: 3000)
     #expect(w.row(1)[peak].brightness > w.row(0)[peak].brightness)   // řádek se posunul dolů
     #expect(w.image != nil)
+}
+
+/// Vykreslený CGImage musí být neprůhledný: prázdné místo černé, špička světlá.
+@Test func waterfallImageIsOpaqueWithCorrectColors() throws {
+    var w = WaterfallRenderer(width: 100, height: 4)
+    var mags = [Float](repeating: 0, count: 600)
+    mags[300] = 1000
+    w.push(SpectrumFrame(binHz: 5, magnitudes: mags), fromHz: 0, toHz: 3000)
+    let img = try #require(w.image)
+    var px = [UInt8](repeating: 0, count: 100 * 4 * 4)
+    let ctx = try #require(CGContext(data: &px, width: 100, height: 4, bitsPerComponent: 8, bytesPerRow: 400,
+                                     space: CGColorSpaceCreateDeviceRGB(),
+                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+    ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 100, height: 4))  // bílé pozadí
+    ctx.draw(img, in: CGRect(x: 0, y: 0, width: 100, height: 4))
+    // horní řádek obrázku = první řádek paměti bitmapového kontextu
+    let row = 0
+    func rgb(_ x: Int) -> (Int, Int, Int) { (Int(px[row + x * 4]), Int(px[row + x * 4 + 1]), Int(px[row + x * 4 + 2])) }
+    let empty = rgb(10), peak = rgb(50)
+    #expect(empty.0 < 30 && empty.1 < 30 && empty.2 < 30, "prázdné místo má být černé: \(empty)")
+    #expect(peak.0 + peak.1 + peak.2 > 600, "špička má být světlá: \(peak)")
 }

@@ -11,7 +11,7 @@ public struct Pixel: Equatable, Sendable {
 /// Posuvný obrázek vodopádu (nejnovější řádek nahoře). Čistá logika, kreslí se hotový CGImage.
 public struct WaterfallRenderer: Sendable {
     public let width: Int, height: Int
-    private var pixels: [UInt32]           // RGBA little-endian (x + y*width)
+    private var pixels: [UInt32]           // bajty v paměti R,G,B,A (UInt32 little-endian 0xAABBGGRR)
     private var peak: Float = 1
     public private(set) var lastRow: [Float] = []   // spektrum posledního řádku (pro čárové spektrum)
 
@@ -70,7 +70,7 @@ public struct WaterfallRenderer: Sendable {
         guard let provider = CGDataProvider(data: data as CFData) else { return nil }
         return CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
                        space: CGColorSpaceCreateDeviceRGB(),
-                       bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
+                       bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
                        provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
     }
 }

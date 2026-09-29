@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "ModemKit", targets: ["ModemKit"]),
         .library(name: "RTTYModem", targets: ["RTTYModem"]),
         .executable(name: "rtty-tool", targets: ["rtty-tool"]),
+        .executable(name: "MMTTY4MacApp", targets: ["MMTTY4MacApp"]),
     ],
     targets: [
         .target(name: "WaveFile"),
@@ -63,6 +64,9 @@ let package = Package(
                                                "AudioIO", "Keying", "RigControl", "RTTYModem"]),
         .testTarget(name: "AppUITests", dependencies: ["AppUI", "AppCore", "Engine", "Settings", "ModemKit", "AudioIO",
                                                        "Keying", "RigControl", "RTTYModem", "RTTYSignalKit", "TestSupport"]),
+        .target(name: "AppViews", dependencies: ["AppUI", "AppCore", "QSOLog", "Settings", "AudioIO", "Keying",
+                                                  "ModemKit", "Engine", "RigControl"]),
+        .executableTarget(name: "MMTTY4MacApp", dependencies: ["AppViews", "AppUI"]),
         .target(name: "RTTYSignalKit"),
         .testTarget(name: "RTTYSignalKitTests", dependencies: ["RTTYSignalKit"]),
     ],

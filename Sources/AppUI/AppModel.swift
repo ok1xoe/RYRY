@@ -1,5 +1,6 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import APIServer
+import AVFoundation
 import AppCore
 import AudioIO
 import Engine
@@ -72,6 +73,15 @@ public final class AppModel {
         messages = w
     }
 
+    /// Stav oprávnění k mikrofonu; při prvním spuštění se zeptá (asynchronně).
+    nonisolated static func microphoneAccess() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: return true
+        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .audio)
+        default: return false
+        }
+    }
+
     public static func makeRig(_ r: RigSettings) -> Rig {
         switch r.type {
         case .hamlib: return HamlibClient(host: r.host, port: UInt16(clamping: r.effectivePort))
@@ -104,6 +114,14 @@ public final class AppModel {
         let events = app.events()
         eventTask = Task { [weak self] in
             for await e in events { self?.handle(e) }
+        }
+        await refreshParams()
+        // Oprávnění k mikrofonu vyžádat předem (jinak spuštění zvukového vstupu čeká na dialog).
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            note("Čekám na povolení přístupu k mikrofonu (systémový dialog)…")
+        }
+        if await !Self.microphoneAccess() {
+            note("Přístup k mikrofonu zamítnut – povolte ho v Nastavení systému → Soukromí → Mikrofon. Příjem nefunguje.")
         }
         do { try await app.start() }
         catch EngineError.audio(let m) { note("Zvuk nefunguje: \(m) – zkontrolujte zařízení a oprávnění k mikrofonu") }

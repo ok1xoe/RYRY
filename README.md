@@ -45,3 +45,13 @@ Ruční testy hardwaru: `docs/hardware-checklist.md`.
 - **JSON-RPC 2.0 / WebSocket** `ws://127.0.0.1:7363/v1` – s událostmi (přijatý text, stav, AFC, rig, log).
 
 Podrobnosti: `docs/api.md`. Nastavení: `~/Library/Application Support/mmtty4mac/settings.json`.
+
+## Aplikace (GUI)
+
+    ./scripts/make-app.sh          # sestaví build/mmtty4mac.app (ad-hoc podpis)
+    open build/mmtty4mac.app
+
+Při prvním spuštění macOS požádá o přístup k mikrofonu (příjem z rádia) – povolte ho.
+Hlavní okno: vodopád (klik = naladit mark), příjem (klik na slovo = značka/jméno/RST do QSO),
+vysílání (po znacích/slovech/řádcích), makra F1–F12 (pravé tlačítko = upravit, opakování = CQ smyčka),
+QSO panel s předchozími spojeními, okno Log (⇧⌘L), Nastavení (⌘,). Klávesy: ⌘T TX/RX, Esc okamžitě RX, ⌘L zalogovat.
