@@ -109,3 +109,15 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - text typed before TX is sent only on next keystroke; .tune state sends
 - log editor DatePicker shows local time while table shows UTC
 - appendRx trim O(n) per char (acceptable at RTTY rates)
+
+## Plán 6 (dokončení)
+
+### Rozhodnutí
+- Task 4: complete — manual: live --his dl9xyz --baud 50 :m2 → 'DL9XYZ DL9XYZ DE OK1XOE…' (no unit test for CLI parsing; Ruling: CLI verified manually)
+- Task 5: Ruling: two flaky assertions fixed (forceOff timeout margin under CPU load; concurrent applySettings order not guaranteed)
+
+### Odložené drobnosti
+- ring clear request drops samples written between request and next render read (first ms of an immediate re-TX)
+- JSON-RPC dates now carry fractional seconds (strict .iso8601 clients)
+- loadProfile saves settings even if load failed; rtty-tool --demod value not pre-validated; XY batch may be one poll old
+- draft typed during RX is sent when a macro without '\\' switches drain→tx (matches MMTTY)
