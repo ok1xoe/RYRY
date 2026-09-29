@@ -58,3 +58,32 @@ done
 xcrun stapler validate build/notarized/mmtty4mac.app
 spctl -a -vv -t execute build/notarized/mmtty4mac.app
 SKIP_BUILD=1 APP=build/notarized/mmtty4mac.app ./scripts/make-dmg.sh
+
+# Appcast pro kontrolu aktualizací (docs/distribution.md): build/appcast.json.
+# UPDATE_BASE_URL=https://example.com/mmtty4mac → url = <BASE>/mmtty4mac-<verze>.dmg (bez ní se pole url vynechá).
+# Volitelně RELEASE_NOTES_CS / RELEASE_NOTES_EN. Chyba tady vydání nepokazí (DMG je už hotové).
+DMG="build/mmtty4mac-$V.dmg"
+if [[ -f "$DMG" ]]; then
+    SHA=$(shasum -a 256 "$DMG" | awk '{print $1}')
+    MINOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist" 2>/dev/null || echo "")
+    V="$V" B="$B" SHA="$SHA" MINOS="$MINOS" python3 - <<'PY' || echo "Appcast se nepodařilo vytvořit (DMG je v pořádku)" >&2
+import json, os
+e = os.environ
+latest = {"version": e["V"], "build": int(e["B"]) if e["B"].isdigit() else e["B"]}
+base = e.get("UPDATE_BASE_URL", "").rstrip("/")
+if base:
+    latest["url"] = f"{base}/mmtty4mac-{e['V']}.dmg"
+notes = {k: e[v] for k, v in (("cs", "RELEASE_NOTES_CS"), ("en", "RELEASE_NOTES_EN")) if e.get(v)}
+if notes:
+    latest["notes"] = notes
+if e.get("MINOS"):
+    latest["minimumSystemVersion"] = e["MINOS"]
+latest["sha256"] = e["SHA"]
+with open("build/appcast.json", "w", encoding="utf-8") as f:
+    json.dump({"latest": latest}, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PY
+    [[ -f build/appcast.json ]] && echo "Appcast: build/appcast.json"
+    [[ -z "${UPDATE_BASE_URL:-}" ]] && echo "UPDATE_BASE_URL není nastavená – v appcastu chybí url (doplňte ručně)" >&2
+fi
+exit 0

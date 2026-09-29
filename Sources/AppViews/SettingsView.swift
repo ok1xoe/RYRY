@@ -716,6 +716,11 @@ struct DisplayTab: View {
                 Toggle(L("Časové značky UTC při přepnutí TX/RX"), isOn: $s.display.timestamps)
                 Toggle(L("Bublinová nápověda tlačítek"), isOn: $s.display.showHints)
             }
+            Section {
+                Toggle(L("Automaticky kontrolovat aktualizace"), isOn: $s.updates.autoCheck)
+            } header: { Text(L("Aktualizace")) } footer: {
+                Text(L("Kontrola proběhne při startu nejvýš jednou denně. Nová verze se nikdy neinstaluje sama – stáhne se DMG a aplikaci přetáhnete do Aplikací. Ruční kontrola: menu aplikace → Zkontrolovat aktualizace…"))
+            }
         }
         .formStyle(.grouped)
     }

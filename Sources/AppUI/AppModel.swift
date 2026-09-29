@@ -292,7 +292,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
+                take(\.txWindow); take(\.updates.autoCheck); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
