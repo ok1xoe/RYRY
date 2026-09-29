@@ -20,7 +20,7 @@ struct TxEditor: View {
                 Button("Smazat") { model.txDraft = "" }
             }
             TextEditor(text: $model.txDraft)
-                .font(.system(size: 14, design: .monospaced))
+                .font(.system(size: model.settings.display.fontSize, design: .monospaced))
                 .scrollContentBackground(.hidden)
                 .background(Color(nsColor: .textBackgroundColor))
                 .onChange(of: model.txDraft) {

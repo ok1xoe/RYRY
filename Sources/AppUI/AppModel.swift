@@ -14,6 +14,7 @@ import QSOLog
 import RigControl
 import RTTYModem
 import Settings
+import WaveFile
 
 public struct RxRun: Equatable, Sendable, Identifiable {
     public let id: Int
@@ -288,7 +289,13 @@ public final class AppModel {
     private func handle(_ e: AppEvent) {
         switch e {
         case .engine(.state(let s)):
+            let prev = state
             state = s
+            // MMTTY „Time stamp“: UTC čas při přepnutí na TX a zpět
+            if settings.display.timestamps, prev != s {
+                if prev == .rx, s != .stopped { appendRx("\r\n[\(Self.stampFmt.string(from: Date())) UTC TX]\r\n", echo: true) }
+                else if s == .rx, prev != .stopped { appendRx("\r\n[\(Self.stampFmt.string(from: Date())) UTC RX]\r\n", echo: false) }
+            }
             if s == .tx, !txDraft.isEmpty { Task { await self.sendDraft(mode: self.sendMode) } }   // rozepsaný text hned vysílat
         case .engine(.modem(.rxText(let c, let echo))): appendRx(String(c), echo: echo)
         case .engine(.modem(.signal(let l, let sq))): signalLevel = l; squelchOpen = sq
@@ -356,6 +363,44 @@ public final class AppModel {
     private func refreshPrevious() async {
         guard let log = app?.log, !qso.call.isEmpty else { previousQSOs = []; return }
         previousQSOs = await log.previous(call: qso.call)
+    }
+
+    static let stampFmt: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm:ss"; return f
+    }()
+
+    // MARK: Přehrání WAV do příjmu (MMTTY „Play“)
+
+    public private(set) var wavPlaying = false
+    private var wavTask: Task<Void, Never>?
+
+    /// Přehraje WAV (libovolná frekvence, převzorkuje se na 11025 Hz) do demodulátoru.
+    /// `speed` 1 = reálný čas, 2–10 = rychleji, 0 = co nejrychleji (vrátí se až po dohrání).
+    public func playWAV(_ url: URL, speed: Double = 1) async throws {
+        stopWAV()
+        guard let engine = app?.engine else { return }
+        let (raw, rate) = try WaveFile.read(from: url)
+        let samples = rate == 11025 ? raw : try SampleRateConverter(from: Double(rate), to: 11025).process(raw)
+        wavPlaying = true
+        let chunk = 1103                                                  // ≈ 100 ms
+        let t = Task { @MainActor [weak self] in
+            var i = 0
+            while i < samples.count, !Task.isCancelled {
+                let n = min(chunk, samples.count - i)
+                await engine.injectRx(Array(samples[i..<(i + n)]))
+                i += n
+                if speed > 0 { try? await Task.sleep(for: .milliseconds(max(1, Int(100 / speed)))) } else { await Task.yield() }
+            }
+            self?.wavPlaying = false
+        }
+        wavTask = t
+        if speed == 0 { await t.value }
+    }
+
+    public func stopWAV() {
+        wavTask?.cancel(); wavTask = nil
+        wavPlaying = false
     }
 
     /// Země DXCC aktuální značky v QSO okně (nil = neznámá).

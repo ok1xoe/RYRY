@@ -30,6 +30,9 @@ struct TopBar: View {
                     .font(.system(.body, design: .monospaced).bold())
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
+                if model.wavPlaying {
+                    Button("▶ WAV ■") { model.stopWAV() }.help("Přehrává se WAV – kliknutím zastavit")
+                }
                 Picker("Demod", selection: model.choiceBinding("demodType")) {
                     ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
                 }.labelsHidden().fixedSize().help("Demodulátor")

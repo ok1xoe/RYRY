@@ -293,6 +293,12 @@ public actor Engine {
 
     // MARK: DSP krok
 
+    /// Vzorky z jiného zdroje (přehrání WAV) do demodulátoru – jen při příjmu, jako MMTTY Play.
+    public func injectRx(_ samples: [Float]) {
+        guard state == .rx, !samples.isEmpty else { return }
+        samples.withUnsafeBufferPointer { modem.processRx($0) }
+    }
+
     /// Jeden krok zpracování: RX, TX generování, časovače stavového automatu.
     public func pump() async {
         guard state != .stopped else { return }

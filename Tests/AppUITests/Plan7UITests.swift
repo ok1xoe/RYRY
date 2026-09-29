@@ -5,6 +5,9 @@ import Engine
 import ModemKit
 import RTTYModem
 import Settings
+import AudioIO
+import WaveFile
+import RTTYSignalKit
 @testable import AppUI
 
 @Test func modemConfigFromSettings() {
@@ -122,5 +125,46 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     #expect(f.model.waterfallToHz == 4000 && f.model.waterfall.gainDB == -6)
     #expect(SettingsStore(directory: f.dir).load().0.display.toHz == 4000)
     #expect(f.engines.count == 1)                            // bez restartu
+    await f.model.stop()
+}
+
+@Test @MainActor func timestampsOnTxRxSwitch() async throws {
+    let f = Fixture()
+    f.configure = { $0.display.timestamps = true }
+    await f.model.start()
+    await f.model.toggleTx()
+    await f.pump(10)
+    await f.settle()
+    await f.model.rxNow()
+    await f.pump(10)
+    await f.settle()
+    let text = f.model.rxRuns.map(\.text).joined()
+    #expect(text.range(of: #"\[\d\d:\d\d:\d\d UTC TX\]"#, options: .regularExpression) != nil, "\(text.debugDescription)")
+    #expect(text.range(of: #"\[\d\d:\d\d:\d\d UTC RX\]"#, options: .regularExpression) != nil, "\(text.debugDescription)")
+    await f.model.stop()
+}
+
+@Test @MainActor func noTimestampsByDefault() async throws {
+    let f = Fixture()
+    await f.model.start()
+    await f.model.toggleTx(); await f.pump(10); await f.settle()
+    await f.model.rxNow(); await f.pump(10); await f.settle()
+    #expect(!f.model.rxRuns.map(\.text).joined().contains("UTC"))
+    await f.model.stop()
+}
+
+@Test @MainActor func playWAVDecodesIntoRxWindow() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let text = "CQ CQ DE DL1ABC DL1ABC K"
+    let s = RTTYSignalGenerator(sampleRate: 11025).generate(text: text + "\r\n")
+    // WAV na 48 kHz – musí se převzorkovat
+    let conv = try SampleRateConverter(from: 11025, to: 48000)
+    let url = f.dir.appendingPathComponent("rx.wav")
+    try WaveFile.write(samples: conv.process(s) + conv.process([Float](repeating: 0, count: 4096)), sampleRate: 48000, to: url)
+    try await f.model.playWAV(url, speed: 0)                    // 0 = co nejrychleji
+    for _ in 0..<50 where !f.model.rxRuns.map(\.text).joined().contains(text) { await f.settle() }
+    #expect(f.model.rxRuns.map(\.text).joined().contains(text))
+    #expect(f.model.wavPlaying == false)
     await f.model.stop()
 }

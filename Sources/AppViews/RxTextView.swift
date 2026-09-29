@@ -30,6 +30,7 @@ struct RxTextView: NSViewRepresentable {
     final class Coordinator {
         var appended = 0
         var trimmed = 0
+        var fontSize = 0.0
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -39,7 +40,7 @@ struct RxTextView: NSViewRepresentable {
         let tv = ClickTextView(frame: .zero)
         tv.isEditable = false
         tv.isSelectable = true
-        tv.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
+        tv.font = .monospacedSystemFont(ofSize: model.settings.display.fontSize, weight: .regular)
         tv.textContainerInset = NSSize(width: 6, height: 6)
         tv.autoresizingMask = [.width]
         tv.isVerticallyResizable = true
@@ -50,8 +51,8 @@ struct RxTextView: NSViewRepresentable {
         return scroll
     }
 
-    static func attrs(echo: Bool) -> [NSAttributedString.Key: Any] {
-        [.font: NSFont.monospacedSystemFont(ofSize: 14, weight: .regular),
+    static func attrs(echo: Bool, size: Double) -> [NSAttributedString.Key: Any] {
+        [.font: NSFont.monospacedSystemFont(ofSize: size, weight: .regular),
          .foregroundColor: echo ? NSColor.systemRed : NSColor.textColor]
     }
 
@@ -61,11 +62,13 @@ struct RxTextView: NSViewRepresentable {
         let atBottom = scroll.contentView.bounds.maxY >= (tv.frame.height - 30)
         let newChars = model.rxAppendedTotal - c.appended
         let cut = model.rxTrimmedTotal - c.trimmed
+        let size = model.settings.display.fontSize
         storage.beginEditing()
-        if newChars >= model.rxCharCount || newChars < 0 || cut < 0 {
+        if newChars >= model.rxCharCount || newChars < 0 || cut < 0 || size != c.fontSize {
+            c.fontSize = size
             // velká změna (start, clear) → celé znovu
             let s = NSMutableAttributedString()
-            for r in model.rxRuns { s.append(NSAttributedString(string: r.text, attributes: Self.attrs(echo: r.echo))) }
+            for r in model.rxRuns { s.append(NSAttributedString(string: r.text, attributes: Self.attrs(echo: r.echo, size: size))) }
             storage.setAttributedString(s)
         } else {
             if cut > 0 {       // ořez zepředu (limit 200 000 znaků)
@@ -73,7 +76,7 @@ struct RxTextView: NSViewRepresentable {
                 storage.deleteCharacters(in: n)
             }
             for r in model.rxTail(newChars) {
-                storage.append(NSAttributedString(string: r.text, attributes: Self.attrs(echo: r.echo)))
+                storage.append(NSAttributedString(string: r.text, attributes: Self.attrs(echo: r.echo, size: size)))
             }
         }
         storage.endEditing()
