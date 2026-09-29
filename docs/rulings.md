@@ -215,3 +215,13 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Nepřekládají se obecné radioamatérské a technické termíny (TX, RX, RST, QSO, QTC, AFC, NET, Log, Call…), vysílané texty (makra, QTC fráze) a data logu/API.
 - Úplnost hlídá test `englishCatalogIsComplete` (všechny `L("…")` ve zdrojích mají anglický překlad se stejnými zástupnými znaky); údržba: `scripts/i18n-extract.py [--update]`.
 - Standardní položky menu macOS (Nastavení…, Ukončit…) řídí jazyk systému, ne tato volba.
+
+## Plán 13: funkce MMTTY, které chyběly
+- Záznam příjmu do souboru: `<adresář logu>/rx/rx-RRRR-MM-DD.txt` (den UTC), volitelně s časem UTC na začátku řádku; zapisuje se i echo vysílání (jako okno příjmu). Složka není volitelná zvlášť – je pod adresářem logu.
+- Nahrávání WAV: vstup zvukovky po převzorkování (11025 Hz, mono, 16 bit); engine vzorky jen sbírá, soubor zapisuje aplikace po 250 ms (engine nezávisí na WaveFile). Během přehrávání WAV se nenahrává (vstup se zahazuje).
+- Odeslání textového souboru: UTF-8, jinak Latin-1; CR LF, tabulátor = mezera, bez řídicích znaků; max. 20 000 znaků; bez maker (%… se nevykládá).
+- Import logu: jen ADIF (MMTTY umí svůj .MDT log exportovat do ADIF; struktura .MDT v přiložených zdrojích není). Duplicita = stejné id nebo značka + pásmo + mód ± 1 min. Jen pásmo bez frekvence → dolní okraj pásma.
+- Klávesové zkratky: makra a 8 příkazů; samotné písmeno bez modifikátoru nejde (kolize s psaním). Esc pro „Okamžitě RX“ na tlačítku Stop zůstává pevně.
+- MMTTY „FFT Width/Sensitivity“ = už existující rozsah a zesílení; nově odezva (doznívání) spektra a paleta vodopádu.
+- „Word wrap on keyboard“ = zalomení psaného textu na zvoleném sloupci (20–200) přímo v okně vysílání.
+- Oprava: „Použít“ v Nastavení přebírá i zvolenou předvolbu závodu (dřív se „Vlastní nastavení“ po Použít neuložilo).

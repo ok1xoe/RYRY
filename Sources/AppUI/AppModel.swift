@@ -114,6 +114,8 @@ public final class AppModel {
     private func syncDisplay() {
         waterfall.gainDB = settings.display.gainDB
         waterfall.autoGain = settings.display.autoGain
+        waterfall.palette = settings.display.palette
+        waterfall.decay = settings.display.fftResponse.decay
     }
 
     public private(set) var app: AppController?
@@ -178,6 +180,7 @@ public final class AppModel {
 
     private func startNow() async {
         guard app == nil else { return }                 // už běží
+        syncRxLog()
         let rig = Self.makeRig(settings.rig)
         let engine = engineFactory(settings, rig)
         let log: QSOLogStore?
@@ -264,6 +267,7 @@ public final class AppModel {
 
     private func stopNow() async {
         await stopWAV()
+        await stopRecordingWAV()
         spectrumTask?.cancel(); spectrumTask = nil
         fldigi?.stop(); json?.stop(); fldigi = nil; json = nil
         await app?.stop()
@@ -289,9 +293,13 @@ public final class AppModel {
                 m.clock = s.clock; m.rttyCore = s.rttyCore
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
-                take(\.display.timestamps); take(\.display.fontSize)
+                take(\.display.timestamps); take(\.display.fontSize); take(\.display.rxFont)
+                take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
+                take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
+                take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
+                take(\.txWindow); take(\.shortcuts)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
-                take(\.contest.nextSerial); take(\.contest.start)
+                take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 return m
             }
             do { try self.settingsStore.save(merge(self.settings)) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
@@ -351,6 +359,12 @@ public final class AppModel {
     }
 
     public func appendRx(_ s: String, echo: Bool) {
+        if let rxLog {
+            do { try rxLog.append(s) } catch {
+                self.rxLog = nil
+                note(L("Záznam příjmu do souboru selhal: %@", "\(error)"))
+            }
+        }
         if var last = rxRuns.last, last.echo == echo {
             last.text += s; rxRuns[rxRuns.count - 1] = last
         } else {
@@ -382,6 +396,33 @@ public final class AppModel {
     }
 
     public var rxPlainText: String { rxRuns.map(\.text).joined() }
+
+    // MARK: Záznam příjmu do souboru (MMTTY „Log Rx file“)
+
+    private var rxLog: RxTextLog?
+    public var rxLogActive: Bool { rxLog != nil }
+
+    /// Otevře/zavře záznam podle nastavení (po startu a po změně nastavení).
+    func syncRxLog() {
+        let l = settings.log
+        guard l.rxText else { rxLog?.close(); rxLog = nil; return }
+        if let r = rxLog, r.directory == l.rxDirectory, r.timestamps == l.rxTimestamps { return }
+        rxLog?.close()
+        rxLog = RxTextLog(directory: l.rxDirectory, timestamps: l.rxTimestamps)
+    }
+
+    /// Přepínač v menu – ukládá se do nastavení.
+    public func setRxTextLog(_ on: Bool) {
+        settings.log.rxText = on
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        syncRxLog()
+    }
+
+    /// Uloží obsah okna příjmu do souboru (MMTTY „RxWindow to file“).
+    public func saveRxText(to url: URL) throws {
+        try Data(rxPlainText.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "").utf8)
+            .write(to: url, options: .atomic)
+    }
     public func clearRx() { rxTrimmedTotal += rxCharCount; rxRuns.removeAll(); rxCharCount = 0 }
 
     private func refreshPrevious() async {
@@ -418,22 +459,93 @@ public final class AppModel {
             return rate == 11025 ? raw : try SampleRateConverter(from: Double(rate), to: 11025).process(raw)
         }.value
         await engine.startPlayback(samples, speed: speed)
-        wavPlaying = true
+        wavPlaying = true; wavPaused = false; wavProgress = 0
+        wavDuration = Double(samples.count) / 11025
         let token = UUID(); wavToken = token
         wavTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(200))
                 if await engine.playbackRemaining == 0 { break }
+                if let self, self.wavToken == token { await self.updateWAVProgress(engine) }
             }
-            if let self, self.wavToken == token { self.wavPlaying = false }
+            if let self, self.wavToken == token { self.wavPlaying = false; self.wavPaused = false; self.wavProgress = 0 }
         }
     }
 
     public func stopWAV() async {
         wavTask?.cancel(); wavTask = nil
         wavToken = UUID()
-        wavPlaying = false
+        wavPlaying = false; wavPaused = false; wavProgress = 0
         await app?.engine.stopPlayback()
+    }
+
+    /// Stav přehrávání pro ovládací lištu (pauza, pozice 0…1, délka v s).
+    public private(set) var wavPaused = false
+    public private(set) var wavProgress = 0.0
+    public private(set) var wavDuration = 0.0
+
+    public func pauseWAV(_ p: Bool) async {
+        guard let engine = app?.engine else { return }
+        await engine.setPlaybackPaused(p)
+        wavPaused = await engine.playbackPaused
+    }
+
+    /// Posun na část souboru 0…1 (0 = převinout na začátek).
+    public func seekWAV(_ fraction: Double) async {
+        guard let engine = app?.engine else { return }
+        await engine.seekPlayback(toFraction: fraction)
+        await updateWAVProgress(engine)
+    }
+
+    private func updateWAVProgress(_ engine: Engine) async {
+        let total = await engine.playbackTotal
+        guard total > 0 else { return }
+        wavProgress = Double(await engine.playbackPosition) / Double(total)
+        wavDuration = Double(total) / 11025
+    }
+
+    // MARK: Nahrávání příjmu do WAV (MMTTY „Record WAVE“)
+
+    public private(set) var recordingURL: URL?
+    public private(set) var recordingSeconds = 0.0
+    private var recorder: WaveWriter?
+    private var recordTask: Task<Void, Never>?
+
+    /// Nahrává vstup zvukovky (po převzorkování na 11025 Hz, mono 16 bit) do souboru.
+    public func startRecordingWAV(to url: URL) async throws {
+        await stopRecordingWAV()
+        guard let engine = app?.engine else { return }
+        let w = try WaveWriter(url: url, sampleRate: 11025)
+        recorder = w; recordingURL = url; recordingSeconds = 0
+        await engine.setRecording(true)
+        recordTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(250))
+                await self?.flushRecording(engine)
+            }
+        }
+    }
+
+    private func flushRecording(_ engine: Engine) async {
+        guard let w = recorder else { return }
+        let s = await engine.drainRecording()
+        do { try w.append(s) } catch {
+            note(L("Nahrávání WAV selhalo: %@", "\(error)"))
+            await stopRecordingWAV()
+            return
+        }
+        recordingSeconds = Double(w.sampleCount) / 11025
+    }
+
+    public func stopRecordingWAV() async {
+        recordTask?.cancel(); recordTask = nil
+        guard let w = recorder else { return }
+        if let engine = app?.engine {
+            await flushRecording(engine)
+            await engine.setRecording(false)
+        }
+        recorder = nil; recordingURL = nil
+        do { try w.close() } catch { note(L("Nahrávání WAV selhalo: %@", "\(error)")) }
     }
 
     // MARK: QTC (WAE DX Contest)
@@ -610,6 +722,17 @@ public final class AppModel {
         await app?.cabrillo(from: from, to: to, contestOnly: contestOnly) ?? ""
     }
 
+    /// Import ADIF (např. log převedený z MMTTY); vrací text pro uživatele.
+    public func importADIF(_ url: URL) async throws -> String {
+        guard let log = app?.log else { throw QSOLogError.io(L("Log není k dispozici.")) }
+        let data = try Data(contentsOf: url)
+        let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
+        let parsed = ADIF.importRecords(text)
+        let r = try await log.importRecords(parsed.records)
+        await refreshLog()
+        return L("Importováno %ld spojení, duplicit %ld, neplatných záznamů %ld.", r.added, r.duplicates, parsed.skipped)
+    }
+
     private func refreshLog() async {
         guard let log = app?.log else { return }
         logRecords = await log.query()
@@ -631,7 +754,12 @@ public final class AppModel {
 
     public func toggleTx() async {
         guard let app else { return }
-        if state == .rx { await run("TX") { try await app.tx() } } else { await app.rx() }
+        if state == .rx {
+            await run("TX") {
+                try await app.tx()
+                if settings.txWindow.autoCRLF { lastSentForTesting = "\r\n"; await app.send(text: "\r\n") }
+            }
+        } else { await app.rx() }
     }
 
     public func rxNow() async { await app?.rxNow() }
@@ -660,6 +788,15 @@ public final class AppModel {
         let out = part.replacingOccurrences(of: "\n", with: "\r\n")
         lastSentForTesting = out
         await app.send(text: out)
+    }
+
+    /// Vyšle obsah textového souboru (MMTTY „Send Text…“).
+    public func sendTextFile(_ url: URL) async {
+        guard let app else { return }
+        await run(L("Odeslat soubor")) {
+            let d = try Data(contentsOf: url)
+            try await app.sendFileText(d)
+        }
     }
 
     public func param(_ id: String) -> ParameterValue? { params[id] }

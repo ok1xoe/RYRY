@@ -2,6 +2,7 @@
 import AppKit
 import AppUI
 import AppViews
+import Settings
 import SwiftUI
 import UniformTypeIdentifiers
 import Localization
@@ -67,6 +68,7 @@ struct MMTTY4MacApp: App {
     var body: some Scene {
         Window("mmtty4mac", id: "main") {
             MainView(model: model)
+                .environment(\.showHints, model.settings.display.showHints)
                 .task {
                     delegate.model = model
                     // spouštěcí parametr -openSettings YES (+ -settingsTab N): otevřít Nastavení (snímky obrazovky, podpora)
@@ -76,34 +78,56 @@ struct MMTTY4MacApp: App {
         }
         .commands {
             CommandMenu(L("Vysílání")) {
-                Button("TX / RX") { Task { await model.toggleTx() } }.keyboardShortcut("t", modifiers: .command)
-                Button(L("Okamžitě RX")) { Task { await model.rxNow() } }.keyboardShortcut(".", modifiers: .command)
-                Button(L("Ladění (tune)")) { Task { await model.tune() } }
+                Button("TX / RX") { Task { await model.toggleTx() } }.shortcut(model.settings.binding(for: .toggleTx))
+                Button(L("Okamžitě RX")) { Task { await model.rxNow() } }.shortcut(model.settings.binding(for: .rxNow))
+                Button(L("Ladění (tune)")) { Task { await model.tune() } }.shortcut(model.settings.binding(for: .tune))
                 Button(L("Zastavit opakování makra")) { Task { await model.stopMacro() } }
+                    .shortcut(model.settings.binding(for: .stopMacro))
+                Button(L("Odeslat textový soubor…")) { FileActions.sendTextFile(model) }
                 Divider()
-                Button(L("Zalogovat QSO")) { Task { await model.logQSO() } }.keyboardShortcut("l", modifiers: .command)
-                Button(L("Vymazat QSO")) { Task { await model.clearQSO() } }
-                Button(L("Vymazat příjem")) { model.clearRx() }.keyboardShortcut("k", modifiers: .command)
+                Button(L("Zalogovat QSO")) { Task { await model.logQSO() } }.shortcut(model.settings.binding(for: .logQSO))
+                Button(L("Vymazat QSO")) { Task { await model.clearQSO() } }.shortcut(model.settings.binding(for: .clearQSO))
+                Button(L("Vymazat příjem")) { model.clearRx() }.shortcut(model.settings.binding(for: .clearRx))
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }
             }
             CommandGroup(after: .newItem) {
+                Button(L("Uložit příjem do souboru…")) { FileActions.saveRxWindow(model) }
+                Toggle(L("Průběžně zapisovat příjem do souboru"),
+                       isOn: Binding(get: { model.settings.log.rxText }, set: { model.setRxTextLog($0) }))
+                Divider()
                 Menu(L("Přehrát WAV do příjmu")) {
                     ForEach([(1.0, L("Reálný čas")), (4.0, L("4× rychleji")), (0.0, L("Co nejrychleji"))], id: \.0) { sp in
                         Button(sp.1 + "…") { playWAV(speed: sp.0) }
                     }
                 }
+                Button(model.wavPaused ? L("Pokračovat v přehrávání") : L("Pozastavit přehrávání")) {
+                    Task { await model.pauseWAV(!model.wavPaused) }
+                }.disabled(!model.wavPlaying)
+                Button(L("Převinout na začátek")) { Task { await model.seekWAV(0) } }.disabled(!model.wavPlaying)
                 Button(L("Zastavit přehrávání WAV")) { Task { await model.stopWAV() } }.disabled(!model.wavPlaying)
+                if model.recordingURL == nil {
+                    Button(L("Nahrávat příjem do WAV…")) { FileActions.recordWAV(model) }
+                } else {
+                    Button(L("Zastavit nahrávání WAV")) { Task { await model.stopRecordingWAV() } }
+                }
+                Divider()
+                Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
+                Divider()
+                Button(L("Nastavení zvuku systému…")) { FileActions.openSoundSettings() }
+                Button(L("Audio MIDI Setup…")) { FileActions.openAudioMIDISetup() }
             }
             CommandGroup(after: .windowArrangement) {
-                Button("Log") { openWindow(id: "log") }.keyboardShortcut("l", modifiers: [.command, .shift])
+                Button("Log") { openWindow(id: "log") }.shortcut(model.settings.binding(for: .openLog))
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
                 Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
             }
         }
-        Window("Log", id: "log") { LogWindow(model: model) }
-        Window(L("Scope demodulátoru"), id: "scope") { ScopeWindow(model: model) }
-        Settings { SettingsView(model: model) }
+        Window("Log", id: "log") { LogWindow(model: model).environment(\.showHints, model.settings.display.showHints) }
+        Window(L("Scope demodulátoru"), id: "scope") {
+            ScopeWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        Settings { SettingsView(model: model).environment(\.showHints, model.settings.display.showHints) }
     }
 }

@@ -35,3 +35,43 @@ import TestSupport
     #expect(await r.engine.playbackRemaining == 0)
     await r.engine.stop()
 }
+
+// Nahrávání: engine sbírá živý vstup, aplikace ho průběžně odebírá (zápis do WAV mimo engine)
+@Test func recordingCollectsLiveInput() async throws {
+    let r = try makeEngine(ptt: .none)
+    try await r.engine.start()
+    await r.engine.setRecording(true)
+    let input = (0..<30_000).map { Float($0 % 100) / 100 }
+    r.audio.feedRx(input)
+    await pump(r, steps: 60) { r.audio.rxRemaining == 0 }
+    var got = await r.engine.drainRecording()
+    #expect(got.count == input.count)
+    #expect(got.prefix(1000) == input.prefix(1000))
+    #expect(await r.engine.drainRecording().isEmpty)          // odebráno
+    await r.engine.setRecording(false)
+    r.audio.feedRx([0.5, 0.5])
+    await pump(r, steps: 3) { false }
+    got = await r.engine.drainRecording()
+    #expect(got.isEmpty)
+    await r.engine.stop()
+}
+
+// Pauza, posun a převinutí přehrávání
+@Test func playbackPauseSeekRewind() async throws {
+    let r = try makeEngine(ptt: .none)
+    try await r.engine.start()
+    r.audio.feedRx([Float](repeating: 0, count: 400_000))
+    await r.engine.startPlayback([Float](repeating: 0.1, count: 100_000), speed: 1)
+    await r.engine.setPlaybackPaused(true)
+    await pump(r, steps: 5) { false }
+    #expect(await r.engine.playbackPosition == 0)             // pauza: nic se nepřehrává
+    await r.engine.seekPlayback(toFraction: 0.5)
+    #expect(await r.engine.playbackPosition == 50_000)
+    await r.engine.setPlaybackPaused(false)
+    await pump(r, steps: 3) { false }
+    #expect(await r.engine.playbackPosition > 50_000)
+    await r.engine.seekPlayback(toFraction: 0)                // převinutí na začátek
+    #expect(await r.engine.playbackPosition == 0)
+    #expect(await r.engine.playbackTotal == 100_000)
+    await r.engine.stop()
+}

@@ -66,3 +66,42 @@ public enum ADIF {
         return out
     }
 }
+
+// MARK: Import (MMTTY a jiné programy exportují ADIF)
+
+extension ADIF {
+    public struct ImportResult: Sendable { public var records: [QSORecord]; public var skipped: Int }
+
+    /// Záznamy ADIF → spojení. Záznam bez značky nebo data/času se přeskočí.
+    /// Jen pásmo bez frekvence → frekvence = dolní okraj pásma (pásmo se v logu odvozuje z frekvence).
+    public static func importRecords(_ text: String) -> ImportResult {
+        var out: [QSORecord] = [], skipped = 0
+        for f in parse(text) {
+            guard let call = f["CALL"].map(QSORecord.normalizeCall), !call.isEmpty,
+                  let on = date(f["QSO_DATE"], f["TIME_ON"]) else { skipped += 1; continue }
+            let id = f["APP_MMTTY4MAC_ID"].flatMap(UUID.init(uuidString:)) ?? UUID()
+            var r = QSORecord(id: id, call: call, timeOn: on, mode: (f["MODE"] ?? "RTTY").uppercased())
+            r.timeOff = date(f["QSO_DATE_OFF"] ?? f["QSO_DATE"], f["TIME_OFF"])
+            if let mhz = f["FREQ"].flatMap(Double.init) { r.frequency = mhz * 1e6 }
+            else if let b = f["BAND"]?.lowercased(), let row = Bands.table.first(where: { $0.0 == b }) { r.frequency = row.1 * 1e6 }
+            func s(_ k: String) -> String? { f[k].flatMap { $0.isEmpty ? nil : $0 } }
+            r.submode = s("SUBMODE"); r.rstSent = s("RST_SENT"); r.rstRcvd = s("RST_RCVD")
+            r.name = s("NAME"); r.qth = s("QTH"); r.grid = s("GRIDSQUARE")
+            r.serialSent = s("STX").flatMap { Int($0) }; r.serialRcvd = s("SRX").flatMap { Int($0) }
+            r.exchangeSent = s("STX_STRING"); r.exchangeRcvd = s("SRX_STRING")
+            r.comment = s("COMMENT") ?? s("NOTES"); r.stationCallsign = s("STATION_CALLSIGN")
+            r.country = s("COUNTRY"); r.continent = s("CONT")
+            r.cqZone = s("CQZ").flatMap { Int($0) }; r.ituZone = s("ITUZ").flatMap { Int($0) }
+            out.append(r)
+        }
+        return ImportResult(records: out, skipped: skipped)
+    }
+
+    /// QSO_DATE (yyyyMMdd) + TIME_ON (HHmm nebo HHmmss), UTC.
+    static func date(_ d: String?, _ t: String?) -> Date? {
+        guard let d, d.count == 8, let t, t.count == 4 || t.count == 6 else { return nil }
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = t.count == 4 ? "yyyyMMddHHmm" : "yyyyMMddHHmmss"
+        return f.date(from: d + t)
+    }
+}

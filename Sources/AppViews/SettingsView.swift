@@ -28,6 +28,7 @@ public struct SettingsView: View {
                 ContestTab(s: $draft).tabItem { Label(L("Závod"), systemImage: "trophy") }.tag(5)
                 DisplayTab(s: $draft).tabItem { Label(L("Zobrazení"), systemImage: "paintpalette") }.tag(6)
                 APITab(s: $draft).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
+                KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
             }
             Divider()
             HStack {
@@ -257,6 +258,20 @@ struct APITab: View {
                     }
                 }
             } header: { Text("Log") } footer: { Text(L("Spojení (JSONL + ADIF) a série QTC se ukládají do tohoto adresáře.")) }
+            Section {
+                Toggle(L("Průběžně zapisovat příjem do souboru"), isOn: $s.log.rxText)
+                Toggle(L("Časová značka UTC na začátku řádku"), isOn: $s.log.rxTimestamps).disabled(!s.log.rxText)
+                LabeledContent(L("Složka")) {
+                    HStack {
+                        Text(s.log.rxDirectory.path).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
+                        Button { try? FileManager.default.createDirectory(at: s.log.rxDirectory, withIntermediateDirectories: true)
+                                 NSWorkspace.shared.open(s.log.rxDirectory) } label: { Image(systemName: "folder") }
+                            .hint(L("Otevřít složku"))
+                    }
+                }
+            } header: { Text(L("Záznam příjmu")) } footer: {
+                Text(L("Každý den UTC jeden soubor rx-RRRR-MM-DD.txt. Přepínač je i v menu Soubor. Obsah okna příjmu uložíš přes Soubor → Uložit příjem do souboru…"))
+            }
         }
         .formStyle(.grouped)
     }
@@ -410,7 +425,7 @@ struct ModemTab: View {
                             TextField("", value: model.doubleBinding(d.id), format: .number).multilineTextAlignment(.trailing).frame(width: 90)
                             Text(unit ?? "").foregroundStyle(.secondary).frame(width: 28, alignment: .leading)
                         }
-                    }.help("\(r.lowerBound.formatted())…\(r.upperBound.formatted())")
+                    }.hint("\(r.lowerBound.formatted())…\(r.upperBound.formatted())")
                 case .int(let r):
                     LabeledContent(title) {
                         HStack(spacing: 4) {
@@ -528,17 +543,167 @@ struct DisplayTab: View {
                         Text("\(Int(s.display.gainDB)) dB").monospacedDigit().foregroundStyle(.secondary).frame(width: 48, alignment: .trailing)
                     }
                 }
+                Picker(L("Paleta vodopádu"), selection: $s.display.palette) {
+                    ForEach(WaterfallPalette.allCases, id: \.self) { p in Text(Self.paletteName(p)).tag(p) }
+                }
+                Picker(L("Odezva spektra"), selection: $s.display.fftResponse) {
+                    Text(L("rychlá")).tag(FFTResponse.fast)
+                    Text(L("střední")).tag(FFTResponse.normal)
+                    Text(L("pomalá")).tag(FFTResponse.slow)
+                }
             } header: { Text(L("Spektrum a vodopád")) } footer: { Text(L("Rozsah a zesílení jdou měnit i v menu v levém horním rohu spektra.")) }
-            Section(L("Text")) {
+            Section("XY scope") {
+                Picker(L("Velikost"), selection: $s.display.xySize) {
+                    Text(L("malá")).tag(XYScopeSize.small)
+                    Text(L("střední")).tag(XYScopeSize.medium)
+                    Text(L("velká")).tag(XYScopeSize.large)
+                }
+                Picker(L("Kvalita"), selection: $s.display.xyQuality) {
+                    Text(L("nízká (méně bodů)")).tag(XYScopeQuality.low)
+                    Text(L("vysoká")).tag(XYScopeQuality.high)
+                }
+            }
+            Section {
+                Picker(L("Písmo"), selection: $s.display.rxFont) {
+                    Text(L("Systémové neproporcionální")).tag("")
+                    ForEach(Self.monospacedFamilies, id: \.self) { f in Text(f).tag(f) }
+                }
                 LabeledContent(L("Velikost písma")) {
                     HStack(spacing: 4) {
                         Text("\(Int(s.display.fontSize)) pt").monospacedDigit()
                         Stepper("", value: $s.display.fontSize, in: 9...32).labelsHidden()
                     }
                 }
+                ColorRow(title: L("Pozadí příjmu"), hex: $s.display.rxBackground, fallback: Color(nsColor: .textBackgroundColor))
+                ColorRow(title: L("Text příjmu"), hex: $s.display.rxTextColor, fallback: Color(nsColor: .textColor))
+                ColorRow(title: L("Echo vysílání v příjmu"), hex: $s.display.rxEchoColor, fallback: .red)
+                ColorRow(title: L("Pozadí vysílání"), hex: $s.display.txBackground, fallback: Color(nsColor: .textBackgroundColor))
+                ColorRow(title: L("Text vysílání"), hex: $s.display.txTextColor, fallback: Color(nsColor: .textColor))
+            } header: { Text(L("Písmo a barvy oken")) } footer: { Text(L("„Výchozí“ vrátí systémovou barvu (přizpůsobí se tmavému režimu).")) }
+            Section {
+                Toggle(L("CR/LF na začátku vysílání tlačítkem TX"), isOn: $s.txWindow.autoCRLF)
+                Toggle(L("Zalamovat psaný text"), isOn: Binding(get: { s.txWindow.wrapColumn > 0 },
+                                                             set: { s.txWindow.wrapColumn = $0 ? 64 : 0 }))
+                if s.txWindow.wrapColumn > 0 {
+                    NumberRow(title: L("Délka řádku"), value: $s.txWindow.wrapColumn, range: TxWindowSettings.wrapRange, unit: L("znaků"))
+                }
+            } header: { Text(L("Okno vysílání")) }
+            Section(L("Ostatní")) {
                 Toggle(L("Časové značky UTC při přepnutí TX/RX"), isOn: $s.display.timestamps)
+                Toggle(L("Bublinová nápověda tlačítek"), isOn: $s.display.showHints)
             }
         }
         .formStyle(.grouped)
+    }
+
+    static func paletteName(_ p: WaterfallPalette) -> String {
+        switch p {
+        case .classic: return L("Klasická (modrá–žlutá)")
+        case .gray: return L("Šedá")
+        case .heat: return L("Teplotní (červená–žlutá)")
+        case .green: return L("Zelená")
+        case .blue: return L("Modrá")
+        }
+    }
+
+    /// Rodiny neproporcionálních písem nainstalované v systému.
+    static let monospacedFamilies: [String] = {
+        let names = NSFontManager.shared.availableFontNames(with: .fixedPitchFontMask) ?? []
+        return Array(Set(names.compactMap { NSFont(name: $0, size: 12)?.familyName }))
+            .filter { !$0.hasPrefix(".") }.sorted()
+    }()
+}
+
+/// Výběr barvy s návratem na výchozí (systémovou) barvu.
+struct ColorRow: View {
+    let title: String
+    @Binding var hex: String?
+    let fallback: Color
+    var body: some View {
+        LabeledContent(title) {
+            HStack {
+                if hex != nil { Button(L("Výchozí")) { hex = nil }.controlSize(.small) }
+                ColorPicker("", selection: Binding(get: { Color(hex: hex) ?? fallback }, set: { hex = $0.hexString }),
+                            supportsOpacity: false).labelsHidden()
+            }
+        }
+    }
+}
+
+/// Klávesové zkratky maker a příkazů (MMTTY „Assign ShortCut Keys“).
+struct KeysTab: View {
+    @Binding var s: AppSettings
+    var body: some View {
+        Form {
+            Section {
+                ForEach(ShortcutCommand.allCases, id: \.id) { c in
+                    LabeledContent(title(c)) {
+                        HStack {
+                            if s.shortcuts[c.id] != nil {
+                                Button(L("Výchozí")) { s.shortcuts[c.id] = nil }.controlSize(.small)
+                            }
+                            KeyRecorder(binding: Binding(get: { s.binding(for: c) },
+                                                         set: { s.shortcuts[c.id] = $0 == c.defaultBinding ? nil : $0 }))
+                        }
+                    }
+                }
+            } header: { Text(L("Klávesové zkratky")) } footer: {
+                let conflicts = s.conflictingShortcuts()
+                if conflicts.isEmpty {
+                    Text(L("Klikni na zkratku a stiskni novou kombinaci kláves. Delete = bez zkratky, Esc = zrušit. Samotné písmeno bez modifikátoru nejde (kolize s psaním)."))
+                } else {
+                    Text(L("Stejná zkratka u více příkazů: %@", conflicts.map { $0.map(title).joined(separator: " = ") }.joined(separator: "; ")))
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    func title(_ c: ShortcutCommand) -> String {
+        switch c {
+        case .macro(let i):
+            let n = i < s.macros.count ? s.macros[i].name : ""
+            return n.isEmpty ? L("Makro %ld", i + 1) : L("Makro %ld – %@", i + 1, n)
+        case .toggleTx: return "TX / RX"
+        case .rxNow: return L("Okamžitě RX")
+        case .tune: return L("Ladění (tune)")
+        case .logQSO: return L("Zalogovat QSO")
+        case .clearQSO: return L("Vymazat QSO")
+        case .clearRx: return L("Vymazat příjem")
+        case .stopMacro: return L("Zastavit opakování makra")
+        case .openLog: return L("Otevřít log")
+        }
+    }
+}
+
+/// Pole pro záznam zkratky: po kliknutí čeká na stisk kláves.
+struct KeyRecorder: View {
+    @Binding var binding: KeyBinding
+    @State private var recording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        Button(recording ? L("Stiskni klávesy…") : binding.display) { recording ? stop() : start() }
+            .monospaced()
+            .frame(minWidth: 110)
+            .onDisappear { stop() }
+    }
+
+    private func start() {
+        recording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            if e.keyCode == 53, e.modifierFlags.intersection([.command, .shift, .option, .control]).isEmpty { stop(); return nil }
+            if e.keyCode == 51 || e.keyCode == 117, e.modifierFlags.intersection([.command, .shift, .option, .control]).isEmpty {
+                binding = .none; stop(); return nil
+            }
+            if let b = KeyBinding.from(e) { binding = b; stop() } else { NSSound.beep() }
+            return nil
+        }
+    }
+
+    private func stop() {
+        if let m = monitor { NSEvent.removeMonitor(m) }
+        monitor = nil; recording = false
     }
 }

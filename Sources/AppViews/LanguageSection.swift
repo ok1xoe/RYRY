@@ -25,7 +25,7 @@ struct LanguageSection: View {
                     Button(L("Uložit šablonu…")) { saveTemplate() }
                         .disabled(library.reference() == nil)
                     Button { openFolder() } label: { Image(systemName: "folder") }
-                        .help(L("Otevřít složku jazyků"))
+                        .hint(L("Otevřít složku jazyků"))
                 }
             }
             if let message { Text(message).font(.caption).foregroundStyle(.secondary) }

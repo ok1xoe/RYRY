@@ -82,3 +82,37 @@ public enum WaveFile {
         }
     }
 }
+
+/// Průběžný zápis WAV (PCM 16 bit mono) – nahrávání příjmu. Velikosti v hlavičce se doplní při `close()`.
+public final class WaveWriter {
+    public let url: URL
+    public let sampleRate: Int
+    public private(set) var sampleCount = 0
+    private let handle: FileHandle
+
+    public init(url: URL, sampleRate: Int) throws {
+        self.url = url; self.sampleRate = sampleRate
+        try WaveFile.write(samples: [], sampleRate: sampleRate, to: url)     // hlavička s nulovou délkou
+        handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd()
+    }
+
+    public func append(_ samples: [Float]) throws {
+        guard !samples.isEmpty else { return }
+        var d = Data(capacity: samples.count * 2)
+        for s in samples {
+            let c = s.isFinite ? max(-1.0, min(1.0, s)) : 0
+            withUnsafeBytes(of: Int16(clamping: Int((c * 32767).rounded())).littleEndian) { d.append(contentsOf: $0) }
+        }
+        try handle.write(contentsOf: d)
+        sampleCount += samples.count
+    }
+
+    /// Doplní velikosti RIFF a data a zavře soubor.
+    public func close() throws {
+        let bytes = UInt32(clamping: sampleCount * 2)
+        try handle.seek(toOffset: 4); try handle.write(contentsOf: withUnsafeBytes(of: (36 + bytes).littleEndian) { Data($0) })
+        try handle.seek(toOffset: 40); try handle.write(contentsOf: withUnsafeBytes(of: bytes.littleEndian) { Data($0) })
+        try handle.close()
+    }
+}

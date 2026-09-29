@@ -22,29 +22,34 @@ struct TopBar: View {
                     Text(model.state == .rx || model.state == .stopped ? "TX" : "RX")
                         .font(.headline).frame(width: 44)
                 }
-                .help(L("Přepnout TX/RX (⌘T)"))
+                .hint(L("Přepnout TX/RX (⌘T)"))
                 Button("Tune") { Task { await model.tune() } }.fixedSize()
                 Button("Stop") { Task { await model.rxNow() } }.fixedSize()
                     .keyboardShortcut(.escape, modifiers: [])
-                    .help(L("Okamžitě RX (Esc)"))
+                    .hint(L("Okamžitě RX (Esc)"))
                 Text(Self.stateLabel(model.state))
                     .font(.system(.body, design: .monospaced).bold()).lineLimit(1).fixedSize()
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
-                if model.wavPlaying {
-                    Button("▶ WAV ■") { Task { await model.stopWAV() } }.help(L("Přehrává se WAV – kliknutím zastavit"))
+                if model.wavPlaying { WAVControls(model: model) }
+                if model.recordingURL != nil {
+                    Button { Task { await model.stopRecordingWAV() } } label: {
+                        Label(String(format: "REC %d:%02d", Int(model.recordingSeconds) / 60, Int(model.recordingSeconds) % 60),
+                              systemImage: "record.circle").foregroundStyle(.red).monospacedDigit()
+                    }
+                    .fixedSize().hint(L("Nahrává se příjem do WAV – kliknutím zastavit"))
                 }
                 Picker("Demod", selection: model.choiceBinding("demodType")) {
                     ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
-                }.labelsHidden().fixedSize().help(L("Demodulátor"))
-                Button("HAM") { Task { await model.hamShift() } }.fixedSize().help("Shift 170 Hz")
+                }.labelsHidden().fixedSize().hint(L("Demodulátor"))
+                Button("HAM") { Task { await model.hamShift() } }.fixedSize().hint("Shift 170 Hz")
                 ProfileMenu(model: model)
                 Spacer()
                 Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")
                     .font(.system(.title3, design: .monospaced))
                     .lineLimit(1).fixedSize()
                     .foregroundStyle(model.rig?.online == true ? .primary : .secondary)
-                    .help(model.rig?.online == true ? L("Rig online") : L("Rig offline"))
+                    .hint(model.rig?.online == true ? L("Rig online") : L("Rig offline"))
                 SignalMeter(level: model.signalLevel, open: model.squelchOpen).frame(width: 56, height: 12)
             }
             HStack(spacing: 6) {
@@ -58,14 +63,14 @@ struct TopBar: View {
                     .font(.caption.monospaced().bold()).lineLimit(1).fixedSize()
                     .padding(.horizontal, 4).padding(.vertical, 2)
                     .background((model.fig ? Color.orange : Color.secondary).opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
-                    .help(L("Stav přijímače LTRS/FIGS"))
+                    .hint(L("Stav přijímače LTRS/FIGS"))
                 FilterMenu(model: model)
                 Spacer(minLength: 4)
                 Group {
                     Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
-                        .help(L("XY scope (křížový indikátor ladění)"))
+                        .hint(L("XY scope (křížový indikátor ladění)"))
                     Toggle("AFC", isOn: model.boolBinding("afc"))
-                        .help(L("AFC · kontextová nabídka: vazba na squelch, omezení rozsahu"))
+                        .hint(L("AFC · kontextová nabídka: vazba na squelch, omezení rozsahu"))
                         .contextMenu {
                             Toggle(L("Jen při otevřeném squelchi"), isOn: model.boolBinding("afcGate"))
                             Picker(L("Max. odchylka od naladění"), selection: model.doubleBinding("afcMaxDev")) {
@@ -130,7 +135,7 @@ struct FilterMenu: View {
             Text(active).lineLimit(1)
         }
         .fixedSize()
-        .help(L("Filtry příjmu (pravé tlačítko ve spektru = zářez) a UOS"))
+        .hint(L("Filtry příjmu (pravé tlačítko ve spektru = zářez) a UOS"))
     }
 }
 
@@ -145,7 +150,7 @@ struct SignalMeter: View {
                     .frame(width: g.size.width * min(1, max(0, log10(max(level, 1)) / 4)))
             }
         }
-        .help(L("Signál %.0f", level))
+        .hint(L("Signál %.0f", level))
     }
 }
 
@@ -176,5 +181,36 @@ struct ProfileMenu: View {
             Button(L("Uložit")) { if let s = saveSlot { let n = name; Task { await model.saveProfile(s, name: n.isEmpty ? L("Profil %ld", s + 1) : n) } }; saveSlot = nil }
             Button(L("Zrušit"), role: .cancel) { saveSlot = nil }
         }
+    }
+}
+
+/// Ovládání přehrávaného WAV: převinutí, pauza, posun, zastavení (MMTTY Play/Pause/Rewind/Seek).
+struct WAVControls: View {
+    @Bindable var model: AppModel
+    @State private var dragging: Double?
+
+    static func time(_ s: Double) -> String { String(format: "%d:%02d", Int(s) / 60, Int(s) % 60) }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Button { Task { await model.seekWAV(0) } } label: { Image(systemName: "backward.end.fill") }
+                .hint(L("Převinout na začátek"))
+            Button { Task { await model.pauseWAV(!model.wavPaused) } } label: {
+                Image(systemName: model.wavPaused ? "play.fill" : "pause.fill")
+            }.hint(model.wavPaused ? L("Pokračovat v přehrávání") : L("Pozastavit přehrávání"))
+            Slider(value: Binding(get: { dragging ?? model.wavProgress }, set: { dragging = $0 }), in: 0...1) { editing in
+                if !editing, let f = dragging { Task { await model.seekWAV(f); dragging = nil } }
+            }
+            .frame(width: 110).controlSize(.small)
+            .hint(L("Posun v přehrávaném souboru"))
+            Text("\(Self.time((dragging ?? model.wavProgress) * model.wavDuration))/\(Self.time(model.wavDuration))")
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary).fixedSize()
+            Button { Task { await model.stopWAV() } } label: { Image(systemName: "stop.fill") }
+                .hint(L("Zastavit přehrávání WAV"))
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 6).padding(.vertical, 2)
+        .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
+        .fixedSize()
     }
 }

@@ -456,6 +456,34 @@ public actor AppController {
         try await sendPlain("\r\n" + t + "\r\n")
     }
 
+    // MARK: Odeslání textového souboru (MMTTY „Send Text…“)
+
+    public enum FileTextError: Error, LocalizedError {
+        case empty, tooLong
+        public var errorDescription: String? {
+            switch self {
+            case .empty: return L("Soubor je prázdný.")
+            case .tooLong: return L("Soubor je příliš dlouhý (max. 20 000 znaků).")
+            }
+        }
+    }
+    static let fileTextLimit = 20_000
+
+    /// Obsah souboru → text k vysílání: UTF-8 (jinak Latin-1), CR LF, tabulátor = mezera, bez řídicích znaků.
+    public static func fileText(_ data: Data) throws -> String {
+        guard data.count <= fileTextLimit * 4 else { throw FileTextError.tooLong }
+        let raw = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
+        let lines = raw.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\t", with: " ")
+        let clean = String(String.UnicodeScalarView(lines.unicodeScalars.filter { $0 == "\n" || !CharacterSet.controlCharacters.contains($0) }))
+        guard !clean.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw FileTextError.empty }
+        guard clean.count <= fileTextLimit else { throw FileTextError.tooLong }
+        return clean.replacingOccurrences(of: "\n", with: "\r\n")
+    }
+
+    /// Vyšle text souboru (bez maker) a po dovysílání přejde na RX.
+    public func sendFileText(_ data: Data) async throws { try await sendPlain(Self.fileText(data)) }
+
     /// Text bez maker: vysílat a po dovysílání RX.
     private func sendPlain(_ text: String) async throws {
         if txDisabled { throw EngineError.pttUnavailable(L("TX zakázáno (rx_only)")) }

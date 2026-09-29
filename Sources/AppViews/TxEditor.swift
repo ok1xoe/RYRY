@@ -1,11 +1,19 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import AppUI
 import Engine
+import AppKit
+import Settings
 import SwiftUI
 import Localization
 
 struct TxEditor: View {
     @Bindable var model: AppModel
+
+    var d: DisplaySettings { model.settings.display }
+    var txFont: Font {
+        if !d.rxFont.isEmpty, NSFont(name: d.rxFont, size: d.fontSize) != nil { return .custom(d.rxFont, size: d.fontSize) }
+        return .system(size: d.fontSize, design: .monospaced)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -22,10 +30,17 @@ struct TxEditor: View {
                 Button(L("Smazat")) { model.txDraft = "" }
             }
             TextEditor(text: $model.txDraft)
-                .font(.system(size: model.settings.display.fontSize, design: .monospaced))
+                .font(txFont)
+                .foregroundStyle(Color(hex: d.txTextColor) ?? .primary)
                 .scrollContentBackground(.hidden)
-                .background(Color(nsColor: .textBackgroundColor))
+                .background(Color(hex: d.txBackground) ?? Color(nsColor: .textBackgroundColor))
                 .onChange(of: model.txDraft) {
+                    // zalamování psaného textu (MMTTY „Word wrap on keyboard“)
+                    let col = model.settings.txWindow.wrapColumn
+                    if col > 0 {
+                        let w = TxWrap.wrap(model.txDraft, column: col)
+                        if w != model.txDraft { model.txDraft = w; return }
+                    }
                     // při vysílání se text posílá průběžně podle režimu (jako MMTTY)
                     if model.state != .rx && model.state != .stopped {
                         Task { await model.sendDraft(mode: model.sendMode) }

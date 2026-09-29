@@ -4,6 +4,7 @@ import AppCore
 import Engine
 import ModemKit
 import Settings
+import WaveFile
 @testable import AppUI
 
 // C1: po dosažení limitu musí model hlásit, kolik se ořízlo zepředu a kolik přibylo (pro inkrementální NSTextView)
@@ -68,4 +69,37 @@ import Settings
     for w in ["3580", "1234", "E5T", "R5T", "1A2B"] { #expect(WordClassifier.classify(w) != .call && WordClassifier.classify(w) != .rst, "\(w)") }
     for c in ["OK1ABC", "DL1ABC/P", "W1AW", "VK2/G4ABC", "2E0XYZ"] { #expect(WordClassifier.classify(c) == .call, "\(c)") }
     for r in ["599", "579", "5NN", "599001", "59912"] { #expect(WordClassifier.classify(r) == .rst, "\(r)") }
+}
+
+// Předvolba závodu a záznam příjmu z dialogu Nastavení se po Použít uloží
+@Test @MainActor func applySettingsTakesPresetAndRxLog() async throws {
+    let f = Fixture()
+    await f.model.start()
+    var d = f.model.settings
+    d.contest = ContestSettings.preset(.waeRTTY, year: 2026)
+    await f.model.applySettings(d, baseline: f.model.settings)
+    #expect(f.model.settings.contest.preset == .waeRTTY)
+    let base = f.model.settings
+    d = base; d.contest.preset = nil
+    d.log.rxText = true
+    await f.model.applySettings(d, baseline: base)
+    #expect(f.model.settings.contest.preset == nil)
+    #expect(f.model.settings.log.rxText && f.model.rxLogActive)
+    await f.model.stop()
+}
+
+// Nahrávání příjmu do WAV: vstup zvukovky se zapíše, po zastavení je soubor kompletní
+@Test @MainActor func recordsInputToWAV() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let url = f.dir.appendingPathComponent("rec.wav")
+    try await f.model.startRecordingWAV(to: url)
+    #expect(f.model.recordingURL == url)
+    f.audio.feedRx([Float](repeating: 0.25, count: 11025))
+    await f.pump(40)
+    await f.model.stopRecordingWAV()
+    #expect(f.model.recordingURL == nil)
+    let (s, rate) = try WaveFile.read(from: url)
+    #expect(rate == 11025 && s.count == 11025)
+    await f.model.stop()
 }

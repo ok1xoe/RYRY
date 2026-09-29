@@ -141,6 +141,23 @@ public actor QSOLogStore {
         }
     }
 
+    /// Hromadný import (ADIF): duplicita = stejné id, nebo stejná značka, pásmo a mód s časem ±1 min.
+    public func importRecords(_ recs: [QSORecord]) throws -> (added: Int, duplicates: Int) {
+        var all = records, added = 0, dup = 0
+        var ids = Set(all.map(\.id))
+        for var r in recs {
+            r.call = QSORecord.normalizeCall(r.call)
+            if ids.contains(r.id) || all.contains(where: { Self.sameQSO($0, r) }) { dup += 1; continue }
+            all.append(r); ids.insert(r.id); added += 1
+        }
+        if added > 0 { try rewrite(all.sorted { $0.timeOn < $1.timeOn }) }
+        return (added, dup)
+    }
+
+    static func sameQSO(_ a: QSORecord, _ b: QSORecord) -> Bool {
+        a.call == b.call && a.band == b.band && a.mode == b.mode && abs(a.timeOn.timeIntervalSince(b.timeOn)) <= 60
+    }
+
     public func update(_ rec: QSORecord) throws {
         var r = rec; r.call = QSORecord.normalizeCall(r.call)
         guard let i = records.firstIndex(where: { $0.id == r.id }) else { throw QSOLogError.notFound(r.id) }

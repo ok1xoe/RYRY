@@ -20,7 +20,7 @@ public struct ScopeWindow: View {
                     ForEach(Array(RTTYModem.scopeSources.enumerated()), id: \.offset) { i, _ in Text(Self.sourceName(i)).tag(i) }
                 }.pickerStyle(.segmented).fixedSize()
                 Toggle(L("Zmrazit"), isOn: $model.scopeFrozen).toggleStyle(.button)
-                    .help(L("Podržet poslední záznam (jednorázové zachycení)"))
+                    .hint(L("Podržet poslední záznam (jednorázové zachycení)"))
                 Spacer()
                 Text(L("Šířka")).font(.caption)
                 Slider(value: $width, in: 256...8192).frame(width: 140)

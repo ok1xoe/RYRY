@@ -71,7 +71,7 @@ struct QSOPanel: View {
                     }
                 }
                 HStack {
-                    Button("Log") { Task { await model.logQSO() } }.help(L("Zalogovat (⌘L)"))
+                    Button("Log") { Task { await model.logQSO() } }.hint(L("Zalogovat (⌘L)"))
                     Button("Clear") { Task { await model.clearQSO() } }
                 }
                 if QSOLayout.showsQTC(model.settings.contest) { QTCPanel(model: model) }

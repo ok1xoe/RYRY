@@ -76,3 +76,16 @@ func readsMoreWaveFormats(format: UInt16, bits: UInt16, ext: Bool) throws {
         #expect((error as? LocalizedError)?.errorDescription?.contains("PCM 16/24/32 bit nebo float") == true)
     }
 }
+
+// Streamovaný zápis (nahrávání příjmu): hlavička se doplní při zavření, čtení vrátí totéž
+@Test func streamingWriterRoundTrip() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("rec-\(UUID()).wav")
+    let w = try WaveWriter(url: url, sampleRate: 11025)
+    let a: [Float] = [0, 0.5, -0.5, 1], b: [Float] = [0.25, -1]
+    try w.append(a); try w.append(b)
+    #expect(w.sampleCount == 6)
+    try w.close()
+    let (s, rate) = try WaveFile.read(from: url)
+    #expect(rate == 11025 && s.count == 6)
+    for (x, y) in zip(s, a + b) { #expect(abs(x - y) < 0.0001) }
+}

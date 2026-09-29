@@ -107,6 +107,7 @@ public struct LogWindow: View {
             HStack {
                 Text(L("%ld spojení", filtered.count)).foregroundStyle(.secondary)
                 Spacer()
+                Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
             }.padding(6).font(.caption)
         }

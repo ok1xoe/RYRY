@@ -1,6 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import AppKit
 import AppUI
+import Settings
 import SwiftUI
 
 /// Okno přijatého textu: NSTextView s inkrementálním přidáváním, echo jinou barvou, klik na slovo → QSO pole.
@@ -30,7 +31,24 @@ struct RxTextView: NSViewRepresentable {
     final class Coordinator {
         var appended = 0
         var trimmed = 0
-        var fontSize = 0.0
+        var style: Style?
+    }
+
+    /// Vzhled okna příjmu (písmo, barvy) – změna vede k přestylování celého obsahu.
+    struct Style: Equatable {
+        var size: Double, font: String, text: String?, echo: String?, background: String?
+        init(_ d: DisplaySettings) {
+            size = d.fontSize; font = d.rxFont; text = d.rxTextColor; echo = d.rxEchoColor; background = d.rxBackground
+        }
+        var nsFont: NSFont {
+            if !font.isEmpty, let f = NSFont(name: font, size: size) { return f }
+            return .monospacedSystemFont(ofSize: size, weight: .regular)
+        }
+        func attrs(echo isEcho: Bool) -> [NSAttributedString.Key: Any] {
+            let c = isEcho ? (Color(hex: echo).map(NSColor.init) ?? .systemRed) : (Color(hex: text).map(NSColor.init) ?? .textColor)
+            return [.font: nsFont, .foregroundColor: c]
+        }
+        var backgroundColor: NSColor { Color(hex: background).map(NSColor.init) ?? .textBackgroundColor }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -40,7 +58,7 @@ struct RxTextView: NSViewRepresentable {
         let tv = ClickTextView(frame: .zero)
         tv.isEditable = false
         tv.isSelectable = true
-        tv.font = .monospacedSystemFont(ofSize: model.settings.display.fontSize, weight: .regular)
+        tv.font = Style(model.settings.display).nsFont
         tv.textContainerInset = NSSize(width: 6, height: 6)
         tv.autoresizingMask = [.width]
         tv.isVerticallyResizable = true
@@ -51,24 +69,20 @@ struct RxTextView: NSViewRepresentable {
         return scroll
     }
 
-    static func attrs(echo: Bool, size: Double) -> [NSAttributedString.Key: Any] {
-        [.font: NSFont.monospacedSystemFont(ofSize: size, weight: .regular),
-         .foregroundColor: echo ? NSColor.systemRed : NSColor.textColor]
-    }
-
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let tv = scroll.documentView as? NSTextView, let storage = tv.textStorage else { return }
         let c = context.coordinator
         let atBottom = scroll.contentView.bounds.maxY >= (tv.frame.height - 30)
         let newChars = model.rxAppendedTotal - c.appended
         let cut = model.rxTrimmedTotal - c.trimmed
-        let size = model.settings.display.fontSize
+        let style = Style(model.settings.display)
+        if style != c.style { tv.backgroundColor = style.backgroundColor; tv.insertionPointColor = style.attrs(echo: false)[.foregroundColor] as? NSColor ?? .textColor }
         storage.beginEditing()
-        if newChars >= model.rxCharCount || newChars < 0 || cut < 0 || size != c.fontSize {
-            c.fontSize = size
+        if newChars >= model.rxCharCount || newChars < 0 || cut < 0 || style != c.style {
+            c.style = style
             // velká změna (start, clear) → celé znovu
             let s = NSMutableAttributedString()
-            for r in model.rxRuns { s.append(NSAttributedString(string: r.text, attributes: Self.attrs(echo: r.echo, size: size))) }
+            for r in model.rxRuns { s.append(NSAttributedString(string: r.text, attributes: style.attrs(echo: r.echo))) }
             storage.setAttributedString(s)
         } else {
             if cut > 0 {       // ořez zepředu (limit 200 000 znaků)
@@ -76,7 +90,7 @@ struct RxTextView: NSViewRepresentable {
                 storage.deleteCharacters(in: n)
             }
             for r in model.rxTail(newChars) {
-                storage.append(NSAttributedString(string: r.text, attributes: Self.attrs(echo: r.echo, size: size)))
+                storage.append(NSAttributedString(string: r.text, attributes: style.attrs(echo: r.echo)))
             }
         }
         storage.endEditing()

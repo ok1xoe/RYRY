@@ -57,12 +57,14 @@ struct WaterfallView: View {
                     let hz = model.waterfallFromHz + Double(loc.x / g.size.width) * (model.waterfallToHz - model.waterfallFromHz)
                     Task { await model.tune(toMarkHz: hz) }
                 }
-                .help(L("Klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = úroveň squelche"))
+                .hint(L("Klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = úroveň squelche"))
                 .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
                                             onRightClick: { f in notch(f) }))
                 if model.xyEnabled {
-                    XYScopeView(points: model.xyPoints)
-                        .frame(width: min(g.size.height, 160), height: min(g.size.height, 160))
+                    let side = min(g.size.height, model.settings.display.xySize.points)
+                    XYScopeView(points: model.settings.display.xyQuality == .low ? Self.decimate(model.xyPoints) : model.xyPoints,
+                                dot: model.settings.display.xyQuality == .low ? 1.2 : 1.6)
+                        .frame(width: side, height: side)
                         .padding(4)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 }
@@ -111,6 +113,7 @@ struct ScrollWheelCatcher: NSViewRepresentable {
 /// XY scope: mark na ose X, space na ose Y (správně naladěný signál = kříž).
 struct XYScopeView: View {
     let points: [XYPoint]
+    var dot: CGFloat = 1.6
     var body: some View {
         Canvas { ctx, size in
             ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black.opacity(0.85)))
@@ -119,7 +122,7 @@ struct XYScopeView: View {
             for pt in points {
                 let x = size.width / 2 + CGFloat(pt.x / m) * size.width * 0.45
                 let y = size.height / 2 - CGFloat(pt.y / m) * size.height * 0.45
-                p.addEllipse(in: CGRect(x: x - 0.8, y: y - 0.8, width: 1.6, height: 1.6))
+                p.addEllipse(in: CGRect(x: x - dot / 2, y: y - dot / 2, width: dot, height: dot))
             }
             ctx.fill(p, with: .color(.green))
         }
@@ -178,7 +181,7 @@ struct SpectrumView: View {
                 let hz = model.waterfallFromHz + f * (model.waterfallToHz - model.waterfallFromHz)
                 Task { await model.notchClick(hz: hz) }
             }))
-            .help(L("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch"))
+            .hint(L("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch"))
             .overlay(alignment: .topLeading) { SpectrumMenu(model: model).padding(4) }
         }
     }
@@ -212,6 +215,11 @@ struct SpectrumMenu: View {
                 .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 3))
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-        .help(L("Rozsah a zesílení spektra a vodopádu"))
+        .hint(L("Rozsah a zesílení spektra a vodopádu"))
     }
+}
+
+extension WaterfallView {
+    /// Nízká kvalita XY scope: každý druhý bod (MMTTY „XYScope Quality“).
+    static func decimate(_ p: [XYPoint]) -> [XYPoint] { p.enumerated().compactMap { $0.offset % 2 == 0 ? $0.element : nil } }
 }
