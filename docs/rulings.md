@@ -197,3 +197,9 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 ### Odložené drobnosti
 - „nahlášeno“ se určuje podle (čas, značka, číslo), ne podle ID záznamu – oprava čísla QSO v logu po nahlášení ho nabídne znovu
 - nejasné, zda vyhodnocovač DARC chce QTC řádky prokládané časově s QSO (teď jsou za QSO)
+
+## Pole QSO podle závodu, OK DX RTTY
+- QSO okno nabízí pole podle režimu (`QSOLayout`): bez závodu Name/QTH/Locator; v závodě jen výměna formátu; panel QTC jen ve WAE.
+- Nový formát „RST + CQ zóna“ (`zone`) pro OK DX RTTY Contest (ČRK: výměna RST + CQ zóna, CONTEST: OK-DX-RTTY): moje zóna z DXCC, zóna protistanice předvyplněná z DXCC (klik na číslo 1–40 ji přepíše).
+- Předvolby závodů (OK DX RTTY: sobota 3. celého víkendu v prosinci; WAE RTTY: 2. celý víkend v listopadu) nastaví název, formát a začátek.
+- Body a násobiče OK DX RTTY se nepočítají (vyhodnocení / logger).

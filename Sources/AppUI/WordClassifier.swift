@@ -65,6 +65,10 @@ public enum WordClassifier {
         var rest = Substring(w)
         if w.count >= 4, w.hasPrefix("599"), w.dropFirst(3).allSatisfy(\.isNumber) { rest = rest.dropFirst(3) }
         switch format {
+        case .zone:
+            // RST + CQ zóna: číslo 1–40 (i „59914“) = zóna protistanice
+            guard !rest.isEmpty, rest.count <= 2, rest.allSatisfy(\.isNumber), let z = Int(rest), (1...40).contains(z) else { return [] }
+            return [("exchangeRcvd", String(z))]
         case .serial, .ped, .wae:
             return contestField(word, serialMode: serialMode).map { [$0] } ?? []
         case .cqrj:

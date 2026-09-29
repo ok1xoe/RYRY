@@ -96,6 +96,10 @@ public actor AppController {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
         self.countries = countries; self.qtcStore = qtc
         qso = Self.contestDefaults(settings.contest)
+        if settings.contest.enabled, settings.contest.format == .zone, qso.exchangeSent.isEmpty,
+           let z = countries?.lookup(settings.station.call)?.cqZone {
+            qso.exchangeSent = String(z)
+        }
     }
 
     /// Prázdné QSO okno podle závodního formátu (odesílané číslo nebo pevná výměna).
@@ -109,6 +113,7 @@ public actor AppController {
         case .bartg: q.serialSent = c.nextSerial                 // čas se doplní se začátkem QSO
         case .ped: break
         case .wae: q.serialSent = c.nextSerial
+        case .zone: q.exchangeSent = c.exchange              // prázdné → doplní vlastní zónu z DXCC
         }
         return q
     }
@@ -264,6 +269,11 @@ public actor AppController {
         case "call":
             qso.call = v.uppercased()
             if !v.isEmpty, qso.timeOn == nil { qso.timeOn = Date() }
+            // RST + CQ zóna: zóna protistanice podle DXCC (klik na číslo v příjmu ji přepíše)
+            if !v.isEmpty, settings.contest.enabled, settings.contest.prefillsZone, qso.exchangeRcvd.isEmpty,
+               let z = country(for: v)?.cqZone {
+                qso.exchangeRcvd = String(z)
+            }
             // BARTG: smazaná značka = QSO nezačalo, čas se znovu bere aktuální (MMTTY UpdateBARTG)
             if v.isEmpty, isBARTG { qso.exchangeSent = ""; qso.timeOn = nil }
         case "name": qso.name = v
@@ -291,6 +301,10 @@ public actor AppController {
     private func applyContestDefaults() {
         let d = Self.contestDefaults(settings.contest)
         qso.serialSent = d.serialSent; qso.exchangeSent = d.exchangeSent
+        if settings.contest.enabled, settings.contest.format == .zone, qso.exchangeSent.isEmpty,
+           let z = country(for: settings.station.call)?.cqZone {
+            qso.exchangeSent = String(z)                      // RST + CQ zóna: moje zóna z DXCC
+        }
     }
 
     @discardableResult

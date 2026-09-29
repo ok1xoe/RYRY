@@ -255,6 +255,16 @@ struct ContestTab: View {
     @Binding var s: AppSettings
     var body: some View {
         Form {
+            Menu("Předvolba závodu…") {
+                ForEach(ContestPreset.allCases, id: \.self) { p in
+                    Button(p.title) {
+                        let serial = s.contest.nextSerial
+                        s.contest = ContestSettings.preset(p, year: Calendar(identifier: .gregorian).component(.year, from: Date()))
+                        if p == .waeRTTY { s.contest.nextSerial = max(1, serial) }
+                    }
+                }
+            }
+            .help("Nastaví název, formát výměny a začátek známého závodu")
             Toggle("Závodní režim (pořadová čísla, klik na číslo = přijaté číslo)", isOn: $s.contest.enabled)
             Picker("Formát", selection: $s.contest.format) {
                 Text("RST + pořadové číslo (nebo pevná výměna)").tag(ContestFormat.serial)
@@ -262,6 +272,7 @@ struct ContestTab: View {
                 Text("BARTG – číslo + čas UTC").tag(ContestFormat.bartg)
                 Text("PED – klik = vždy značka, bez čísel").tag(ContestFormat.ped)
                 Text("WAE – RST + číslo a výměna QTC").tag(ContestFormat.wae)
+                Text("RST + CQ zóna (OK DX RTTY)").tag(ContestFormat.zone)
             }
             TextField("Název závodu (Cabrillo CONTEST)", text: $s.contest.name)
             TextField("Kategorie (Cabrillo, oddělit „;“)", text: $s.contest.category)

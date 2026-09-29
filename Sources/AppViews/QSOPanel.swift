@@ -19,6 +19,7 @@ struct QSOPanel: View {
         case .bartg: f = "BARTG"
         case .ped: f = "PED"
         case .wae: f = "WAE + QTC"
+        case .zone: f = "RST + CQ zóna"
         }
         return c.name.isEmpty ? "závod · \(f)" : "\(c.name) · \(f)"
     }
