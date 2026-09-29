@@ -92,6 +92,11 @@ extension Color {
         guard let h = Macro.validColor(hex), let v = UInt32(h.dropFirst(), radix: 16) else { return nil }
         self.init(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
     }
+    /// Světlá barva (žlutá, světle zelená…) potřebuje tmavý text.
+    var isLight: Bool {
+        guard let c = NSColor(self).usingColorSpace(.sRGB) else { return false }
+        return 0.299 * c.redComponent + 0.587 * c.greenComponent + 0.114 * c.blueComponent > 0.6
+    }
     var hexString: String? {
         guard let c = NSColor(self).usingColorSpace(.sRGB) else { return nil }
         return String(format: "#%02X%02X%02X", Int((c.redComponent * 255).rounded()), Int((c.greenComponent * 255).rounded()),

@@ -213,3 +213,15 @@ func makeFormatApp(_ f: ContestFormat, exchange: String = "") throws -> Harness 
     let p = await ped.app.qso
     #expect(p.serialSent == nil && p.exchangeSent.isEmpty)
 }
+
+// Plán 9: oprava značky v logu přepočítá zemi DXCC
+@Test func updateQSORecomputesCountry() async throws {
+    let h = try makeDXCCApp()
+    try await h.app.setQSOField("call", "JA1XYZ")
+    var r = try await h.app.logQSO()
+    #expect(r.country == "Japan")
+    r.call = "DL1ABC"
+    try await h.app.updateQSO(r)
+    let saved = await h.app.log!.records.first { $0.id == r.id }
+    #expect(saved?.country == "Fed. Rep. of Germany" && saved?.cqZone == 14 && saved?.continent == "EU")
+}

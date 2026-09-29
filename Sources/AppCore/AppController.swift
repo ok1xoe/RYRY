@@ -339,8 +339,14 @@ public actor AppController {
         return Cabrillo.export(recs, header: h)
     }
 
-    public func updateQSO(_ r: QSORecord) async throws {
+    public func updateQSO(_ r0: QSORecord) async throws {
         guard let log else { throw AppError.noLog }
+        var r = r0
+        // opravená značka → znovu zjistit zemi DXCC
+        if let old = await log.records.first(where: { $0.id == r.id }), old.call != r.call {
+            let ci = country(for: r.call)
+            r.country = ci?.name; r.continent = ci?.continent; r.cqZone = ci?.cqZone; r.ituZone = ci?.ituZone
+        }
         do { try await log.update(r) } catch { throw AppError.log("\(error)") }
         broadcaster.send(.qsoUpdated(r))
     }

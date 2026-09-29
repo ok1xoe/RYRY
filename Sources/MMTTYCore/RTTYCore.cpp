@@ -42,6 +42,8 @@ struct RTTYCore {
     int    echo = 1;
     int    afc = 1, afcMode = 1;
     double afcSQ = 32, afcTime = 8.0, afcSweep = 1.0;
+    double afcMaxDev = 0, afcAnchor = 2125;   // plán 9: omezení AFC kolem ručně nastaveného marku
+    int    afcGate = 0;
     int    txActive = 0;
     int    txStopping = 0;
     int    tuning = 0;
@@ -186,7 +188,7 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
     case RC_MARK:
         if (!inRange(v, 100, 3000)) return RC_ERR_RANGE;
         if (!inRange(std::fabs(dem.GetSpaceFreq() - v), 20, 2000)) return RC_ERR_RANGE;
-        dem.SetMarkFreq(v); mod.SetMarkFreq(v); c->calcBPF(); break;
+        dem.SetMarkFreq(v); mod.SetMarkFreq(v); c->calcBPF(); c->afcAnchor = v; break;
     case RC_SPACE:
         if (!inRange(v, 100, 3000)) return RC_ERR_RANGE;
         if (!inRange(std::fabs(v - dem.GetMarkFreq()), 20, 2000)) return RC_ERR_RANGE;
@@ -375,6 +377,12 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
     case RC_TX_RANDOM_DIDDLE:
         if (!isBool(v)) return RC_ERR_RANGE;
         mod.m_RandomDiddle = int(v); break;
+    case RC_AFC_MAX_DEV:
+        if (!inRange(v, 0, 1000)) return RC_ERR_RANGE;
+        c->afcMaxDev = v; c->afcAnchor = dem.GetMarkFreq(); break;
+    case RC_AFC_GATE:
+        if (!isBool(v)) return RC_ERR_RANGE;
+        c->afcGate = int(v); break;
     default:
         return RC_ERR_UNKNOWN;
     }
@@ -449,6 +457,8 @@ extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
     case RC_TX_CHAR_WAIT: return mod.m_CharWait;
     case RC_TX_CHAR_WAIT_DIDDLE: return mod.m_CharWaitDiddle;
     case RC_TX_RANDOM_DIDDLE: return mod.m_RandomDiddle;
+    case RC_AFC_MAX_DEV: return c->afcMaxDev;
+    case RC_AFC_GATE: return c->afcGate;
     default: return NAN;
     }
 }
@@ -603,8 +613,21 @@ extern "C" int rttycore_tick(RTTYCore* c) {
     }
     if (!c->afc) return 0;
     if (c->txActive && c->echo != 2) return 0;        // během vysílání AFC neběží
+    // plán 9: AFC jen při signálu nad prahem squelche (jinak v šumu přeskakuje na jiné stanice)
+    if (c->afcGate) {
+        double thr = c->dem->m_Limit ? c->dem->GetSQLevel() * 10.0 : c->dem->GetSQLevel();
+        if (c->dem->m_avgdeff < thr) return 0;
+    }
     AFCParams p{ c->afcMode, c->afcSQ, c->afcTime, c->afcSweep, sys.m_FFTGain };
     int r = DoAFC(c->fft->m_fft, c->fftWindow, c->bpfafc, *c->dem, p);
+    if (r != AFC_NOCHANGE && c->afcMaxDev > 0) {
+        double m = c->dem->GetMarkFreq(), sft = c->dem->GetSpaceFreq() - m;
+        double lo = c->afcAnchor - c->afcMaxDev, hi = c->afcAnchor + c->afcMaxDev;
+        if (m < lo || m > hi) {
+            double cm = m < lo ? lo : hi;
+            c->dem->AFCMarkFreq(cm); c->dem->AFCSpaceFreq(cm + sft);
+        }
+    }
     if (r == AFC_CHANGED_RECALC_BPF) c->calcBPF();
     return r != AFC_NOCHANGE ? 1 : 0;
 }

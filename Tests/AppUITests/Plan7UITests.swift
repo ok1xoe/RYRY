@@ -99,7 +99,9 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
 @Test func waterfallGainBrightens() {
     var a = WaterfallRenderer(width: 100, height: 2), b = WaterfallRenderer(width: 100, height: 2)
     b.gainDB = 6
-    let f = frame(peakAt: 2125, level: 200)
+    var mags = frame(peakAt: 2125, level: 200).magnitudes
+    mags[200] = 100                                           // střední úroveň – zesílení ji zjasní
+    let f = SpectrumFrame(binHz: 5.3833, magnitudes: mags)
     a.push(f, fromHz: 0, toHz: 3000); b.push(f, fromHz: 0, toHz: 3000)
     let sa = a.row(0).map(\.brightness).reduce(0, +), sb = b.row(0).map(\.brightness).reduce(0, +)
     #expect(sb > sa, "\(sa) → \(sb)")
@@ -320,4 +322,46 @@ func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = t
     #expect(cu("AR", .cqrj, exch: "04") == ["exchangeRcvd": "04 AR"])      // Arkansas
     #expect(cu("TU", .cqrj).isEmpty)
     #expect(cu("01203", .bartg) == ["exchangeRcvd": "1203"])               // MMTTY StoreUTC: > 3 číslice = čas, je-li platný
+}
+
+// Plán 9: po skončení signálu nesmí šum pásma vodopád přesvítit (AGC klesla na úroveň šumu)
+@Test func noiseOnlyWaterfallStaysDarkAfterSignal() {
+    var w = WaterfallRenderer(width: 200, height: 2)
+    var g = NoiseGenerator(seed: 5)
+    func noiseFrame(signal: Bool) -> SpectrumFrame {
+        var m = (0..<743).map { _ in 45 + 12 * g.gaussian() }          // šum pásma v log jednotkách jádra (≈ 45)
+        if signal { m[395] = 238; m[426] = 230 }
+        return SpectrumFrame(binHz: 5.3833, magnitudes: m)
+    }
+    for _ in 0..<50 { w.push(noiseFrame(signal: true), fromHz: 0, toHz: 3000) }
+    for _ in 0..<600 { w.push(noiseFrame(signal: false), fromHz: 0, toHz: 3000) }   // 40 s jen šum
+    let avg = w.row(0).map(\.brightness).reduce(0, +) / 200
+    #expect(avg < 200, "průměrný jas šumu \(avg)")                  // tmavě modrá, ne žlutá (~500+)
+    // silný signál je pořád výrazný
+    w.push(noiseFrame(signal: true), fromHz: 0, toHz: 3000)
+    #expect((135...147).map { w.row(0)[$0].brightness }.max()! > 500)
+}
+
+// Plán 9: měření hodin měří zařízení zvolené v dialogu; neúspěšné načtení profilu nemění nastavení
+@Test @MainActor func measureClockUsesGivenDevices() async throws {
+    let f = Fixture()
+    await f.model.start()
+    var asked: [String?] = []
+    f.model.clockRates = { uid, _ in asked.append(uid); return (48000, 48000) }
+    _ = await f.model.measureClock(seconds: 0.1, inputUID: "IN-DRAFT", outputUID: "OUT-DRAFT")
+    #expect(asked == ["IN-DRAFT", "OUT-DRAFT"])
+    await f.model.stop()
+}
+
+@Test @MainActor func failedProfileLoadKeepsSettings() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let before = SettingsStore(directory: f.dir).load().0
+    await f.model.setParam("baud", .double(50))
+    let mid = SettingsStore(directory: f.dir).load().0
+    await f.model.loadProfile(7)                                // prázdný slot → chyba
+    #expect(SettingsStore(directory: f.dir).load().0 == mid)
+    #expect(f.model.messages.contains { $0.contains("Profil") })
+    _ = before
+    await f.model.stop()
 }

@@ -1,9 +1,17 @@
 import Foundation
 
-/// Minimalistické čtení a zápis PCM WAV (16 bit). Zápis vždy mono, čtení bere 1. kanál.
+/// Minimalistické čtení a zápis WAV. Zápis PCM 16 bit mono; čtení PCM 16/24/32 bit, float 32 bit
+/// i WAVE_FORMAT_EXTENSIBLE, bere 1. kanál.
 public enum WaveFile {
-    public enum Error: Swift.Error, Equatable {
+    public enum Error: Swift.Error, Equatable, LocalizedError {
         case notWave, unsupportedFormat(String), truncated
+        public var errorDescription: String? {
+            switch self {
+            case .notWave: return "Soubor není WAV."
+            case .unsupportedFormat(let f): return "Nepodporovaný formát WAV (\(f)). Podporováno: PCM 16/24/32 bit nebo float 32 bit."
+            case .truncated: return "Soubor WAV je neúplný."
+            }
+        }
     }
 
     public static func write(samples: [Float], sampleRate: Int, to url: URL) throws {
@@ -42,17 +50,28 @@ public enum WaveFile {
                 if id == "fmt " {
                     guard body + 16 <= raw.count else { throw Error.truncated }
                     format = u16(body); channels = u16(body + 2); rate = u32(body + 4); bits = u16(body + 14)
+                    // WAVE_FORMAT_EXTENSIBLE: skutečný formát je v prvních 2 bajtech SubFormat GUID
+                    if format == 0xFFFE, size >= 40, body + 26 <= raw.count { format = u16(body + 24) }
                 } else if id == "data" {
-                    guard format == 1, bits == 16, channels >= 1 else {
-                        throw Error.unsupportedFormat("format=\(format) bits=\(bits) ch=\(channels)")
+                    let ok = (format == 1 && [16, 24, 32].contains(bits)) || (format == 3 && bits == 32)
+                    guard ok, channels >= 1 else {
+                        throw Error.unsupportedFormat("format \(format), \(bits) bit, \(channels) kan.")
                     }
                     let end = min(body + size, raw.count)
-                    let frame = 2 * channels
+                    let bps = bits / 8, frame = bps * channels
                     var out = [Float](); out.reserveCapacity((end - body) / frame)
                     var p = body
-                    while p + 2 <= end {
-                        let v = Int16(bitPattern: UInt16(u16(p)))
-                        out.append(Float(v) / 32768)
+                    while p + bps <= end {
+                        switch (format, bits) {
+                        case (1, 16): out.append(Float(Int16(bitPattern: UInt16(u16(p)))) / 32768)
+                        case (1, 24):
+                            let v = Int32(bitPattern: UInt32(raw[p]) << 8 | UInt32(raw[p + 1]) << 16 | UInt32(raw[p + 2]) << 24) >> 8
+                            out.append(Float(v) / 8_388_608)
+                        case (1, 32): out.append(Float(Int32(bitPattern: UInt32(u32(p)))) / 2_147_483_648)
+                        default:
+                            let f = Float(bitPattern: UInt32(u32(p)))
+                            out.append(f.isFinite ? f : 0)
+                        }
                         p += frame
                     }
                     return (out, rate)
