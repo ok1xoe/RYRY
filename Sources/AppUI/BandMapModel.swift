@@ -28,14 +28,20 @@ extension AppModel {
         for s in spots.sorted(by: { $0.time > $1.time }) {
             guard let a = BandMap.audioOffset(spotHz: s.frequencyHz, dialHz: dialHz, mode: mode, offsetHz: offsetHz, markHz: markHz),
                   a >= fromHz, a <= toHz else { continue }
-            var st = BandMapMarker.Status.new
-            if index.status(of: s) != .none { st = .worked }
-            if let since = contestSince,
-               DupeCheck.isDupe(call: s.call, band: s.band, mode: s.mode ?? "RTTY", records: records, since: since) { st = .dupe }
+            let st = spotStatus(s, index: index, records: records, contestSince: contestSince)
             out.append(BandMapMarker(spot: s, audioHz: a, status: st))
             if out.count >= BandMap.maxMarkers { break }
         }
         return out
+    }
+
+    /// Stav spotu: nová / už v logu (`SpotLogIndex`) / duplicita v závodě (`DupeCheck`, jen když je závod zapnutý).
+    public nonisolated static func spotStatus(_ s: Spot, index: SpotLogIndex, records: [QSORecord], contestSince: Date?) -> BandMapMarker.Status {
+        var st = BandMapMarker.Status.new
+        if index.status(of: s) != .none { st = .worked }
+        if let since = contestSince,
+           DupeCheck.isDupe(call: s.call, band: s.band, mode: s.mode ?? "RTTY", records: records, since: since) { st = .dupe }
+        return st
     }
 
     /// Štítky pro aktuální stav; prázdné, když je funkce vypnutá nebo rig nehlásí frekvenci.

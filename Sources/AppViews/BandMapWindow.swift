@@ -1,0 +1,222 @@
+// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import AppKit
+import AppUI
+import Localization
+import QSOLog
+import Spots
+import SwiftUI
+
+/// Okno „Band mapa“: svislá stupnice RTTY části pásma (jako Bandmap v N1MM Logger+) se spoty z DX clusteru / RBN,
+/// odpracovanými stanicemi z logu a značkou frekvence rigu. Klik na spot = stejné jako dvojklik ve Spotech.
+public struct BandMapWindow: View {
+    @Bindable var model: AppModel
+    /// Ruční volba pásma (nil = automaticky podle rigu / ruční frekvence QSO).
+    @State private var bandChoice: String?
+    @State private var scales: [String: BandScale] = [:]
+    @State private var showLogged = true
+    @State private var loggedMinutes = 60
+    public init(model: AppModel) { self.model = model }
+
+    static let rowHeight: CGFloat = 16
+    static let rulerWidth: CGFloat = 64
+    static let labelWidth: CGFloat = 118
+
+    /// Krok popisků stupnice v kHz podle viditelného rozsahu.
+    static func tickStep(span: Double) -> Double {
+        for s in [0.1, 0.2, 0.5, 1, 2, 5, 10] where span / s <= 14 { return s }
+        return 10
+    }
+
+    struct Entry: Identifiable {
+        let id: String
+        let kHz: Double
+        let text: String
+        let color: Color
+        let spot: Spot?
+        let tip: String
+    }
+
+    var rigKHz: Double? {
+        guard let r = model.rig, r.online, let f = r.frequency, f > 0 else { return nil }
+        return f / 1000
+    }
+
+    var band: String? {
+        RTTYBandPlan.selectBand(choice: bandChoice, rigHz: rigKHz.map { $0 * 1000 }, manualHz: model.qso.frequency)
+    }
+
+    func scale(for band: String) -> BandScale {
+        scales[band] ?? BandScale(segment: RTTYBandPlan.segment(for: band)!)
+    }
+
+    func zoom(_ factor: Double, band: String, around f: Double? = nil) {
+        var s = scale(for: band); s.zoom(by: factor, around: f ?? rigKHz.flatMap { scale(for: band).contains(kHz: $0) ? $0 : nil })
+        scales[band] = s
+    }
+
+    func entries(band: String, scale: BandScale, now: Date) -> [Entry] {
+        let feed = model.spotFeed
+        let spots = BandMapFilter.spots(feed.book.byID.values.map { $0 }, band: band, rttyOnly: feed.rttyOnly,
+                                        maxAgeMinutes: max(1, feed.config.maxAgeMinutes), now: now)
+        let index = SpotLogIndex(model.logRecords)
+        let since = model.settings.contest.enabled ? model.settings.contest.effectiveStart : nil
+        var out: [Entry] = []
+        for s in spots where scale.contains(kHz: s.frequencyKHz) {
+            let st = AppModel.spotStatus(s, index: index, records: model.logRecords, contestSince: since)
+            let age = BandMapFilter.ageMinutes(of: s, now: now)
+            out.append(Entry(id: "s|" + s.id, kHz: s.frequencyKHz, text: "\(s.call)  \(L("%ld min", age))", color: st.color, spot: s,
+                             tip: String(format: "%@ · %.1f kHz · %@ · %@", s.call, s.frequencyKHz, st.legend,
+                                         L("klik = naladit rig a vložit značku"))))
+        }
+        if showLogged {
+            for r in BandMapFilter.logged(model.logRecords, band: band, minutes: loggedMinutes, now: now) {
+                guard let f = r.frequency, scale.contains(kHz: f / 1000) else { continue }
+                out.append(Entry(id: "l|" + r.id.uuidString, kHz: f / 1000, text: r.call + " ✓", color: .gray, spot: nil,
+                                 tip: String(format: "%@ · %.1f kHz · %@", r.call, f / 1000, L("odpracováno"))))
+            }
+        }
+        return out
+    }
+
+    public var body: some View {
+        VStack(spacing: 6) {
+            controls
+            if let band {
+                TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                    mapView(band: band, now: ctx.date)
+                }
+            } else {
+                Spacer()
+                Text(L("Zvolte pásmo (rig ani ruční frekvence nejsou na pásmu s RTTY částí)."))
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+            }
+        }
+        .padding(8)
+        .frame(minWidth: 280, minHeight: 360)
+    }
+
+    var controls: some View {
+        HStack(spacing: 8) {
+            Picker(L("Pásmo"), selection: $bandChoice) {
+                Text(L("auto")).tag(String?.none)
+                ForEach(RTTYBandPlan.bands, id: \.self) { Text($0).tag(String?.some($0)) }
+            }.fixedSize()
+            Button { if let band { zoom(0.6, band: band) } } label: { Image(systemName: "plus.magnifyingglass") }
+                .hint(L("Přiblížit stupnici")).disabled(band == nil)
+            Button { if let band { zoom(1 / 0.6, band: band) } } label: { Image(systemName: "minus.magnifyingglass") }
+                .hint(L("Oddálit stupnici")).disabled(band == nil)
+            Button {
+                if let band, let f = rigKHz { var s = scale(for: band); s.center(on: f); scales[band] = s }
+            } label: { Image(systemName: "scope") }
+                .hint(L("Střed na rig")).disabled(band == nil || rigKHz == nil)
+            Spacer()
+            Toggle(L("Můj log"), isOn: $showLogged).toggleStyle(.checkbox)
+            if showLogged {
+                Stepper(value: $loggedMinutes, in: 5...1440, step: 15) { Text(L("%ld min", loggedMinutes)).monospacedDigit() }
+                    .fixedSize()
+            }
+        }
+    }
+
+    func mapView(band: String, now: Date) -> some View {
+        let sc = scale(for: band)
+        let list = entries(band: band, scale: sc, now: now)
+        let empty = !model.settings.spots.clusterEnabled && !model.settings.spots.rbnEnabled && rigKHz == nil
+        return GeometryReader { g in
+            let h = g.size.height
+            let ys = list.map { sc.y(forKHz: $0.kHz, height: h) }
+            let adj = BandMapLayout.spread(ys, minGap: Self.rowHeight, height: h - Self.rowHeight)
+            let labelX = max(Self.rulerWidth + 16, g.size.width - Self.labelWidth - 4)
+            ZStack(alignment: .topLeading) {
+                Canvas { ctx, size in
+                    let step = Self.tickStep(span: sc.span)
+                    var f = (sc.visibleLow / step).rounded(.up) * step
+                    while f <= sc.visibleHigh + 1e-9 {
+                        let y = sc.y(forKHz: f, height: size.height)
+                        var p = Path(); p.move(to: CGPoint(x: Self.rulerWidth - 8, y: y)); p.addLine(to: CGPoint(x: Self.rulerWidth, y: y))
+                        ctx.stroke(p, with: .color(.secondary), lineWidth: 1)
+                        ctx.draw(Text(String(format: step < 1 ? "%.1f" : "%.0f", f)).font(.caption2.monospacedDigit()).foregroundColor(.secondary),
+                                 at: CGPoint(x: Self.rulerWidth - 12, y: y), anchor: .trailing)
+                        f += step
+                    }
+                    var axis = Path(); axis.move(to: CGPoint(x: Self.rulerWidth, y: 0)); axis.addLine(to: CGPoint(x: Self.rulerWidth, y: size.height))
+                    ctx.stroke(axis, with: .color(.secondary), lineWidth: 1)
+                    for (i, e) in list.enumerated() {
+                        var l = Path()
+                        l.move(to: CGPoint(x: Self.rulerWidth, y: ys[i]))
+                        l.addLine(to: CGPoint(x: labelX, y: adj[i] + Self.rowHeight / 2))
+                        ctx.stroke(l, with: .color(e.color.opacity(0.6)), lineWidth: 1)
+                    }
+                    if let r = rigKHz, sc.contains(kHz: r) {
+                        let y = sc.y(forKHz: r, height: size.height)
+                        var line = Path(); line.move(to: CGPoint(x: 0, y: y)); line.addLine(to: CGPoint(x: size.width, y: y))
+                        ctx.stroke(line, with: .color(.red.opacity(0.7)), lineWidth: 1)
+                        var tri = Path()
+                        tri.move(to: CGPoint(x: Self.rulerWidth + 2, y: y)); tri.addLine(to: CGPoint(x: Self.rulerWidth + 10, y: y - 5))
+                        tri.addLine(to: CGPoint(x: Self.rulerWidth + 10, y: y + 5)); tri.closeSubpath()
+                        ctx.fill(tri, with: .color(.red))
+                        ctx.draw(Text(String(format: "%.1f", r)).font(.caption2.monospacedDigit().bold()).foregroundColor(.red),
+                                 at: CGPoint(x: 2, y: y - 7), anchor: .bottomLeading)
+                    }
+                }
+                .allowsHitTesting(false)
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, e in
+                    let label = Text(verbatim: e.text).font(.caption2.monospaced().bold()).lineLimit(1)
+                        .foregroundStyle(e.spot == nil ? Color.white : Color.black)
+                        .frame(width: Self.labelWidth, height: Self.rowHeight - 1, alignment: .leading).padding(.leading, 4)
+                        .background(e.color.opacity(e.spot == nil ? 0.55 : 0.9), in: RoundedRectangle(cornerRadius: 3))
+                    Group {
+                        if let spot = e.spot {
+                            Button { Task { await model.useSpot(spot) } } label: { label }.buttonStyle(.plain)
+                        } else { label }
+                    }
+                    .offset(x: labelX, y: adj[i])
+                    .hint(e.tip)
+                }
+                if empty {
+                    Text(L("Zapněte DX cluster nebo RBN (Nastavení → Spoty)."))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity).padding(.top, 8)
+                        .offset(x: 0, y: 0)
+                }
+                ScrollWheelZoom { dy, fromTop in
+                    let f = sc.kHz(forY: fromTop * h, height: h)
+                    zoom(dy > 0 ? 0.85 : 1 / 0.85, band: band, around: f)
+                }
+                .allowsHitTesting(false)
+            }
+            .frame(width: g.size.width, height: h, alignment: .topLeading)
+        }
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// Kolečko myši nad oblastí: lokální monitor událostí (SwiftUI na macOS nemá pohled pro scrollWheel).
+/// Vrací směr (dy > 0 = kolečko dopředu = přiblížit) a relativní polohu kurzoru shora (0…1).
+private struct ScrollWheelZoom: NSViewRepresentable {
+    var onScroll: (CGFloat, Double) -> Void
+
+    final class Coordinator {
+        var monitor: Any?
+        var onScroll: (CGFloat, Double) -> Void = { _, _ in }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        let c = context.coordinator
+        c.monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak v] e in
+            guard let v, let w = v.window, e.window === w, abs(e.scrollingDeltaY) > 0.01 else { return e }
+            let p = v.convert(e.locationInWindow, from: nil)
+            guard v.bounds.contains(p), v.bounds.height > 0 else { return e }
+            c.onScroll(e.scrollingDeltaY, Double(1 - p.y / v.bounds.height))
+            return nil
+        }
+        return v
+    }
+    func updateNSView(_ v: NSView, context: Context) { context.coordinator.onScroll = onScroll }
+    static func dismantleNSView(_ v: NSView, coordinator: Coordinator) {
+        if let m = coordinator.monitor { NSEvent.removeMonitor(m) }
+    }
+}
