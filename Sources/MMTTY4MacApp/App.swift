@@ -28,6 +28,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+@MainActor func showAbout() {
+    let credits = """
+    RTTY pro macOS – nativní přepis MMTTY s API pro loggery (fldigi XML-RPC, JSON-RPC).
+
+    Jádro demodulátoru a modulátoru: MMTTY © 2000–2013 Makoto Mori (JE3HHT), Nobuyuki Oba.
+    mmtty4mac © 2026 OK1XOE. Licence GNU LGPL v3 (COPYING, COPYING.LESSER).
+    DXCC: cty.dat – Jim Reisert AD1C (country-files.com).
+    """
+    let para = NSMutableParagraphStyle(); para.alignment = .center
+    NSApp.orderFrontStandardAboutPanel(options: [
+        .credits: NSAttributedString(string: credits, attributes: [.font: NSFont.systemFont(ofSize: 11), .paragraphStyle: para]),
+    ])
+    NSApp.activate(ignoringOtherApps: true)
+}
+
 @main
 struct MMTTY4MacApp: App {
     @MainActor func playWAV(speed: Double) {
@@ -62,6 +77,9 @@ struct MMTTY4MacApp: App {
                 Button("Zalogovat QSO") { Task { await model.logQSO() } }.keyboardShortcut("l", modifiers: .command)
                 Button("Vymazat QSO") { Task { await model.clearQSO() } }
                 Button("Vymazat příjem") { model.clearRx() }.keyboardShortcut("k", modifiers: .command)
+            }
+            CommandGroup(replacing: .appInfo) {
+                Button("O aplikaci mmtty4mac") { showAbout() }
             }
             CommandGroup(after: .newItem) {
                 Menu("Přehrát WAV do příjmu") {
