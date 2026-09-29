@@ -14,3 +14,6 @@ int cserial_set_break(int fd, int on);
 int cserial_write(int fd, const unsigned char* buf, unsigned long n);
 int cserial_drain(int fd);
 int cserial_flush_output(int fd);
+/* Přečte až n bajtů, čeká nejvýše timeout_ms; *got = počet (0 = nic nepřišlo). */
+int cserial_read(int fd, unsigned char* buf, unsigned long n, int timeout_ms, long* got);
+int cserial_flush_input(int fd);

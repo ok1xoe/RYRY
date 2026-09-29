@@ -38,7 +38,14 @@ int cserial_configure(int fd, int dataBits, int stopBits) {
 
 int cserial_set_speed(int fd, unsigned long baud) {
     speed_t s = (speed_t)baud;
-    return ioctl(fd, IOSSIOSPEED, &s) < 0 ? errno : 0;
+    if (ioctl(fd, IOSSIOSPEED, &s) == 0) return 0;
+    int e = errno;
+    if (e != ENOTTY && e != EINVAL) return e;
+    /* ovladač bez IOSSIOSPEED (pseudoterminál, některé USB převodníky): standardní rychlost přes termios */
+    struct termios t;
+    if (tcgetattr(fd, &t) < 0) return e;
+    if (cfsetspeed(&t, s) < 0) return e;
+    return tcsetattr(fd, TCSANOW, &t) < 0 ? e : 0;
 }
 
 static int modem_bit(int fd, int bit, int on) {
@@ -60,3 +67,19 @@ int cserial_write(int fd, const unsigned char* buf, unsigned long n) {
 int cserial_drain(int fd) { return tcdrain(fd) < 0 ? errno : 0; }
 
 int cserial_flush_output(int fd) { return tcflush(fd, TCOFLUSH) < 0 ? errno : 0; }
+
+#include <poll.h>
+int cserial_read(int fd, unsigned char* buf, unsigned long n, int timeout_ms, long* got) {
+    *got = 0;
+    struct pollfd p = { .fd = fd, .events = POLLIN };
+    int r = poll(&p, 1, timeout_ms);
+    if (r < 0) return errno == EINTR ? 0 : errno;
+    if (r == 0) return 0;
+    if (p.revents & (POLLHUP | POLLNVAL | POLLERR)) return EIO;
+    ssize_t k = read(fd, buf, n);
+    if (k < 0) return (errno == EAGAIN || errno == EINTR) ? 0 : errno;
+    *got = k;
+    return 0;
+}
+
+int cserial_flush_input(int fd) { return tcflush(fd, TCIFLUSH) < 0 ? errno : 0; }

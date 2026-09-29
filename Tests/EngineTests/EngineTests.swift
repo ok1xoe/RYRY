@@ -13,9 +13,10 @@ final class FakeRig: Rig, @unchecked Sendable {
     var online = true
     var ptt: [Bool] = []
     var freq = 14_080_000.0
+    var disconnects = 0
     var name: String { "fake" }
     func connect() async throws { if !online { throw RigError.offline } }
-    func disconnect() async {}
+    func disconnect() async { disconnects += 1 }
     func frequency() async throws -> Double { if !online { throw RigError.offline }; return freq }
     func setFrequency(_ hz: Double) async throws { freq = hz }
     func mode() async throws -> String { "USB" }
@@ -298,4 +299,14 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     await r.engine.rxNow()
     #expect(r.port.events.contains(.flush))
     await r.engine.stop()
+}
+
+
+// Zastavení engine uvolní rig (sériový port CAT, spuštěný rigctld) – nový engine po Použít ho může hned otevřít
+@Test func stopDisconnectsRig() async throws {
+    let rig = FakeRig()
+    let r = try makeEngine(ptt: .none, rig: rig)
+    try await r.engine.start()
+    await r.engine.stop()
+    #expect(rig.disconnects == 1)
 }

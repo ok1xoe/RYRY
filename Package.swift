@@ -36,7 +36,7 @@ let package = Package(
                                                           "MacroEngine", "Settings", "AppCore", "APIServer", "QSOLog"]),
         .target(name: "XMLRPC"),
         .testTarget(name: "XMLRPCTests", dependencies: ["XMLRPC"]),
-        .target(name: "RigControl", dependencies: ["XMLRPC"]),
+        .target(name: "RigControl", dependencies: ["XMLRPC", "CSerial"]),
         .testTarget(name: "RigControlTests", dependencies: ["RigControl", "XMLRPC"]),
         .target(name: "CSerial"),
         .target(name: "Keying", dependencies: ["CSerial", "RigControl"]),

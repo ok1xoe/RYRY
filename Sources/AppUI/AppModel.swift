@@ -153,13 +153,7 @@ public final class AppModel {
         }
     }
 
-    public static func makeRig(_ r: RigSettings) -> Rig {
-        switch r.type {
-        case .hamlib: return HamlibClient(host: r.host, port: UInt16(clamping: r.effectivePort))
-        case .flrig: return FlrigClient(host: r.host, port: r.effectivePort)
-        case .none: return NoRig()
-        }
-    }
+    public static func makeRig(_ r: RigSettings) -> Rig { RigFactory.make(r) }
 
     public static let realEngine: EngineFactory = { s, rig in
         // RTTYModem na 11025 Hz (± 2 % korekce hodin) nemůže selhat
