@@ -46,7 +46,7 @@ struct WaterfallView: View {
                     var hz = (model.waterfallFromHz / 500).rounded(.up) * 500
                     while hz < model.waterfallToHz {
                         let xx = x(hz, size.width)
-                        ctx.draw(Text("\(Int(hz))").font(.caption2).foregroundStyle(.white.opacity(0.7)),
+                        ctx.draw(Text(verbatim: "\(Int(hz))").font(.caption2).foregroundStyle(.white.opacity(0.7)),
                                  at: CGPoint(x: xx, y: 8))
                         hz += 500
                     }
@@ -204,11 +204,13 @@ struct SpectrumMenu: View {
                 }
             }
         } label: {
-            Text("\(Int(model.waterfallFromHz))–\(Int(model.waterfallToHz)) Hz · \(model.settings.display.autoGain ? "AGC" : "\(Int(model.settings.display.gainDB)) dB")")
-                .font(.caption2.monospaced())
+            Text(verbatim: "\(Int(model.waterfallFromHz))–\(Int(model.waterfallToHz)) Hz · "
+                 + (model.settings.display.autoGain ? "AGC" : "\(Int(model.settings.display.gainDB)) dB") + " ▾")
+                .font(.caption2.monospaced()).foregroundStyle(.white)
+                .padding(.horizontal, 5).padding(.vertical, 2)
+                .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 3))
         }
-        .menuStyle(.borderlessButton).fixedSize()
-        .padding(.horizontal, 4).background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 3))
-        .foregroundStyle(.white)
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .help("Rozsah a zesílení spektra a vodopádu")
     }
 }

@@ -27,7 +27,7 @@ struct TopBar: View {
                     .keyboardShortcut(.escape, modifiers: [])
                     .help("Okamžitě RX (Esc)")
                 Text(model.state.rawValue.uppercased())
-                    .font(.system(.body, design: .monospaced).bold())
+                    .font(.system(.body, design: .monospaced).bold()).lineLimit(1).fixedSize()
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
                 if model.wavPlaying {
@@ -36,7 +36,7 @@ struct TopBar: View {
                 Picker("Demod", selection: model.choiceBinding("demodType")) {
                     ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
                 }.labelsHidden().fixedSize().help("Demodulátor")
-                Button("HAM") { Task { await model.hamShift() } }.help("Shift 170 Hz")
+                Button("HAM") { Task { await model.hamShift() } }.fixedSize().help("Shift 170 Hz")
                 ProfileMenu(model: model)
                 Spacer()
                 Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")
@@ -46,7 +46,7 @@ struct TopBar: View {
                     .help(model.rig?.online == true ? "Rig online" : "Rig offline")
                 SignalMeter(level: model.signalLevel, open: model.squelchOpen).frame(width: 80, height: 12)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Picker("Baud", selection: baudBinding) {
                     ForEach([45.45, 50, 75, 100, 110], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
                 }.fixedSize()
@@ -54,31 +54,24 @@ struct TopBar: View {
                     ForEach([170.0, 200, 425, 850], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
                 }.fixedSize()
                 Text(model.fig ? "FIGS" : "LTRS")
-                    .font(.caption.monospaced().bold()).padding(.horizontal, 4).padding(.vertical, 2)
+                    .font(.caption.monospaced().bold()).lineLimit(1).fixedSize()
+                    .padding(.horizontal, 4).padding(.vertical, 2)
                     .background((model.fig ? Color.orange : Color.secondary).opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
                     .help("Stav přijímače LTRS/FIGS")
-                Toggle("UOS", isOn: model.boolBinding("uos")).toggleStyle(.button)
-                    .help("Unshift on space – po mezeře zpět na písmena")
-                Spacer()
-                Toggle("BPF", isOn: model.boolBinding("bpf")).toggleStyle(.button).help("Vstupní pásmová propust")
-                Toggle(model.param("lmsType") == .string("lms") ? "LMS" : "NOT", isOn: model.boolBinding("lms"))
-                    .toggleStyle(.button)
-                    .help("Zářez (notch) nebo LMS filtr · pravé tlačítko ve spektru = zářez · kontextová nabídka = typ")
-                    .contextMenu {
-                        Button("Notch (zářez)") { Task { await model.setParam("lmsType", .string("notch")) } }
-                        Button("LMS") { Task { await model.setParam("lmsType", .string("lms")) } }
-                        Toggle("Dva zářezy", isOn: model.boolBinding("twoNotch"))
-                    }
-                Toggle("AA6YQ", isOn: model.boolBinding("aa6yq")).toggleStyle(.button)
-                    .help("Filtr AA6YQ (BPF mark–space + zádrž mezi nimi)")
-                Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
-                    .toggleStyle(.button).help("XY scope (křížový indikátor ladění)")
-                Toggle("AFC", isOn: model.boolBinding("afc")).toggleStyle(.button)
-                Toggle("NET", isOn: model.boolBinding("net")).toggleStyle(.button)
-                Toggle("REV", isOn: model.boolBinding("reverse")).toggleStyle(.button)
-                Toggle("ATC", isOn: model.boolBinding("atc")).toggleStyle(.button)
-                Toggle("SQ", isOn: model.boolBinding("squelch")).toggleStyle(.button)
+                FilterMenu(model: model)
+                Spacer(minLength: 4)
+                Group {
+                    Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
+                        .help("XY scope (křížový indikátor ladění)")
+                    Toggle("AFC", isOn: model.boolBinding("afc"))
+                    Toggle("NET", isOn: model.boolBinding("net"))
+                    Toggle("REV", isOn: model.boolBinding("reverse"))
+                    Toggle("ATC", isOn: model.boolBinding("atc"))
+                    Toggle("SQ", isOn: model.boolBinding("squelch"))
+                }
+                .toggleStyle(.button).fixedSize()
             }
+            .controlSize(.small)
         }
         .padding(8)
     }
@@ -86,6 +79,36 @@ struct TopBar: View {
     var baudBinding: Binding<Double> {
         Binding(get: { if case .double(let d)? = model.param("baud") { return d }; return 45.45 },
                 set: { v in Task { await model.setParam("baud", .double(v)) } })
+    }
+}
+
+/// Filtry příjmu a UOS v jedné nabídce (šetří místo); popisek ukazuje zapnuté.
+struct FilterMenu: View {
+    @Bindable var model: AppModel
+    var active: String {
+        var a: [String] = []
+        if model.param("bpf") == .bool(true) { a.append("BPF") }
+        if model.param("lms") == .bool(true) { a.append(model.param("lmsType") == .string("lms") ? "LMS" : "NOT") }
+        if model.param("aa6yq") == .bool(true) { a.append("AA6YQ") }
+        if model.param("uos") == .bool(true) { a.append("UOS") }
+        return a.isEmpty ? "Filtry" : a.joined(separator: "+")
+    }
+    var body: some View {
+        Menu {
+            Toggle("BPF – vstupní pásmová propust", isOn: model.boolBinding("bpf"))
+            Toggle("Zářez (notch) / LMS", isOn: model.boolBinding("lms"))
+            Picker("Typ", selection: model.choiceBinding("lmsType")) {
+                Text("Notch (zářez)").tag("notch"); Text("LMS").tag("lms")
+            }
+            Toggle("Dva zářezy", isOn: model.boolBinding("twoNotch"))
+            Toggle("AA6YQ (BPF mark–space + zádrž)", isOn: model.boolBinding("aa6yq"))
+            Divider()
+            Toggle("UOS – unshift on space", isOn: model.boolBinding("uos"))
+        } label: {
+            Text(active).lineLimit(1)
+        }
+        .fixedSize()
+        .help("Filtry příjmu (pravé tlačítko ve spektru = zářez) a UOS")
     }
 }
 
