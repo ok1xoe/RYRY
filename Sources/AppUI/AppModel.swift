@@ -8,6 +8,7 @@ import Foundation
 import Keying
 import ModemKit
 import Observation
+import OSLog
 import QSOLog
 import RigControl
 import RTTYModem
@@ -57,6 +58,12 @@ public final class AppModel {
     public private(set) var waterfall = WaterfallRenderer(width: 600, height: 200)
     public private(set) var params: [String: ParameterValue] = [:]
     public private(set) var descriptors: [ParameterDescriptor] = []
+    public private(set) var profileNames: [String?] = []
+    public private(set) var xyPoints: [XYPoint] = []
+    public private(set) var xyEnabled = false
+    var lastSentForTesting = ""
+    private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
+    static let micWaitMessage = "Čekám na povolení přístupu k mikrofonu (systémový dialog)…"
     public var waterfallFromHz = 0.0
     public var waterfallToHz = 3000.0
 
@@ -107,7 +114,10 @@ public final class AppModel {
         Engine(modem: try! RTTYModem(), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig())
     }
 
+    func noteForTesting(_ m: String) { note(m) }
+
     private func note(_ m: String) {
+        logger.notice("\(m, privacy: .public)")
         messages.append(m)
         if messages.count > 50 { messages.removeFirst(messages.count - 50) }
     }
@@ -133,9 +143,11 @@ public final class AppModel {
         await refreshParams()
         // Oprávnění k mikrofonu vyžádat předem (jinak spuštění zvukového vstupu čeká na dialog).
         if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
-            note("Čekám na povolení přístupu k mikrofonu (systémový dialog)…")
+            note(Self.micWaitMessage)
         }
-        if await !Self.microphoneAccess() {
+        let micOK = await Self.microphoneAccess()
+        messages.removeAll { $0 == Self.micWaitMessage }       // dialog vyřízen
+        if !micOK {
             note("Přístup k mikrofonu zamítnut – povolte ho v Nastavení systému → Soukromí → Mikrofon. Příjem nefunguje.")
         }
         do { try await app.start() }
@@ -144,6 +156,10 @@ public final class AppModel {
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
+        profileNames = profileStore.load().map { $0?.name }
+        if xyEnabled { await engine.setXYScope(true) }
+        let st = await engine.state
+        logger.info("start: stav \(st.rawValue, privacy: .public)")
         await startAPIs(app)
         startSpectrum(engine)
     }
@@ -171,6 +187,7 @@ public final class AppModel {
             while !Task.isCancelled {
                 if let f = await engine.spectrum(), let self {
                     self.waterfall.push(f, fromHz: self.waterfallFromHz, toHz: self.waterfallToHz)
+                    if self.xyEnabled, let pts = await engine.xyScope() { self.xyPoints = pts }
                 }
                 try? await Task.sleep(for: .milliseconds(interval))
             }
@@ -221,7 +238,9 @@ public final class AppModel {
 
     private func handle(_ e: AppEvent) {
         switch e {
-        case .engine(.state(let s)): state = s
+        case .engine(.state(let s)):
+            state = s
+            if s == .tx, !txDraft.isEmpty { Task { await self.sendDraft(mode: self.sendMode) } }   // rozepsaný text hned vysílat
         case .engine(.modem(.rxText(let c, let echo))): appendRx(String(c), echo: echo)
         case .engine(.modem(.signal(let l, let sq))): signalLevel = l; squelchOpen = sq
         case .engine(.modem(.tuning(let t))): mark = t.mark; space = t.space
@@ -311,6 +330,7 @@ public final class AppModel {
     /// Odešle z editoru část podle režimu (znak = vše, slovo = do poslední mezery, řádek = do posledního konce řádku).
     public func sendDraft(mode: SendMode) async {
         guard let app else { return }
+        if txDraft.unicodeScalars.contains("\r") { txDraft = txDraft.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n") }
         var cut = txDraft.endIndex
         switch mode {
         case .char: break
@@ -320,7 +340,9 @@ public final class AppModel {
         let part = String(txDraft[..<cut])
         guard !part.isEmpty else { return }
         txDraft = String(txDraft[cut...])
-        await app.send(text: part.replacingOccurrences(of: "\n", with: "\r\n"))
+        let out = part.replacingOccurrences(of: "\n", with: "\r\n")
+        lastSentForTesting = out
+        await app.send(text: out)
     }
 
     public func param(_ id: String) -> ParameterValue? { params[id] }
@@ -367,6 +389,38 @@ public final class AppModel {
     }
 
     public func profiles() -> [Profile?] { profileStore.load() }
-    public func loadProfile(_ slot: Int) async { guard let app else { return }; await run("Profil") { try await app.loadProfile(slot) }; await refreshParams() }
-    public func saveProfile(_ slot: Int, name: String) async { guard let app else { return }; await run("Profil") { try await app.saveProfile(slot, name: name) } }
+    public func loadProfile(_ slot: Int) async {
+        guard let app else { return }
+        await run("Profil") { try await app.loadProfile(slot) }
+        await refreshParams()
+        settings.rtty = params
+        try? settingsStore.save(settings)
+    }
+    public func saveProfile(_ slot: Int, name: String) async {
+        guard let app else { return }
+        await run("Profil") { try await app.saveProfile(slot, name: name) }
+        profileNames = profileStore.load().map { $0?.name }
+    }
+
+    /// Tlačítko HAM: standardní shift 170 Hz.
+    public func hamShift() async { await setParam("shift", .double(170)) }
+
+    /// Kolečko myši ve vodopádu: squelch level po krocích 16 (MMTTY 0–1024).
+    public func adjustSquelch(steps: Int) async {
+        guard case .double(let v)? = param("squelchLevel") else { return }
+        let n = min(1024, max(0, v + Double(steps) * 16))
+        await setParam("squelchLevel", .double(n))
+    }
+
+    public func setXYScope(_ on: Bool) async {
+        xyEnabled = on
+        if !on { xyPoints = [] }
+        await app?.engine.setXYScope(on)
+    }
+
+    /// Jedno načtení XY bodů (volá smyčka spektra; pro testy ručně).
+    public func pollXY() async {
+        guard xyEnabled, let pts = await app?.engine.xyScope() else { return }
+        xyPoints = pts
+    }
 }

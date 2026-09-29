@@ -67,7 +67,8 @@ struct QSOEditor: View {
     var body: some View {
         Form {
             TextField("Značka", text: Binding(get: { record.call }, set: { record.call = $0.uppercased() }))
-            DatePicker("Začátek (lokálně)", selection: $record.timeOn)
+            DatePicker("Začátek (UTC)", selection: $record.timeOn)
+                .environment(\.timeZone, TimeZone(identifier: "UTC")!)
             TextField("Frekvence (Hz)", value: $record.frequency, format: .number)
             TextField("Mód", text: $record.mode)
             TextField("RST odeslané", text: text(\.rstSent))

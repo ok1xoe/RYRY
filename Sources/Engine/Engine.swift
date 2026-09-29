@@ -443,5 +443,7 @@ public actor Engine {
         try modem.select(mode: m)
     }
     public func spectrum() -> SpectrumFrame? { modem.spectrum() }
+    public func setXYScope(_ on: Bool) { modem.setXYScope(on) }
+    public func xyScope() -> [XYPoint]? { modem.xyScope() }
     public var txPending: Int { modem.txPending }
 }

@@ -47,7 +47,11 @@ struct TopBar: View {
                 Picker("Demod", selection: model.choiceBinding("demodType")) {
                     ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
                 }.fixedSize()
+                Button("HAM") { Task { await model.hamShift() } }.help("Shift 170 Hz")
+                ProfileMenu(model: model)
                 Spacer()
+                Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
+                    .toggleStyle(.button).help("XY scope (křížový indikátor ladění)")
                 Toggle("AFC", isOn: model.boolBinding("afc")).toggleStyle(.button)
                 Toggle("NET", isOn: model.boolBinding("net")).toggleStyle(.button)
                 Toggle("REV", isOn: model.boolBinding("reverse")).toggleStyle(.button)
@@ -76,5 +80,35 @@ struct SignalMeter: View {
             }
         }
         .help(String(format: "Signál %.0f", level))
+    }
+}
+
+/// Nabídka 16 profilů parametrů modemu (načíst / uložit aktuální).
+struct ProfileMenu: View {
+    @Bindable var model: AppModel
+    @State private var saveSlot: Int?
+    @State private var name = ""
+
+    var body: some View {
+        Menu("Profily") {
+            Section("Načíst") {
+                ForEach(0..<16, id: \.self) { i in
+                    let n = i < model.profileNames.count ? model.profileNames[i] : nil
+                    Button("\(i + 1): \(n ?? "—")") { Task { await model.loadProfile(i) } }.disabled(n == nil)
+                }
+            }
+            Section("Uložit aktuální do") {
+                ForEach(0..<16, id: \.self) { i in
+                    let n = i < model.profileNames.count ? model.profileNames[i] : nil
+                    Button("\(i + 1): \(n ?? "prázdný")") { name = n ?? ""; saveSlot = i }
+                }
+            }
+        }
+        .fixedSize()
+        .alert("Název profilu", isPresented: Binding(get: { saveSlot != nil }, set: { if !$0 { saveSlot = nil } })) {
+            TextField("Název", text: $name)
+            Button("Uložit") { if let s = saveSlot { let n = name; Task { await model.saveProfile(s, name: n.isEmpty ? "Profil \(s + 1)" : n) } }; saveSlot = nil }
+            Button("Zrušit", role: .cancel) { saveSlot = nil }
+        }
     }
 }
