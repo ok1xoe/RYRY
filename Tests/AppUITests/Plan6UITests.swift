@@ -79,3 +79,14 @@ import Settings
     #expect(f.model.param("squelchLevel") == .double(148))
     await f.model.stop()
 }
+
+/// Parametr změněný mimo GUI (API) se promítne do modelu i uloženého nastavení.
+@Test @MainActor func externalParamChangeUpdatesModel() async throws {
+    let f = Fixture()
+    await f.model.start()
+    try await f.model.app!.setModemParam("reverse", .bool(true))
+    for _ in 0..<50 where f.model.param("reverse") != .bool(true) { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(f.model.param("reverse") == .bool(true))
+    #expect(f.model.settings.rtty["reverse"] == .bool(true))
+    await f.model.stop()
+}

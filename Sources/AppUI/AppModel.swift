@@ -22,6 +22,16 @@ public struct RxRun: Equatable, Sendable, Identifiable {
 
 public enum SendMode: String, CaseIterable, Sendable { case char, word, line }
 
+/// Výchozí parametry modemu (pro rozhodnutí, co ukládat do nastavení).
+enum AppDefaults {
+    static let rtty: [String: ParameterValue] = {
+        guard let m = try? RTTYModem() else { return [:] }
+        var d: [String: ParameterValue] = [:]
+        for p in m.parameters { d[p.id] = p.defaultValue }
+        return d
+    }()
+}
+
 /// Stav a akce pro GUI. Veškerá logika je v AppController/Engine, tady jen propojení a odvozený stav.
 @MainActor @Observable
 public final class AppModel {
@@ -257,6 +267,14 @@ public final class AppModel {
             if callChanged { Task { await self.refreshPrevious() } }
         case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious() }
         case .qsoUpdated, .qsoDeleted: Task { await self.refreshLog() }
+        case .paramsChanged(let p):
+            params = p
+            if case .double(let m)? = p["mark"] { mark = m }
+            if case .double(let sh)? = p["shift"] { space = mark + sh }
+            // uložit jen parametry, které uživatel mění (stejné klíče jako dosud v nastavení + změněné)
+            var r = settings.rtty
+            for (k, v) in p where r[k] != nil || AppDefaults.rtty[k] != v { r[k] = v }
+            if r != settings.rtty { settings.rtty = r; try? settingsStore.save(settings) }
         default: break
         }
     }

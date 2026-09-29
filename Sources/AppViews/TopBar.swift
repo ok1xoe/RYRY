@@ -30,6 +30,11 @@ struct TopBar: View {
                     .font(.system(.body, design: .monospaced).bold())
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
+                Picker("Demod", selection: model.choiceBinding("demodType")) {
+                    ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
+                }.fixedSize()
+                Button("HAM") { Task { await model.hamShift() } }.help("Shift 170 Hz")
+                ProfileMenu(model: model)
                 Spacer()
                 Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")
                     .font(.system(.title3, design: .monospaced))
@@ -44,11 +49,6 @@ struct TopBar: View {
                 Picker("Shift", selection: model.doubleBinding("shift")) {
                     ForEach([170.0, 200, 425, 850], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
                 }.fixedSize()
-                Picker("Demod", selection: model.choiceBinding("demodType")) {
-                    ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
-                }.fixedSize()
-                Button("HAM") { Task { await model.hamShift() } }.help("Shift 170 Hz")
-                ProfileMenu(model: model)
                 Spacer()
                 Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
                     .toggleStyle(.button).help("XY scope (křížový indikátor ladění)")

@@ -41,6 +41,8 @@ public enum AppEvent: Sendable {
     case engine(EngineEvent)
     case qsoChanged(QSOFields)
     case qsoLogged(QSORecord), qsoUpdated(QSORecord), qsoDeleted(UUID)
+    /// Parametry modemu se změnily (GUI, API, profil) – aktuální hodnoty.
+    case paramsChanged([String: ParameterValue])
     case error(String)
 }
 
@@ -242,7 +244,10 @@ public actor AppController {
     public func setFrequency(_ hz: Double) async throws { try await engine.setRigFrequency(hz) }
     public func setRigMode(_ m: String) async throws { try await engine.setRigMode(m) }
     public func modemParam(_ id: String) async -> ParameterValue? { await engine.modemParam(id) }
-    public func setModemParam(_ id: String, _ v: ParameterValue) async throws { try await engine.setModemParam(id, v) }
+    public func setModemParam(_ id: String, _ v: ParameterValue) async throws {
+        try await engine.setModemParam(id, v)
+        broadcaster.send(.paramsChanged(await engine.modemParams()))
+    }
     public func modemParams() async -> [String: ParameterValue] { await engine.modemParams() }
 
     // MARK: Profily
@@ -252,6 +257,7 @@ public actor AppController {
         let all = profiles.load()
         guard all.indices.contains(slot), let p = all[slot] else { throw AppError.profile("slot \(slot) je prázdný") }
         for (k, v) in p.rtty { try await engine.setModemParam(k, v) }
+        broadcaster.send(.paramsChanged(await engine.modemParams()))
     }
 
     public func saveProfile(_ slot: Int, name: String) async throws {
