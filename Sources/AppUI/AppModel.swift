@@ -915,28 +915,43 @@ public final class AppModel {
     // MARK: Zálohy a statistika logu
 
     /// Denní záloha (při startu a po zalogování, když od poslední uběhlo 24 h) – na pozadí.
-    func backupLogIfDue() {
-        guard settings.log.backup else { return }
+    /// Nejvýše jedna najednou; selhání se hlásí jen jednou za relaci (jinak by se hláška opakovala po každém QSO).
+    @discardableResult
+    func backupLogIfDue() -> Task<Void, Never>? {
+        guard settings.log.backup, !autoBackupRunning else { return nil }
+        autoBackupRunning = true
         let loc = logLocation, keep = settings.log.backupKeep
-        Task.detached { [weak self] in
-            guard LogBackup.isDue(loc) else { return }
-            do { try LogBackup.backup(loc, keep: keep) }
-            catch LogBackup.BackupError.nothingToBackup { }
-            catch { await self?.note(L("Záloha logu selhala: %@", "\(error)")) }
+        return Task { [weak self] in
+            let failure: String? = await Task.detached {
+                guard LogBackup.isDue(loc) else { return nil }
+                do { try LogBackup.backup(loc, keep: keep); return nil }
+                catch LogBackup.BackupError.nothingToBackup { return nil }
+                catch { return "\(error)" }
+            }.value
+            guard let self else { return }
+            self.autoBackupRunning = false
+            if let failure, !self.autoBackupFailureReported {
+                self.autoBackupFailureReported = true
+                self.note(L("Záloha logu selhala: %@", failure))
+            }
         }
     }
+    @ObservationIgnored private var autoBackupRunning = false
+    @ObservationIgnored private var autoBackupFailureReported = false
 
-    /// Ruční záloha (menu Soubor); vrací složku zálohy.
+    /// Ruční záloha (menu Soubor) – kopírování mimo hlavní vlákno; vrací složku zálohy.
     @discardableResult
-    public func backupLogNow() throws -> URL {
-        try LogBackup.backup(logLocation, keep: settings.log.backupKeep)
+    public func backupLogNow() async throws -> URL {
+        let loc = logLocation, keep = settings.log.backupKeep
+        return try await Task.detached { try LogBackup.backup(loc, keep: keep) }.value
     }
 
     public var backupDirectory: URL { LogBackup.directory(for: logLocation) }
 
     /// Statistika logu; v závodě jen od začátku závodu.
-    public var logStats: LogStats {
-        LogStats(records: logRecords, since: settings.contest.enabled ? settings.contest.effectiveStart : nil)
+    public var logStats: LogStats { logStats(now: Date()) }
+    public func logStats(now: Date) -> LogStats {
+        LogStats(records: logRecords, now: now, since: settings.contest.enabled ? settings.contest.effectiveStart : nil)
     }
 
     // MARK: Správa logu (nový, otevřít, uložit jako)
@@ -1101,6 +1116,14 @@ public final class AppModel {
     /// Požadavek na přesun fokusu v QSO panelu (název pole); pohled ho po provedení vynuluje.
     public var esmFocusField: String?
     var lastESMMacroForTesting: Int?
+    var esmSendCountForTesting = 0
+    /// Právě běží esmEnter – další Enter (podržený, rychlý) se ignoruje.
+    public private(set) var esmBusy = false
+
+    /// Makro pro ESM chybí nebo je prázdné (jen bílé znaky) – Enter by zaklíčoval bez textu.
+    public func esmMacroIsEmpty(_ i: Int) -> Bool {
+        !settings.macros.indices.contains(i) || settings.macros[i].isBlank
+    }
 
     /// ESM je v provozu (zapnuté a závod zapnutý).
     public var esmActive: Bool { settings.esm.enabled && settings.contest.enabled }
@@ -1124,17 +1147,36 @@ public final class AppModel {
     /// do právě vysílaného textu). Vrací pole, kam přesunout fokus (nil = ESM neaktivní nebo TX).
     @discardableResult
     public func esmEnter() async -> String? {
-        guard esmActive, app != nil, state == .rx else { return nil }
+        guard esmActive, !esmBusy, let app, state == .rx else { return nil }
+        esmBusy = true                              // před prvním await – druhý Enter se sem nedostane
+        defer { esmBusy = false }
         let step = esmStep
-        guard let i = ESM.macro(for: step, settings.esm), settings.macros.indices.contains(i) else {
+        guard let i = ESM.macro(for: step, settings.esm) else {
             return ESM.nextFocus(after: step, qso: qso, contest: settings.contest)
         }
+        guard !esmMacroIsEmpty(i) else {
+            note(L("Makro %@ je prázdné – nastavte ho v Nastavení → Závod → ESM", settings.binding(for: .macro(i)).display))
+            return nil
+        }
         let text = settings.macros[i].text
+        let logsItself = (step == .tu || step == .exchangeAndLog) && ESM.macroLogs(text)
+        let handled = await app.logRequestsHandled
         guard await runMacro(i) else { return nil }
         lastESMMacroForTesting = i
+        esmSendCountForTesting += 1
         if ESM.needsExplicitLog(step, macroText: text) {
             await logQSO()                          // makro je už rozvinuté – značka a výměna jsou odeslané
-            if let app { qso = await app.qso }
+        } else if logsItself {
+            // %l zaloguje controller asynchronně (.logRequested) – počkat, ať se stará značka / výměna
+            // nepřenese do dalšího QSO (pole v panelu převezmou hodnotu až po návratu)
+            let deadline = ContinuousClock.now + .seconds(3)
+            while await app.logRequestsHandled == handled, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(5))
+            }
+        }
+        if step == .tu || step == .exchangeAndLog {
+            qso = await app.qso
+            if qso.call.isEmpty { esmProgress = ESM.Progress() }
         }
         return ESM.nextFocus(after: step, qso: qso, contest: settings.contest)
     }
@@ -1408,6 +1450,8 @@ public final class AppModel {
 
     /// Načte Mmtty.ini (nic nemění); parametry se ověřují proti popisům modemu.
     public func previewMMTTYImport(_ url: URL) throws -> MMTTYImportResult {
+        let size = (try url.resourceValues(forKeys: [.fileSizeKey])).fileSize ?? 0
+        guard size <= MMTTYImport.maxFileSize else { throw MMTTYImportError.tooLarge }
         let data = try Data(contentsOf: url)
         let descs = descriptors.isEmpty ? ((try? RTTYModem())?.parameters ?? []) : descriptors
         return MMTTYImport.parse(data: data, descriptors: descs)
@@ -1415,7 +1459,25 @@ public final class AppModel {
 
     /// Uloží vybrané části importu stejnou cestou jako dialogy: makra/zprávy (`saveMacros`/`saveMessages`),
     /// parametry (`setParam`), stanice a zkratky (`applySettings` – restartuje zvuk).
-    public func applyMMTTYImport(_ r: MMTTYImportResult, options: MMTTYImportOptions) async {
+    public enum MMTTYImportError: Error, LocalizedError {
+        case tooLarge
+        public var errorDescription: String? { L("Soubor je větší než 1 MB – nejde o Mmtty.ini; nic se neimportuje.") }
+    }
+
+    /// Import přepíše makra, na která ESM odkazuje indexy – náhled na to upozorní (a nabídne vypnutí ESM).
+    public func mmttyImportAffectsESM(_ r: MMTTYImportResult, options: MMTTYImportOptions) -> Bool {
+        settings.esm.enabled && options.contains(.macros) && r.macros != nil
+    }
+
+    /// `disableESM`: po importu maker vypnout ESM (přiřazení maker podle indexů je třeba zkontrolovat).
+    public func applyMMTTYImport(_ r: MMTTYImportResult, options: MMTTYImportOptions, disableESM: Bool = false) async {
+        // parametry ani makra se nesmí měnit uprostřed vysílání / CQ smyčky
+        await stopMacro()
+        await rxNow()                                   // v RX nic nedělá
+        if disableESM, mmttyImportAffectsESM(r, options: options) {
+            settings.esm.enabled = false
+            do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        }
         if options.contains(.macros), let m = r.macros { await saveMacros(m) }
         if options.contains(.messages), let m = r.messages { await saveMessages(m) }
         if options.contains(.modem) {
@@ -1432,7 +1494,7 @@ public final class AppModel {
         if !opts.isEmpty, (opts.contains(.station) && r.station != nil) || (opts.contains(.shortcuts) && !r.shortcuts.isEmpty) {
             let base = settings
             var s = settings
-            r.apply(to: &s, options: opts)
+            for w in r.apply(to: &s, options: opts) { note(w) }
             await applySettings(s, baseline: base)
         }
     }

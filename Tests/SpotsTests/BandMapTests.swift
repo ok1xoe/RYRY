@@ -12,10 +12,17 @@ import Testing
     #expect(BandMap.audioOffset(spotHz: 14_080_000, dialHz: 14_082_125, mode: "PKTLSB", offsetHz: 0) == 2125)
 }
 
-@Test func rttyModeBehavesLikeLSB() {
-    #expect(BandMap.audioOffset(spotHz: 14_080_000, dialHz: 14_081_500, mode: "RTTY", offsetHz: 0) == 1500)
-    #expect(BandMap.audioOffset(spotHz: 14_080_000, dialHz: 14_081_500, mode: "RTTYR", offsetHz: 0) == 1500)
-    #expect(BandMap.audioOffset(spotHz: 14_080_000, dialHz: 14_081_500, mode: "FSK", offsetHz: 0) == 1500)
+@Test func rttyModeUsesCurrentMark() {
+    // RTTY/FSK: rig hlásí dial ≈ mark → spot na dialu leží na aktuálním marku, níž na RF = výš v audiu
+    #expect(BandMap.audioOffset(spotHz: 14_080_000, dialHz: 14_080_000, mode: "RTTY", offsetHz: 0, markHz: 2125) == 2125)
+    #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "RTTY", offsetHz: 0, markHz: 2125) == 2625)
+    #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "FSK", offsetHz: 0, markHz: 1275) == 1775)
+    #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "RTTY", offsetHz: 170, markHz: 2125) == 2625)
+    // RTTYR / FSK-R: obrácené znaménko
+    #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "RTTYR", offsetHz: 0, markHz: 2125) == 1625)
+    #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "FSK-R", offsetHz: 0, markHz: 2125) == 1625)
+    // bez známého marku v RTTY nic
+    #expect(BandMap.audioOffset(spotHz: 14_080_000, dialHz: 14_080_000, mode: "RTTY", offsetHz: 0) == nil)
 }
 
 @Test func outOfRangeOrUnknownModeIsNil() {

@@ -145,9 +145,18 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     /// Barva tlačítka `#RRGGBB` (MMTTY: barva tlačítka makra); nil = výchozí.
     public var color: String?
     public init(name: String, text: String, repeatSeconds: Double? = nil, color: String? = nil) {
-        self.name = name; self.text = text; self.repeatSeconds = repeatSeconds; self.color = Self.validColor(color)
+        self.name = name; self.text = text; self.repeatSeconds = Self.validRepeat(repeatSeconds); self.color = Self.validColor(color)
     }
     static var fallback: Macro { Macro(name: "", text: "") }
+    /// Makro nic neobsahuje (jen bílé znaky) – spuštěním by se nic neodvysílalo.
+    public var isBlank: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// Povolený interval opakování makra (s).
+    public static let repeatRange = 0.1...3600.0
+    /// Interval opakování v rozsahu 0,1–3600 s, jinak nil (nekonečno, NaN, záporné, obří hodnoty).
+    public static func validRepeat(_ s: Double?) -> Double? {
+        guard let s, s.isFinite, repeatRange.contains(s) else { return nil }
+        return s
+    }
     /// Jen `#RRGGBB`, jinak nil.
     public static func validColor(_ c: String?) -> String? {
         guard let c, c.count == 7, c.first == "#", c.dropFirst().allSatisfy(\.isHexDigit) else { return nil }
@@ -157,7 +166,7 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "macro"
         name = c.tolerant(.name, "", w, s); text = c.tolerant(.text, "", w, s)
-        repeatSeconds = c.tolerant(.repeatSeconds, nil, w, s)
+        repeatSeconds = Self.validRepeat(c.tolerant(.repeatSeconds, nil, w, s))
         color = Self.validColor(c.tolerant(.color, nil, w, s))
     }
 }

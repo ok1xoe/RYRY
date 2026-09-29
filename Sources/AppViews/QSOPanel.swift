@@ -113,12 +113,8 @@ struct QSOPanel: View {
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        // Enter s fokusem v panelu mimo textové pole (pole Enter zpracují samy)
-        .onKeyPress(.return) {
-            guard model.esmActive else { return .ignored }
-            Task { if let f = await model.esmEnter() { model.esmFocusField = f } }
-            return .handled
-        }
+        // ESM spouští jen Enter v polích Call a výměny (onSubmit v QSOField). Panelový `.onKeyPress(.return)` by
+        // zachytil i Enter v jiných polích (Notes, jméno, kHz) a poslal makro nechtěně – proto tu žádný není.
     }
 }
 
@@ -142,6 +138,10 @@ struct ESMBar: View {
                 .padding(.horizontal, 8).padding(.vertical, 2)
                 .background(step == .none ? Color.clear : color(step), in: RoundedRectangle(cornerRadius: 4))
                 .hint(model.state == .rx ? L("Co pošle Enter v poli Call nebo výměny") : L("Během vysílání Enter nic neposílá"))
+            if let macro, model.esmMacroIsEmpty(macro) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    .hint(L("Makro %@ je prázdné – nastavte ho v Nastavení → Závod → ESM", model.settings.binding(for: .macro(macro)).display))
+            }
         }
     }
 
@@ -165,6 +165,9 @@ struct QSOField: View {
     /// Volá se při každé změně textu (Super Check Partial u značky).
     var onTyping: ((String) -> Void)? = nil
     @State private var text = ""
+    /// Běží ESM akce spuštěná z tohoto pole – do jejího konce se text do modelu nezapisuje (po zalogování
+    /// by stará hodnota přešla do nového QSO).
+    @State private var esmPending = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -184,17 +187,20 @@ struct QSOField: View {
     /// Enter: potvrdit pole, pak (ESM) poslat makro a přesunout fokus na další prázdné pole.
     private func submit() {
         guard esm, model.esmActive else { commit(); return }
+        guard !esmPending, !model.esmBusy else { return }          // podržený Enter
         let changed = text != (model.qso.value(field) ?? ""), v = text
+        esmPending = true
         Task {
             if changed { await model.setQSOField(field, v) }
-            let next = await model.esmEnter()
+            let next = await model.esmEnter()                     // logující krok vrací až po zalogování
             text = model.qso.value(field) ?? ""          // po zalogování prázdné – odchod z pole nesmí vrátit starou hodnotu
+            esmPending = false
             if let next { model.esmFocusField = next }
         }
     }
 
     private func commit() {
-        guard text != (model.qso.value(field) ?? "") else { return }
+        guard !esmPending, text != (model.qso.value(field) ?? "") else { return }
         let v = text
         Task { await model.setQSOField(field, v) }
     }

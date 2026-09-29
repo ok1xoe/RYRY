@@ -42,10 +42,13 @@ struct StatusBar: View {
             }
             Spacer()
             if model.settings.contest.enabled {
-                let st = model.logStats
-                Text(L("QSO %ld · 10 min: %ld/h · 60 min: %ld/h", st.total, st.rate10, st.rate60))
-                    .monospacedDigit().foregroundStyle(.secondary)
-                    .hint(L("Rychlost závodu: počet spojení za posledních 10 a 60 minut přepočtený na hodinu"))
+                // přepočet každých 30 s – rychlost klesá i bez nových spojení
+                TimelineView(.periodic(from: .now, by: 30)) { tl in
+                    let st = model.logStats(now: tl.date)
+                    Text(L("QSO %ld · 10 min: %ld/h · 60 min: %ld/h", st.total, st.rate10, st.rate60))
+                        .monospacedDigit().foregroundStyle(.secondary)
+                        .hint(L("Rychlost závodu: počet spojení za posledních 10 a 60 minut přepočtený na hodinu"))
+                }
                 Divider().frame(height: 12)
             }
             Text(model.apiStatus).foregroundStyle(.secondary)

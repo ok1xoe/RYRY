@@ -1059,9 +1059,20 @@ struct ESMSection: View {
         Picker(title, selection: value) {
             ForEach(0..<AppSettings.macroCount, id: \.self) { i in
                 let n = i < s.macros.count ? s.macros[i].name : ""
-                Text(n.isEmpty ? s.binding(for: .macro(i)).display : "\(s.binding(for: .macro(i)).display) – \(n)").tag(i)
+                let key = s.binding(for: .macro(i)).display
+                let empty = isEmpty(i) ? " " + L("(prázdné)") : ""
+                Text((n.isEmpty ? key : "\(key) – \(n)") + empty).tag(i)
             }
         }
+    }
+
+    func isEmpty(_ i: Int) -> Bool { !s.macros.indices.contains(i) || s.macros[i].isBlank }
+
+    /// Prázdná makra přiřazená krokům ESM (Enter by nic neodeslal).
+    var emptyAssigned: [String] {
+        let e = s.esm
+        return Set([e.runCQ, e.runExchange, e.runTU, e.spMyCall, e.spExchange, e.agn]).filter(isEmpty).sorted()
+            .map { s.binding(for: .macro($0)).display }
     }
 
     var body: some View {
@@ -1078,6 +1089,11 @@ struct ESMSection: View {
                 macroPicker(L("S&P: moje značka"), $s.esm.spMyCall)
                 macroPicker(L("S&P: výměna + zalogovat"), $s.esm.spExchange)
                 macroPicker(L("AGN? (část výměny)"), $s.esm.agn)
+                if s.esm.enabled, !emptyAssigned.isEmpty {
+                    Label(L("Prázdná makra (%@) – Enter je nespustí; doplňte je nebo zvolte jiná.", emptyAssigned.joined(separator: ", ")),
+                          systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange).font(.callout)
+                }
             }.disabled(!s.esm.enabled)
         } header: { Text("ESM – Enter Sends Message") } footer: {
             Text(L("V závodě Enter v poli Call nebo výměny pošle makro podle stavu: Run – CQ, výměna, TU a zalogování; S&P – moje značka, výměna a zalogování. Nemá-li makro TU nebo výměny S&P %l, spojení se zaloguje automaticky. Během vysílání Enter nic neposílá. Run / S&P přepíná i QSO panel a %@.", s.binding(for: .esmMode).display))

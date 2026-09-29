@@ -7,14 +7,15 @@
 #   SIGN_ID=-   → ad-hoc (macOS se na mikrofon zeptá po každém sestavení).
 #   SIGN_ID="Developer ID Application: …" → konkrétní identita.
 #
-# Architektury (ARCHS): výchozí „arm64 x86_64“ = univerzální aplikace (Apple Silicon i Intel, lipo).
-#   ARCHS=arm64 → rychlé sestavení jen pro Apple Silicon (vývoj).
+# Architektury (MMTTY_ARCHS): výchozí „arm64 x86_64“ = univerzální aplikace (Apple Silicon i Intel, lipo).
+#   MMTTY_ARCHS=arm64 → rychlé sestavení jen pro Apple Silicon (vývoj).
+#   (Ne ARCHS – tu exportuje Xcode a skript spuštěný z jeho build fáze by ji převzal.)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
-ARCHS=(${=ARCHS:-arm64 x86_64})
+ARCH_LIST=(${=MMTTY_ARCHS:-arm64 x86_64})
 PARTS=()
-for a in $ARCHS; do
+for a in $ARCH_LIST; do
     swift build -c release --arch "$a" --product MMTTY4MacApp
     PARTS+=("$(swift build -c release --arch "$a" --show-bin-path)/MMTTY4MacApp")
 done

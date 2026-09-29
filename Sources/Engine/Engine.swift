@@ -268,6 +268,11 @@ public actor Engine {
             if m.startsTx { try await tx() }
             return
         }
+        // makro bez textu (prázdné, jen %l) nezaklíčuje – TX by visel bez konce; `#` na konci = záměrně TX
+        if state == .rx, m.end != .keepTx, m.outputs.allSatisfy(\.isEmpty) {
+            if m.logQSO { broadcaster.send(.logRequested) }
+            return
+        }
         // doběh už běží (jádro nepřijímá text) → odložit na nový TX po návratu do RX
         if state == .pttOff || (state == .drain && stopRequested) {
             pendingMacros.append(m)

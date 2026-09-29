@@ -131,11 +131,13 @@ import UniformTypeIdentifiers
 
     /// Záloha logu teď (menu Soubor).
     public static func backupLog(_ model: AppModel) {
-        do {
-            let dir = try model.backupLogNow()
-            let a = NSAlert(); a.messageText = "Log"
-            a.informativeText = L("Záloha uložena: %@", (dir.path as NSString).abbreviatingWithTildeInPath); a.runModal()
-        } catch { NSAlert(error: error).runModal() }
+        Task { @MainActor in
+            do {
+                let dir = try await model.backupLogNow()
+                let a = NSAlert(); a.messageText = "Log"
+                a.informativeText = L("Záloha uložena: %@", (dir.path as NSString).abbreviatingWithTildeInPath); a.runModal()
+            } catch { NSAlert(error: error).runModal() }
+        }
     }
 
     public static func openBackups(_ model: AppModel) {

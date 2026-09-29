@@ -14,6 +14,8 @@ struct MMTTYImportView: View {
 
     @State private var options: MMTTYImportOptions = .all
     @State private var working = false
+    /// Po importu maker vypnout ESM (makra kroků jsou indexy – po přepsání maker mohou ukazovat jinam).
+    @State private var disableESM = true
 
     private func binding(_ o: MMTTYImportOptions) -> Binding<Bool> {
         Binding(get: { options.contains(o) }, set: { if $0 { options.insert(o) } else { options.remove(o) } })
@@ -50,6 +52,14 @@ struct MMTTYImportView: View {
                     row(.shortcuts, L("Klávesové zkratky: %ld", result.shortcuts.count))
                 }
             }
+            if model.mmttyImportAffectsESM(result, options: selected) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(L("ESM používá makra podle pořadí (F1, F4, F5…). Po importu maker zkontrolujte přiřazení v Nastavení → Závod → ESM."),
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    Toggle(L("Vypnout ESM"), isOn: $disableESM)
+                }
+            }
             if !result.warnings.isEmpty {
                 DisclosureGroup(L("Upozornění (%ld)", result.warnings.count)) {
                     ScrollView {
@@ -66,9 +76,9 @@ struct MMTTYImportView: View {
                 Button(L("Zrušit")) { close() }.keyboardShortcut(.cancelAction)
                 Button(L("Importovat")) {
                     working = true
-                    let opts = selected
+                    let opts = selected, off = disableESM
                     Task { @MainActor in
-                        await model.applyMMTTYImport(result, options: opts)
+                        await model.applyMMTTYImport(result, options: opts, disableESM: off)
                         working = false
                         close()
                     }

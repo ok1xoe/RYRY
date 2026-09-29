@@ -83,23 +83,60 @@ public struct MMTTYImportResult: Sendable, Equatable {
     public var isEmpty: Bool { macros == nil && messages == nil && station == nil && rtty.isEmpty && shortcuts.isEmpty }
 
     /// Zapíše vybrané části do nastavení (čistá funkce; ukládání a aplikace do běžícího modemu řeší AppModel).
-    public func apply(to s: inout AppSettings, options: MMTTYImportOptions) {
+    @discardableResult
+    public func apply(to s: inout AppSettings, options: MMTTYImportOptions) -> [String] {
         if options.contains(.macros), let macros { s.macros = macros }
         if options.contains(.messages), let messages { s.messages = messages }
         if options.contains(.station), let station { s.station.call = station.call }
         if options.contains(.modem) { for (k, v) in rtty { s.rtty[k] = v } }
-        if options.contains(.shortcuts) {
-            for (id, b) in shortcuts {
-                guard let c = ShortcutCommand.allCases.first(where: { $0.id == id }) else { continue }
-                s.shortcuts[id] = b == c.defaultBinding ? nil : b
+        guard options.contains(.shortcuts), !shortcuts.isEmpty else { return [] }
+        // Kolize se počítají proti skutečnému cílovému nastavení: zkratka, která by se kryla s jiným příkazem,
+        // se nepřevezme (zůstane původní). Opakuje se, dokud vrácení nevyřeší všechny kolize způsobené importem.
+        let original = s
+        var accepted = Dictionary(uniqueKeysWithValues: ShortcutCommand.allCases.compactMap { c in
+            shortcuts[c.id].map { (c.id, $0) }
+        })
+        var rejected: [(ShortcutCommand, KeyBinding)] = []
+        while true {
+            var probe = original
+            for (id, b) in accepted {
+                let c = ShortcutCommand.allCases.first { $0.id == id }!
+                probe.shortcuts[id] = b == c.defaultBinding ? nil : b
             }
+            let clash = probe.conflictingShortcuts().flatMap { $0 }
+                .filter { c in accepted[c.id].map { $0 != original.binding(for: c) } ?? false }
+            if clash.isEmpty { s = probe; break }
+            for c in clash { if let b = accepted.removeValue(forKey: c.id) { rejected.append((c, b)) } }
         }
+        guard !rejected.isEmpty else { return [] }
+        let order = ShortcutCommand.allCases.map(\.id)
+        let list = rejected.sorted { order.firstIndex(of: $0.0.id)! < order.firstIndex(of: $1.0.id)! }
+            .map { "\($0.1.display) (\(Self.commandName($0.0)))" }
+        return [L("Zkratky kolidující s jiným příkazem nebyly převzaty: %@.", list.joined(separator: ", "))]
+    }
+
+    static func commandName(_ c: ShortcutCommand) -> String {
+        if case .macro(let i) = c { return L("makro %ld", i + 1) }
+        return c.id
     }
 }
 
 // MARK: Import
 
 public enum MMTTYImport {
+    /// Mmtty.ini má desítky kB; větší soubor se nečte.
+    public static let maxFileSize = 1_048_576
+
+    /// Bezpečný převod čísla z ini na Int (Int(1e20) by aplikaci shodil); mimo ±2³¹ nebo nekonečno → nil.
+    static func safeInt(_ d: Double) -> Int? {
+        guard d.isFinite, abs(d) < 2_147_483_648 else { return nil }
+        return Int(d.rounded())
+    }
+
+    /// Značka: jen A–Z, 0–9 a /, nejvýše 15 znaků.
+    static func isValidCall(_ c: String) -> Bool {
+        (1...15).contains(c.count) && c.unicodeScalars.allSatisfy { ("A"..."Z").contains($0) || ("0"..."9").contains($0) || $0 == "/" }
+    }
     /// Bajty souboru → text. Platné UTF-8 se nemění (včetně BOM), jinak se každý bajt ≥ 0x80 nahradí „?“
     /// (Shift-JIS / Windows-1250 – v makrech RTTY stačí ASCII).
     public static func decode(_ data: Data) -> (text: String, replaced: Int) {
@@ -163,6 +200,11 @@ public enum MMTTYImport {
     public static func convertMacroText(_ s: String) -> String { var n = 0; return convertMacroText(s, removed: &n) }
 
     public static func parse(data: Data, descriptors: [ParameterDescriptor] = []) -> MMTTYImportResult {
+        guard data.count <= maxFileSize else {
+            var r = MMTTYImportResult()
+            r.warnings.append(L("Soubor je větší než 1 MB – nejde o Mmtty.ini; nic se neimportuje."))
+            return r
+        }
         let (text, replaced) = decode(data)
         var r = parse(text: text, descriptors: descriptors)
         if replaced > 0 { r.warnings.append(L("Znaky mimo ASCII (%ld) nahrazeny „?“.", replaced)) }
@@ -254,6 +296,7 @@ public enum MMTTYImport {
             return d
         }
         var controlChars = 0
+        var badTimers: [String] = []
 
         // makra: 16 tlačítek
         if ini.hasSection("Macro") || ini.hasSection("MacroName") {
@@ -264,15 +307,20 @@ public enum MMTTYImport {
                 let raw = get("Macro", k).map { convertMacroText(unescape($0), removed: &controlChars) } ?? ""
                 if raw.isEmpty && name == k { name = "" }                     // zástupné jméno MMTTY prázdného tlačítka
                 var timer: Double?
-                if let t = number("MacroTimer", k), t > 0 { timer = t / 10 }  // MMTTY: násobky 0,1 s
+                if let t = number("MacroTimer", k), t != 0 {                  // MMTTY: násobky 0,1 s
+                    timer = Macro.validRepeat(t / 10)
+                    if timer == nil { badTimers.append(k) }
+                }
                 var color: String?
-                if let c = number("MacroCol", k), c > 0, c <= 16_777_215 {
-                    let v = Int(c)                                           // TColor = 0x00BBGGRR
+                if let c = number("MacroCol", k), c > 0, c <= 16_777_215, let v = safeInt(c) {   // TColor = 0x00BBGGRR
                     color = String(format: "#%02X%02X%02X", v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF)
                 }
                 list.append(Macro(name: name, text: raw, repeatSeconds: timer, color: color))
             }
             r.macros = list
+            if !badTimers.isEmpty {
+                r.warnings.append(L("Opakování maker mimo rozsah 0,1–3600 s nebylo převzato: %@.", badTimers.joined(separator: ", ")))
+            }
         }
 
         // zprávy: MsgName + MsgList, seznam končí prvním prázdným jménem / textem (jako ReadRegister)
@@ -293,7 +341,8 @@ public enum MMTTYImport {
         // stanice: MMTTY ukládá jen značku
         if let call = get("Define", "Call")?.trimmingCharacters(in: .whitespaces).uppercased(),
            !call.isEmpty, call != "NOCALL" {
-            var st = Station(); st.call = call; r.station = st
+            if isValidCall(call) { var st = Station(); st.call = call; r.station = st }
+            else { r.warnings.append(L("Značka „%@“ není platná (jen A–Z, 0–9 a /, nejvýše 15 znaků); nepřevzata.", call)) }
         }
 
         // parametry modemu
@@ -310,11 +359,12 @@ public enum MMTTYImport {
             guard let d = number("Define", p.key) else { continue }
             switch p.kind {
             case .bool: accept(p.id, .bool(d != 0))
-            case .int: accept(p.id, .int(Int(d.rounded())))
+            case .int:
+                if let i = safeInt(d) { accept(p.id, .int(i)) }
+                else { r.warnings.append(L("Parametr %@ má hodnotu mimo povolený rozsah; přeskočeno.", p.id)) }
             case .double: accept(p.id, .double(d))
             case .choice(let names):
-                let i = Int(d.rounded())
-                if names.indices.contains(i) { accept(p.id, .string(names[i])) }
+                if let i = safeInt(d), names.indices.contains(i) { accept(p.id, .string(names[i])) }
                 else { r.warnings.append(L("Parametr %@ má hodnotu mimo povolený rozsah; přeskočeno.", p.id)) }
             }
         }
@@ -328,7 +378,7 @@ public enum MMTTYImport {
 
         // PTT / FSK: port COMx nemá na macOS protějšek, nastavuje se ručně
         let ptt = get("Define", "PTT")?.trimmingCharacters(in: .whitespaces) ?? ""
-        let txPort = Int(number("Define", "TxPort") ?? 0)
+        let txPort = number("Define", "TxPort").flatMap(safeInt) ?? 0
         _ = get("Define", "InvPTT")
         if !ptt.isEmpty, ptt.uppercased() != "NONE" {
             r.warnings.append(txPort == 0
@@ -339,11 +389,14 @@ public enum MMTTYImport {
         // klávesové zkratky: makra (MacroKey) a vybrané systémové (SysKey)
         var unsupported: [String] = [], reserved: [String] = []
         func shortcut(_ id: String, section: String, key: String, skip: Int = 0) {
-            guard let d = number(section, key), Int(d) != 0, Int(d) != skip else { return }
-            switch convertKey(Int(d)) {
+            guard let d = number(section, key), let code = safeInt(d), code != 0, code != skip else {
+                if let d = number(section, key), safeInt(d) == nil { unsupported.append(key) }
+                return
+            }
+            switch convertKey(code) {
             case .ok(let b): r.shortcuts[id] = b
-            case .unsupported: unsupported.append("\(key) (0x" + String(Int(d), radix: 16, uppercase: true) + ")")
-            case .reserved: reserved.append("\(key) (0x" + String(Int(d), radix: 16, uppercase: true) + ")")
+            case .unsupported: unsupported.append("\(key) (0x" + String(code, radix: 16, uppercase: true) + ")")
+            case .reserved: reserved.append("\(key) (0x" + String(code, radix: 16, uppercase: true) + ")")
             }
         }
         for i in 1...AppSettings.macroCount { shortcut("macro.\(i - 1)", section: "MacroKey", key: "M\(i)") }
@@ -354,11 +407,7 @@ public enum MMTTYImport {
         if !reserved.isEmpty {
             r.warnings.append(L("Zkratky kolidující s menu macOS nebyly převzaty: %@.", reserved.joined(separator: ", ")))
         }
-        if !r.shortcuts.isEmpty {
-            var probe = AppSettings(); probe.shortcuts = r.shortcuts
-            let n = probe.conflictingShortcuts().count
-            if n > 0 { r.warnings.append(L("Po importu se %ld zkratek kryje s jinou; upravte je v Nastavení → Klávesy.", n)) }
-        }
+        // kolize zkratek se ověřují až v apply(to:) proti skutečnému nastavení
 
         // shrnutí
         if consumed.isEmpty {
