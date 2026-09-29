@@ -256,3 +256,13 @@ func rxClockCorrectionKeepsAFCOnTrueFrequency(ppm: Double, expectedMark: Double)
     let f = Double(crossings) / 2
     #expect(abs(f - 2125 / 1.01) < 4, "\(f)")                // v datech nižší, zařízení ho zrychlí na 2125
 }
+
+// Shift po naladění kliknutím (mark s desetinami) nesmí vyjít 169.99999… (picker v GUI ho pak nenajde)
+@Test func shiftReadBackIsExactAfterFractionalMark() throws {
+    let m = try RTTYModem()
+    for i in 0..<150 {                                   // mark 1500…2600 Hz
+        let mk = 1500 + Double(i) * 7.3 + 0.1 * Double(i % 10)
+        try m.set(parameter: "mark", value: .double((mk * 10).rounded() / 10))
+        #expect(m.get(parameter: "shift") == .double(170), "mark \(mk)")
+    }
+}
