@@ -28,8 +28,9 @@
     <li><a href="#zavody">7. Závody a QTC</a></li>
     <li><a href="#soubory">8. Soubory a WAV</a></li>
     <li><a href="#api">9. API pro loggery</a></li>
-    <li><a href="#zobrazeni">10. Zobrazení, jazyk, klávesy</a></li>
-    <li><a href="#problemy">11. Když něco nefunguje</a></li>
+    <li><a href="#online">10. Online služby</a></li>
+    <li><a href="#zobrazeni">11. Zobrazení, jazyk, klávesy</a></li>
+    <li><a href="#problemy">12. Když něco nefunguje</a></li>
   </ol>
 </nav>
 
@@ -101,6 +102,11 @@
   <li><b>Filtry</b> (menu vedle Shift): BPF, AA6YQ, notch/LMS, UOS. <b>XY</b> zapne křížový indikátor ladění.</li>
   <li><b>Klik na slovo</b> v přijatém textu ho vloží do QSO okna – značku, RST, číslo, jméno podle typu slova.</li>
 </ul>
+<h3>Druhý dekodér a vícekanálové dekódování</h3>
+<ul>
+  <li><b>Druhý dekodér</b> (přepínač „2. dek.“ v horní liště) přijímá stejný signál jiným demodulátorem a jeho text ukazuje v panelu pod příjmem. Slabý nebo rušený signál tak často přečte jeden z nich – podobně jako se v závodech používá 2Tone vedle MMTTY.</li>
+  <li><b>Vícekanálové dekódování</b> (menu Okno → Kanály) samo najde RTTY signály ve vodopádu a každý dekóduje zvlášť (až 8 kanálů). Tlačítko <b>Naladit</b> přeladí hlavní dekodér na vybraný signál. Nastavení: Nastavení → Dekodéry.</li>
+</ul>
 <figure><a href="../img/cs-scope.png"><img src="../img/cs-scope.png" alt="Scope demodulátoru" loading="lazy"></a>
   <figcaption>Okno → Scope demodulátoru: průběhy mark a space, rozhodnuté bity a synchronizace – pro jemné ladění parametrů demodulátoru.</figcaption></figure>
 </section>
@@ -129,6 +135,12 @@
 <section id="log">
 <h2>6. QSO a log</h2>
 <p>QSO okno ukazuje jen pole, která aktuální režim potřebuje. Pod značkou je země DXCC (z cty.dat), CQ a ITU zóna, místní čas protistanice a seznam předchozích spojení. <b>Log</b> (<kbd>⌘</kbd><kbd>L</kbd>) zapíše spojení, <b>Clear</b> okno vyprázdní.</p>
+<h3>Pásmo bez rigu, návrhy značek, callbook</h3>
+<ul>
+  <li><b>Pásmo:</b> bez připojeného rigu vyberte pod poli QSO pásmo nebo zadejte frekvenci v kHz – zapíše se do logu a zůstane i pro další spojení. S rigem se frekvence bere z rádia.</li>
+  <li><b>Super Check Partial:</b> při psaní značky se pod polem Call nabízejí známé značky (z MASTER.SCP a z vašeho logu); „≈“ označuje značky lišící se o jeden znak – pomohou opravit chybně přijatou značku. MASTER.SCP stáhnete v Nastavení → Závod.</li>
+  <li><b>Callbook:</b> po zadání značky se z QRZ.com nebo HamQTH doplní jméno, QTH a lokátor (Nastavení → API a log → Callbook; heslo je v Klíčence).</li>
+</ul>
 <figure><a href="../img/cs-log.png"><img src="../img/cs-log.png" alt="Okno Log" loading="lazy"></a>
   <figcaption>Okno Log (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): hledání, oprava dvojklikem, mazání. Dole je cesta k otevřenému logu, menu <b>Log</b> (nový, otevřít, uložit jako, export ADIF), import ADIF a export Cabrillo. Záložka QTC ukazuje série QTC ze závodu WAE.</figcaption></figure>
 <p>Log se ukládá do <code>~/Documents/mmtty4mac</code> jako JSONL a zároveň jako ADIF (<code>mmtty4mac.adi</code>), který přečte každý logger. Starý log z MMTTY v MMTTY exportujte do ADIF a v mmtty4mac importujte – duplicity se přeskočí.</p>
@@ -153,6 +165,7 @@
   <figure><a href="../img/cs-settings-5.png"><img src="../img/cs-settings-5.png" alt="Nastavení – Závod" loading="lazy"></a><figcaption>Předvolba, výměna, Cabrillo a začátek závodu.</figcaption></figure>
   <figure><a href="../img/cs-contest.png"><img src="../img/cs-contest.png" alt="OK DX RTTY Contest v hlavním okně" loading="lazy"></a><figcaption>OK DX RTTY: QSO okno nabízí jen RST a CQ zónu; vaši zónu doplní aplikace, zónu protistanice předvyplní podle značky.</figcaption></figure>
 </div>
+<p><b>Duplicity:</b> když se stanicí už máte v tomto závodě spojení na stejném pásmu a módu, zobrazí se u značky červené <b>DUPE</b>. Zalogovat lze i tak.</p>
 <p>Formáty výměny: RST + pořadové číslo (nebo pevná výměna), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Pořadová čísla se po zalogování zvyšují sama. Body a násobiče aplikace nepočítá.</p>
 <h3>WAE a QTC</h3>
 <p>Ve formátu WAE je v QSO okně panel QTC: <b>QTC?</b> se zeptá protistanice, <b>QRV – přijmout</b> otevře příjem série, <b>Poslat…</b> připraví a odvysílá sérii z vašeho logu. Aplikace hlídá pravidla – nejvýše 10 QTC na dvojici stanic, jen mezi kontinenty, každé spojení jen jednou. Přijaté řádky se plní klikem na slova nebo tlačítkem <b>Načíst z příjmu</b>.</p>
@@ -179,8 +192,20 @@
 <div class="note warn">API nemá autentizaci a umí zapnout vysílač. Ve výchozím stavu naslouchá jen na tomto Macu; přístup ze sítě zapínejte jen v důvěryhodné síti.</div>
 </section>
 
+<section id="online">
+<h2>10. Online služby</h2>
+<p>Všechny služby jsou ve výchozím stavu vypnuté a na internet se připojují jen po zapnutí. Hesla a klíče se ukládají do Klíčenky macOS.</p>
+<table>
+  <tr><th>Služba</th><th>Kde zapnout</th><th>Co dělá</th></tr>
+  <tr><td>Callbook (QRZ.com, HamQTH)</td><td>Nastavení → API a log</td><td>doplní jméno, QTH a lokátor protistanice</td></tr>
+  <tr><td>DX cluster a RBN</td><td>Nastavení → Spoty, okno Okno → Spoty</td><td>seznam RTTY spotů; dvojklik naladí rig a vloží značku (posun frekvence pro LSB/AFSK nastavíte)</td></tr>
+  <tr><td>LoTW, eQSL, Club Log</td><td>Nastavení → Online, okno Log → Nahrát</td><td>nahraje dosud nenahraná spojení (LoTW přes program TQSL); volitelně automaticky po zalogování</td></tr>
+  <tr><td>Aktualizace</td><td>menu aplikace → Zkontrolovat aktualizace…</td><td>upozorní na novou verzi a stáhne DMG (nic neinstaluje samo)</td></tr>
+</table>
+</section>
+
 <section id="zobrazeni">
-<h2>10. Zobrazení, jazyk, klávesy</h2>
+<h2>11. Zobrazení, jazyk, klávesy</h2>
 <div class="gallery">
   <figure><a href="../img/cs-settings-6.png"><img src="../img/cs-settings-6.png" alt="Nastavení – Zobrazení" loading="lazy"></a>
     <figcaption>Jazyk rozhraní, spektrum a vodopád (rozsah, zesílení, paleta, odezva), XY scope, písmo a barvy oken, volby okna vysílání, bublinová nápověda.</figcaption></figure>
@@ -193,7 +218,7 @@
 </section>
 
 <section id="problemy">
-<h2>11. Když něco nefunguje</h2>
+<h2>12. Když něco nefunguje</h2>
 <table>
   <tr><th>Problém</th><th>Řešení</th></tr>
   <tr><td>Vodopád je prázdný</td><td>Zkontrolujte vstup v Nastavení → Zvuk a povolení mikrofonu.</td></tr>

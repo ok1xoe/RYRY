@@ -28,8 +28,9 @@
     <li><a href="#contests">7. Contests and QTC</a></li>
     <li><a href="#files">8. Files and WAV</a></li>
     <li><a href="#api">9. API for loggers</a></li>
-    <li><a href="#display">10. Display, language, keys</a></li>
-    <li><a href="#trouble">11. Troubleshooting</a></li>
+    <li><a href="#online">10. Online services</a></li>
+    <li><a href="#display">11. Display, language, keys</a></li>
+    <li><a href="#trouble">12. Troubleshooting</a></li>
   </ol>
 </nav>
 
@@ -101,6 +102,11 @@
   <li><b>Filters</b> (menu next to Shift): BPF, AA6YQ, notch/LMS, UOS. <b>XY</b> shows the cross tuning indicator.</li>
   <li><b>Click a word</b> in the received text to put it into the QSO window – call, RST, number or name by word type.</li>
 </ul>
+<h3>Second decoder and multi-channel decoding</h3>
+<ul>
+  <li>The <b>second decoder</b> (the “2nd dec.” switch in the top bar) receives the same signal with another demodulator and shows its text in a panel below the RX window. A weak or disturbed signal is often copied by one of them – much like 2Tone is used next to MMTTY in contests.</li>
+  <li><b>Multi-channel decoding</b> (Window → Channels) finds RTTY signals in the waterfall by itself and decodes each separately (up to 8 channels). <b>Tune</b> retunes the main decoder to the chosen signal. Settings: Settings → Decoders.</li>
+</ul>
 <figure><a href="../img/en-scope.png"><img src="../img/en-scope.png" alt="Demodulator scope" loading="lazy"></a>
   <figcaption>Window → Demodulator scope: mark and space waveforms, decided bits and sync – for fine-tuning the demodulator parameters.</figcaption></figure>
 </section>
@@ -129,6 +135,12 @@
 <section id="log">
 <h2>6. QSO and log</h2>
 <p>The QSO window shows only the fields the current mode needs. Under the call you see the DXCC country (from cty.dat), CQ and ITU zones, the other station's local time and previous QSOs. <b>Log</b> (<kbd>⌘</kbd><kbd>L</kbd>) saves the QSO, <b>Clear</b> empties the window.</p>
+<h3>Band without a rig, call suggestions, callbook</h3>
+<ul>
+  <li><b>Band:</b> without a connected rig choose the band below the QSO fields or enter the frequency in kHz – it is written to the log and kept for the next QSOs. With a rig the frequency comes from the radio.</li>
+  <li><b>Super Check Partial:</b> while typing a call, known calls (from MASTER.SCP and your log) are suggested below the Call field; “≈” marks calls differing by one character – they help correct a miscopied call. Download MASTER.SCP in Settings → Contest.</li>
+  <li><b>Callbook:</b> after entering a call the name, QTH and locator are filled from QRZ.com or HamQTH (Settings → API and log → Callbook; the password is kept in the Keychain).</li>
+</ul>
 <figure><a href="../img/en-log.png"><img src="../img/en-log.png" alt="Log window" loading="lazy"></a>
   <figcaption>Log window (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): search, edit by double-click, delete. At the bottom the path of the open log, the <b>Log</b> menu (new, open, save as, export ADIF), ADIF import and Cabrillo export. The QTC tab lists QTC series from the WAE contest.</figcaption></figure>
 <p>The log is stored in <code>~/Documents/mmtty4mac</code> as JSONL and also as ADIF (<code>mmtty4mac.adi</code>) that any logger can read. For an old MMTTY log, export it to ADIF in MMTTY and import it in mmtty4mac – duplicates are skipped.</p>
@@ -153,6 +165,7 @@
   <figure><a href="../img/en-settings-5.png"><img src="../img/en-settings-5.png" alt="Settings – Contest" loading="lazy"></a><figcaption>Preset, exchange, Cabrillo and contest start.</figcaption></figure>
   <figure><a href="../img/en-contest.png"><img src="../img/en-contest.png" alt="OK DX RTTY Contest in the main window" loading="lazy"></a><figcaption>OK DX RTTY: the QSO window offers only RST and CQ zone; your zone is filled in and the other station's zone is prefilled from its call.</figcaption></figure>
 </div>
+<p><b>Dupes:</b> when you already have a QSO with the station in this contest on the same band and mode, a red <b>DUPE</b> appears next to the call. You can still log it.</p>
 <p>Exchange formats: RST + serial number (or a fixed exchange), RST + CQ zone, CQ/RJ (zone + QTH), BARTG (number + time), WAE (number + QTC), PED. Serial numbers increase automatically after logging. The app does not compute points or multipliers.</p>
 <h3>WAE and QTC</h3>
 <p>In the WAE format the QSO window has a QTC panel: <b>QTC?</b> asks the other station, <b>QRV – receive</b> opens receiving a series, <b>Send…</b> prepares and sends a series from your log. The app enforces the rules – max. 10 QTC per pair of stations, only between continents, each QSO only once. Received lines are filled by clicking words or with <b>Load from RX</b>.</p>
@@ -179,8 +192,20 @@
 <div class="note warn">The API has no authentication and can key the transmitter. By default it listens on this Mac only; enable network access only on a trusted network.</div>
 </section>
 
+<section id="online">
+<h2>10. Online services</h2>
+<p>All services are off by default and connect to the internet only when enabled. Passwords and keys are stored in the macOS Keychain.</p>
+<table>
+  <tr><th>Service</th><th>Where to enable</th><th>What it does</th></tr>
+  <tr><td>Callbook (QRZ.com, HamQTH)</td><td>Settings → API and log</td><td>fills in the other station's name, QTH and locator</td></tr>
+  <tr><td>DX cluster and RBN</td><td>Settings → Spots, Window → Spots</td><td>list of RTTY spots; double-click tunes the rig and puts the call into the QSO window (frequency offset for LSB/AFSK is configurable)</td></tr>
+  <tr><td>LoTW, eQSL, Club Log</td><td>Settings → Online, Log window → Upload</td><td>uploads QSOs not uploaded yet (LoTW via TQSL); optionally automatically after logging</td></tr>
+  <tr><td>Updates</td><td>app menu → Check for Updates…</td><td>tells you about a new version and downloads the DMG (installs nothing by itself)</td></tr>
+</table>
+</section>
+
 <section id="display">
-<h2>10. Display, language, keys</h2>
+<h2>11. Display, language, keys</h2>
 <div class="gallery">
   <figure><a href="../img/en-settings-6.png"><img src="../img/en-settings-6.png" alt="Settings – Display" loading="lazy"></a>
     <figcaption>Interface language, spectrum and waterfall (range, gain, palette, response), XY scope, window fonts and colors, TX window options, tooltips.</figcaption></figure>
@@ -193,7 +218,7 @@
 </section>
 
 <section id="trouble">
-<h2>11. Troubleshooting</h2>
+<h2>12. Troubleshooting</h2>
 <table>
   <tr><th>Problem</th><th>Solution</th></tr>
   <tr><td>The waterfall is empty</td><td>Check the input in Settings → Audio and the microphone permission.</td></tr>
