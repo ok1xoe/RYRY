@@ -17,11 +17,12 @@ struct MacroBar: View {
                     ForEach(0..<8) { col in
                         let i = row * 8 + col
                         let name = i < macros.count ? macros[i].name : ""
+                        let kb = model.settings.binding(for: .macro(i))
                         Button { Task { await model.runMacro(i) } } label: {
-                            Text("\(Self.keyName(i)) \(name)").lineLimit(1).frame(maxWidth: .infinity)
+                            Text(kb.isNone ? name : "\(kb.display) \(name)").lineLimit(1).frame(maxWidth: .infinity)
                                 .foregroundStyle(Self.textColor(i < macros.count ? macros[i].color : nil))
                         }
-                        .keyboardShortcut(Self.key(i), modifiers: i < 12 ? [] : .shift)
+                        .shortcut(kb)
                         .buttonStyle(.borderedProminentIf(i < macros.count && macros[i].color != nil,
                                                           color: i < macros.count ? Color(hex: macros[i].color) : nil))
                         .contextMenu { Button(L("Upravit…")) { editing = i } }
@@ -45,9 +46,6 @@ extension MacroBar {
         return c.isLight ? .black : .white
     }
     static func keyName(_ i: Int) -> String { i < 12 ? "F\(i + 1)" : "⇧F\(i - 11)" }
-    static func key(_ i: Int) -> KeyEquivalent {
-        KeyEquivalent(Character(UnicodeScalar(NSF1FunctionKey + (i < 12 ? i : i - 12))!))
-    }
 }
 
 struct EditIndex: Identifiable { let id: Int }

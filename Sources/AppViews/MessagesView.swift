@@ -19,7 +19,7 @@ struct MessagesMenu: View {
             Button(L("Upravit zprávy…")) { editing = true }
         }
         .fixedSize()
-        .help(L("Seznam uložených zpráv – výběr zprávu odešle (syntaxe maker)"))
+        .hint(L("Seznam uložených zpráv – výběr zprávu odešle (syntaxe maker)"))
         .sheet(isPresented: $editing) { MessagesEditor(model: model) }
     }
 }

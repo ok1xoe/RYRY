@@ -722,6 +722,17 @@ public final class AppModel {
         await app?.cabrillo(from: from, to: to, contestOnly: contestOnly) ?? ""
     }
 
+    /// Import ADIF (např. log převedený z MMTTY); vrací text pro uživatele.
+    public func importADIF(_ url: URL) async throws -> String {
+        guard let log = app?.log else { throw QSOLogError.io(L("Log není k dispozici.")) }
+        let data = try Data(contentsOf: url)
+        let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
+        let parsed = ADIF.importRecords(text)
+        let r = try await log.importRecords(parsed.records)
+        await refreshLog()
+        return L("Importováno %ld spojení, duplicit %ld, neplatných záznamů %ld.", r.added, r.duplicates, parsed.skipped)
+    }
+
     private func refreshLog() async {
         guard let log = app?.log else { return }
         logRecords = await log.query()

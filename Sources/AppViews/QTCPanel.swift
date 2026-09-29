@@ -46,14 +46,14 @@ struct QTCPanel: View {
     var idleButtons: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
-                Button("QTC?") { Task { await model.qtcPhrase(.ask) } }.help(L("Zeptat se, zda má protistanice QTC"))
+                Button("QTC?") { Task { await model.qtcPhrase(.ask) } }.hint(L("Zeptat se, zda má protistanice QTC"))
                 Button(L("QRV – přijmout")) { Task { await model.qtcQRVReceive() } }
                     .disabled(model.qso.call.isEmpty || sameContinent)
-                    .help(L("Protistanice nabízí QTC: otevřít příjem a odvysílat QRV"))
+                    .hint(L("Protistanice nabízí QTC: otevřít příjem a odvysílat QRV"))
             }
             HStack(spacing: 4) {
                 Button(L("Přijmout…")) { model.startQTCReceive() }.disabled(model.qso.call.isEmpty || sameContinent)
-                    .help(L("Otevřít příjem QTC bez vysílání (série už přišla nebo přijde)"))
+                    .hint(L("Otevřít příjem QTC bez vysílání (série už přišla nebo přijde)"))
                 Button(L("Poslat…")) {
                     sending = Array((model.qtcStatus?.available ?? []).prefix(10))
                 }
@@ -72,11 +72,11 @@ struct QTCPanel: View {
                     Text("\(i + 1). \(QTCText.line(l))").font(.caption.monospaced())
                     Spacer()
                     if model.qtcPending != nil {
-                        Button("↻") { Task { await model.qtcRepeat(i + 1) } }.help(L("Zopakovat řádek (AGN %ld)", i + 1))
+                        Button("↻") { Task { await model.qtcRepeat(i + 1) } }.hint(L("Zopakovat řádek (AGN %ld)", i + 1))
                             .controlSize(.mini)
                     } else {
                         Button { sending?.remove(at: i) } label: { Image(systemName: "minus.circle") }
-                            .buttonStyle(.borderless).help(L("Vynechat"))
+                            .buttonStyle(.borderless).hint(L("Vynechat"))
                     }
                 }
             }
@@ -89,7 +89,7 @@ struct QTCPanel: View {
                     Task { await model.qtcConfirmSent(); if model.qtcPending == nil { sending = nil } }
                 }
                     .disabled(model.qtcPending == nil)
-                    .help(L("Protistanice potvrdila příjem (R R ALL OK)"))
+                    .hint(L("Protistanice potvrdila příjem (R R ALL OK)"))
                 Button(L("Zrušit")) { Task { await model.qtcCancelSent(); sending = nil } }
             }
         }
@@ -107,7 +107,7 @@ struct QTCPanel: View {
                                                set: { model.qtcSetHeader($0) }))
                     .frame(width: 60).font(.caption.monospaced())
                 Spacer()
-                Button(L("Načíst z příjmu")) { NSApp.keyWindow?.makeFirstResponder(nil); model.qtcFillFromRx() }.help(L("Rozebrat text přijatý od „Přijmout…“"))
+                Button(L("Načíst z příjmu")) { NSApp.keyWindow?.makeFirstResponder(nil); model.qtcFillFromRx() }.hint(L("Rozebrat text přijatý od „Přijmout…“"))
             }
             ForEach(0..<min(rows, 10), id: \.self) { i in
                 HStack {

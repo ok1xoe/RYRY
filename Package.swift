@@ -66,7 +66,7 @@ let package = Package(
                                                        "Keying", "RigControl", "RTTYModem", "RTTYSignalKit", "TestSupport", "WaveFile"]),
         .target(name: "AppViews", dependencies: ["AppUI", "AppCore", "QSOLog", "Settings", "AudioIO", "Keying",
                                                   "ModemKit", "Engine", "RigControl", "RTTYModem", "Localization"]),
-        .executableTarget(name: "MMTTY4MacApp", dependencies: ["AppViews", "AppUI", "Localization"]),
+        .executableTarget(name: "MMTTY4MacApp", dependencies: ["AppViews", "AppUI", "Localization", "Settings"]),
         .target(name: "DXCC"),
         .target(name: "Localization"),
         .testTarget(name: "LocalizationTests", dependencies: ["Localization"]),
