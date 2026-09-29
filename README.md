@@ -66,4 +66,5 @@ Z MMTTY dále:
 - DXCC z `cty.dat` (AD1C; vlastní verzi lze dát do `~/Library/Application Support/mmtty4mac/cty.dat`), pozdrav `%g` podle místního času protistanice;
 - přehrání WAV do příjmu (Soubor → Přehrát WAV do příjmu);
 - seznam zpráv (menu „Zprávy“ u vysílání), barvy tlačítek maker, scope demodulátoru (Okno → Scope demodulátoru);
-- závodní formáty RST + číslo, CQ/RJ (zóna + QTH), BARTG (číslo + čas) a PED.
+- závodní formáty RST + číslo, CQ/RJ (zóna + QTH), BARTG (číslo + čas), PED a WAE s výměnou QTC
+  (odeslání i příjem série v QSO panelu, limity podle pravidel DARC, QTC v Cabrillu).

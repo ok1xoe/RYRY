@@ -1,0 +1,94 @@
+import Foundation
+import Testing
+import DXCC
+import Engine
+import MacroEngine
+import ModemKit
+import QSOLog
+import RTTYModem
+import Settings
+import TestSupport
+@testable import AppCore
+
+private let cty = """
+Fed. Rep. of Germany:     14:  28:  EU:   51.00:   -10.00:    -1.0:  DL:
+    DA,DB,DC,DD,DE,DF,DG,DH,DI,DJ,DK,DL,DM,DN,DO,DP,DQ,DR;
+Czech Republic:           15:  28:  EU:   50.00:   -16.00:    -1.0:  OK:
+    OK,OL;
+United States:            05:  08:  NA:   37.53:    91.67:     5.0:  K:
+    AA,AB,K,N,W;
+"""
+
+func makeWAEApp() throws -> (Harness, QTCStore) {
+    var s = AppSettings()
+    s.station.call = "OK1XOE"; s.ptt.method = .none
+    s.contest.enabled = true; s.contest.format = .wae; s.contest.nextSerial = 1
+    let audio = FakeAudioBackend(), clock = ManualClock(), rig = FakeRig2()
+    let engine = Engine(modem: try RTTYModem(), rig: rig, audio: audio, config: s.engineConfig(),
+                        serialFactory: { _ in FakeSerialPort() }, clock: clock, autoRun: false)
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("wae-\(UUID())")
+    let qtc = try QTCStore(directory: dir)
+    let app = AppController(settings: s, engine: engine, log: try QSOLogStore(directory: dir), profiles: nil,
+                            countries: try CountryDB(text: cty), qtc: qtc)
+    return (Harness(app: app, engine: engine, audio: audio, clock: clock, rig: rig, dir: dir), qtc)
+}
+
+private func logQSO(_ h: Harness, _ call: String, rcvd: Int) async throws {
+    try await h.app.setQSOField("call", call)
+    try await h.app.setQSOField("serialRcvd", String(rcvd))
+    _ = try await h.app.logQSO()
+}
+
+@Test func waeUsesSerialsAndOffersQTCToOtherContinent() async throws {
+    let (h, _) = try makeWAEApp()
+    #expect(await h.app.qso.serialSent == 1)                       // WAE = RST + pořadové číslo
+    try await logQSO(h, "DL1ABC", rcvd: 5)
+    try await logQSO(h, "OK2PBR", rcvd: 12)
+    let st = await h.app.qtcStatus(for: "W1AW")
+    #expect(st.available.map(\.call) == ["DL1ABC", "OK2PBR"] && st.exchanged == 0 && st.nextSeries == 1)
+    #expect(st.differentContinent == true)
+    let eu = await h.app.qtcStatus(for: "DL9ZZ")
+    #expect(eu.differentContinent == false)                         // v RTTY jen mezi kontinenty
+}
+
+@Test func sendQTCTransmitsAndSavesAfterConfirm() async throws {
+    let (h, store) = try makeWAEApp()
+    try await h.app.start()
+    try await logQSO(h, "DL1ABC", rcvd: 5)
+    try await logQSO(h, "OK2PBR", rcvd: 12)
+    try await h.app.setQSOField("call", "W1AW")
+    let lines = await h.app.qtcStatus(for: "W1AW").available
+    try await h.app.sendQTC(lines)
+    await run(h) { await h.engine.state == .rx && h.audio.tx.count > 0 }
+    let text = try await decodeTxAudio(h.audio.tx)
+    #expect(text.contains("QTC 1/2 QTC 1/2") && text.contains("DL1ABC 005") && text.contains("OK2PBR 012"), "\(text)")
+    #expect(await store.series.isEmpty)                            // uloží se až po potvrzení
+    try await h.app.confirmSentQTC()
+    let s = await store.series
+    #expect(s.count == 1 && s[0].direction == .sent && s[0].counterpart == "W1AW" && s[0].count == 2)
+    #expect(await h.app.qtcStatus(for: "W1AW").exchanged == 2)
+    #expect(await h.app.qtcStatus(for: "K2ZZ").available.isEmpty)   // obě QSO už nahlášená
+    #expect(await h.app.qtcStatus(for: "K2ZZ").nextSeries == 2)
+    await h.app.stop()
+}
+
+@Test func receivedQTCSavedAndInCabrillo() async throws {
+    let (h, store) = try makeWAEApp()
+    try await h.app.setQSOField("call", "W1AW")
+    try await h.app.saveReceivedQTC(number: 4, lines: [QTCLine(time: "0915", call: "JA1YY", serial: 7)])
+    #expect(await store.series.first?.direction == .received)
+    #expect(await h.app.qtcStatus(for: "W1AW").exchanged == 1)
+    let cab = await h.app.cabrillo()
+    #expect(cab.contains("OK1XOE        4/1   W1AW          0915 JA1YY         007"))
+    await #expect(throws: AppError.self) { try await h.app.saveReceivedQTC(number: 1, lines: []) }
+}
+
+func decodeTxAudio(_ samples: [Float]) async throws -> String {
+    let m = try RTTYModem()
+    let ev = m.events
+    (samples + [Float](repeating: 0, count: 4000)).withUnsafeBufferPointer { m.processRx($0) }
+    m.finishEvents()
+    var t = ""
+    for await e in ev { if case .rxText(let c, false) = e { t.append(c) } }
+    return t
+}

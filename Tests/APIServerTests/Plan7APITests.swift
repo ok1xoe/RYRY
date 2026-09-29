@@ -57,3 +57,15 @@ import Testing
     let bad = try await c.call("msg.run", ["index": 99])
     #expect((bad["error"] as? [String: Any])?["code"] as? Int == -32602)
 }
+
+@Test func jsonRPCQTCStatusAndList() async throws {
+    let h = try await makeAPIHarness()
+    let (srv, port) = try await jsonServer(h)
+    defer { srv.stop() }
+    let c = WSClient(port: port)
+    let st = try await c.call("qtc.status", ["call": "W1AW"])
+    let o = st["result"] as? [String: Any]
+    #expect(o?["exchanged"] as? Int == 0 && o?["nextSeries"] as? Int == 1 && (o?["available"] as? [Any]) != nil)
+    let l = try await c.call("qtc.list")
+    #expect((l["result"] as? [Any])?.isEmpty == true)
+}

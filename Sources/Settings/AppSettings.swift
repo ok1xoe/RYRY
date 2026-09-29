@@ -156,8 +156,8 @@ public struct RTTYCoreSettings: Codable, Sendable, Equatable {
 }
 
 /// Závodní formát (MMTTY Log m_Contest): ON = RST + číslo, CQ/RJ = zóna + QTH, BARTG = číslo + čas UTC,
-/// PED = klik na slovo vždy vyplní značku, bez čísel.
-public enum ContestFormat: String, Codable, Sendable, CaseIterable { case serial, cqrj, bartg, ped }
+/// PED = klik na slovo vždy vyplní značku, bez čísel. WAE = RST + číslo a výměna QTC (WAE DX Contest).
+public enum ContestFormat: String, Codable, Sendable, CaseIterable { case serial, cqrj, bartg, ped, wae }
 
 /// Závodní režim: pořadová čísla a hlavička Cabrillo.
 public struct ContestSettings: Codable, Sendable, Equatable {
@@ -169,7 +169,7 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     public var exchange = ""               // odesílaná výměna místo čísla (prázdné = pořadové číslo)
     public init() {}
     /// Formát posílá pořadové číslo (ON bez pevné výměny, BARTG).
-    public var sendsSerial: Bool { format == .bartg || (format == .serial && exchange.isEmpty) }
+    public var sendsSerial: Bool { format == .bartg || format == .wae || (format == .serial && exchange.isEmpty) }
     enum CodingKeys: String, CodingKey { case enabled, format, name, category, nextSerial, exchange }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "contest", x = ContestSettings()

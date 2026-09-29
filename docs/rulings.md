@@ -178,3 +178,10 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Oprava značky v logu přepočítá zemi DXCC; měření hodin měří zařízení zvolená v dialogu; neúspěšné načtení profilu nemění nastavení; editor logu v UTC; text na obarvených makrech černý/bílý podle jasu barvy.
 - Položky „pasted CRLF…“ a „text typed before TX…“ ze seznamů plánu 5 už opravil plán 6 (seznam byl zastaralý).
 - F4 „Contest“ mimo závodní režim posílá „599“ bez čísla – ponecháno jako MMTTY (%N je prázdné).
+
+## Plán 12 (QTC pro WAE)
+- QTC jen ve formátu závodu WAE; pravidla RTTY podle DARC: ≤ 10 QTC na dvojici (odeslaná + přijatá), QSO nahlásit jen jednou a ne stanici, které se týká, výměna jen mezi kontinenty (DXCC; neznámý kontinent jen varuje, neblokuje).
+- Odeslaná série se uloží až po „Potvrzeno – uložit“ (příjemce R R ALL OK); do té doby lze opakovat řádky (AGN N).
+- Příjem: „Načíst z příjmu“ rozebere text přijatý od „Přijmout…“; ručně klik na slova (n/k, čas, značka, číslo) nebo úprava řádku.
+- Násobiče a váhy pásem WAE se nepočítají – zobrazují se body za QTC; skóre spočítá vyhodnocení / logger.
+- Série QTC v `qtc.jsonl` v adresáři logu; Cabrillo řádky `QTC:` podle DARC (QTC bez kmitočtu jako `X-QTC:`).

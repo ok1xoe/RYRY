@@ -65,7 +65,7 @@ public enum WordClassifier {
         var rest = Substring(w)
         if w.count >= 4, w.hasPrefix("599"), w.dropFirst(3).allSatisfy(\.isNumber) { rest = rest.dropFirst(3) }
         switch format {
-        case .serial, .ped:
+        case .serial, .ped, .wae:
             return contestField(word, serialMode: serialMode).map { [$0] } ?? []
         case .cqrj:
             // „ZZ QTH“: číslo = zóna, text = QTH (druhá část zůstane)

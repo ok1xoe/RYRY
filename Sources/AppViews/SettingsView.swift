@@ -261,6 +261,7 @@ struct ContestTab: View {
                 Text("CQ/RJ – zóna + QTH (CQ WW RTTY)").tag(ContestFormat.cqrj)
                 Text("BARTG – číslo + čas UTC").tag(ContestFormat.bartg)
                 Text("PED – klik = vždy značka, bez čísel").tag(ContestFormat.ped)
+                Text("WAE – RST + číslo a výměna QTC").tag(ContestFormat.wae)
             }
             TextField("Název závodu (Cabrillo CONTEST)", text: $s.contest.name)
             TextField("Kategorie (Cabrillo, oddělit „;“)", text: $s.contest.category)
