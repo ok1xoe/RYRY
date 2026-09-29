@@ -65,9 +65,12 @@ public struct LanguageLibrary: Sendable {
         defaults.set(p?.code ?? Localizer.baseCode, forKey: Self.defaultsKey)
     }
 
-    /// Obnoví jazyk z minulého spuštění (chybějící soubor → čeština).
+    /// Jazyk bez uložené volby (první spuštění).
+    public static let defaultCode = "en"
+
+    /// Obnoví jazyk z minulého spuštění; bez volby angličtina, chybějící soubor → čeština.
     public func restore(localizer: Localizer = .shared, defaults: UserDefaults = .standard) {
-        let c = defaults.string(forKey: Self.defaultsKey) ?? Localizer.baseCode
+        let c = defaults.string(forKey: Self.defaultsKey) ?? Self.defaultCode
         localizer.use(c == Localizer.baseCode ? nil : pack(code: c))
     }
 }

@@ -102,7 +102,7 @@ mmtty4mac se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovláda
 
 ## 10. Jazyk a klávesy
 
-- **Jazyk:** Nastavení → Zobrazení → Jazyk rozhraní (čeština, angličtina, nahrané jazyky). Vlastní překlad: **Uložit šablonu…**, přeložit hodnoty v `strings`, nastavit `code` a `name`, **Nahrát jazyk…**.
+- **Jazyk:** ve výchozím stavu angličtina; změna v Nastavení → Zobrazení → Jazyk rozhraní (čeština, angličtina, nahrané jazyky). Vlastní překlad: **Uložit šablonu…**, přeložit hodnoty v `strings`, nastavit `code` a `name`, **Nahrát jazyk…**.
 - **Klávesy:** Nastavení → Klávesy – klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).
 
 ## 11. Když něco nefunguje
