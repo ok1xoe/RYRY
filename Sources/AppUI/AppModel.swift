@@ -81,6 +81,13 @@ public final class AppModel {
     public private(set) var logRecords: [QSORecord] = []
     public private(set) var messages: [String] = []
     public private(set) var apiStatus = ""
+    /// Nenápadná informace pro QSO panel: „callbook: QRZ.com“ nebo chyba (prázdné = nic).
+    public private(set) var callbookStatus = ""
+    private let secrets: SecretStore
+    private let callbookFetcher: HTTPFetcher
+    private let callbookDelay: Duration
+    private var callbookTask: Task<Void, Never>?
+    private var callbookCache: (key: String, service: CachingCallbook)?
     public private(set) var waterfall = WaterfallRenderer(width: 600, height: 200)
     public private(set) var params: [String: ParameterValue] = [:]
     public private(set) var descriptors: [ParameterDescriptor] = []
@@ -134,7 +141,10 @@ public final class AppModel {
     }
 
     public init(settingsStore: SettingsStore = SettingsStore(), profileStore: ProfileStore = ProfileStore(),
-                engineFactory: EngineFactory? = nil, spectrumFPS: Double = 15) {
+                engineFactory: EngineFactory? = nil, spectrumFPS: Double = 15,
+                secrets: SecretStore = KeychainSecretStore(), callbookFetcher: @escaping HTTPFetcher = CallbookFactory.liveFetcher,
+                callbookDelay: Duration = .milliseconds(800)) {
+        self.secrets = secrets; self.callbookFetcher = callbookFetcher; self.callbookDelay = callbookDelay
         self.settingsStore = settingsStore; self.profileStore = profileStore
         self.engineFactory = engineFactory ?? AppModel.realEngine
         self.spectrumFPS = spectrumFPS
@@ -292,7 +302,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
+                take(\.callbook); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
@@ -335,7 +345,7 @@ public final class AppModel {
         case .qsoChanged(let q):
             let callChanged = q.call != qso.call
             qso = q
-            if callChanged { Task { await self.refreshPrevious(); await self.refreshQTC() } }
+            if callChanged { Task { await self.refreshPrevious(); await self.refreshQTC() }; scheduleCallbook() }
         case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious(); await self.refreshQTC() }
         case .qtcChanged: Task { await self.refreshQTC(); await self.refreshQTCSeries() }
         case .contestSerial(let n):
@@ -928,7 +938,79 @@ public final class AppModel {
         guard let app else { return }
         await run("QSO") { try await app.setQSOField(name, value) }
         qso = await app.qso
-        if name == "call" { await refreshPrevious() }
+        if name == "call" { await refreshPrevious(); scheduleCallbook() }
+    }
+
+    // MARK: Callbook
+
+    public func callbookPassword(kind: CallbookKind, username: String) -> String {
+        guard kind != .none, !username.isEmpty else { return "" }
+        return secrets.password(service: kind.rawValue, account: username) ?? ""
+    }
+
+    public func saveCallbookPassword(_ password: String, kind: CallbookKind, username: String) {
+        guard kind != .none, !username.isEmpty else { return }
+        do { try secrets.setPassword(password, service: kind.rawValue, account: username) }
+        catch { note(L("Heslo callbooku nelze uložit do Klíčenky: %@", "\(error)")) }
+        callbookCache = nil
+    }
+
+    /// Po krátké prodlevě dohledá aktuální značku (další změna dotaz zruší).
+    private func scheduleCallbook() {
+        callbookTask?.cancel(); callbookTask = nil
+        let cb = settings.callbook
+        let call = qso.call
+        guard !call.isEmpty else { callbookStatus = ""; return }
+        guard cb.service != .none, cb.autoLookup else { return }
+        callbookTask = Task { [weak self, delay = callbookDelay] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            await self?.performCallbook(call)
+        }
+    }
+
+    private func callbookService(_ cb: CallbookSettings) -> CachingCallbook? {
+        let pw = callbookPassword(kind: cb.service, username: cb.username)
+        guard cb.service != .none, !cb.username.isEmpty, !pw.isEmpty else { return nil }
+        let key = "\(cb.service.rawValue)|\(cb.username)|\(pw)"
+        if let c = callbookCache, c.key == key { return c.service }
+        guard let svc = CallbookFactory.make(cb.service, username: cb.username, password: pw, fetcher: callbookFetcher) else { return nil }
+        let c = CachingCallbook(svc)
+        callbookCache = (key, c)
+        return c
+    }
+
+    private func performCallbook(_ call: String) async {
+        let cb = settings.callbook
+        guard let svc = callbookService(cb) else { callbookStatus = L("callbook: chybí uživatel nebo heslo"); return }
+        do {
+            let entry = try await svc.lookup(call)
+            guard !Task.isCancelled, qso.call == call else { return }
+            guard let e = entry else { callbookStatus = L("callbook: %@ · nenalezeno", svc.name); return }
+            callbookStatus = L("callbook: %@", svc.name)
+            for (field, value) in [("name", e.name), ("qth", e.qth), ("locator", e.grid)] where !value.isEmpty {
+                guard qso.call == call else { return }
+                if !cb.fillEmptyOnly || (qso.value(field) ?? "").isEmpty { await setQSOField(field, value) }
+            }
+        } catch is CancellationError {
+        } catch {
+            guard !Task.isCancelled, qso.call == call else { return }
+            callbookStatus = L("callbook: chyba – %@", error.localizedDescription)
+        }
+    }
+
+    /// Tlačítko „Vyzkoušet“: přihlášení a vyhledání vlastní značky s hodnotami z dialogu (bez cache).
+    public func testCallbook(kind: CallbookKind, username: String, password: String, call: String) async -> String {
+        guard let svc = CallbookFactory.make(kind, username: username, password: password, fetcher: callbookFetcher),
+              !username.isEmpty, !password.isEmpty else { return L("Vyberte službu a zadejte uživatele a heslo.") }
+        guard !call.isEmpty else { return L("Ve Stanici chybí vaše značka.") }
+        do {
+            guard let e = try await svc.lookup(call) else { return L("Přihlášení v pořádku, značka %@ nenalezena.", call) }
+            let parts = [e.name, e.qth, e.grid, e.country].filter { !$0.isEmpty }
+            return L("Funguje: %@", ([e.call] + parts).joined(separator: " · "))
+        } catch {
+            return L("Chyba: %@", error.localizedDescription)
+        }
     }
 
     public func insertWord(_ w: String) async {

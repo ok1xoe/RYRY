@@ -15,6 +15,8 @@ public struct SettingsView: View {
     @State private var draft = AppSettings()
     @State private var baseline = AppSettings()       // stav, ze kterého koncept vyšel
     @State private var loaded = false
+    @State private var callbookPassword = ""          // heslo se ukládá do Klíčenky, ne do nastavení
+    @State private var callbookPasswordDirty = false
     /// Vybraná záložka (spouštěcí parametr `-settingsTab N` pro snímky obrazovky).
     @State private var tab = UserDefaults.standard.integer(forKey: "settingsTab")
     public init(model: AppModel) { self.model = model }
@@ -29,7 +31,7 @@ public struct SettingsView: View {
                 ModemTab(model: model, s: $draft).tabItem { Label("Modem", systemImage: "slider.horizontal.3") }.tag(4)
                 ContestTab(s: $draft).tabItem { Label(L("Závod"), systemImage: "trophy") }.tag(5)
                 DisplayTab(s: $draft).tabItem { Label(L("Zobrazení"), systemImage: "paintpalette") }.tag(6)
-                APITab(s: $draft).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
+                APITab(s: $draft, model: model, callbookPassword: $callbookPassword, callbookPasswordDirty: $callbookPasswordDirty).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
                 KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
             }
             Divider()
@@ -41,12 +43,22 @@ public struct SettingsView: View {
                 Button(L("Vrátit")) { draft = model.settings; baseline = draft }
                 Button(L("Použít")) {
                     let d = draft, b = baseline
+                    if callbookPasswordDirty {
+                        model.saveCallbookPassword(callbookPassword, kind: d.callbook.service, username: d.callbook.username)
+                        callbookPasswordDirty = false
+                    }
                     Task { await model.applySettings(d, baseline: b); draft = model.settings; baseline = draft }
                 }.keyboardShortcut(.defaultAction)
             }.padding(12)
         }
         .frame(width: 720, height: 640)
-        .onAppear { if !loaded { draft = model.settings; baseline = draft; loaded = true } }
+        .onAppear {
+            if !loaded {
+                draft = model.settings; baseline = draft; loaded = true
+                callbookPassword = model.callbookPassword(kind: draft.callbook.service, username: draft.callbook.username)
+                callbookPasswordDirty = false
+            }
+        }
         .onDisappear { loaded = false }                  // příště načíst aktuální stav
     }
 }
@@ -351,8 +363,46 @@ struct RigTab: View {
 
 struct APITab: View {
     @Binding var s: AppSettings
+    var model: AppModel
+    @Binding var callbookPassword: String
+    @Binding var callbookPasswordDirty: Bool
+    @State private var callbookTestResult = ""
+    @State private var callbookTesting = false
     var body: some View {
         Form {
+            Section {
+                Picker(L("Služba"), selection: $s.callbook.service) {
+                    Text(L("Vypnuto")).tag(CallbookKind.none)
+                    Text("QRZ.com").tag(CallbookKind.qrz)
+                    Text("HamQTH").tag(CallbookKind.hamqth)
+                }
+                .onChange(of: s.callbook.service) { _, _ in reloadPassword() }
+                Group {
+                    TextField(L("Uživatel"), text: $s.callbook.username)
+                        .onChange(of: s.callbook.username) { _, _ in reloadPassword() }
+                    SecureField(L("Heslo"), text: Binding(get: { callbookPassword },
+                                                          set: { callbookPassword = $0; callbookPasswordDirty = true }))
+                    Toggle(L("Automaticky doplnit"), isOn: $s.callbook.autoLookup)
+                    Toggle(L("Doplnit jen prázdná pole"), isOn: $s.callbook.fillEmptyOnly)
+                    LabeledContent {
+                        HStack {
+                            if callbookTesting { ProgressView().controlSize(.small) }
+                            Text(callbookTestResult).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        }
+                    } label: {
+                        Button(L("Vyzkoušet")) {
+                            let d = s.callbook, pw = callbookPassword, call = s.station.call
+                            callbookTesting = true; callbookTestResult = ""
+                            Task {
+                                callbookTestResult = await model.testCallbook(kind: d.service, username: d.username, password: pw, call: call)
+                                callbookTesting = false
+                            }
+                        }.disabled(callbookTesting)
+                    }
+                }.disabled(s.callbook.service == .none)
+            } header: { Text("Callbook") } footer: {
+                Text(L("Po zadání značky v okně QSO se dohledá jméno, QTH a lokátor. Heslo se ukládá do Klíčenky. Dotazy jdou na server služby jen při zapnutém callbooku."))
+            }
             Section {
                 Toggle("fldigi XML-RPC", isOn: $s.api.fldigiEnabled)
                 LabeledContent(L("Port")) {
@@ -402,6 +452,15 @@ struct APITab: View {
 }
 
 /// Parametry modemu generované z popisu (mění se hned, bez restartu) + nastavení jádra (po Použít).
+extension APITab {
+    /// Při změně služby nebo uživatele načíst heslo z Klíčenky (pokud se právě nepíše nové).
+    fileprivate func reloadPassword() {
+        guard !callbookPasswordDirty else { return }
+        callbookPassword = model.callbookPassword(kind: s.callbook.service, username: s.callbook.username)
+        callbookPasswordDirty = false
+    }
+}
+
 struct ModemTab: View {
     @Bindable var model: AppModel
     @Binding var s: AppSettings

@@ -246,3 +246,10 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Výchozí jazyk rozhraní (bez uložené volby) je angličtina (`LanguageLibrary.defaultCode`); klíče překladů zůstávají české. Výslovně zvolená čeština se pamatuje v UserDefaults `language`.
 - Čeština má vlastní soubor `cs.json` (hodnota = klíč; bez souboru funguje vestavěná). Při startu se přibalené `cs.json`/`en.json` kopírují do `Application Support/mmtty4mac/Languages`; neupravená kopie se s novou verzí obnoví (otisk SHA-256 v `.<kód>.json.seeded`), upravenou aplikace nepřepíše. Soubor ve složce má přednost, chybějící/prázdné texty doplní přibalená verze.
 - Složku jazyků hlídá `LanguageWatcher` (DispatchSource na adresáři, prodleva 250 ms): uložený soubor aktivního jazyka se hned znovu načte na hlavní frontě; rozbitý soubor jazyk nezmění. Ověřeno v běžící aplikaci (okna, Nastavení i lišta menu se přepnou živě).
+
+## Callbook (QRZ.com, HamQTH)
+- `AppCore/Callbook.swift`: `CallbookService` (`lookup` → `CallbookEntry?`, nil = nenalezeno), `QRZCallbook` (`xmldata.qrz.com`, session Key, při „Session Timeout“ jedno opakované přihlášení) a `HamQTHCallbook` (`session_id`, `prg=mmtty4mac`). Síť přes `HTTPFetcher`; jméno = QRZ `fname name`, HamQTH `nick`, jinak `adr_name`; QTH = QRZ `addr2`.
+- `CachingCallbook`: cache značka → výsledek (i „nenalezeno“, max. 500, chyby se neukládají), dotazy na stejnou značku se sloučí, souběžně nejvýš 2.
+- Nastavení `callbook` (`service` none/qrz/hamqth, `username`, `autoLookup`, `fillEmptyOnly`); heslo jen v Klíčence (`cz.ok1xoe.mmtty4mac.qrz|hamqth`, účet = uživatel) přes `SecretStore`, do Klíčenky se zapisuje až po Použít. Bez zapnuté služby se nic neposílá.
+- Po změně značky v QSO okně (jakýmkoli způsobem) se po 0,8 s dohledá a doplní jméno, QTH, lokátor (jen prázdná pole, pokud `fillEmptyOnly`); další změna dotaz zruší. Stav „callbook: QRZ.com“ / chyba je pod poli QSO. Vlastní značku zkouší tlačítko Vyzkoušet (hodnoty z dialogu, bez cache).
+- Neověřeno proti skutečným službám (formáty podle dokumentace); v testech se síť nepoužívá.
