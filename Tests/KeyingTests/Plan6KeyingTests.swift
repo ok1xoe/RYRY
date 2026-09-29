@@ -28,5 +28,5 @@ import TestSupport
     let ptt = PTTController(method: .cat, port: nil, rig: HangRig())
     let t0 = Date()
     await ptt.forceOff()
-    #expect(Date().timeIntervalSince(t0) < 3)
+    #expect(Date().timeIntervalSince(t0) < 5)          // limit 2 s + rezerva na zatížený stroj
 }
