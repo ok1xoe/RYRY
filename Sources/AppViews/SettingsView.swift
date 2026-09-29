@@ -368,10 +368,20 @@ struct ModemTab: View {
 struct ContestTab: View {
     @Binding var s: AppSettings
 
+    /// Vybraná předvolba (podle názvu a formátu); výběr nastaví nejbližší termín závodu.
+    var presetBinding: Binding<ContestPreset?> {
+        Binding(get: { ContestPreset.matching(s.contest) }, set: { p in
+            guard let p else { return }
+            let serial = s.contest.nextSerial
+            s.contest = ContestSettings.upcoming(p, locator: s.station.locator)
+            if p == .waeRTTY { s.contest.nextSerial = max(1, serial) }
+        })
+    }
+
     var exchangeHint: String {
         switch s.contest.format {
         case .serial: return "Prázdné = posílá se pořadové číslo; jinak tento text (např. stát)."
-        case .cqrj: return "Moje zóna a QTH, např. „15“ nebo „05 NY“."
+        case .cqrj: return "Prázdné = moje CQ zóna podle značky; W/VE přidají stát, např. „05 NY“."
         case .zone: return "Prázdné = moje CQ zóna podle značky (DXCC)."
         case .bartg, .wae, .ped: return "V tomto formátu se nepoužívá."
         }
@@ -381,23 +391,23 @@ struct ContestTab: View {
         Form {
             Section {
                 Toggle("Závodní režim", isOn: $s.contest.enabled)
-                LabeledContent("Předvolba") {
-                    Menu("Vybrat závod…") {
-                        ForEach(ContestPreset.allCases, id: \.self) { p in
-                            Button(p.title) {
-                                let serial = s.contest.nextSerial
-                                s.contest = ContestSettings.preset(p, year: Calendar(identifier: .gregorian).component(.year, from: Date()))
-                                if p == .waeRTTY { s.contest.nextSerial = max(1, serial) }
-                            }
-                        }
-                    }.fixedSize()
+                Picker("Předvolba", selection: presetBinding) {
+                    Text("Vlastní nastavení").tag(ContestPreset?.none)
+                    Divider()
+                    ForEach(ContestPreset.allCases, id: \.self) { p in Text(p.title).tag(ContestPreset?.some(p)) }
                 }
-            } footer: { Text("Předvolba nastaví název, formát výměny a začátek známého závodu.") }
+            } footer: {
+                if let p = ContestPreset.matching(s.contest) {
+                    Text("\(p.summary). Termín ověř v pravidlech závodu.")
+                } else {
+                    Text("Předvolba nastaví název, formát výměny a nejbližší začátek známého závodu.")
+                }
+            }
             Section {
                 Picker("Formát výměny", selection: $s.contest.format) {
                     Text("RST + pořadové číslo").tag(ContestFormat.serial)
                     Text("RST + CQ zóna (OK DX RTTY)").tag(ContestFormat.zone)
-                    Text("CQ/RJ – zóna + QTH").tag(ContestFormat.cqrj)
+                    Text("CQ/RJ – zóna + QTH (CQ WW)").tag(ContestFormat.cqrj)
                     Text("BARTG – číslo + čas UTC").tag(ContestFormat.bartg)
                     Text("WAE – číslo + QTC").tag(ContestFormat.wae)
                     Text("PED – klik = značka").tag(ContestFormat.ped)

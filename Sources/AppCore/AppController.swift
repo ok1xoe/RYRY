@@ -96,7 +96,7 @@ public actor AppController {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
         self.countries = countries; self.qtcStore = qtc
         qso = Self.contestDefaults(settings.contest)
-        if settings.contest.enabled, settings.contest.format == .zone, qso.exchangeSent.isEmpty,
+        if settings.contest.enabled, settings.contest.sendsOwnZone, qso.exchangeSent.isEmpty,
            let z = countries?.lookup(settings.station.call)?.cqZone {
             qso.exchangeSent = String(z)
         }
@@ -301,9 +301,9 @@ public actor AppController {
     private func applyContestDefaults() {
         let d = Self.contestDefaults(settings.contest)
         qso.serialSent = d.serialSent; qso.exchangeSent = d.exchangeSent
-        if settings.contest.enabled, settings.contest.format == .zone, qso.exchangeSent.isEmpty,
+        if settings.contest.enabled, settings.contest.sendsOwnZone, qso.exchangeSent.isEmpty,
            let z = country(for: settings.station.call)?.cqZone {
-            qso.exchangeSent = String(z)                      // RST + CQ zóna: moje zóna z DXCC
+            qso.exchangeSent = String(z)                      // RST + CQ zóna, CQ/RJ: moje zóna z DXCC
         }
     }
 
