@@ -160,14 +160,77 @@ public struct RTTYCoreSettings: Codable, Sendable, Equatable {
 /// ZONE = RST + CQ zóna (OK DX RTTY Contest).
 public enum ContestFormat: String, Codable, Sendable, CaseIterable { case serial, cqrj, bartg, ped, wae, zone }
 
-/// Předvolby známých RTTY závodů (název pro Cabrillo, formát, začátek).
+/// Předvolby známých RTTY závodů (název pro Cabrillo, formát, začátek) – v pořadí kalendářního roku.
+/// Termíny podle obvyklých pravidel; přesné datum je třeba ověřit v pravidlech závodu.
 public enum ContestPreset: String, CaseIterable, Sendable {
-    case okDXRTTY, waeRTTY
+    case arrlRoundup, cqwpxRTTY, bartgHF, sartgRTTY, cqwwRTTY, makrothen, jartsRTTY, waeRTTY, okDXRTTY
     public var title: String {
         switch self {
-        case .okDXRTTY: return "OK DX RTTY Contest (RST + CQ zóna)"
-        case .waeRTTY: return "WAE DX Contest RTTY (RST + číslo, QTC)"
+        case .arrlRoundup: return "ARRL RTTY Roundup"
+        case .cqwpxRTTY: return "CQ WPX RTTY"
+        case .bartgHF: return "BARTG HF RTTY"
+        case .sartgRTTY: return "SARTG WW RTTY"
+        case .cqwwRTTY: return "CQ WW RTTY"
+        case .makrothen: return "Makrothen RTTY"
+        case .jartsRTTY: return "JARTS WW RTTY"
+        case .waeRTTY: return "WAE DX Contest RTTY"
+        case .okDXRTTY: return "OK DX RTTY Contest"
         }
+    }
+    /// CONTEST: v Cabrillu.
+    public var cabrilloName: String {
+        switch self {
+        case .arrlRoundup: return "ARRL-RTTY"
+        case .cqwpxRTTY: return "CQ-WPX-RTTY"
+        case .bartgHF: return "BARTG-RTTY"
+        case .sartgRTTY: return "SARTG-RTTY"
+        case .cqwwRTTY: return "CQ-WW-RTTY"
+        case .makrothen: return "MAKROTHEN-RTTY"
+        case .jartsRTTY: return "JARTS-WW-RTTY"
+        case .waeRTTY: return "WAEDC"
+        case .okDXRTTY: return "OK-DX-RTTY"
+        }
+    }
+    public var format: ContestFormat {
+        switch self {
+        case .cqwwRTTY: return .cqrj
+        case .bartgHF: return .bartg
+        case .waeRTTY: return .wae
+        case .okDXRTTY: return .zone
+        case .arrlRoundup, .cqwpxRTTY, .sartgRTTY, .makrothen, .jartsRTTY: return .serial
+        }
+    }
+    /// Termín: měsíc, kolikátý celý víkend (0 = poslední) a hodina začátku v sobotu (UTC).
+    var schedule: (month: Int, weekend: Int, hour: Int) {
+        switch self {
+        case .arrlRoundup: return (1, 1, 18)
+        case .cqwpxRTTY: return (2, 2, 0)
+        case .bartgHF: return (3, 3, 2)
+        case .sartgRTTY: return (8, 3, 0)
+        case .cqwwRTTY: return (9, 0, 0)
+        case .makrothen: return (10, 2, 0)
+        case .jartsRTTY: return (10, 3, 0)
+        case .waeRTTY: return (11, 2, 0)
+        case .okDXRTTY: return (12, 3, 0)
+        }
+    }
+    /// Termín a výměna jedním řádkem (pro nabídku a popisek v Nastavení).
+    public var summary: String {
+        switch self {
+        case .arrlRoundup: return "1. celý víkend v lednu · RST + číslo (W/VE stát)"
+        case .cqwpxRTTY: return "2. celý víkend v únoru · RST + číslo"
+        case .bartgHF: return "3. celý víkend v březnu · RST + číslo + čas"
+        case .sartgRTTY: return "3. celý víkend v srpnu · RST + číslo, tři etapy"
+        case .cqwwRTTY: return "poslední celý víkend v září · RST + CQ zóna (W/VE + stát)"
+        case .makrothen: return "2. celý víkend v říjnu · RST + lokátor (4 znaky), tři etapy"
+        case .jartsRTTY: return "3. celý víkend v říjnu · RST + věk operátora (YL 00)"
+        case .waeRTTY: return "2. celý víkend v listopadu · RST + číslo, QTC"
+        case .okDXRTTY: return "3. celý víkend v prosinci · RST + CQ zóna"
+        }
+    }
+    /// Předvolba odpovídající nastavení (podle názvu a formátu); nil = vlastní nastavení.
+    public static func matching(_ c: ContestSettings) -> ContestPreset? {
+        allCases.first { $0.cabrilloName == c.name && $0.format == c.format }
     }
 }
 
@@ -184,38 +247,46 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     public init() {}
     public var effectiveStart: Date { start ?? Date().addingTimeInterval(-72 * 3600) }
 
-    /// Nastavení podle předvolby závodu v daném roce (začátek = 00:00 UTC prvního dne).
-    public static func preset(_ p: ContestPreset, year: Int) -> ContestSettings {
+    /// Nastavení podle předvolby závodu v daném roce. `locator` = vlastní lokátor (výměna Makrothenu).
+    public static func preset(_ p: ContestPreset, year: Int, locator: String = "") -> ContestSettings {
         var c = ContestSettings()
         c.enabled = true; c.nextSerial = 1
-        switch p {
-        case .okDXRTTY:        // sobota 3. celého víkendu v prosinci, 00–24 UTC
-            c.name = "OK-DX-RTTY"; c.format = .zone; c.exchange = ""
-            c.start = fullWeekendSaturday(year: year, month: 12, n: 3)
-        case .waeRTTY:         // 2. celý víkend v listopadu
-            c.name = "WAEDC"; c.format = .wae; c.exchange = ""
-            c.start = fullWeekendSaturday(year: year, month: 11, n: 2)
-        }
+        c.name = p.cabrilloName; c.format = p.format
+        if p == .makrothen { c.exchange = String(locator.uppercased().prefix(4)) }
+        let s = p.schedule
+        c.start = fullWeekendSaturday(year: year, month: s.month, n: s.weekend)
+            .map { $0.addingTimeInterval(Double(s.hour) * 3600) }
         return c
     }
 
-    /// Sobota n-tého celého víkendu (sobota i neděle v měsíci), 00:00 UTC.
+    /// Nejbližší termín: letošní, pokud ještě neskončil (začátek + 48 h), jinak příští rok.
+    public static func upcoming(_ p: ContestPreset, now: Date = Date(), locator: String = "") -> ContestSettings {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+        let y = cal.component(.year, from: now)
+        let c = preset(p, year: y, locator: locator)
+        if let st = c.start, st.addingTimeInterval(48 * 3600) > now { return c }
+        return preset(p, year: y + 1, locator: locator)
+    }
+
+    /// Sobota n-tého celého víkendu (sobota i neděle v měsíci), 00:00 UTC; n = 0 → poslední celý víkend.
     static func fullWeekendSaturday(year: Int, month: Int, n: Int) -> Date? {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
-        var count = 0
+        var found: [Date] = []
         for day in 1...31 {
             guard let d = cal.date(from: DateComponents(year: year, month: month, day: day)),
                   cal.component(.month, from: d) == month, cal.component(.weekday, from: d) == 7 else { continue }
             guard let sun = cal.date(byAdding: .day, value: 1, to: d), cal.component(.month, from: sun) == month else { continue }
-            count += 1
-            if count == n { return d }
+            found.append(d)
         }
-        return nil
+        if n == 0 { return found.last }
+        return found.count >= n ? found[n - 1] : nil
     }
     /// Formát posílá pořadové číslo (ON bez pevné výměny, BARTG).
     public var sendsSerial: Bool { format == .bartg || format == .wae || (format == .serial && exchange.isEmpty) }
     /// Formát, kde se zóna protistanice předvyplní z DXCC.
     public var prefillsZone: Bool { format == .zone }
+    /// Formát, kde se bez vyplněné výměny posílá moje CQ zóna z DXCC (OK DX RTTY, CQ WW RTTY).
+    public var sendsOwnZone: Bool { format == .zone || format == .cqrj }
     enum CodingKeys: String, CodingKey { case enabled, format, name, category, nextSerial, exchange, start }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "contest", x = ContestSettings()

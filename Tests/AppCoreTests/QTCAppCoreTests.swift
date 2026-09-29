@@ -170,3 +170,19 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
     let q1 = await app.qso
     #expect(q1.exchangeSent == "15" && q1.call.isEmpty)
 }
+
+// CQ WW RTTY (CQ/RJ) bez vyplněné výměny: moje CQ zóna z DXCC
+@Test func cqwwFillsOwnZone() async throws {
+    var s = AppSettings(); s.station.call = "OK1XOE"; s.ptt.method = .none
+    s.contest = ContestSettings.preset(.cqwwRTTY, year: 2026)
+    let engine = Engine(modem: try RTTYModem(), rig: FakeRig2(), audio: FakeAudioBackend(), config: s.engineConfig(),
+                        serialFactory: { _ in FakeSerialPort() }, clock: ManualClock(), autoRun: false)
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("cqww-\(UUID())")
+    let app = AppController(settings: s, engine: engine, log: try QSOLogStore(directory: dir), profiles: nil,
+                            countries: try CountryDB(text: cty))
+    #expect(await app.qso.exchangeSent == "15")
+    try await app.setQSOField("call", "W1AW")
+    #expect(await app.qso.exchangeRcvd == "")                       // přijatá výměna CQ/RJ nese i stát – nepředvyplňovat
+    _ = try await app.logQSO()
+    #expect(await app.qso.exchangeSent == "15")
+}

@@ -83,3 +83,50 @@ import Testing
     let wae = ContestSettings.preset(.waeRTTY, year: 2026)
     #expect(wae.format == .wae && wae.name == "WAEDC" && wae.start == ISO8601DateFormatter().date(from: "2026-11-14T00:00:00Z"))
 }
+
+// Paleta předvoleb: začátky podle obvyklých pravidel (celý víkend = sobota i neděle v měsíci)
+@Test func contestPresetCalendar() {
+    let iso = ISO8601DateFormatter()
+    let cases: [(ContestPreset, Int, String, ContestFormat, String)] = [
+        (.arrlRoundup, 2027, "ARRL-RTTY", .serial, "2027-01-02T18:00:00Z"),
+        (.cqwpxRTTY, 2027, "CQ-WPX-RTTY", .serial, "2027-02-13T00:00:00Z"),
+        (.bartgHF, 2027, "BARTG-RTTY", .bartg, "2027-03-20T02:00:00Z"),
+        (.sartgRTTY, 2026, "SARTG-RTTY", .serial, "2026-08-15T00:00:00Z"),
+        (.cqwwRTTY, 2026, "CQ-WW-RTTY", .cqrj, "2026-09-26T00:00:00Z"),
+        (.makrothen, 2026, "MAKROTHEN-RTTY", .serial, "2026-10-10T00:00:00Z"),
+        (.jartsRTTY, 2026, "JARTS-WW-RTTY", .serial, "2026-10-17T00:00:00Z"),
+    ]
+    for (p, y, name, f, start) in cases {
+        let c = ContestSettings.preset(p, year: y)
+        #expect(c.enabled && c.name == name && c.format == f, "\(p)")
+        #expect(c.start == iso.date(from: start), "\(p)")
+        #expect(ContestPreset.matching(c) == p, "\(p)")
+    }
+    #expect(ContestPreset.allCases.count == 9)
+}
+
+// Vybraná předvolba se pozná z názvu a formátu; ruční úprava = vlastní nastavení
+@Test func contestPresetMatching() {
+    var c = ContestSettings.preset(.waeRTTY, year: 2026)
+    #expect(ContestPreset.matching(c) == .waeRTTY)
+    c.name = "MUJ-ZAVOD"
+    #expect(ContestPreset.matching(c) == nil)
+    #expect(ContestPreset.matching(ContestSettings()) == nil)
+}
+
+// Nejbližší termín: letošní, pokud ještě neskončil, jinak příští rok
+@Test func contestPresetUpcoming() {
+    let iso = ISO8601DateFormatter()
+    let now = iso.date(from: "2026-09-29T12:00:00Z")!
+    #expect(ContestSettings.upcoming(.cqwwRTTY, now: now).start == iso.date(from: "2027-09-25T00:00:00Z"))
+    #expect(ContestSettings.upcoming(.makrothen, now: now).start == iso.date(from: "2026-10-10T00:00:00Z"))
+    // závod právě běží → letošní
+    #expect(ContestSettings.upcoming(.cqwwRTTY, now: iso.date(from: "2026-09-27T10:00:00Z")!).start
+            == iso.date(from: "2026-09-26T00:00:00Z"))
+}
+
+// Makrothen: výměna = 4místný lokátor
+@Test func makrothenUsesLocator() {
+    #expect(ContestSettings.preset(.makrothen, year: 2026, locator: "jo70fb").exchange == "JO70")
+    #expect(ContestSettings.preset(.makrothen, year: 2026).exchange == "")
+}
