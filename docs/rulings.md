@@ -225,3 +225,12 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - MMTTY „FFT Width/Sensitivity“ = už existující rozsah a zesílení; nově odezva (doznívání) spektra a paleta vodopádu.
 - „Word wrap on keyboard“ = zalomení psaného textu na zvoleném sloupci (20–200) přímo v okně vysílání.
 - Oprava: „Použít“ v Nastavení přebírá i zvolenou předvolbu závodu (dřív se „Vlastní nastavení“ po Použít neuložilo).
+
+## Plán 14: CAT přes USB
+- Dvě cesty: vestavěný CAT (`SerialCATRig`: Icom CI-V, Yaesu nové CAT, Kenwood, Elecraft – frekvence, mód, PTT) a hamlib spuštěný aplikací (`ManagedHamlibRig`: `rigctld -m <model> -r <port> -s <baud> -T 127.0.0.1 -t 4534`) pro ostatní modely. rigctld se hledá v /opt/homebrew/bin, /usr/local/bin a PATH (nepřibaluje se).
+- Kenwood PTT = `TX1;` (DATA SEND – zvuk z USB/ACC), Elecraft `TX;`, Yaesu `TX1;`/`TX0;`; Icom 1C 00. PKTUSB: Icom USB + 1A 06 01 01, Kenwood `MD2;DA1;`, Elecraft `MD6;DT0;`, Yaesu `MD0C;`.
+- CI-V: echo vlastních rámců a oznámení (adresa 00) se ignorují; FA = odmítnutí. Textové nastavovací příkazy rádia nepotvrzují – chyba se projeví až dotazem.
+- Engine rig nepřipojuje zvlášť: CAT port se otevře při prvním dotazu, rigctld se spustí líně; po neúspěšném spuštění se 10 s znovu nespouští. `Engine.stop()` rig odpojí (uvolní port / ukončí rigctld) až po PTT off.
+- Port CAT se otevírá výhradně (TIOCEXCL) a DTR/RTS se shodí – sdílení s PTT přes RTS/DTR na stejném portu nejde, PTT přes CAT ano.
+- Rychlost: IOSSIOSPEED, u ovladačů bez něj záložně termios (standardní rychlosti).
+- Neověřeno se skutečným rádiem (není k dispozici) – testy: kodeky, simulované rádio, pseudoterminál, skutečný rigctld Dummy.

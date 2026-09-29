@@ -124,6 +124,7 @@ public actor Engine {
             // start selhal (např. zvuk) – jen ukončit proudy událostí, ať odběratelé nečekají věčně
             finished = true
             await ptt?.forceOff()
+            await rig.disconnect()
             modem.finishEvents()
             broadcaster.finish()
             return
@@ -139,6 +140,7 @@ public actor Engine {
         await ptt?.forceOff()
         audio.stop()
         for p in ports.values { p.close() }
+        await rig.disconnect()                   // uvolnit port CAT / ukončit spuštěný rigctld (až po PTT off)
         // doběhnutí událostí z modemu, pak konec streamů
         modem.finishEvents()
         await modemTask?.value

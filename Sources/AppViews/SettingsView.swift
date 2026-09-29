@@ -6,6 +6,8 @@ import Keying
 import Localization
 import ModemKit
 import Settings
+import RigControl
+import AppCore
 import SwiftUI
 
 public struct SettingsView: View {
@@ -208,23 +210,138 @@ struct PTTTab: View {
 
 struct RigTab: View {
     @Binding var s: AppSettings
+    @State private var ports: [String] = POSIXSerialPort.availablePorts()
+    @State private var models: [HamlibModel] = []
+    @State private var rigctld: String? = ManagedHamlibRig.findRigctld()
+    @State private var testResult: String?
+    @State private var testing = false
+
+    var usesSerial: Bool { s.rig.type == .cat || s.rig.type == .hamlibManaged }
+
     var body: some View {
         Form {
             Section {
                 Picker(L("Ovládání"), selection: $s.rig.type) {
-                    Text(L("Žádné")).tag(RigType.none); Text("hamlib rigctld").tag(RigType.hamlib); Text("flrig").tag(RigType.flrig)
+                    Text(L("Žádné")).tag(RigType.none)
+                    Text(L("CAT přes USB (vestavěný)")).tag(RigType.cat)
+                    Text(L("hamlib – spustit automaticky")).tag(RigType.hamlibManaged)
+                    Text(L("hamlib rigctld (síť)")).tag(RigType.hamlib)
+                    Text("flrig").tag(RigType.flrig)
                 }
-                Group {
+            } header: { Text("Rig (CAT)") } footer: { Text(typeHint) }
+
+            if s.rig.type == .cat {
+                Section(L("Rádio")) {
+                    Picker(L("Protokol"), selection: $s.rig.catProtocol) {
+                        Text("Icom CI-V").tag(CATKind.icom)
+                        Text(L("Yaesu (FT-991, FTDX10/101, FT-710…)")).tag(CATKind.yaesu)
+                        Text(L("Kenwood (TS-590, TS-890…)")).tag(CATKind.kenwood)
+                        Text(L("Elecraft (K3, K4, KX3…)")).tag(CATKind.elecraft)
+                    }
+                    if s.rig.catProtocol == .icom {
+                        Picker(L("Model Icom"), selection: $s.rig.civAddress) {
+                            ForEach(RigSettings.icomAddresses, id: \.0) { m in Text(String(format: "%@ (%02Xh)", m.0, m.1)).tag(m.1) }
+                            if !RigSettings.icomAddresses.contains(where: { $0.1 == s.rig.civAddress }) {
+                                Text(String(format: L("vlastní (%02Xh)"), s.rig.civAddress)).tag(s.rig.civAddress)
+                            }
+                        }
+                        LabeledContent(L("Adresa CI-V (hex)")) {
+                            TextField("", text: Binding(get: { String(format: "%02X", s.rig.civAddress) },
+                                                        set: { if let v = Int($0, radix: 16), (1...0xDF).contains(v) { s.rig.civAddress = v } }))
+                                .multilineTextAlignment(.trailing).frame(width: 60)
+                        }
+                    }
+                }
+            }
+
+            if s.rig.type == .hamlibManaged {
+                Section(L("Model hamlib")) {
+                    if rigctld == nil {
+                        Text(L("rigctld nenalezen – nainstaluj hamlib: brew install hamlib")).foregroundStyle(.orange)
+                    } else if models.isEmpty {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Picker(L("Model"), selection: $s.rig.hamlibModel) {
+                            ForEach(models) { m in Text("\(m.title) (#\(m.id))").tag(m.id) }
+                        }
+                    }
+                    TextField(L("Místní TCP port"), value: $s.rig.port, format: .number.grouping(.never), prompt: Text("4534"))
+                }
+            }
+
+            if usesSerial {
+                Section {
+                    LabeledContent(L("Sériový port")) {
+                        HStack {
+                            Picker("", selection: $s.rig.serialPort) {
+                                Text(L("— vyber —")).tag("")
+                                ForEach(ports, id: \.self) { p in Text(p.replacingOccurrences(of: "/dev/", with: "")).tag(p) }
+                                if !s.rig.serialPort.isEmpty, !ports.contains(s.rig.serialPort) {
+                                    Text(s.rig.serialPort + " " + L("(nepřipojen)")).tag(s.rig.serialPort)
+                                }
+                            }.labelsHidden()
+                            Button { ports = POSIXSerialPort.availablePorts() } label: { Image(systemName: "arrow.clockwise") }
+                                .hint(L("Znovu načíst porty"))
+                        }
+                    }
+                    Picker(L("Rychlost"), selection: $s.rig.baud) {
+                        ForEach(RigSettings.baudRates, id: \.self) { b in Text("\(b) Bd").tag(b) }
+                    }
+                    Picker(L("Stop bity"), selection: $s.rig.stopBits) { Text("1").tag(1); Text("2").tag(2) }
+                } header: { Text(L("Připojení")) } footer: {
+                    Text(L("Rychlost a stop bity musí odpovídat nastavení CAT v menu rádia. Pro PTT přes CAT zvol v záložce PTT / FSK metodu CAT – port CAT nejde sdílet s PTT přes RTS/DTR."))
+                }
+            }
+
+            if s.rig.type == .hamlib || s.rig.type == .flrig {
+                Section(L("Síť")) {
                     TextField(L("Adresa"), text: $s.rig.host)
                     TextField(L("Port"), value: $s.rig.port, format: .number.grouping(.never),
                               prompt: Text(s.rig.type == .flrig ? "12345" : "4532"))
                 }
-                .disabled(s.rig.type == .none)
-            } header: { Text("Rig (CAT)") } footer: {
-                Text(L("hamlib: spusťte např. „rigctld -m <model> -r /dev/cu.X -s <baud>“. flrig: stačí spuštěný flrig. Prázdný port = výchozí."))
+            }
+
+            if s.rig.type != .none {
+                Section {
+                    HStack {
+                        Button(testing ? L("Zkouším…") : L("Vyzkoušet spojení")) { test() }.disabled(testing)
+                        if let testResult { Text(testResult).font(.callout).foregroundStyle(.secondary).textSelection(.enabled) }
+                    }
+                } footer: { Text(L("Zkouška otevře port zvlášť – když ho právě používá běžící aplikace, zkouška selže na obsazeném portu.")) }
             }
         }
         .formStyle(.grouped)
+        .task(id: s.rig.type) {
+            guard s.rig.type == .hamlibManaged, models.isEmpty, let bin = rigctld else { return }
+            models = await Task.detached { ManagedHamlibRig.availableModels(binary: bin) }.value
+        }
+    }
+
+    var typeHint: String {
+        switch s.rig.type {
+        case .none: return L("Frekvence se nečte a PTT přes CAT není k dispozici.")
+        case .cat: return L("Vestavěné ovládání bez dalších programů: frekvence, mód a PTT přímo přes USB kabel rádia.")
+        case .hamlibManaged: return L("Pro ostatní rádia: aplikace sama spustí rigctld se zvoleným modelem a portem (hamlib z Homebrew).")
+        case .hamlib: return L("hamlib: spusťte např. „rigctld -m <model> -r /dev/cu.X -s <baud>“. flrig: stačí spuštěný flrig. Prázdný port = výchozí.")
+        case .flrig: return L("flrig musí běžet a mít povolené XML-RPC (výchozí port 12345).")
+        }
+    }
+
+    private func test() {
+        testing = true; testResult = nil
+        let r = s.rig
+        Task {
+            let rig = RigFactory.make(r)
+            var out: String
+            do {
+                try await rig.connect()
+                let f = try await rig.frequency()
+                let m = (try? await rig.mode()) ?? "?"
+                out = L("OK: %@ kHz, mód %@", String(format: "%.3f", f / 1000), m)
+            } catch { out = L("Chyba: %@", "\(error)") }
+            await rig.disconnect()
+            testResult = out; testing = false
+        }
     }
 }
 

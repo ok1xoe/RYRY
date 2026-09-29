@@ -65,18 +65,41 @@ public struct FSKSettings: Codable, Sendable, Equatable {
     }
 }
 
-public enum RigType: String, Codable, Sendable, CaseIterable { case none, hamlib, flrig }
+/// hamlib/flrig přes síť, vestavěný CAT přes USB sériový port, nebo hamlib spuštěný aplikací.
+public enum RigType: String, Codable, Sendable, CaseIterable { case none, hamlib, flrig, cat, hamlibManaged }
+/// Protokol vestavěného CAT.
+public enum CATKind: String, Codable, Sendable, CaseIterable { case icom, yaesu, kenwood, elecraft }
 
 public struct RigSettings: Codable, Sendable, Equatable {
     public var type: RigType = .none
     public var host = "127.0.0.1"
     public var port: Int?                     // nil = výchozí (4532 / 12345)
+    /// CAT přes USB (vestavěný i hamlib spuštěný aplikací): sériový port a rychlost.
+    public var serialPort = ""
+    public var baud = 19200
+    public var stopBits = 1
+    public var catProtocol = CATKind.icom
+    /// Adresa CI-V rádia Icom (IC-7300 = 94h).
+    public var civAddress = 0x94
+    /// Číslo modelu hamlib (`rigctld -l`), 1 = Dummy.
+    public var hamlibModel = 1
     public init() {}
     public var effectivePort: Int { port ?? (type == .flrig ? 12345 : 4532) }
-    enum CodingKeys: String, CodingKey { case type, host, port }
+    public static let baudRates = [4800, 9600, 19200, 38400, 57600, 115200]
+    /// Výchozí adresy CI-V běžných rádií Icom.
+    public static let icomAddresses: [(String, Int)] = [("IC-7300", 0x94), ("IC-7610", 0x98), ("IC-705", 0xA4), ("IC-9700", 0xA2),
+                                                        ("IC-7100", 0x88), ("IC-7851", 0x8E), ("IC-7600", 0x7A), ("IC-7000", 0x70),
+                                                        ("IC-7410", 0x80), ("IC-718", 0x5E), ("IC-7300MK2", 0xB6)]
+    enum CodingKeys: String, CodingKey { case type, host, port, serialPort, baud, stopBits, catProtocol, civAddress, hamlibModel }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "rig", x = RigSettings()
         type = c.tolerant(.type, x.type, w, s); host = c.tolerant(.host, x.host, w, s); port = c.tolerant(.port, x.port, w, s)
+        serialPort = c.tolerant(.serialPort, x.serialPort, w, s)
+        let b = c.tolerant(.baud, x.baud, w, s); baud = (300...1_000_000).contains(b) ? b : x.baud
+        let sb = c.tolerant(.stopBits, x.stopBits, w, s); stopBits = (1...2).contains(sb) ? sb : x.stopBits
+        catProtocol = c.tolerant(.catProtocol, x.catProtocol, w, s)
+        let a = c.tolerant(.civAddress, x.civAddress, w, s); civAddress = (1...0xDF).contains(a) ? a : x.civAddress
+        let m = c.tolerant(.hamlibModel, x.hamlibModel, w, s); hamlibModel = m > 0 ? m : x.hamlibModel
     }
 }
 

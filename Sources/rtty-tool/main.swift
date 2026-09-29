@@ -222,12 +222,7 @@ case "live":
 
     let m: RTTYModem
     do { m = try RTTYModem() } catch { fail("\(error)") }
-    let rig: Rig
-    switch settings.rig.type {
-    case .hamlib: rig = HamlibClient(host: settings.rig.host, port: UInt16(settings.rig.effectivePort))
-    case .flrig: rig = FlrigClient(host: settings.rig.host, port: settings.rig.effectivePort)
-    case .none: rig = NoRig()
-    }
+    let rig: Rig = RigFactory.make(settings.rig)
     let engine = Engine(modem: m, rig: rig, audio: CoreAudioBackend(), config: settings.engineConfig())
     let log: QSOLogStore?
     do { log = try QSOLogStore(directory: URL(fileURLWithPath: settings.log.directory)) }
