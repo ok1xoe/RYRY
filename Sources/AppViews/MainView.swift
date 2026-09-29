@@ -15,6 +15,9 @@ public struct MainView: View {
                     SpectrumView(model: model).frame(minHeight: 50, idealHeight: 80)
                     WaterfallView(model: model).frame(minHeight: 90, idealHeight: 150)
                     RxTextView(model: model).frame(minHeight: 140)
+                    if model.settings.decoders.secondEnabled {
+                        SecondDecoderPanel(model: model).frame(minHeight: 60, idealHeight: 90)
+                    }
                     TxEditor(model: model).frame(minHeight: 70, idealHeight: 90)
                 }
                 MacroBar(model: model)

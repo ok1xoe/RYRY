@@ -205,6 +205,42 @@ public struct RTTYCoreSettings: Codable, Sendable, Equatable {
     }
 }
 
+/// Doplňkové dekodéry: druhý dekodér (jiný demodulátor) a vícekanálové dekódování.
+public struct DecoderSettings: Codable, Sendable, Equatable {
+    public var secondEnabled = false
+    /// Demodulátor druhého dekodéru (iir/fir/pll/fft); nil = automaticky jiný než hlavní.
+    public var secondDemod: String?
+    public var channelsEnabled = false
+    public var maxChannels = 4              // 1…8
+    public var channelTimeoutS = 15.0       // kanál zaniká po tolika s bez signálu
+    public var showChannelMarks = true      // značky kanálů ve vodopádu
+    public init() {}
+    public static let channelRange = 1...8
+    public static let timeoutRange = 2.0...300.0
+    enum CodingKeys: String, CodingKey { case secondEnabled, secondDemod, channelsEnabled, maxChannels, channelTimeoutS, showChannelMarks }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "decoders", x = DecoderSettings()
+        secondEnabled = c.tolerant(.secondEnabled, x.secondEnabled, w, s)
+        let dm: String? = c.tolerant(.secondDemod, x.secondDemod, w, s)
+        secondDemod = dm.flatMap { AuxDecoderConfig.demodTypes.contains($0) ? $0 : nil }
+        channelsEnabled = c.tolerant(.channelsEnabled, x.channelsEnabled, w, s)
+        let n = c.tolerant(.maxChannels, x.maxChannels, w, s); maxChannels = Self.channelRange.contains(n) ? n : x.maxChannels
+        let t = c.tolerant(.channelTimeoutS, x.channelTimeoutS, w, s)
+        channelTimeoutS = Self.timeoutRange.contains(t) ? t : x.channelTimeoutS
+        showChannelMarks = c.tolerant(.showChannelMarks, x.showChannelMarks, w, s)
+    }
+
+    /// Konfigurace doplňkových dekodérů pro Engine.
+    public func auxConfig() -> AuxDecoderConfig {
+        var a = AuxDecoderConfig()
+        a.secondEnabled = secondEnabled; a.secondDemod = secondDemod
+        a.channelsEnabled = channelsEnabled
+        a.maxChannels = min(Self.channelRange.upperBound, max(Self.channelRange.lowerBound, maxChannels))
+        a.channelTimeout = min(Self.timeoutRange.upperBound, max(Self.timeoutRange.lowerBound, channelTimeoutS.isFinite ? channelTimeoutS : 15))
+        return a
+    }
+}
+
 /// Závodní formát (MMTTY Log m_Contest): ON = RST + číslo, CQ/RJ = zóna + QTH, BARTG = číslo + čas UTC,
 /// PED = klik na slovo vždy vyplní značku, bez čísel. WAE = RST + číslo a výměna QTC (WAE DX Contest).
 /// ZONE = RST + CQ zóna (OK DX RTTY Contest).
@@ -425,6 +461,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var txWindow = TxWindowSettings()
     /// Vlastní klávesové zkratky (id příkazu → zkratka); chybějící = výchozí.
     public var shortcuts: [String: KeyBinding] = [:]
+    public var decoders = DecoderSettings()
     public init() {}
     public static let macroCount = 16
 
@@ -448,7 +485,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     ]
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, rtty, macros, log,
-                                             clock, rttyCore, contest, display, messages, txWindow, shortcuts }
+                                             clock, rttyCore, contest, display, messages, txWindow, shortcuts, decoders }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -476,6 +513,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         messages = c.contains(.messages) ? c.tolerant(.messages, TolerantArray<Macro>(), w, s).items : x.messages
         txWindow = c.tolerant(.txWindow, x.txWindow, w, s)
         shortcuts = c.tolerant(.shortcuts, TolerantDict<KeyBinding>(), w, s).items.filter { $0.value.isValid }
+        decoders = c.tolerant(.decoders, x.decoders, w, s)
     }
 
     /// Konfigurace Engine z nastavení.
