@@ -1,6 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import CryptoKit
 import Foundation
+import Localization
 
 /// Síť pro kontrolu aktualizací (v testech nahrazena atrapou).
 public protocol UpdateNetwork: Sendable {
@@ -94,7 +95,7 @@ public final class UpdateChecker: @unchecked Sendable {
     /// `manual` = ruční příkaz z menu: ignoruje denní limit i přeskočenou verzi.
     public func check(manual: Bool) async -> UpdateOutcome {
         guard configured else { return .notConfigured }
-        guard let feedURL else { return .failed("neplatná adresa aktualizací") }
+        guard let feedURL else { return .failed(L("neplatná adresa aktualizací")) }
         if !manual && !dueForAutomaticCheck() { return .skippedByLimit }
         let info: UpdateInfo
         do {
@@ -120,9 +121,9 @@ public final class UpdateChecker: @unchecked Sendable {
 
     static func describe(_ e: UpdateError) -> String {
         switch e {
-        case .invalidFeed(let s): return "neplatná data aktualizací (\(s))"
-        case .http(let c): return "server odpověděl kódem \(c)"
-        case .checksumMismatch: return "kontrolní součet nesouhlasí"
+        case .invalidFeed(let s): return L("neplatná data aktualizací (%@)", s)
+        case .http(let c): return L("server odpověděl kódem %ld", c)
+        case .checksumMismatch: return L("kontrolní součet nesouhlasí")
         }
     }
 

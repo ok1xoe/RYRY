@@ -979,11 +979,29 @@ struct SecretField: View {
     let service: String
     let store: any UploadSecretStore
     @State private var value = ""
+    @State private var saved = ""
     @State private var loaded = false
+    @State private var error: String?
+    @FocusState private var focused: Bool
     var body: some View {
-        SecureField(title, text: $value)
-            .onAppear { if !loaded { value = store.get(service: service, account: SecretServices.account) ?? ""; loaded = true } }
-            .onChange(of: value) { _, v in if loaded { try? store.set(v, service: service, account: SecretServices.account) } }
+        VStack(alignment: .trailing, spacing: 2) {
+            SecureField(title, text: $value)
+                .focused($focused)
+                .onSubmit { save() }
+                .onChange(of: focused) { if !focused { save() } }
+                .onDisappear { save() }
+            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+        }
+        .onAppear {
+            if !loaded { value = store.get(service: service, account: SecretServices.account) ?? ""; saved = value; loaded = true }
+        }
+    }
+
+    /// Uloží do Klíčenky při potvrzení nebo opuštění pole (ne po každém znaku); chybu ukáže.
+    private func save() {
+        guard loaded, value != saved else { return }
+        do { try store.set(value, service: service, account: SecretServices.account); saved = value; error = nil }
+        catch { self.error = L("Heslo nelze uložit do Klíčenky: %@", error.localizedDescription) }
     }
 }
 

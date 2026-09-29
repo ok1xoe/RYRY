@@ -1,6 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import AppKit
 import Foundation
+import Localization
 import Observation
 import Updates
 
@@ -82,8 +83,8 @@ public final class UpdateModel {
         } catch {
             let m = (error as? UpdateError).map { e -> String in
                 switch e {
-                case .checksumMismatch: return "kontrolní součet nesouhlasí"
-                case .http(let c): return "server odpověděl kódem \(c)"
+                case .checksumMismatch: return L("kontrolní součet nesouhlasí")
+                case .http(let c): return L("server odpověděl kódem %ld", c)
                 case .invalidFeed(let s): return s
                 }
             } ?? error.localizedDescription

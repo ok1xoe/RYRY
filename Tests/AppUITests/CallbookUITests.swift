@@ -48,7 +48,7 @@ private func waitUntil(_ cond: () -> Bool) async {
     let (f, req) = await setup()
     await f.model.setQSOField("name", "JAN")
     await f.model.setQSOField("call", "ok1abc")
-    await waitUntil { !f.model.qso.qth.isEmpty }
+    await waitUntil { !f.model.qso.qth.isEmpty && !f.model.qso.locator.isEmpty }
     #expect(f.model.qso.name == "JAN")                // vyplněné pole zůstalo
     #expect(f.model.qso.qth == "Praha")
     #expect(f.model.qso.locator == "JO70FB")

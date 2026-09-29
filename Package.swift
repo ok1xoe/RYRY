@@ -73,7 +73,7 @@ let package = Package(
         .target(name: "Spots", dependencies: ["QSOLog"]),
         .testTarget(name: "SpotsTests", dependencies: ["Spots", "QSOLog"]),
         .target(name: "Localization"),
-        .target(name: "Updates"),
+        .target(name: "Updates", dependencies: ["Localization"]),
         .testTarget(name: "UpdatesTests", dependencies: ["Updates"]),
         .testTarget(name: "LocalizationTests", dependencies: ["Localization"]),
         .testTarget(name: "DXCCTests", dependencies: ["DXCC"]),

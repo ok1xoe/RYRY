@@ -69,7 +69,8 @@ if [[ -f "$DMG" ]]; then
     V="$V" B="$B" SHA="$SHA" MINOS="$MINOS" python3 - <<'PY' || echo "Appcast se nepodařilo vytvořit (DMG je v pořádku)" >&2
 import json, os
 e = os.environ
-latest = {"version": e["V"], "build": int(e["B"]) if e["B"].isdigit() else e["B"]}
+latest = {"version": e["V"]}
+if e["B"].isdigit(): latest["build"] = int(e["B"])      # nečíselné číslo sestavení vynechat (appcast čte build jako číslo)
 base = e.get("UPDATE_BASE_URL", "").rstrip("/")
 if base:
     latest["url"] = f"{base}/mmtty4mac-{e['V']}.dmg"

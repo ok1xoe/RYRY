@@ -48,3 +48,21 @@ import Testing
     let imp = ADIF.importRecords(ADIF.header() + ADIF.record(r)).records[0]
     #expect(imp.isUploaded(.clublog) && !imp.isUploaded(.eqsl))
 }
+
+// Review Critical 1: dvě instance logu nad stejnými soubory (nahrávání přes Použít) – přepis nesmí smazat
+// spojení zapsané druhou instancí
+@Test func rewriteReloadsWhenFileChangedElsewhere() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("stale-\(UUID())")
+    let old = try QSOLogStore(directory: dir)
+    let a = QSORecord(call: "OK1AAA", timeOn: Date())
+    try await old.append(a)
+    let fresh = try QSOLogStore(directory: dir)                   // restart po Použít
+    try await Task.sleep(for: .milliseconds(20))                  // jiný čas změny souboru
+    try await fresh.append(QSORecord(call: "OK2BBB", timeOn: Date()))
+    try await old.markUploaded(ids: [a.id], target: .lotw)        // doběhlé nahrávání ve staré instanci
+    let check = try QSOLogStore(directory: dir)
+    let calls = await check.records.map(\.call)
+    #expect(calls.sorted() == ["OK1AAA", "OK2BBB"])
+    #expect(await check.records.first { $0.call == "OK1AAA" }?.uploads?["lotw"] != nil)
+    #expect(await check.isADIFConsistent())
+}

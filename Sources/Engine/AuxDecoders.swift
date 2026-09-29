@@ -122,7 +122,8 @@ final class AuxDecoderHub: @unchecked Sendable {
         }
         guard ok else { return }
         queue.async {
-            self.process(block, tuning: tuning, spectrum: spectrum)
+            // po stop() zbylé bloky jen zahodit (jinak by zastavení čekalo na zpracování až 20 s audia)
+            if !self.lock.withLock({ self.stopped }) { self.process(block, tuning: tuning, spectrum: spectrum) }
             self.lock.withLock { self.backlog -= n }
         }
     }

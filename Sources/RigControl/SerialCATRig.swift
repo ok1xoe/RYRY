@@ -28,7 +28,7 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
     private let proto: CATProtocol
     private let timeout: Duration
     private let queue = DispatchQueue(label: "mmtty4mac.cat")
-    private var isOpen = false
+    private var isOpen = false { didSet { let v = isOpen; openLock.withLock { openFlag = v } } }
     /// Po výslovném disconnect() se port znovu neotevírá (dokud nepřijde connect()).
     private var closedByOwner = false
     /// Počet číslic frekvence podle poslední odpovědi rádia (starší Yaesu mají 8).
@@ -44,7 +44,10 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
         }
     }
 
-    public var isIdle: Bool { queue.sync { !isOpen } }
+    /// Bez blokování (queue.sync by čekal na běžící CAT dotaz až ~1 s na vlákně actoru Engine).
+    public var isIdle: Bool { openLock.withLock { !openFlag } }
+    private let openLock = NSLock()
+    private var openFlag = false
 
     public func connect() async throws {
         try await onQueue { [self] in

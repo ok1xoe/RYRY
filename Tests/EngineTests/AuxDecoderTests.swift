@@ -124,6 +124,7 @@ func collectAux(_ events: AsyncStream<EngineEvent>) async -> AuxCollected {
         let text = "CQ CQ DE OK1XOE OK1XOE PSE K"
         r.audio.feedRx(mix([RTTYSignalGenerator().generate(text: text)], noise: 0.05))
         await pump(r) { r.audio.rxRemaining == 0 }
+        await r.engine.flushAuxDecoders()
         await r.engine.stop()
         let got = await collectAux(r.events)
         #expect(got.main.contains(text))
@@ -146,6 +147,7 @@ func collectAux(_ events: AsyncStream<EngineEvent>) async -> AuxCollected {
         #expect(c.resolvedSecondDemod(main: "fft") == "iir")
         var pll = c; pll.secondDemod = "pll"
         #expect(pll.resolvedSecondDemod(main: "iir") == "pll")
+        await r.engine.flushAuxDecoders()
         await r.engine.stop()
         #expect(await collectAux(r.events).second.contains(text))
     }
@@ -162,6 +164,7 @@ func collectAux(_ events: AsyncStream<EngineEvent>) async -> AuxCollected {
         r.audio.feedRx(RTTYSignalGenerator().generate(text: "CQ CQ DE OK1XOE K"))
         await pump(r, steps: 40) { false }
         await r.engine.auxFlush()
+        await r.engine.flushAuxDecoders()
         await r.engine.stop()
         #expect(await collectAux(r.events).second.isEmpty)
     }
@@ -180,6 +183,7 @@ func collectAux(_ events: AsyncStream<EngineEvent>) async -> AuxCollected {
         let s2 = RTTYSignalGenerator(markHz: 1650, amplitude: 0.3).generate(text: "RYRYRY " + t2 + " " + t2 + " " + t2, leadIn: 2)
         r.audio.feedRx(mix([s1, s2]))
         await pump(r) { r.audio.rxRemaining == 0 }
+        await r.engine.flushAuxDecoders()
         await r.engine.stop()
         let got = await collectAux(r.events)
         let marks = got.lists.last(where: { !$0.isEmpty }) ?? []
@@ -208,6 +212,7 @@ func collectAux(_ events: AsyncStream<EngineEvent>) async -> AuxCollected {
         await pump(r) { r.audio.rxRemaining == 0 }
         await r.engine.auxFlush()
         #expect(await r.engine.auxModemCount == 0)
+        await r.engine.flushAuxDecoders()
         await r.engine.stop()
         let got = await collectAux(r.events)
         #expect(got.lists.contains { $0.count == 1 })
@@ -232,6 +237,7 @@ func collectAux(_ events: AsyncStream<EngineEvent>) async -> AuxCollected {
         await r.engine.setAuxDecoders(AuxDecoderConfig())
         await r.engine.auxFlush()
         #expect(await r.engine.auxModemCount == 0)
+        await r.engine.flushAuxDecoders()
         await r.engine.stop()
         let got = await collectAux(r.events)
         #expect(got.lists.allSatisfy { $0.count <= 1 })
@@ -251,6 +257,7 @@ func collectAux(_ events: AsyncStream<EngineEvent>) async -> AuxCollected {
         await pump(r) { r.audio.rxRemaining == 0 }
         await r.engine.auxFlush()
         #expect(tracker.alive >= 2)
+        await r.engine.flushAuxDecoders()
         await r.engine.stop()
         _ = await collectAux(r.events)                    // proud událostí skončil (hub i odběratelé doběhli)
         #expect(await r.engine.auxModemCount == 0)

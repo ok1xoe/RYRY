@@ -13,6 +13,9 @@ public actor QSOLogStore {
     private var badLines: [String] = []
     /// Log se nepodařilo přečíst → zápisy se odmítají, aby se nepřepsal.
     private var readFailed = false
+    /// Velikost a čas změny JSONL po posledním vlastním čtení/zápisu – pozná změnu jinou instancí
+    /// (např. dlouhé nahrávání do LoTW přes restart po Použít).
+    private var signature: [Int] = []
 
     /// ISO 8601 s milisekundami; čte i starší zápis bez desetin.
     static let encoder: JSONEncoder = {
@@ -67,6 +70,29 @@ public actor QSOLogStore {
             do { try Self.atomicWrite(ADIF.header() + records.map(ADIF.record).joined(), to: adifURL); warnings.append("\(adifURL.lastPathComponent) neodpovídal JSONL – přegenerován") }
             catch { warnings.append("\(adifURL.lastPathComponent) nelze přegenerovat: \(error)") }
         }
+        signature = Self.signatureOf(jsonlURL)
+    }
+
+    private func fileSignature() -> [Int] { Self.signatureOf(jsonlURL) }
+
+    static func signatureOf(_ url: URL) -> [Int] {
+        guard let at = try? FileManager.default.attributesOfItem(atPath: url.path) else { return [] }
+        let size = (at[.size] as? NSNumber)?.intValue ?? -1
+        let mtime = Int(((at[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0) * 1_000_000)
+        return [size, mtime]
+    }
+
+    /// Před přepisem logu: když soubor mezitím změnila jiná instance, znovu ho načíst (jinak by přepis ztratil
+    /// spojení zapsaná jinde).
+    private func refreshIfChangedExternally() {
+        guard !readFailed, fileSignature() != signature, let d = try? Data(contentsOf: jsonlURL) else { return }
+        var recs: [QSORecord] = [], bad: [String] = []
+        for line in d.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true) {
+            if let r = try? Self.decoder.decode(QSORecord.self, from: Data(line)) { recs.append(r) }
+            else { bad.append(String(decoding: line, as: UTF8.self)) }
+        }
+        records = recs; badLines = bad
+        signature = fileSignature()
     }
 
     private static func appendRaw(_ d: Data, to url: URL) throws {
@@ -103,8 +129,10 @@ public actor QSOLogStore {
     public func append(_ rec: QSORecord) throws {
         var r = rec; r.call = QSORecord.normalizeCall(r.call)
         try checkWritable()
+        let external = fileSignature() != signature
         try appendLine(try jsonLine(r), to: jsonlURL)        // zdroj pravdy – chyba = spojení nezalogováno
         records.append(r)
+        if external { signature = [] } else { signature = fileSignature() }   // cizí změna → příští přepis znovu načte
         do { try appendLine(ADIF.record(r), to: adifURL, header: ADIF.header()) }
         catch { warnings.append("ADIF zápis selhal (\(error)); JSONL je v pořádku, ADIF se přegeneruje") }
     }
@@ -114,6 +142,7 @@ public actor QSOLogStore {
         let jsonl = try recs.map(jsonLine).joined() + badLines.map { $0 + "\n" }.joined()
         try atomicWrite(jsonl, to: jsonlURL)
         records = recs
+        signature = fileSignature()
         do { try atomicWrite(ADIF.header() + recs.map(ADIF.record).joined(), to: adifURL) }
         catch { warnings.append("ADIF přepis selhal (\(error)); JSONL je v pořádku") }
     }
@@ -143,6 +172,7 @@ public actor QSOLogStore {
 
     /// Hromadný import (ADIF): duplicita = stejné id, nebo stejná značka, pásmo a mód s časem ±1 min.
     public func importRecords(_ recs: [QSORecord]) throws -> (added: Int, duplicates: Int) {
+        refreshIfChangedExternally()
         var all = records, added = 0, dup = 0
         var ids = Set(all.map(\.id))
         for var r in recs {
@@ -159,6 +189,7 @@ public actor QSOLogStore {
     }
 
     public func update(_ rec: QSORecord) throws {
+        refreshIfChangedExternally()
         var r = rec; r.call = QSORecord.normalizeCall(r.call)
         guard let i = records.firstIndex(where: { $0.id == r.id }) else { throw QSOLogError.notFound(r.id) }
         var recs = records; recs[i] = r
@@ -168,6 +199,7 @@ public actor QSOLogStore {
     /// Označí spojení jako nahraná na službu (jediný přepis logu). Vrací počet změněných záznamů.
     @discardableResult
     public func markUploaded(ids: [UUID], target: UploadTarget, at: Date = Date()) throws -> Int {
+        refreshIfChangedExternally()
         let set = Set(ids)
         var recs = records, n = 0
         for i in recs.indices where set.contains(recs[i].id) { recs[i].markUploaded(target, at: at); n += 1 }
@@ -176,6 +208,7 @@ public actor QSOLogStore {
     }
 
     public func delete(id: UUID) throws {
+        refreshIfChangedExternally()
         guard records.contains(where: { $0.id == id }) else { throw QSOLogError.notFound(id) }
         try rewrite(records.filter { $0.id != id })
     }

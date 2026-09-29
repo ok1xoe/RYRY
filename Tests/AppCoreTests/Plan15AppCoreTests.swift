@@ -3,6 +3,10 @@ import Foundation
 import Testing
 import QSOLog
 import Settings
+import Engine
+import RigControl
+import RTTYModem
+import TestSupport
 @testable import AppCore
 
 // Bod 2: bez rigu se zapíše ručně zadaná frekvence; zůstává pro další QSO; rig online má přednost
@@ -68,4 +72,19 @@ import Settings
     #expect(scp.partial("1?B").contains("K1ABC"))                // ? = libovolný znak
     let parsed = SuperCheck.parse("# MASTER.SCP\n# comment\nDL1ABC\nOK1XOE\n\n")
     #expect(parsed == ["DL1ABC", "OK1XOE"])
+}
+
+// Review Important 3: s nastaveným rigem, který neodpovídá, se nezapíše stará uložená ruční frekvence
+@Test func staleManualFrequencyNotUsedWithRigConfigured() async throws {
+    var s = AppSettings(); s.station.call = "OK1XOE"; s.ptt.method = .none
+    s.rig.type = .cat; s.log.manualFrequency = 14_080_000
+    let engine = Engine(modem: try RTTYModem(), rig: NoRig(), audio: FakeAudioBackend(), config: s.engineConfig(),
+                        serialFactory: { _ in FakeSerialPort() }, clock: ManualClock(), autoRun: false)
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("stale-\(UUID())")
+    let app = AppController(settings: s, engine: engine, log: try QSOLogStore(directory: dir), profiles: nil)
+    try await app.setQSOField("call", "DL1ABC")
+    #expect(try await app.logQSO().frequency == nil)            // rig offline, stará frekvence se nepoužije
+    try await app.setQSOField("freq", "7040")                    // zadaná teď → použije se
+    try await app.setQSOField("call", "DL2ABC")
+    #expect(try await app.logQSO().frequency == 7_040_000)
 }

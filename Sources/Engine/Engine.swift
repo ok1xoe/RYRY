@@ -479,6 +479,9 @@ public actor Engine {
     }
     public var auxDecoders: AuxDecoderConfig { auxConfig }
 
+    /// Počká, až doplňkové dekodéry zpracují všechen dosud přijatý zvuk (stop() zbytek zahodí).
+    public func flushAuxDecoders() async { await aux?.flush() }
+
     private func syncAux() {
         guard state != .stopped, !finished, let f = auxFactory else { return }
         if aux == nil, auxConfig.isActive {

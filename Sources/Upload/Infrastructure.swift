@@ -164,7 +164,7 @@ public struct UploadKeychainStore: UploadSecretStore {
                                    kSecAttrAccount as String: account]
         guard let value, !value.isEmpty else {
             let st = SecItemDelete(base as CFDictionary)
-            if st != errSecSuccess && st != errSecItemNotFound { throw UploadError.notConfigured("Klíčenka (\(st))") }
+            if st != errSecSuccess && st != errSecItemNotFound { throw UploadError.notConfigured(L("Klíčenka (chyba %ld)", Int(st))) }
             return
         }
         let data = Data(value.utf8)
@@ -172,8 +172,8 @@ public struct UploadKeychainStore: UploadSecretStore {
         if st == errSecItemNotFound {
             var add = base; add[kSecValueData as String] = data
             let s2 = SecItemAdd(add as CFDictionary, nil)
-            if s2 != errSecSuccess { throw UploadError.notConfigured("Klíčenka (\(s2))") }
-        } else if st != errSecSuccess { throw UploadError.notConfigured("Klíčenka (\(st))") }
+            if s2 != errSecSuccess { throw UploadError.notConfigured(L("Klíčenka (chyba %ld)", Int(s2))) }
+        } else if st != errSecSuccess { throw UploadError.notConfigured(L("Klíčenka (chyba %ld)", Int(st))) }
     }
 }
 

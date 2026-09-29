@@ -305,6 +305,7 @@ public actor AppController {
             guard let k = Double(v.replacingOccurrences(of: ",", with: ".")), k.isFinite, k > 10, k < 10_000_000
             else { throw AppError.badValue(L("Neplatná frekvence „%@“ (zadejte kHz, např. 14080).", v)) }
             qso.frequency = (k * 1000).rounded()
+            manualFrequencySetThisSession = true
         default: throw AppError.unknownField(name)
         }
         broadcaster.send(.qsoChanged(qso))
@@ -331,8 +332,13 @@ public actor AppController {
     /// Frekvence pro log: rig online, jinak ručně zadaná.
     func currentFrequency(manual: Double?) async -> Double? {
         if let st = await engine.rigStatus, st.online, let f = st.frequency { return f }
+        // s nastaveným rigem, který zrovna neodpovídá, jen frekvenci zadanou v této relaci (ne starou uloženou)
+        if settings.rig.type != .none, !manualFrequencySetThisSession { return nil }
         return manual
     }
+
+    /// Ruční frekvence zadaná od startu (ne jen převzatá z uloženého nastavení).
+    private var manualFrequencySetThisSession = false
 
     /// Duplicita v závodě pro značku v QSO okně (stejná stanice, pásmo a mód od začátku závodu).
     public func dupe() async -> Bool {

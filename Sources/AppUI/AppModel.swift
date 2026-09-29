@@ -372,7 +372,10 @@ public final class AppModel {
         case .engine(.modem(.signal(let l, let sq))): signalLevel = l; squelchOpen = sq
         case .engine(.modem(.tuning(let t))): mark = t.mark; space = t.space
         case .engine(.modem(.shift(let f))): fig = f
-        case .engine(.rig(let r)): rig = r
+        case .engine(.rig(let r)):
+            let bandChanged = Bands.band(forHz: r.frequency) != Bands.band(forHz: rig?.frequency)
+            rig = r
+            if bandChanged, !qso.call.isEmpty { Task { await self.refreshDupe() } }   // QSY na jiné pásmo
         case .engine(.error(let err)): note("\(err)")
         case .engine(.pttTimeout): note(L("PTT časovač vypnul vysílání"))
         case .error(let m): note(m)
@@ -1164,8 +1167,15 @@ public final class AppModel {
         let off = min(max(settings.spots.offsetHz, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound)
         let hz = spot.frequencyHz + off
         if let app, settings.rig.type != .none {
-            do { try await app.setFrequency(hz) }
-            catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
+            if state != .rx {
+                // nikdy nepřelaďovat zaklíčovaný vysílač (jiné pásmo pod zátěží, cizí kmitočet)
+                note(L("Během vysílání se rig nepřelaďuje – spot použijte po přechodu na RX."))
+            } else {
+                do { try await app.setFrequency(hz) }
+                catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
+            }
+        } else {
+            await setQSOField("freq", String(format: "%.1f", spot.frequencyHz / 1000))   // bez rigu: frekvence spotu do logu
         }
         await setQSOField("call", spot.call)
     }
