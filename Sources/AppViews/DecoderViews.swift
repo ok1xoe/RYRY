@@ -128,7 +128,7 @@ public struct ChannelsWindow: View {
                 .listStyle(.inset)
             }
         }
-        .frame(minWidth: 520, minHeight: 200)
+        .frame(minWidth: 520, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity, alignment: .top)
     }
 }
 
