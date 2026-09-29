@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
-"""Vytáhne klíče L("…") ze Sources a doplní je do jazykových souborů.
+"""Vytáhne klíče L("…") ze Sources a doplní je do jazykových souborů (cs.json: hodnota = klíč, ostatní prázdné).
 
   scripts/i18n-extract.py            # vypíše chybějící a nepoužívané klíče v Resources/Languages/*.json
   scripts/i18n-extract.py --update   # doplní chybějící klíče (prázdná hodnota) a smaže nepoužívané
@@ -33,7 +33,7 @@ def main():
         for k in missing: print("  + " + k)
         for k in stale: print("  - " + k)
         if update:
-            for k in missing: st.setdefault(k, "")
+            for k in missing: st[k] = k if d.get("code") == "cs" else ""   # čeština: text = klíč
             for k in stale: del st[k]
             p.write_text(json.dumps(d, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 

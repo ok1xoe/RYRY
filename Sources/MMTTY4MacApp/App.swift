@@ -71,7 +71,11 @@ struct MMTTY4MacApp: App {
     @Environment(\.openSettings) private var openSettings
 
     /// Jazyk rozhraní z minulého spuštění (spouštěcí parametr -language en přepíše volbu).
-    init() { LanguageLibrary.standard().restore() }
+    init() {
+        let lib = LanguageLibrary.standard()
+        lib.seedUserDirectory()                  // cs.json, en.json do složky jazyků (k úpravám)
+        lib.restore()
+    }
 
     var body: some Scene {
         Window("mmtty4mac", id: "main") {

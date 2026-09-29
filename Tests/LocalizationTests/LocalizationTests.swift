@@ -43,7 +43,6 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
 @Test func packRejectsGarbage() {
     #expect(throws: LanguagePack.PackError.self) { try LanguagePack.decode(Data("nonsense".utf8)) }
     #expect(throws: LanguagePack.PackError.self) { try LanguagePack.decode(Data(#"{"code":"","name":"X","strings":{}}"#.utf8)) }
-    #expect(throws: LanguagePack.PackError.self) { try LanguagePack.decode(Data(#"{"code":"cs","name":"X","strings":{}}"#.utf8)) }
 }
 
 // Překlad s jiným počtem/typem zástupných znaků než klíč se nepoužije (String(format:) by spadl)
@@ -114,4 +113,45 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     let l2 = Localizer()
     lib.restore(localizer: l2, defaults: d)
     #expect(l2.code == "cs")
+}
+
+
+// Čeština je normální jazykový soubor (lze ho nahrát a upravit)
+@Test func czechPackAllowed() throws {
+    let p = try LanguagePack.decode(Data(#"{"code":"cs","name":"Čeština","strings":{"Zvuk":"Audio karta"}}"#.utf8))
+    let l = Localizer(); l.use(p)
+    #expect(l.code == "cs" && l.tr("Zvuk") == "Audio karta" && l.tr("Rig") == "Rig")
+}
+
+// Upravený soubor ve složce má přednost, chybějící texty doplní přibalená verze
+@Test func userPackOverlaysBundled() throws {
+    let bundled = tmp(), user = tmp()
+    try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
+    try LanguagePack(code: "en", name: "English (mine)", strings: ["Zvuk": "Sound", "Nové": ""]).encoded()
+        .write(to: user.appendingPathComponent("en.json"))
+    let p = try #require(LanguageLibrary(bundled: [bundled], userDirectory: user).pack(code: "en"))
+    #expect(p.name == "English (mine)" && p.strings["Zvuk"] == "Sound" && p.strings["Spojení: %d"] == "QSOs: %d")
+}
+
+// Při startu se přibalené jazyky zkopírují do složky; neupravené kopie se s novou verzí obnoví, upravené ne
+@Test func seedUserDirectory() throws {
+    let bundled = tmp(), user = tmp()
+    try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
+    let lib = LanguageLibrary(bundled: [bundled], userDirectory: user)
+    lib.seedUserDirectory()
+    let u = user.appendingPathComponent("en.json")
+    #expect(try LanguagePack.decode(Data(contentsOf: u)) == en)
+    // nová verze aplikace: neupravená kopie se obnoví
+    var v2 = en; v2.strings["Zvuk"] = "Sound card"
+    try v2.encoded().write(to: bundled.appendingPathComponent("en.json"))
+    lib.seedUserDirectory()
+    #expect(try LanguagePack.decode(Data(contentsOf: u)).strings["Zvuk"] == "Sound card")
+    // uživatel kopii upravil → další verze ji nepřepíše
+    var mine = v2; mine.strings["Zvuk"] = "My audio"
+    try mine.encoded().write(to: u)
+    var v3 = v2; v3.strings["Zvuk"] = "Audio v3"
+    try v3.encoded().write(to: bundled.appendingPathComponent("en.json"))
+    lib.seedUserDirectory()
+    #expect(try LanguagePack.decode(Data(contentsOf: u)).strings["Zvuk"] == "My audio")
+    #expect(lib.pack(code: "en")?.strings["Zvuk"] == "My audio")
 }

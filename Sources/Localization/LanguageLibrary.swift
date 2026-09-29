@@ -1,4 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import CryptoKit
 import Foundation
 
 /// Dostupné jazyky: přibalené v aplikaci a nahrané uživatelem (Application Support/mmtty4mac/Languages).
@@ -29,13 +30,55 @@ public struct LanguageLibrary: Sendable {
             .compactMap { try? LanguagePack.decode(Data(contentsOf: $0)) }
     }
 
-    /// Všechny jazyky (bez vestavěné češtiny), seřazené podle kódu.
+    /// Přibalené jazyky podle kódu (dřívější složka v `bundled` má přednost).
+    func bundledPacks() -> [String: (pack: LanguagePack, file: URL)] {
+        var byCode: [String: (LanguagePack, URL)] = [:]
+        for d in bundled.reversed() {
+            let files = (try? FileManager.default.contentsOfDirectory(at: d, includingPropertiesForKeys: nil)) ?? []
+            for f in files where f.pathExtension.lowercased() == "json" {
+                if let p = try? LanguagePack.decode(Data(contentsOf: f)) { byCode[p.code] = (p, f) }
+            }
+        }
+        return byCode
+    }
+
+    /// Všechny jazyky seřazené podle kódu. Soubor ve složce uživatele má přednost; texty, které v něm chybějí
+    /// (nebo jsou prázdné), doplní přibalená verze – nové texty z dalších verzí aplikace tak nechybí.
     public func available() -> [LanguagePack] {
-        var byCode: [String: LanguagePack] = [:]
-        for d in bundled.reversed() { for p in packs(in: d) { byCode[p.code] = p } }
-        for p in packs(in: userDirectory) { byCode[p.code] = p }
+        var byCode = bundledPacks().mapValues(\.pack)
+        for u in packs(in: userDirectory) {
+            if var b = byCode[u.code] {
+                for (k, v) in u.strings where !v.isEmpty { b.strings[k] = v }
+                b.name = u.name; b.version = u.version
+                byCode[u.code] = b
+            } else {
+                byCode[u.code] = u
+            }
+        }
         return byCode.values.sorted { $0.code < $1.code }
     }
+
+    /// Zkopíruje přibalené jazyky do složky uživatele (kde je lze upravit). Kopie, kterou uživatel neupravil,
+    /// se při nové verzi aplikace obnoví; upravenou nepřepíše (pozná se podle otisku v `.<soubor>.seeded`).
+    public func seedUserDirectory() {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: userDirectory, withIntermediateDirectories: true)
+        for (code, b) in bundledPacks() {
+            guard let src = try? Data(contentsOf: b.file) else { continue }
+            let dst = userDirectory.appendingPathComponent("\(code).json")
+            let mark = userDirectory.appendingPathComponent(".\(code).json.seeded")
+            if let cur = try? Data(contentsOf: dst) {
+                guard cur != src, let seeded = try? String(contentsOf: mark, encoding: .utf8),
+                      seeded == Self.digest(cur) else { continue }      // upravená (nebo cizí) kopie – nechat
+            }
+            do {
+                try src.write(to: dst, options: .atomic)
+                try Self.digest(src).write(to: mark, atomically: true, encoding: .utf8)
+            } catch { continue }
+        }
+    }
+
+    static func digest(_ d: Data) -> String { SHA256.hash(data: d).map { String(format: "%02x", $0) }.joined() }
 
     public func pack(code: String) -> LanguagePack? { available().first { $0.code == code } }
 
@@ -60,7 +103,7 @@ public struct LanguageLibrary: Sendable {
 
     /// Přepne jazyk (nil/„cs“ = čeština) a zapamatuje volbu.
     public func select(_ code: String?, localizer: Localizer = .shared, defaults: UserDefaults = .standard) {
-        let p = code.flatMap { $0 == Localizer.baseCode ? nil : pack(code: $0) }
+        let p = code.flatMap { pack(code: $0) }                     // čeština bez souboru = vestavěná
         localizer.use(p)
         defaults.set(p?.code ?? Localizer.baseCode, forKey: Self.defaultsKey)
     }
@@ -71,6 +114,6 @@ public struct LanguageLibrary: Sendable {
     /// Obnoví jazyk z minulého spuštění; bez volby angličtina, chybějící soubor → čeština.
     public func restore(localizer: Localizer = .shared, defaults: UserDefaults = .standard) {
         let c = defaults.string(forKey: Self.defaultsKey) ?? Self.defaultCode
-        localizer.use(c == Localizer.baseCode ? nil : pack(code: c))
+        localizer.use(pack(code: c))
     }
 }
