@@ -69,3 +69,20 @@ import Settings
     for c in ["OK1ABC", "DL1ABC/P", "W1AW", "VK2/G4ABC", "2E0XYZ"] { #expect(WordClassifier.classify(c) == .call, "\(c)") }
     for r in ["599", "579", "5NN", "599001", "59912"] { #expect(WordClassifier.classify(r) == .rst, "\(r)") }
 }
+
+// Předvolba závodu a záznam příjmu z dialogu Nastavení se po Použít uloží
+@Test @MainActor func applySettingsTakesPresetAndRxLog() async throws {
+    let f = Fixture()
+    await f.model.start()
+    var d = f.model.settings
+    d.contest = ContestSettings.preset(.waeRTTY, year: 2026)
+    await f.model.applySettings(d, baseline: f.model.settings)
+    #expect(f.model.settings.contest.preset == .waeRTTY)
+    let base = f.model.settings
+    d = base; d.contest.preset = nil
+    d.log.rxText = true
+    await f.model.applySettings(d, baseline: base)
+    #expect(f.model.settings.contest.preset == nil)
+    #expect(f.model.settings.log.rxText && f.model.rxLogActive)
+    await f.model.stop()
+}

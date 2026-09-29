@@ -178,6 +178,7 @@ public final class AppModel {
 
     private func startNow() async {
         guard app == nil else { return }                 // už běží
+        syncRxLog()
         let rig = Self.makeRig(settings.rig)
         let engine = engineFactory(settings, rig)
         let log: QSOLogStore?
@@ -291,7 +292,7 @@ public final class AppModel {
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
                 take(\.display.timestamps); take(\.display.fontSize)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
-                take(\.contest.nextSerial); take(\.contest.start)
+                take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 return m
             }
             do { try self.settingsStore.save(merge(self.settings)) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
@@ -351,6 +352,12 @@ public final class AppModel {
     }
 
     public func appendRx(_ s: String, echo: Bool) {
+        if let rxLog {
+            do { try rxLog.append(s) } catch {
+                self.rxLog = nil
+                note(L("Záznam příjmu do souboru selhal: %@", "\(error)"))
+            }
+        }
         if var last = rxRuns.last, last.echo == echo {
             last.text += s; rxRuns[rxRuns.count - 1] = last
         } else {
@@ -382,6 +389,33 @@ public final class AppModel {
     }
 
     public var rxPlainText: String { rxRuns.map(\.text).joined() }
+
+    // MARK: Záznam příjmu do souboru (MMTTY „Log Rx file“)
+
+    private var rxLog: RxTextLog?
+    public var rxLogActive: Bool { rxLog != nil }
+
+    /// Otevře/zavře záznam podle nastavení (po startu a po změně nastavení).
+    func syncRxLog() {
+        let l = settings.log
+        guard l.rxText else { rxLog?.close(); rxLog = nil; return }
+        if let r = rxLog, r.directory == l.rxDirectory, r.timestamps == l.rxTimestamps { return }
+        rxLog?.close()
+        rxLog = RxTextLog(directory: l.rxDirectory, timestamps: l.rxTimestamps)
+    }
+
+    /// Přepínač v menu – ukládá se do nastavení.
+    public func setRxTextLog(_ on: Bool) {
+        settings.log.rxText = on
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        syncRxLog()
+    }
+
+    /// Uloží obsah okna příjmu do souboru (MMTTY „RxWindow to file“).
+    public func saveRxText(to url: URL) throws {
+        try Data(rxPlainText.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "").utf8)
+            .write(to: url, options: .atomic)
+    }
     public func clearRx() { rxTrimmedTotal += rxCharCount; rxRuns.removeAll(); rxCharCount = 0 }
 
     private func refreshPrevious() async {

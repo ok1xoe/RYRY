@@ -120,11 +120,18 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
 
 public struct LogSettings: Codable, Sendable, Equatable {
     public var directory: String = NSHomeDirectory() + "/Documents/mmtty4mac"
+    /// Průběžný záznam přijatého textu do `<directory>/rx/rx-YYYY-MM-DD.txt` (MMTTY „Log Rx file“).
+    public var rxText = false
+    /// Časová značka UTC na začátku řádku záznamu příjmu.
+    public var rxTimestamps = true
     public init() {}
-    enum CodingKeys: String, CodingKey { case directory }
+    public var rxDirectory: URL { URL(fileURLWithPath: directory).appendingPathComponent("rx") }
+    enum CodingKeys: String, CodingKey { case directory, rxText, rxTimestamps }
     public init(from d: Decoder) throws {
-        let c = try d.container(keyedBy: CodingKeys.self)
-        directory = c.tolerant(.directory, LogSettings().directory, d.warningSink, "log")
+        let c = try d.container(keyedBy: CodingKeys.self), x = LogSettings()
+        directory = c.tolerant(.directory, x.directory, d.warningSink, "log")
+        rxText = c.tolerant(.rxText, x.rxText, d.warningSink, "log")
+        rxTimestamps = c.tolerant(.rxTimestamps, x.rxTimestamps, d.warningSink, "log")
     }
 }
 
