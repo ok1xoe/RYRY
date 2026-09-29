@@ -19,6 +19,7 @@ struct Options {
     var inUID: String?, outUID: String?, ptt = "none", port: String?, rig = "none", fsk: String?
     var call = "", his = ""
     var settingsDir: String?, pttSet = false, rigSet = false, noAPI = false
+    var modemFlags: Set<String> = []      // přepínače modemu zadané na příkazové řádce
     var positional: [String] = []
 }
 
@@ -35,15 +36,15 @@ func parse(_ args: ArraySlice<String>) -> Options {
     }
     while let a = it.next() {
         switch a {
-        case "--baud": o.baud = num(a)
-        case "--mark": o.mark = num(a)
-        case "--shift": o.shift = num(a)
+        case "--baud": o.baud = num(a); o.modemFlags.insert("baud")
+        case "--mark": o.mark = num(a); o.modemFlags.insert("mark")
+        case "--shift": o.shift = num(a); o.modemFlags.insert("shift")
         case "--noise": o.noise = Float(num(a))
         case "--seed": o.seed = UInt64(max(0, num(a)))
         case "--demod":
             guard let v = it.next() else { fail("--demod očekává iir|fir|pll|fft") }
-            o.demod = v
-        case "--no-afc": o.afc = false
+            o.demod = v; o.modemFlags.insert("demodType")
+        case "--no-afc": o.afc = false; o.modemFlags.insert("afc")
         case "--in": o.inUID = it.next()
         case "--out": o.outUID = it.next()
         case "--ptt": o.ptt = it.next() ?? "none"; o.pttSet = true
@@ -105,7 +106,7 @@ let usage = """
       rtty-tool live [--in UID] [--out UID] [--ptt none|rts|dtr|rtsDtr|cat] [--port /dev/cu.X]
                      [--rig none|hamlib|flrig] [--fsk uart|soft-dtr|soft-rts|soft-break] [--baud B] [--mark F]
          stdin: text = odvysílat (TX → text → RX po dovysílání), :tx, :rx, :abort, :tune, :q,
-                :c ZNAČKA (protistanice), :m1…:m12 (makra), :log; [--call MOJE] [--settings DIR] [--no-api]
+                :c ZNAČKA (protistanice), :m1…:m12 (makra), :log; [--call MOJE] [--his PROTISTANICE] [--settings DIR] [--no-api]
          nastavení: ~/Library/Application Support/mmtty4mac/settings.json (API: fldigi :7362, JSON-RPC :7363)
     """
 
@@ -212,10 +213,15 @@ case "live":
     if o.fsk != nil && settings.fsk.port == nil { fail("--fsk potřebuje --port") }
     if o.rigSet { guard let t = RigType(rawValue: o.rig) else { fail("--rig: \(o.rig)") }; settings.rig.type = t }
     if o.noAPI { settings.api.fldigiEnabled = false; settings.api.jsonRPCEnabled = false }
+    // přepínače modemu z příkazové řádky mají přednost před uloženými parametry (jen zadané)
+    if o.modemFlags.contains("baud") { settings.rtty["baud"] = .double(o.baud) }
+    if o.modemFlags.contains("mark") { settings.rtty["mark"] = .double(o.mark) }
+    if o.modemFlags.contains("shift") { settings.rtty["shift"] = .double(o.shift) }
+    if o.modemFlags.contains("demodType") { settings.rtty["demodType"] = .string(o.demod) }
+    if o.modemFlags.contains("afc") { settings.rtty["afc"] = .bool(o.afc) }
 
     let m: RTTYModem
     do { m = try RTTYModem() } catch { fail("\(error)") }
-    configure(m, o)
     let rig: Rig
     switch settings.rig.type {
     case .hamlib: rig = HamlibClient(host: settings.rig.host, port: UInt16(settings.rig.effectivePort))
@@ -245,6 +251,7 @@ case "live":
         }
     }
     do { try await app.start() } catch { fail("start: \(error)") }
+    if !o.his.isEmpty { try? await app.setQSOField("call", o.his) }
     let bindHost = settings.api.allowRemote ? "0.0.0.0" : "127.0.0.1"
     var fldigiServer: FldigiXMLRPCServer?, jsonServer: JSONRPCServer?
     if settings.api.fldigiEnabled {
