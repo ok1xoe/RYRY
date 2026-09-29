@@ -635,15 +635,12 @@ public final class AppModel {
         if n != newMultiplier { newMultiplier = n }
     }
 
-    /// Soubor MASTER.SCP (Application Support/mmtty4mac).
-    public static var scpURL: URL {
-        (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory).appendingPathComponent("mmtty4mac/MASTER.SCP")
-    }
+    /// Soubor MASTER.SCP – ve složce nastavení (v aplikaci Application Support/mmtty4mac; testy mají vlastní složku).
+    public var scpURL: URL { settingsStore.url.deletingLastPathComponent().appendingPathComponent("MASTER.SCP") }
 
     /// Načte MASTER.SCP a značky z logu (po startu a po přepnutí logu).
     func loadSuperCheck() async {
-        let url = Self.scpURL
+        let url = scpURL
         scpMaster = await Task.detached { (try? String(contentsOf: url, encoding: .utf8)).map(SuperCheck.parse) ?? [] }.value
         historyCalls = Set(logRecords.map(\.call))
         rebuildSuperCheck()
@@ -677,8 +674,8 @@ public final class AppModel {
         else { throw QSOLogError.io(L("MASTER.SCP se nepodařilo stáhnout.")) }
         let calls = SuperCheck.parse(text)
         guard calls.count > 1000 else { throw QSOLogError.io(L("MASTER.SCP se nepodařilo stáhnout.")) }
-        try FileManager.default.createDirectory(at: Self.scpURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: Self.scpURL, options: .atomic)
+        try FileManager.default.createDirectory(at: scpURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: scpURL, options: .atomic)
         scpMaster = calls
         rebuildSuperCheck()
         return calls.count

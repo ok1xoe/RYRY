@@ -159,7 +159,8 @@ import WaveFile
     await f.model.setQSOField("freq", "14080")
     await f.model.setQSOField("call", "DL1ABC")
     await f.model.logQSO()
-    await until { f.model.settings.log.manualFrequency == 14_080_000 && f.model.scpCount > 0 }
+    // po zalogování v závodě se QSO okno vyprázdní asynchronně – počkat, ať pozdní událost nepřepíše další zadání
+    await until { f.model.settings.log.manualFrequency == 14_080_000 && f.model.scpCount > 0 && f.model.qso.call.isEmpty }
     #expect(f.model.settings.log.manualFrequency == 14_080_000)
     await f.model.setQSOField("call", "1AB"); await until { f.model.scpPartial == ["DL1ABC"] }
     #expect(f.model.scpPartial == ["DL1ABC"])
