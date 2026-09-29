@@ -15,6 +15,7 @@ import QSOLog
 import RigControl
 import RTTYModem
 import Settings
+import Upload
 import WaveFile
 
 public struct RxRun: Equatable, Sendable, Identifiable {
@@ -99,6 +100,9 @@ public final class AppModel {
     public private(set) var demodScopeEnabled = false
     public var scopeSource = 2
     public var scopeFrozen = false
+    /// Nahrávání na online služby (vyměnitelné v testech).
+    public var uploader = UploadCoordinator()
+    public private(set) var uploadsRunning: Set<UploadTarget> = []
     private var sqTarget: Double?
     private var sqChain: Task<Void, Never>?
     var lastSentForTesting = ""
@@ -298,7 +302,7 @@ public final class AppModel {
             func merge(_ cur: AppSettings) -> AppSettings {
                 var m = cur
                 m.station = s.station; m.audio = s.audio; m.ptt = s.ptt; m.fsk = s.fsk
-                m.rig = s.rig; m.api = s.api
+                m.rig = s.rig; m.api = s.api; m.upload = s.upload
                 m.clock = s.clock; m.rttyCore = s.rttyCore
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
@@ -360,6 +364,9 @@ public final class AppModel {
             logRecords.insert(r, at: 0)
             if historyCalls.insert(r.call).inserted { rebuildSuperCheck() }
             Task { await self.refreshPrevious(); await self.refreshQTC(); await self.refreshDupe() }
+            for t in UploadTarget.allCases where UploadCoordinator.isAuto(t, settings.upload) {
+                Task { _ = await self.uploadPending(t, automatic: true) }
+            }
         case .qtcChanged: Task { await self.refreshQTC(); await self.refreshQTCSeries() }
         case .contestSerial(let n):
             settings.contest.nextSerial = n
@@ -894,6 +901,28 @@ public final class AppModel {
         let r = try await log.importRecords(parsed.records)
         await refreshLog()
         return L("Importováno %ld spojení, duplicit %ld, neplatných záznamů %ld.", r.added, r.duplicates, parsed.skipped)
+    }
+
+    // MARK: Nahrávání (LoTW / eQSL / Club Log)
+
+    /// Nahraje dosud nenahraná spojení na službu. Ruční volání vrací zprávu pro alert; automatické (po zalogování)
+    /// běží na pozadí, chybu hlásí do stavového řádku (`note`) a vrací nil.
+    @discardableResult
+    public func uploadPending(_ t: UploadTarget, automatic: Bool = false) async -> String? {
+        guard let log = app?.log else { return automatic ? nil : L("Log není dostupný.") }
+        guard !uploadsRunning.contains(t) else { return automatic ? nil : L("%@: nahrávání už běží.", t.title) }
+        uploadsRunning.insert(t); defer { uploadsRunning.remove(t) }
+        let coordinator = uploader, cfg = settings
+        do {
+            let msg = try await coordinator.uploadPending(t, settings: cfg, log: log)
+            await refreshLog()
+            return automatic ? nil : msg
+        } catch {
+            await refreshLog()
+            let text = "\(t.title): \((error as? LocalizedError)?.errorDescription ?? "\(error)")"
+            if automatic { note(text); return nil }
+            return text
+        }
     }
 
     private func refreshLog() async {

@@ -9,6 +9,8 @@ import Settings
 import RigControl
 import AppCore
 import SwiftUI
+import Upload
+import QSOLog
 
 public struct SettingsView: View {
     @Bindable var model: AppModel
@@ -33,6 +35,7 @@ public struct SettingsView: View {
                 DisplayTab(s: $draft).tabItem { Label(L("Zobrazení"), systemImage: "paintpalette") }.tag(6)
                 APITab(s: $draft, model: model, callbookPassword: $callbookPassword, callbookPasswordDirty: $callbookPasswordDirty).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
                 KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
+                UploadTab(s: $draft, secrets: model.uploader.secrets).tabItem { Label("Online", systemImage: "icloud.and.arrow.up") }.tag(9)
             }
             Divider()
             HStack {
@@ -915,5 +918,60 @@ struct KeyRecorder: View {
     private func stop() {
         if let m = monitor { NSEvent.removeMonitor(m) }
         monitor = nil; recording = false
+    }
+}
+
+
+/// Heslo/API klíč uložený v Klíčence (mění se hned při psaní, ne přes Použít).
+struct SecretField: View {
+    let title: String
+    let service: String
+    let store: any UploadSecretStore
+    @State private var value = ""
+    @State private var loaded = false
+    var body: some View {
+        SecureField(title, text: $value)
+            .onAppear { if !loaded { value = store.get(service: service, account: SecretServices.account) ?? ""; loaded = true } }
+            .onChange(of: value) { _, v in if loaded { try? store.set(v, service: service, account: SecretServices.account) } }
+    }
+}
+
+/// Nahrávání na LoTW (TQSL), eQSL a Club Log.
+struct UploadTab: View {
+    @Binding var s: AppSettings
+    let secrets: any UploadSecretStore
+    var tqslFound: String? { TQSLLocator.find(custom: s.upload.lotwTqslPath) }
+    var body: some View {
+        Form {
+            Section {
+                Toggle(L("Nahrávat na LoTW"), isOn: $s.upload.lotwEnabled)
+                TextField(L("Station Location"), text: $s.upload.lotwLocation).disabled(!s.upload.lotwEnabled)
+                TextField(L("Cesta k tqsl"), text: $s.upload.lotwTqslPath, prompt: Text(L("prázdné = automaticky")))
+                    .disabled(!s.upload.lotwEnabled)
+                Toggle(L("Nahrát automaticky po zalogování"), isOn: $s.upload.lotwAuto).disabled(!s.upload.lotwEnabled)
+                LabeledContent("TQSL") {
+                    Text(tqslFound ?? L("nenalezen – nainstalujte TrustedQSL")).foregroundStyle(tqslFound == nil ? .orange : .secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+            } header: { Text("LoTW") } footer: {
+                Text(L("Spojení se podepíšou a odešlou programem TQSL (certifikát a Station Location musí být v TQSL nastaveny)."))
+            }
+            Section {
+                Toggle(L("Nahrávat na eQSL"), isOn: $s.upload.eqslEnabled)
+                TextField(L("Uživatel"), text: $s.upload.eqslUser).disabled(!s.upload.eqslEnabled)
+                SecretField(title: L("Heslo"), service: SecretServices.eqsl, store: secrets).disabled(!s.upload.eqslEnabled)
+                Toggle(L("Nahrát automaticky po zalogování"), isOn: $s.upload.eqslAuto).disabled(!s.upload.eqslEnabled)
+            } header: { Text("eQSL") }
+            Section {
+                Toggle(L("Nahrávat na Club Log"), isOn: $s.upload.clublogEnabled)
+                TextField("E-mail", text: $s.upload.clublogEmail).disabled(!s.upload.clublogEnabled)
+                SecretField(title: L("Heslo"), service: SecretServices.clublog, store: secrets).disabled(!s.upload.clublogEnabled)
+                SecretField(title: L("API klíč"), service: SecretServices.clublogAPIKey, store: secrets).disabled(!s.upload.clublogEnabled)
+                Toggle(L("Nahrát automaticky po zalogování"), isOn: $s.upload.clublogAuto).disabled(!s.upload.clublogEnabled)
+            } header: { Text("Club Log") } footer: {
+                Text(L("API klíč si vyžádáte u Club Log (Settings → Api Keys). Hesla a klíč se ukládají do Klíčenky, ne do nastavení."))
+            }
+        }
+        .formStyle(.grouped)
     }
 }

@@ -26,9 +26,16 @@ public struct QSORecord: Codable, Sendable, Equatable, Identifiable {
     public var continent: String?
     public var cqZone: Int?
     public var ituZone: Int?
+    /// Kdy bylo spojení nahráno na online služby (klíč = `UploadTarget.rawValue`). Starší logy pole nemají.
+    public var uploads: [String: Date]?
 
     public init(id: UUID = UUID(), call: String, timeOn: Date, mode: String = "RTTY") {
         self.id = id; self.call = call.uppercased(); self.timeOn = timeOn; self.mode = mode
+    }
+
+    public func isUploaded(_ t: UploadTarget) -> Bool { uploads?[t.rawValue] != nil }
+    public mutating func markUploaded(_ t: UploadTarget, at: Date = Date()) {
+        var u = uploads ?? [:]; u[t.rawValue] = at; uploads = u
     }
 
     public var band: String? { Bands.band(forHz: frequency) }
@@ -43,6 +50,9 @@ public struct QSORecord: Codable, Sendable, Equatable, Identifiable {
         return parts.max { $0.count < $1.count } ?? call.uppercased()
     }
 }
+
+/// Online služby, na které se spojení nahrávají.
+public enum UploadTarget: String, Codable, Sendable, CaseIterable { case lotw, eqsl, clublog }
 
 public enum Bands {
     static let table: [(String, Double, Double)] = [
