@@ -1,5 +1,6 @@
 import Testing
 import Settings
+import AppCore
 @testable import AppUI
 
 private func layout(_ enabled: Bool, _ f: ContestFormat = .serial, exchange: String = "") -> [QSOLayout.Row] {
@@ -26,4 +27,16 @@ private func layout(_ enabled: Bool, _ f: ContestFormat = .serial, exchange: Str
     #expect(QSOLayout.showsQTC(c))
     c.enabled = false
     #expect(!QSOLayout.showsQTC(c))
+}
+
+@Test func zoneFormatLayoutAndClicks() {
+    #expect(layout(true, .zone) == [.single("call", "Call"), .country, .pair("rstSent", "RST s", "rstRcvd", "RST r"),
+                                    .pair("exchangeSent", "Zóna s", "exchangeRcvd", "Zóna r"), .single("notes", "Notes")])
+    var q = QSOFields(); q.call = "W1AW"
+    func f(_ w: String) -> [String] { WordClassifier.contestUpdate(w, format: .zone, serialMode: false, current: q).map { "\($0.0)=\($0.1)" } }
+    #expect(f("14") == ["exchangeRcvd=14"])
+    #expect(f("59914") == ["exchangeRcvd=14"])
+    #expect(f("599") == ["rstRcvd=599"])
+    #expect(f("TEST") == [])
+    #expect(f("41") == [])                                                // CQ zóna je 1–40
 }

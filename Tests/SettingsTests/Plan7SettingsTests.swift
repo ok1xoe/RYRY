@@ -73,3 +73,13 @@ import Testing
     #expect(o.macros[0].color == nil && o.macros[1].color == nil)
     #expect(o.messages == AppSettings.defaultMessages)
 }
+
+// OK DX RTTY Contest: sobota 3. celého víkendu v prosinci, 00–24 UTC; výměna RST + CQ zóna
+@Test func contestPresets() {
+    let ok = ContestSettings.preset(.okDXRTTY, year: 2026)
+    #expect(ok.enabled && ok.format == .zone && ok.name == "OK-DX-RTTY")
+    #expect(ok.start == ISO8601DateFormatter().date(from: "2026-12-19T00:00:00Z"))
+    #expect(ContestSettings.preset(.okDXRTTY, year: 2027).start == ISO8601DateFormatter().date(from: "2027-12-18T00:00:00Z"))
+    let wae = ContestSettings.preset(.waeRTTY, year: 2026)
+    #expect(wae.format == .wae && wae.name == "WAEDC" && wae.start == ISO8601DateFormatter().date(from: "2026-11-14T00:00:00Z"))
+}

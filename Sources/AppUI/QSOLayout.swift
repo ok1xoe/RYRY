@@ -24,6 +24,7 @@ public enum QSOLayout {
         case .bartg: return base + [serial, .pair("exchangeSent", "Čas s", "exchangeRcvd", "Čas r"), notes]
         case .ped: return base + [notes]
         case .wae: return base + [serial, notes]
+        case .zone: return base + [.pair("exchangeSent", "Zóna s", "exchangeRcvd", "Zóna r"), notes]
         }
     }
 

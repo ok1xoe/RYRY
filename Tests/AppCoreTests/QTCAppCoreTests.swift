@@ -146,3 +146,27 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
     try await h.app.deleteQTCSeries(s.id)
     #expect(await store.series.isEmpty)
 }
+
+// Formát „RST + CQ zóna“ (OK DX RTTY): moje zóna z DXCC, zóna protistanice předvyplněná podle značky
+@Test func zoneFormatFillsZones() async throws {
+    var s = AppSettings(); s.station.call = "OK1XOE"; s.ptt.method = .none
+    s.contest = ContestSettings.preset(.okDXRTTY, year: 2026)
+    let audio = FakeAudioBackend(), clock = ManualClock()
+    let engine = Engine(modem: try RTTYModem(), rig: FakeRig2(), audio: audio, config: s.engineConfig(),
+                        serialFactory: { _ in FakeSerialPort() }, clock: clock, autoRun: false)
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("okdx-\(UUID())")
+    let app = AppController(settings: s, engine: engine, log: try QSOLogStore(directory: dir), profiles: nil,
+                            countries: try CountryDB(text: cty))
+    let q0 = await app.qso
+    #expect(q0.exchangeSent == "15" && q0.serialSent == nil)
+    try await app.setQSOField("call", "W1AW")
+    #expect(await app.qso.exchangeRcvd == "5")
+    let t = MacroEngine.expand("%N|%M", context: await app.macroContext()).outputs
+        .compactMap { if case .text(let x) = $0 { return x } else { return nil } }.joined()
+    #expect(t == "15|5")
+    try await app.setQSOField("exchangeRcvd", "4")                      // stanice poslala jinou – oprava platí
+    let r = try await app.logQSO()
+    #expect(r.exchangeSent == "15" && r.exchangeRcvd == "4")
+    let q1 = await app.qso
+    #expect(q1.exchangeSent == "15" && q1.call.isEmpty)
+}
