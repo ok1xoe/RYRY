@@ -16,7 +16,7 @@ struct TopBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 Button { Task { await model.toggleTx() } } label: {
                     Text(model.state == .rx || model.state == .stopped ? "TX" : "RX")
                         .font(.headline).frame(width: 44)
@@ -44,7 +44,7 @@ struct TopBar: View {
                     .lineLimit(1).fixedSize()
                     .foregroundStyle(model.rig?.online == true ? .primary : .secondary)
                     .help(model.rig?.online == true ? "Rig online" : "Rig offline")
-                SignalMeter(level: model.signalLevel, open: model.squelchOpen).frame(width: 80, height: 12)
+                SignalMeter(level: model.signalLevel, open: model.squelchOpen).frame(width: 56, height: 12)
             }
             HStack(spacing: 6) {
                 Picker("Baud", selection: baudBinding) {
