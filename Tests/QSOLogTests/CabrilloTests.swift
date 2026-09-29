@@ -42,3 +42,12 @@ private func rec(_ call: String, _ time: String, sent: Int?, rcvd: Int?, exS: St
     let empty = Cabrillo.export([], header: CabrilloHeader(callsign: "OK1XOE", contest: "X"))
     #expect(!empty.contains("QSO:") && empty.hasSuffix("END-OF-LOG:\r\n"))
 }
+
+@Test func adifContainsDXCCFields() {
+    var r = QSORecord(call: "JA1XYZ", timeOn: Date(timeIntervalSince1970: 0))
+    r.country = "Japan"; r.continent = "AS"; r.cqZone = 25; r.ituZone = 45
+    let a = ADIF.record(r)
+    #expect(a.contains("<COUNTRY:5>Japan ") && a.contains("<CONT:2>AS ") && a.contains("<CQZ:2>25 ") && a.contains("<ITUZ:2>45 "))
+    let back = ADIF.parse("<EOH>" + a)
+    #expect(back.first?["COUNTRY"] == "Japan")
+}

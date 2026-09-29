@@ -56,6 +56,11 @@ extension JSONRPCServer {
                 do { try await app.setModemParam(k, pv) } catch { throw RPCError(code: -32602, message: "\(k): \(error)") }
             }
             return (await app.modemParams()).mapValues(Self.toJSON)
+        case "dxcc.lookup":
+            guard let call = p["call"] as? String, !call.isEmpty else { throw RPCError.params("chybí 'call'") }
+            guard let ci = app.country(for: call) else { return NSNull() }
+            return ["name": ci.name, "prefix": ci.primaryPrefix, "continent": ci.continent, "cqZone": ci.cqZone,
+                    "ituZone": ci.ituZone, "latitude": ci.latitude, "longitude": ci.longitude, "utcOffset": ci.utcOffsetHours]
         case "modem.notch":
             let hz = try num(p, "hz")
             guard hz >= 0, hz <= 3000 else { throw RPCError.params("hz: 0–3000") }

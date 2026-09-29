@@ -1,4 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import DXCC
 import Engine
 import Foundation
 import MacroEngine
@@ -80,8 +81,13 @@ public actor AppController {
     private var eventTask: Task<Void, Never>?
     private var repeatTask: Task<Void, Never>?
 
-    public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil) {
+    /// Databáze zemí DXCC (cty.dat); nil = bez zjišťování zemí.
+    public nonisolated let countries: CountryDB?
+
+    public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil,
+                countries: CountryDB? = CountryDB.shared) {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
+        self.countries = countries
         if settings.contest.enabled {
             if settings.contest.exchange.isEmpty { qso.serialSent = settings.contest.nextSerial }
             else { qso.exchangeSent = settings.contest.exchange }
@@ -144,6 +150,7 @@ public actor AppController {
         c.rstSent = qso.rstSent + (qso.serialSent.map { String(format: "%03d", $0) } ?? qso.exchangeSent)
         c.rstRcvd = qso.rstRcvd + (qso.serialRcvd.map { String(format: "%03d", $0) } ?? qso.exchangeRcvd)
         c.now = Date()
+        c.hisUTCOffsetHours = country(for: qso.call)?.utcOffsetHours
         return c
     }
 
@@ -237,6 +244,9 @@ public actor AppController {
         r.exchangeRcvd = qso.exchangeRcvd.isEmpty ? nil : qso.exchangeRcvd
         r.comment = qso.notes.isEmpty ? nil : qso.notes
         r.stationCallsign = settings.station.call.isEmpty ? nil : settings.station.call.uppercased()
+        if let ci = country(for: qso.call) {
+            r.country = ci.name; r.continent = ci.continent; r.cqZone = ci.cqZone; r.ituZone = ci.ituZone
+        }
         do { try await log.append(r) } catch { throw AppError.log("\(error)") }
         broadcaster.send(.qsoLogged(r))
         if settings.contest.enabled {
@@ -248,6 +258,9 @@ public actor AppController {
         }
         return r
     }
+
+    /// Země DXCC pro značku (nil = neznámá nebo /MM).
+    public nonisolated func country(for call: String) -> CountryInfo? { countries?.lookup(call) }
 
     /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
     public func cabrillo(from: Date? = nil, to: Date? = nil) async -> String {

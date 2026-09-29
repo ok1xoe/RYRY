@@ -7,6 +7,8 @@ public struct MacroContext: Sendable, Equatable {
     public var rstSent = "599"          // MMTTY MyRST  (%s, %M)
     public var rstRcvd = "599"          // MMTTY HisRST (%r, %R, %N, %x, %y)
     public var now: Date = Date()
+    /// Místní čas protistanice = UTC + offset (z DXCC); nil = země neznámá (%g → HELLO, %f → nic).
+    public var hisUTCOffsetHours: Double?
     public init() {}
 }
 
@@ -123,7 +125,9 @@ public enum MacroEngine {
             let parts = n.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
             return parts.count > 1 ? String(parts[1]) : ""
         case "g", "f":
-            let h = utc.component(.hour, from: c.now)
+            // TMmttyWd::SetGreetingString: místní čas protistanice podle země
+            guard let off = c.hisUTCOffsetHours, off.isFinite else { return code == "g" ? "HELLO" : "" }
+            let h = utc.component(.hour, from: c.now.addingTimeInterval(off * 3600))
             let (long, short) = h < 12 ? ("GOOD MORNING", "GM") : h < 18 ? ("GOOD AFTERNOON", "GA") : ("GOOD EVENING", "GE")
             return code == "g" ? long : short
         case "D":

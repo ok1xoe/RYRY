@@ -46,6 +46,7 @@ public struct LogWindow: View {
                 }.width(70)
                 TableColumn("Jméno") { r in Text(r.name ?? "") }
                 TableColumn("QTH") { r in Text(r.qth ?? "") }
+                TableColumn("Země") { r in Text(r.country ?? "") }
             }
             .contextMenu(forSelectionType: QSORecord.ID.self) { ids in
                 if let id = ids.first, let r = model.logRecords.first(where: { $0.id == id }) {

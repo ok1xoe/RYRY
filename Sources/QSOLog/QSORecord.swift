@@ -21,6 +21,11 @@ public struct QSORecord: Codable, Sendable, Equatable, Identifiable {
     public var exchangeRcvd: String?
     public var comment: String?
     public var stationCallsign: String?
+    // DXCC (z cty.dat při zalogování)
+    public var country: String?
+    public var continent: String?
+    public var cqZone: Int?
+    public var ituZone: Int?
 
     public init(id: UUID = UUID(), call: String, timeOn: Date, mode: String = "RTTY") {
         self.id = id; self.call = call.uppercased(); self.timeOn = timeOn; self.mode = mode

@@ -34,6 +34,8 @@ public enum ADIF {
         s += field("NAME", r.name) + field("QTH", r.qth) + field("GRIDSQUARE", r.grid)
         s += field("STX", r.serialSent.map(String.init)) + field("SRX", r.serialRcvd.map(String.init))
         s += field("STX_STRING", r.exchangeSent) + field("SRX_STRING", r.exchangeRcvd)
+        s += field("COUNTRY", r.country) + field("CONT", r.continent)
+        s += field("CQZ", r.cqZone.map(String.init)) + field("ITUZ", r.ituZone.map(String.init))
         s += field("COMMENT", r.comment) + field("STATION_CALLSIGN", r.stationCallsign)
         s += field("APP_MMTTY4MAC_ID", r.id.uuidString)
         return s + "<EOR>\n"

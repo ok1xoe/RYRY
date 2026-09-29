@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import ModemKit
+import DXCC
 import Engine
 import QSOLog
 import RTTYModem
@@ -67,4 +68,30 @@ func makeContestApp(exchange: String = "", next: Int = 7) throws -> Harness {
     _ = try await h.app.logQSO()
     #expect(await h.app.qso.call == "DL1ABC")
     #expect(await h.app.qso.serialSent == nil)
+}
+
+let ctyFixture = """
+Fed. Rep. of Germany:     14:  28:  EU:   51.00:   -10.00:    -1.0:  DL:
+    DA,DB,DC,DD,DE,DF,DG,DH,DI,DJ,DK,DL,DM,DN,DO,DP,DQ,DR;
+Japan:                    25:  45:  AS:   36.40:  -138.38:    -9.0:  JA:
+    JA,JE,JF,JG,JH,JI,JJ,JK,JL,JM,JN,JO,JP,JQ,JR,JS;
+"""
+
+func makeDXCCApp() throws -> Harness {
+    let h = try makeApp()
+    var s = AppSettings(); s.station.call = "OK1XOE"; s.ptt.method = .cat
+    let app = AppController(settings: s, engine: h.engine, log: h.app.log, profiles: nil,
+                            countries: try CountryDB(text: ctyFixture))
+    return Harness(app: app, engine: h.engine, audio: h.audio, clock: h.clock, rig: h.rig, dir: h.dir)
+}
+
+@Test func macroContextAndLogUseDXCC() async throws {
+    let h = try makeDXCCApp()
+    try await h.app.setQSOField("call", "JA1XYZ")
+    #expect(await h.app.macroContext().hisUTCOffsetHours == 9)
+    #expect(await h.app.country(for: "DL1ABC/P")?.name == "Fed. Rep. of Germany")
+    let r = try await h.app.logQSO()
+    #expect(r.country == "Japan" && r.continent == "AS" && r.cqZone == 25 && r.ituZone == 45)
+    try await h.app.setQSOField("call", "ZZ9ZZ")
+    #expect(await h.app.macroContext().hisUTCOffsetHours == nil)
 }

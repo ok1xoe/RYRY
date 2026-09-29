@@ -2,6 +2,7 @@
 import APIServer
 import AVFoundation
 import AppCore
+import DXCC
 import AudioIO
 import Engine
 import Foundation
@@ -356,6 +357,9 @@ public final class AppModel {
         guard let log = app?.log, !qso.call.isEmpty else { previousQSOs = []; return }
         previousQSOs = await log.previous(call: qso.call)
     }
+
+    /// Země DXCC aktuální značky v QSO okně (nil = neznámá).
+    public var dxcc: CountryInfo? { qso.call.isEmpty ? nil : app?.country(for: qso.call) }
 
     /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
     public func cabrilloText(from: Date? = nil, to: Date? = nil) async -> String {
