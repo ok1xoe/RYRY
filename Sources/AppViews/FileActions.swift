@@ -2,6 +2,8 @@
 import AppKit
 import AppUI
 import Localization
+import Settings
+import SwiftUI
 import UniformTypeIdentifiers
 
 /// Akce menu Soubor, které otevírají systémové dialogy.
@@ -50,6 +52,27 @@ import UniformTypeIdentifiers
                 let a = NSAlert(); a.messageText = L("Import ADIF"); a.informativeText = msg; a.runModal()
             } catch { NSAlert(error: error).runModal() }
         }
+    }
+
+    // MARK: Import z MMTTY
+
+    private static var importWindow: NSWindow?
+
+    /// Menu Soubor → Importovat z MMTTY…: výběr Mmtty.ini, náhled a volba, co přepsat.
+    public static func importMMTTY(_ model: AppModel) {
+        let p = NSOpenPanel()
+        p.allowedContentTypes = [UTType(filenameExtension: "ini"), .plainText].compactMap { $0 }
+        p.title = L("Importovat z MMTTY"); p.message = L("Vyberte soubor Mmtty.ini z Windows MMTTY.")
+        guard p.runModal() == .OK, let url = p.url else { return }
+        let result: MMTTYImportResult
+        do { result = try model.previewMMTTYImport(url) } catch { NSAlert(error: error).runModal(); return }
+        importWindow?.close()
+        let view = MMTTYImportView(model: model, result: result, fileName: url.path) { importWindow?.close() }
+        let w = NSWindow(contentViewController: NSHostingController(rootView: view))
+        w.title = L("Importovat z MMTTY"); w.styleMask = [.titled, .closable]
+        w.isReleasedWhenClosed = false
+        w.center(); w.makeKeyAndOrderFront(nil)
+        importWindow = w
     }
 
     // MARK: Správa logu
@@ -104,6 +127,22 @@ import UniformTypeIdentifiers
         p.title = L("Exportovat ADIF")
         guard p.runModal() == .OK, let url = p.url else { return }
         run { try await model.exportADIF(to: url); return nil }
+    }
+
+    /// Záloha logu teď (menu Soubor).
+    public static func backupLog(_ model: AppModel) {
+        Task { @MainActor in
+            do {
+                let dir = try await model.backupLogNow()
+                let a = NSAlert(); a.messageText = "Log"
+                a.informativeText = L("Záloha uložena: %@", (dir.path as NSString).abbreviatingWithTildeInPath); a.runModal()
+            } catch { NSAlert(error: error).runModal() }
+        }
+    }
+
+    public static func openBackups(_ model: AppModel) {
+        try? FileManager.default.createDirectory(at: model.backupDirectory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(model.backupDirectory)
     }
 
     /// Otevře nastavení zvuku systému (úroveň vstupu a výstupu zvukovky).

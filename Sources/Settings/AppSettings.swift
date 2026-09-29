@@ -145,9 +145,18 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     /// Barva tlačítka `#RRGGBB` (MMTTY: barva tlačítka makra); nil = výchozí.
     public var color: String?
     public init(name: String, text: String, repeatSeconds: Double? = nil, color: String? = nil) {
-        self.name = name; self.text = text; self.repeatSeconds = repeatSeconds; self.color = Self.validColor(color)
+        self.name = name; self.text = text; self.repeatSeconds = Self.validRepeat(repeatSeconds); self.color = Self.validColor(color)
     }
     static var fallback: Macro { Macro(name: "", text: "") }
+    /// Makro nic neobsahuje (jen bílé znaky) – spuštěním by se nic neodvysílalo.
+    public var isBlank: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// Povolený interval opakování makra (s).
+    public static let repeatRange = 0.1...3600.0
+    /// Interval opakování v rozsahu 0,1–3600 s, jinak nil (nekonečno, NaN, záporné, obří hodnoty).
+    public static func validRepeat(_ s: Double?) -> Double? {
+        guard let s, s.isFinite, repeatRange.contains(s) else { return nil }
+        return s
+    }
     /// Jen `#RRGGBB`, jinak nil.
     public static func validColor(_ c: String?) -> String? {
         guard let c, c.count == 7, c.first == "#", c.dropFirst().allSatisfy(\.isHexDigit) else { return nil }
@@ -157,7 +166,7 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "macro"
         name = c.tolerant(.name, "", w, s); text = c.tolerant(.text, "", w, s)
-        repeatSeconds = c.tolerant(.repeatSeconds, nil, w, s)
+        repeatSeconds = Self.validRepeat(c.tolerant(.repeatSeconds, nil, w, s))
         color = Self.validColor(c.tolerant(.color, nil, w, s))
     }
 }
@@ -172,6 +181,9 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public var manualFrequency: Double?
     /// Super Check Partial (MASTER.SCP + značky z logu) pod polem Call.
     public var superCheck = true
+    /// Automatická denní záloha logu (složka backup vedle logu) a kolik záloh držet.
+    public var backup = true
+    public var backupKeep = 10
     public static let recentLimit = 8
     public mutating func remember(_ path: String) {
         recent.removeAll { $0 == path }
@@ -187,7 +199,8 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public var rxTimestamps = true
     public init() {}
     public var rxDirectory: URL { URL(fileURLWithPath: directory).appendingPathComponent("rx") }
-    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps, manualFrequency, superCheck }
+    enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps, manualFrequency, superCheck, backup,
+                                             backupKeep }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), x = LogSettings()
         directory = c.tolerant(.directory, x.directory, d.warningSink, "log")
@@ -196,6 +209,8 @@ public struct LogSettings: Codable, Sendable, Equatable {
         let mf: Double? = c.tolerant(.manualFrequency, nil, d.warningSink, "log")
         manualFrequency = mf.flatMap { $0.isFinite && $0 > 10_000 && $0 < 10e9 ? $0 : nil }
         superCheck = c.tolerant(.superCheck, x.superCheck, d.warningSink, "log")
+        backup = c.tolerant(.backup, x.backup, d.warningSink, "log")
+        backupKeep = min(100, max(1, c.tolerant(.backupKeep, x.backupKeep, d.warningSink, "log")))
         rxText = c.tolerant(.rxText, x.rxText, d.warningSink, "log")
         rxTimestamps = c.tolerant(.rxTimestamps, x.rxTimestamps, d.warningSink, "log")
     }
@@ -504,6 +519,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
     /// DX cluster a RBN spoty.
     public var spots = SpotSettings()
     public var decoders = DecoderSettings()
+    /// Enter Sends Message (Run / S&P) v závodě.
+    public var esm = ESMSettings()
     public init() {}
     public static let macroCount = 16
 
@@ -522,13 +539,13 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "NR?", text: "\r\nNR? NR?\r\n\\"),
         Macro(name: "Test CQ", text: "\r\nCQ TEST CQ TEST DE %m %m TEST\r\n\\"),
         Macro(name: "Exch", text: "\r\n%c 599 %N %N\r\n\\"),
-        Macro(name: "", text: ""),
+        Macro(name: "My call", text: "\r\n%m %m\r\n\\"),          // ESM S&P
         Macro(name: "", text: ""),
     ]
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty,
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
-                                             shortcuts, updates, upload, spots, decoders }
+                                             shortcuts, updates, upload, spots, decoders, esm }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -561,6 +578,11 @@ public struct AppSettings: Codable, Sendable, Equatable {
         upload = c.tolerant(.upload, x.upload, w, s)
         spots = c.tolerant(.spots, x.spots, w, s)
         decoders = c.tolerant(.decoders, x.decoders, w, s)
+        // starší nastavení bez ESM: prázdný ⇧F3 dostane výchozí makro „My call“ (S&P)
+        if !c.contains(.esm), macros.indices.contains(14), macros[14].name.isEmpty, macros[14].text.isEmpty {
+            macros[14] = Self.defaultMacros[14]
+        }
+        esm = c.tolerant(.esm, x.esm, w, s)
     }
 
     /// Konfigurace Engine z nastavení.

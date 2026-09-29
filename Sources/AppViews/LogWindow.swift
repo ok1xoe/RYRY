@@ -119,6 +119,9 @@ public struct LogWindow: View {
             }
             HStack {
                 Text(L("%ld spojení", filtered.count)).foregroundStyle(.secondary)
+                Text(model.logStats.byBand.map { "\($0.band) \($0.count)" }.joined(separator: " · "))
+                    .foregroundStyle(.secondary).lineLimit(1)
+                    .hint(L("Počty spojení podle pásem (v závodě od začátku závodu)"))
                 Text((model.logLocation.displayPath as NSString).abbreviatingWithTildeInPath).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
                     .hint(model.logLocation.displayPath)
                 Spacer()

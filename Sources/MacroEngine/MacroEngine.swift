@@ -14,7 +14,13 @@ public struct MacroContext: Sendable, Equatable {
     public init() {}
 }
 
-public enum MacroOutput: Sendable, Equatable { case text(String), raw([UInt8]) }
+public enum MacroOutput: Sendable, Equatable {
+    case text(String), raw([UInt8])
+    /// Nic k odvysílání.
+    public var isEmpty: Bool {
+        switch self { case .text(let t): t.isEmpty; case .raw(let r): r.isEmpty }
+    }
+}
 public enum MacroEnd: Sendable, Equatable { case none, rxAfter, keepTx }
 public enum MacroMode: Sendable, Equatable { case send, toEditor }
 

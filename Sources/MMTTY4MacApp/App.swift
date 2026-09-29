@@ -117,6 +117,10 @@ struct MMTTY4MacApp: App {
                 Button(L("Zalogovat QSO")) { Task { await model.logQSO() } }.shortcut(model.settings.binding(for: .logQSO))
                 Button(L("Vymazat QSO")) { Task { await model.clearQSO() } }.shortcut(model.settings.binding(for: .clearQSO))
                 Button(L("Vymazat příjem")) { model.clearRx() }.shortcut(model.settings.binding(for: .clearRx))
+                Divider()
+                Button(model.settings.esm.mode == .run ? L("ESM: přepnout na S&P") : L("ESM: přepnout na Run")) {
+                    model.toggleESMMode()
+                }.shortcut(model.settings.binding(for: .esmMode))
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }
@@ -138,6 +142,9 @@ struct MMTTY4MacApp: App {
                 Button(L("Uložit log jako…")) { FileActions.saveLogAs(model) }.keyboardShortcut("s", modifiers: [.command, .shift])
                 Button(L("Exportovat ADIF…")) { FileActions.exportADIF(model) }
                 Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
+                Button(L("Importovat z MMTTY…")) { FileActions.importMMTTY(model) }
+                Button(L("Zálohovat log teď")) { FileActions.backupLog(model) }
+                Button(L("Otevřít složku záloh")) { FileActions.openBackups(model) }
                 Divider()
             }
             CommandGroup(after: .newItem) {

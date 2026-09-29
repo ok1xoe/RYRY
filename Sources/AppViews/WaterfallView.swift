@@ -61,6 +61,7 @@ struct WaterfallView: View {
                 .hint(L("Klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = úroveň squelche"))
                 .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
                                             onRightClick: { f in notch(f) }))
+                BandMapOverlay(model: model, topInset: 16)
                 if model.xyEnabled {
                     let side = min(g.size.height, model.settings.display.xySize.points)
                     XYScopeView(points: model.settings.display.xyQuality == .low ? Self.decimate(model.xyPoints) : model.xyPoints,
@@ -183,6 +184,7 @@ struct SpectrumView: View {
                 Task { await model.notchClick(hz: hz) }
             }))
             .hint(L("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch"))
+            .overlay { BandMapOverlay(model: model, topInset: 24) }
             .overlay(alignment: .topLeading) { SpectrumMenu(model: model).padding(4) }
         }
     }
@@ -198,6 +200,11 @@ struct SpectrumMenu: View {
                     Button((model.waterfallFromHz == r.1 && model.waterfallToHz == r.2 ? "✓ " : "") + r.0) {
                         Task { await model.setDisplay { $0.fromHz = r.1; $0.toHz = r.2 } }
                     }
+                }
+            }
+            Section(L("Spoty")) {
+                Button((model.settings.spots.showInWaterfall ? "✓ " : "") + L("Spoty ve vodopádu")) {
+                    model.setSpots { $0.showInWaterfall.toggle() }
                 }
             }
             Section(L("Zesílení (%ld dB)", Int(model.settings.display.gainDB))) {

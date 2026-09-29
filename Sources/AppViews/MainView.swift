@@ -1,5 +1,6 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import AppUI
+import Localization
 import SwiftUI
 
 public struct MainView: View {
@@ -40,6 +41,16 @@ struct StatusBar: View {
                 Button("OK") { model.dismissMessages() }.buttonStyle(.borderless)
             }
             Spacer()
+            if model.settings.contest.enabled {
+                // přepočet každých 30 s – rychlost klesá i bez nových spojení
+                TimelineView(.periodic(from: .now, by: 30)) { tl in
+                    let st = model.logStats(now: tl.date)
+                    Text(L("QSO %ld · 10 min: %ld/h · 60 min: %ld/h", st.total, st.rate10, st.rate60))
+                        .monospacedDigit().foregroundStyle(.secondary)
+                        .hint(L("Rychlost závodu: počet spojení za posledních 10 a 60 minut přepočtený na hodinu"))
+                }
+                Divider().frame(height: 12)
+            }
             Text(model.apiStatus).foregroundStyle(.secondary)
         }
         .font(.caption)

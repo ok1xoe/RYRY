@@ -436,6 +436,8 @@ struct APITab: View {
                 LabeledContent(L("Otevřený log")) {
                     Text(s.log.name + ".adi").foregroundStyle(.secondary)
                 }
+                Toggle(L("Denní záloha logu"), isOn: $s.log.backup)
+                NumberRow(title: L("Počet záloh"), value: $s.log.backupKeep, range: 1...100).disabled(!s.log.backup)
             } header: { Text("Log") } footer: { Text(L("Spojení (JSONL + ADIF) a série QTC se ukládají do tohoto adresáře. Jiný log založíte nebo otevřete v menu Soubor (Nový log…, Otevřít log…).")) }
             Section {
                 Toggle(L("Průběžně zapisovat příjem do souboru"), isOn: $s.log.rxText)
@@ -490,6 +492,7 @@ struct SpotsTab: View {
             }
             Section {
                 Toggle(L("Jen RTTY"), isOn: $s.spots.rttyOnly)
+                Toggle(L("Spoty ve vodopádu"), isOn: $s.spots.showInWaterfall)
                 NumberRow(title: L("Stáří spotů"), value: $s.spots.maxAgeMinutes, range: SpotSettings.ageRange, unit: "min")
                 LabeledContent(L("Posun frekvence rigu")) {
                     HStack {
@@ -756,6 +759,7 @@ struct ContestTab: View {
             Section {
                 Text(L("%N odesílané číslo nebo výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST")).font(.callout)
             } header: { Text(L("Makra")) }
+            ESMSection(s: $s)
             Section {
                 Toggle(L("Návrhy značek pod polem Call"), isOn: $s.log.superCheck)
                 LabeledContent(L("Databáze značek")) {
@@ -937,6 +941,7 @@ struct KeysTab: View {
         case .clearRx: return L("Vymazat příjem")
         case .stopMacro: return L("Zastavit opakování makra")
         case .openLog: return L("Otevřít log")
+        case .esmMode: return L("ESM: přepnout Run / S&P")
         }
     }
 }
@@ -1042,5 +1047,57 @@ struct UploadTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+
+/// ESM (Enter Sends Message): zapnutí, výchozí režim a makra pro jednotlivé kroky.
+struct ESMSection: View {
+    @Binding var s: AppSettings
+
+    func macroPicker(_ title: String, _ value: Binding<Int>) -> some View {
+        Picker(title, selection: value) {
+            ForEach(0..<AppSettings.macroCount, id: \.self) { i in
+                let n = i < s.macros.count ? s.macros[i].name : ""
+                let key = s.binding(for: .macro(i)).display
+                let empty = isEmpty(i) ? " " + L("(prázdné)") : ""
+                Text((n.isEmpty ? key : "\(key) – \(n)") + empty).tag(i)
+            }
+        }
+    }
+
+    func isEmpty(_ i: Int) -> Bool { !s.macros.indices.contains(i) || s.macros[i].isBlank }
+
+    /// Prázdná makra přiřazená krokům ESM (Enter by nic neodeslal).
+    var emptyAssigned: [String] {
+        let e = s.esm
+        return Set([e.runCQ, e.runExchange, e.runTU, e.spMyCall, e.spExchange, e.agn]).filter(isEmpty).sorted()
+            .map { s.binding(for: .macro($0)).display }
+    }
+
+    var body: some View {
+        Section {
+            Toggle(L("Enter posílá makra (ESM)"), isOn: $s.esm.enabled)
+            Picker(L("Režim"), selection: $s.esm.mode) {
+                Text("Run").tag(ESMMode.run)
+                Text("S&P").tag(ESMMode.sp)
+            }.pickerStyle(.segmented)
+            Group {
+                macroPicker(L("Run: CQ"), $s.esm.runCQ)
+                macroPicker(L("Run: výměna"), $s.esm.runExchange)
+                macroPicker(L("Run: TU + zalogovat"), $s.esm.runTU)
+                macroPicker(L("S&P: moje značka"), $s.esm.spMyCall)
+                macroPicker(L("S&P: výměna + zalogovat"), $s.esm.spExchange)
+                macroPicker(L("AGN? (část výměny)"), $s.esm.agn)
+                if s.esm.enabled, !emptyAssigned.isEmpty {
+                    Label(L("Prázdná makra (%@) – Enter je nespustí; doplňte je nebo zvolte jiná.", emptyAssigned.joined(separator: ", ")),
+                          systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange).font(.callout)
+                }
+            }.disabled(!s.esm.enabled)
+        } header: { Text("ESM – Enter Sends Message") } footer: {
+            Text(L("V závodě Enter v poli Call nebo výměny pošle makro podle stavu: Run – CQ, výměna, TU a zalogování; S&P – moje značka, výměna a zalogování. Nemá-li makro TU nebo výměny S&P %l, spojení se zaloguje automaticky. Během vysílání Enter nic neposílá. Run / S&P přepíná i QSO panel a %@.", s.binding(for: .esmMode).display))
+        }
+        .disabled(!s.contest.enabled)
     }
 }

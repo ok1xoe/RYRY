@@ -95,6 +95,8 @@ public actor AppController {
     private let broadcaster = AppBroadcaster()
     private var eventTask: Task<Void, Never>?
     private var repeatTask: Task<Void, Never>?
+    /// Počet vyřízených požadavků na zalogování z makra (%l) – úspěšných i neúspěšných (ESM na ně čeká).
+    public private(set) var logRequestsHandled = 0
 
     /// Databáze zemí DXCC (cty.dat); nil = bez zjišťování zemí.
     public nonisolated let countries: CountryDB?
@@ -172,6 +174,7 @@ public actor AppController {
         case .modem(.rxText(let c, let echo)): (echo ? txText : rxText).append(String(c))
         case .logRequested:
             do { _ = try await logQSO() } catch { broadcaster.send(.error("log: \(error)")) }
+            logRequestsHandled += 1
         default: break
         }
         broadcaster.send(.engine(e))
@@ -230,7 +233,7 @@ public actor AppController {
     public func runMacro(index: Int) async throws {
         stopMacroRepeat()
         try await runMacroOnce(index)
-        if let sec = settings.macros[index].repeatSeconds, sec > 0 { startRepeat(index, every: sec) }
+        if let sec = Macro.validRepeat(settings.macros[index].repeatSeconds) { startRepeat(index, every: sec) }
     }
 
     private func runMacroOnce(_ index: Int) async throws {
@@ -249,7 +252,7 @@ public actor AppController {
             while !Task.isCancelled {
                 while await engine.state != .rx, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(50)) }
                 let mark = rx.absoluteEnd                 // absolutní – text.clear_rx ji nesníží
-                try? await Task.sleep(for: .milliseconds(Int(sec * 1000)))
+                try? await Task.sleep(for: .seconds(sec))           // sec ověřené (0,1–3600 s)
                 if Task.isCancelled || rx.absoluteEnd > mark { break }
                 guard await engine.state == .rx else { continue }
                 do { try await self?.runMacroOnce(index) } catch { break }
