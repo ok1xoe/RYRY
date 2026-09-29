@@ -58,12 +58,15 @@ struct MMTTY4MacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var model = AppModel()
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some Scene {
         Window("mmtty4mac", id: "main") {
             MainView(model: model)
                 .task {
                     delegate.model = model
+                    // spouštěcí parametr -openSettings YES (+ -settingsTab N): otevřít Nastavení (snímky obrazovky, podpora)
+                    if UserDefaults.standard.bool(forKey: "openSettings") { openSettings() }
                     if model.state == .stopped { await model.start() }
                 }
         }
