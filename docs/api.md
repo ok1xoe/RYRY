@@ -133,6 +133,12 @@ Notifikace (bez `id`, jen odebírané):
 Klient, který nestíhá číst (fronta přes 1000 zpráv), se odpojí. Požadavky jednoho klienta se zpracovávají postupně v pořadí příchodu.
 Když se odpojí klient, který zahájil vysílání (`engine.tx`, `engine.tune`, `macro.run`), vysílání se okamžitě ukončí.
 
+### Klienti
+- **Java/Kotlin (JDK 21, bez závislostí):** `clients/java` – `Mmtty4macClient`, ukázka a test, návod na napojení MacContestLoggeru.
+- **Python:** příklad níže.
+
+Ověřená kompatibilita fldigi XML-RPC: sekvence volání RUMlogNG (metody zjištěné z jeho binárky) – test `rumlogNGCallSequence`.
+
 ### Příklad (Python)
 
 ```python
