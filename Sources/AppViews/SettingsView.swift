@@ -56,7 +56,7 @@ public struct SettingsView: View {
                 }.keyboardShortcut(.defaultAction)
             }.padding(12)
         }
-        .frame(width: 720, height: 640)
+        .frame(width: 820, height: 640)
         .onAppear {
             if !loaded {
                 draft = model.settings; baseline = draft; loaded = true
