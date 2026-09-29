@@ -121,6 +121,23 @@ public struct APISettings: Codable, Sendable, Equatable {
     }
 }
 
+public enum CallbookKind: String, Codable, Sendable, CaseIterable { case none, qrz, hamqth }
+
+/// Vyhledání značky v callbooku (QRZ.com / HamQTH). Heslo je v Klíčence, ne tady.
+public struct CallbookSettings: Codable, Sendable, Equatable {
+    public var service: CallbookKind = .none
+    public var username = ""
+    public var autoLookup = true
+    public var fillEmptyOnly = true
+    public init() {}
+    enum CodingKeys: String, CodingKey { case service, username, autoLookup, fillEmptyOnly }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "callbook", x = CallbookSettings()
+        service = c.tolerant(.service, x.service, w, s); username = c.tolerant(.username, x.username, w, s)
+        autoLookup = c.tolerant(.autoLookup, x.autoLookup, w, s); fillEmptyOnly = c.tolerant(.fillEmptyOnly, x.fillEmptyOnly, w, s)
+    }
+}
+
 public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public var name: String
     public var text: String
@@ -420,6 +437,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var fsk = FSKSettings()
     public var rig = RigSettings()
     public var api = APISettings()
+    public var callbook = CallbookSettings()
     public var rtty: [String: ParameterValue] = [:]
     public var macros: [Macro] = AppSettings.defaultMacros
     public var log = LogSettings()
@@ -454,7 +472,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "", text: ""),
     ]
 
-    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, rtty, macros, log,
+    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty, macros, log,
                                              clock, rttyCore, contest, display, messages, txWindow, shortcuts }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
@@ -469,6 +487,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         station = c.tolerant(.station, x.station, w, s); audio = c.tolerant(.audio, x.audio, w, s)
         ptt = c.tolerant(.ptt, x.ptt, w, s); fsk = c.tolerant(.fsk, x.fsk, w, s)
         rig = c.tolerant(.rig, x.rig, w, s); api = c.tolerant(.api, x.api, w, s)
+        callbook = c.tolerant(.callbook, x.callbook, w, s)
         rtty = c.tolerant(.rtty, TolerantDict<ParameterValue>(), w, s).items
         macros = c.contains(.macros) ? c.tolerant(.macros, TolerantArray<Macro>(), w, s).items : x.macros
         // dřívější výchozí závodní makro mělo %M (v MMTTY přijaté číslo) místo %N (odesílané)

@@ -91,6 +91,9 @@ struct QSOPanel: View {
                     }
                 }
                 FrequencyRow(model: model)
+                if !model.callbookStatus.isEmpty {
+                    Text(model.callbookStatus).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                }
                 HStack {
                     Button("Log") { Task { await model.logQSO() } }.hint(L("Zalogovat (⌘L)"))
                     Button("Clear") { Task { await model.clearQSO() } }
