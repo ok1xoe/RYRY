@@ -12,6 +12,9 @@ public protocol CATTransport: AnyObject, Sendable {
     func discardInput()
 }
 
+/// Chyba vstupu/výstupu portu (odpojené USB apod.) – port se zavře a příští dotaz ho otevře znovu.
+public enum CATIOError: Error, Equatable { case io(String) }
+
 /// Protokol CAT: Icom CI-V (adresa rádia) nebo textový (Kenwood, Elecraft, Yaesu).
 public enum CATProtocol: Sendable, Equatable {
     case icom(address: UInt8)
@@ -26,6 +29,8 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
     private let timeout: Duration
     private let queue = DispatchQueue(label: "mmtty4mac.cat")
     private var isOpen = false
+    /// Počet číslic frekvence podle poslední odpovědi rádia (starší Yaesu mají 8).
+    private var faDigits: Int?
 
     public init(transport: CATTransport, protocol p: CATProtocol, timeout: Duration = .milliseconds(500), name: String = "CAT") {
         self.transport = transport; self.proto = p; self.timeout = timeout; self.name = name
@@ -120,7 +125,9 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
                 else { throw RigError.protocolError("frekvence") }
                 return Double(hz)
             case .text:
-                guard let hz = TextCAT.parseFrequency(try textQuery(TextCAT.frequencyQuery)) else { throw RigError.protocolError("frekvence") }
+                let r = try textQuery(TextCAT.frequencyQuery)
+                guard let hz = TextCAT.parseFrequency(r) else { throw RigError.protocolError("frekvence") }
+                faDigits = r.count - 3
                 return hz
             }
         }
@@ -131,7 +138,8 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
         try await onQueue { [self] in
             switch proto {
             case .icom(let a): _ = try civ(a, CIV.setFrequency(hz, to: a), expect: nil)
-            case .text(let d): try textSet(TextCAT.setFrequency(hz, dialect: d))
+            case .text(let d):
+                try textSet(faDigits.map { TextCAT.setFrequency(hz, digits: $0) } ?? TextCAT.setFrequency(hz, dialect: d))
             }
         }
     }
@@ -182,7 +190,11 @@ public final class SerialCATTransport: CATTransport, @unchecked Sendable {
     let baud: Int, stopBits: Int
     private var fd: Int32 = -1
 
-    public init(path: String, baud: Int, stopBits: Int = 1) { self.path = path; self.baud = baud; self.stopBits = stopBits }
+    /// `rts`: po otevření zapnout RTS (Yaesu „CAT RTS = ENABLE“ bez něj příkazy nepřijme).
+    let rts: Bool
+    public init(path: String, baud: Int, stopBits: Int = 1, rts: Bool = false) {
+        self.path = path; self.baud = baud; self.stopBits = stopBits; self.rts = rts
+    }
     deinit { close() }
 
     private static func err(_ e: Int32) -> String { String(cString: strerror(e)) }
@@ -191,28 +203,29 @@ public final class SerialCATTransport: CATTransport, @unchecked Sendable {
         if fd >= 0 { return }
         var f: Int32 = -1
         var e = cserial_open(path, &f)
-        if e != 0 { throw RigError.protocolError("\(path): \(Self.err(e))") }
+        if e != 0 { throw CATIOError.io("\(path): \(Self.err(e))") }
         e = cserial_configure(f, 8, Int32(stopBits))
         if e == 0 { e = cserial_set_speed(f, UInt(baud)) }
-        if e != 0 { _ = cserial_close(f); throw RigError.protocolError("\(path): \(Self.err(e))") }
+        if e == 0, rts { e = cserial_set_rts(f, 1) }
+        if e != 0 { _ = cserial_close(f); throw CATIOError.io("\(path): \(Self.err(e))") }
         fd = f
     }
 
     public func close() { if fd >= 0 { _ = cserial_close(fd); fd = -1 } }
 
     public func write(_ bytes: [UInt8]) throws {
-        guard fd >= 0 else { throw RigError.offline }
+        guard fd >= 0 else { throw CATIOError.io("port zavřený") }
         let e = bytes.withUnsafeBufferPointer { cserial_write(fd, $0.baseAddress, UInt($0.count)) }
-        if e != 0 { throw RigError.protocolError("zápis: \(Self.err(e))") }
+        if e != 0 { throw CATIOError.io("zápis: \(Self.err(e))") }
     }
 
     public func read(max: Int, timeout: Duration) throws -> [UInt8] {
-        guard fd >= 0 else { throw RigError.offline }
+        guard fd >= 0 else { throw CATIOError.io("port zavřený") }
         var buf = [UInt8](repeating: 0, count: max)
         var got = 0
         let ms = Int32(timeout.components.seconds * 1000 + timeout.components.attoseconds / 1_000_000_000_000_000)
         let e = buf.withUnsafeMutableBufferPointer { cserial_read(fd, $0.baseAddress, UInt(max), ms, &got) }
-        if e != 0 { throw RigError.protocolError("čtení: \(Self.err(e))") }
+        if e != 0 { throw CATIOError.io("čtení: \(Self.err(e))") }
         return Array(buf.prefix(got))
     }
 

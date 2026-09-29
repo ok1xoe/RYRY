@@ -283,7 +283,7 @@ public final class AppModel {
             func merge(_ cur: AppSettings) -> AppSettings {
                 var m = cur
                 m.station = s.station; m.audio = s.audio; m.ptt = s.ptt; m.fsk = s.fsk
-                m.rig = s.rig; m.api = s.api; m.log = s.log
+                m.rig = s.rig; m.api = s.api; m.log.directory = s.log.directory
                 m.clock = s.clock; m.rttyCore = s.rttyCore
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
@@ -291,7 +291,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.txWindow); take(\.shortcuts)
+                take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 return m
@@ -525,7 +525,10 @@ public final class AppModel {
         let s = await engine.drainRecording()
         do { try w.append(s) } catch {
             note(L("Nahrávání WAV selhalo: %@", "\(error)"))
-            await stopRecordingWAV()
+            recorder = nil; recordingURL = nil
+            recordTask?.cancel(); recordTask = nil
+            await engine.setRecording(false)
+            try? w.close()
             return
         }
         recordingSeconds = Double(w.sampleCount) / 11025

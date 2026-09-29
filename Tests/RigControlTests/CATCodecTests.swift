@@ -36,6 +36,7 @@ import Testing
     #expect(TextCAT.setFrequency(14_085_000, dialect: .kenwood) == "FA00014085000;")
     #expect(TextCAT.setFrequency(14_085_000, dialect: .elecraft) == "FA00014085000;")
     #expect(TextCAT.setFrequency(14_085_000, dialect: .yaesu) == "FA014085000;")
+    #expect(TextCAT.setFrequency(14_085_000, digits: 8) == "FA14085000;")
     #expect(TextCAT.parseFrequency("FA00014085000;") == 14_085_000)
     #expect(TextCAT.parseFrequency("FA014085000;") == 14_085_000)
     #expect(TextCAT.parseFrequency("?;") == nil)
@@ -45,7 +46,7 @@ import Testing
     #expect(TextCAT.modeQuery(.yaesu) == "MD0;" && TextCAT.modeQuery(.kenwood) == "MD;")
     #expect(TextCAT.parseMode("MD6;", dialect: .kenwood) == "RTTY" && TextCAT.parseMode("MD9;", dialect: .kenwood) == "RTTYR")
     #expect(TextCAT.parseMode("MD0C;", dialect: .yaesu) == "PKTUSB" && TextCAT.parseMode("MD06;", dialect: .yaesu) == "RTTY")
-    #expect(TextCAT.setMode("RTTY", dialect: .kenwood) == "MD6;" && TextCAT.setMode("PKTUSB", dialect: .yaesu) == "MD0C;")
+    #expect(TextCAT.setMode("RTTY", dialect: .kenwood) == "MD6;DA0;" && TextCAT.setMode("PKTUSB", dialect: .yaesu) == "MD0C;")
     #expect(TextCAT.setMode("PKTUSB", dialect: .kenwood) == "MD2;DA1;")
     #expect(TextCAT.setMode("nonsense", dialect: .kenwood) == nil)
 }

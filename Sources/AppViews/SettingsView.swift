@@ -288,6 +288,10 @@ struct RigTab: View {
                         ForEach(RigSettings.baudRates, id: \.self) { b in Text("\(b) Bd").tag(b) }
                     }
                     Picker(L("Stop bity"), selection: $s.rig.stopBits) { Text("1").tag(1); Text("2").tag(2) }
+                    if s.rig.type == .cat {
+                        Toggle(L("RTS zapnuté (Yaesu „CAT RTS“)"),
+                               isOn: Binding(get: { s.rig.effectiveCatRTS }, set: { s.rig.catRTS = $0 }))
+                    }
                 } header: { Text(L("Připojení")) } footer: {
                     Text(L("Rychlost a stop bity musí odpovídat nastavení CAT v menu rádia. Pro PTT přes CAT zvol v záložce PTT / FSK metodu CAT – port CAT nejde sdílet s PTT přes RTS/DTR."))
                 }

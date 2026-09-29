@@ -103,3 +103,15 @@ import WaveFile
     #expect(rate == 11025 && s.count == 11025)
     await f.model.stop()
 }
+
+// Review 4: Použít ze starší kopie dialogu nesmí vypnout záznam příjmu zapnutý v menu
+@Test @MainActor func applySettingsKeepsRxLogToggledInMenu() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let draft = f.model.settings                       // dialog otevřen
+    f.model.setRxTextLog(true)                         // menu Soubor
+    var d = draft; d.station.call = "OK9ZZZ"
+    await f.model.applySettings(d, baseline: draft)
+    #expect(f.model.settings.log.rxText && f.model.rxLogActive)
+    await f.model.stop()
+}

@@ -250,6 +250,7 @@
     "RST + číslo": "RST + number",
     "RST odeslané": "RST sent",
     "RST přijaté": "RST received",
+    "RTS zapnuté (Yaesu „CAT RTS“)": "RTS on (Yaesu “CAT RTS”)",
     "RTTY pro macOS – nativní přepis MMTTY s API pro loggery (fldigi XML-RPC, JSON-RPC).": "RTTY for macOS – a native port of MMTTY with an API for loggers (fldigi XML-RPC, JSON-RPC).",
     "RX %@ ppm, TX %@ ppm – potvrďte Použít.": "RX %@ ppm, TX %@ ppm – confirm with Apply.",
     "Reverse (prohodit mark/space)": "Reverse (swap mark/space)",

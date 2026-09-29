@@ -56,7 +56,7 @@ public struct KeyBinding: Codable, Sendable, Hashable {
     public var isValid: Bool {
         if isNone { return true }
         if key.hasPrefix("f"), let n = Int(key.dropFirst()), (1...20).contains(n) { return true }
-        if Self.named[key] != nil { return true }
+        if Self.named[key] != nil { return !modifiers.isEmpty }        // Space, Return, šipky… by kolidovaly s psaním
         guard key.count == 1, let ch = key.first, !ch.isWhitespace, !ch.isNewline else { return false }
         return !modifiers.isEmpty                               // samotné písmeno by kolidovalo s psaním textu
     }

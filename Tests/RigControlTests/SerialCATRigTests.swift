@@ -135,3 +135,38 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     await rig.disconnect()
     close(slave); close(master)
 }
+
+// Review 1: I/O chyba (vytažené USB) zavře port a další dotaz ho otevře znovu
+@Test func catReopensAfterIOError() async throws {
+    final class Flaky: CATTransport, @unchecked Sendable {
+        var opens = 0, failNext = false
+        func open() throws { opens += 1 }
+        func close() {}
+        func write(_ b: [UInt8]) throws { if failNext { failNext = false; throw CATIOError.io("EIO") } }
+        func read(max: Int, timeout: Duration) throws -> [UInt8] { Array("FA00014085000;".utf8) }
+        func discardInput() {}
+    }
+    let t = Flaky()
+    let rig = SerialCATRig(transport: t, protocol: .text(.kenwood), timeout: .milliseconds(100))
+    #expect(try await rig.frequency() == 14_085_000)
+    t.failNext = true
+    await #expect(throws: RigError.offline) { try await rig.frequency() }
+    #expect(try await rig.frequency() == 14_085_000)
+    #expect(t.opens == 2)
+}
+
+// Review 2: starší Yaesu (FTDX3000, FT-950) mají FA s 8 číslicemi – délka se převezme z odpovědi rádia
+@Test func yaesuFrequencyDigitsFromRadio() async throws {
+    let y = FakeCATTransport { b in String(decoding: b, as: UTF8.self) == "FA;" ? Array("FA14085000;".utf8) : [] }
+    let rig = SerialCATRig(transport: y, protocol: .text(.yaesu), timeout: .milliseconds(200))
+    #expect(try await rig.frequency() == 14_085_000)
+    try await rig.setFrequency(7_045_000)
+    #expect(String(decoding: y.written.last!, as: UTF8.self) == "FA07045000;")
+}
+
+// Review 13: Kenwood při odchodu z datového režimu vypne DA; Elecraft zná PKTLSB
+@Test func textModesLeaveDataMode() {
+    #expect(TextCAT.setMode("RTTY", dialect: .kenwood) == "MD6;DA0;")
+    #expect(TextCAT.setMode("USB", dialect: .kenwood) == "MD2;DA0;")
+    #expect(TextCAT.setMode("PKTLSB", dialect: .elecraft) == "MD9;DT0;")
+}
