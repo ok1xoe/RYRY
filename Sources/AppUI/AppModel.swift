@@ -204,6 +204,7 @@ public final class AppModel {
         catch EngineError.audio(let m) { note("Zvuk nefunguje: \(m) – zkontrolujte zařízení a oprávnění k mikrofonu") }
         catch { note("Start selhal: \(error)") }
         qso = await app.qso                              // např. odesílané číslo závodu
+        await refreshQTCSeries()
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
@@ -331,7 +332,7 @@ public final class AppModel {
             qso = q
             if callChanged { Task { await self.refreshPrevious(); await self.refreshQTC() } }
         case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious(); await self.refreshQTC() }
-        case .qtcChanged: Task { await self.refreshQTC() }
+        case .qtcChanged: Task { await self.refreshQTC(); await self.refreshQTCSeries() }
         case .contestSerial(let n):
             settings.contest.nextSerial = n
             do { try settingsStore.save(settings) } catch { note("Nastavení nelze uložit: \(error)") }
@@ -443,6 +444,29 @@ public final class AppModel {
     public func refreshQTC() async {
         guard qtcEnabled, let app else { qtcStatus = nil; return }
         qtcStatus = await app.qtcStatus(for: qso.call)
+    }
+
+    /// Všechny uložené série (okno Log → QTC), nejnovější první.
+    public private(set) var qtcSeries: [QTCSeries] = []
+    public struct QTCSummary: Equatable, Sendable { public var sent = 0, received = 0, seriesCount = 0; public var points: Int { sent + received } }
+    public var qtcSummary: QTCSummary {
+        var r = QTCSummary()
+        for s in qtcSeries { if s.direction == .sent { r.sent += s.count } else { r.received += s.count } }
+        r.seriesCount = qtcSeries.count
+        return r
+    }
+    public func refreshQTCSeries() async {
+        qtcSeries = (await app?.qtcStore?.series ?? []).sorted { $0.time > $1.time }
+    }
+    public func updateQTCSeries(_ s: QTCSeries) async {
+        guard let app else { return }
+        await run("QTC") { try await app.updateQTCSeries(s) }
+        await refreshQTCSeries(); await refreshQTC()
+    }
+    public func deleteQTCSeries(_ id: UUID) async {
+        guard let app else { return }
+        await run("QTC") { try await app.deleteQTCSeries(id) }
+        await refreshQTCSeries(); await refreshQTC()
     }
 
     public var qtcPending: QTCSeries? { qtcPendingCache }

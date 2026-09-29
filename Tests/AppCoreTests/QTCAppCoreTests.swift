@@ -128,3 +128,21 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
     let s = try #require(await store.series.first)
     #expect(s.counterpart == "W1AW" && s.declaredCount == 10)
 }
+
+@Test func updateAndDeleteQTCSeries() async throws {
+    let (h, store) = try makeWAEApp()
+    try await h.app.saveReceivedQTC(counterpart: "K3LRX", number: 12, declaredCount: 10,
+                                    lines: [QTCLine(time: "0712", call: "JA3YBK", serial: 118)])
+    var s = try #require(await store.series.first)
+    let ev = h.app.events()
+    s.counterpart = "K3LR"
+    try await h.app.updateQTCSeries(s)
+    #expect(await store.series.first?.counterpart == "K3LR")
+    let a = await h.app.qtcStatus(for: "K3LR").exchanged, b = await h.app.qtcStatus(for: "K3LRX").exchanged
+    #expect(a == 1 && b == 0)
+    var saw = false
+    for await e in ev { if case .qtcChanged = e { saw = true; break } }
+    #expect(saw)
+    try await h.app.deleteQTCSeries(s.id)
+    #expect(await store.series.isEmpty)
+}
