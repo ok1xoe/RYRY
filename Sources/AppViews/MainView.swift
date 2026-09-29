@@ -12,7 +12,8 @@ public struct MainView: View {
                 TopBar(model: model)
                 Divider()
                 VSplitView {
-                    WaterfallView(model: model).frame(minHeight: 110, idealHeight: 170)
+                    SpectrumView(model: model).frame(minHeight: 50, idealHeight: 80)
+                    WaterfallView(model: model).frame(minHeight: 90, idealHeight: 150)
                     RxTextView(model: model).frame(minHeight: 140)
                     TxEditor(model: model).frame(minHeight: 70, idealHeight: 90)
                 }

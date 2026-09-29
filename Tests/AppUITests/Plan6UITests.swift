@@ -90,3 +90,17 @@ import Settings
     #expect(f.model.settings.rtty["reverse"] == .bool(true))
     await f.model.stop()
 }
+
+/// Čárové spektrum: poslední řádek s vyhlazením (průměr přes snímky) a špičkou na správném místě.
+@Test func spectrumLineIsSmoothedAndPeaksAtTone() {
+    var w = WaterfallRenderer(width: 100, height: 4)
+    var mags = [Float](repeating: 0, count: 600)
+    mags[300] = 1000
+    w.push(SpectrumFrame(binHz: 5, magnitudes: mags), fromHz: 0, toHz: 3000)
+    let line1 = w.spectrumLine
+    #expect(line1.count == 100)
+    let peak = line1.enumerated().max { $0.element < $1.element }!.offset
+    #expect(abs(peak - 50) <= 1)
+    w.push(SpectrumFrame(binHz: 5, magnitudes: [Float](repeating: 0, count: 600)), fromHz: 0, toHz: 3000)
+    #expect(w.spectrumLine[peak] > 0 && w.spectrumLine[peak] < line1[peak])   // doznívá, nespadne hned na 0
+}

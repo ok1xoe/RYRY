@@ -101,3 +101,54 @@ struct XYScopeView: View {
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(.gray.opacity(0.6)))
     }
 }
+
+/// Čárové spektrum (FFT) nad vodopádem s kurzory mark/space; klik = naladit, kolečko = squelch.
+struct SpectrumView: View {
+    @Bindable var model: AppModel
+
+    func x(_ hz: Double, _ w: CGFloat) -> CGFloat {
+        CGFloat((hz - model.waterfallFromHz) / (model.waterfallToHz - model.waterfallFromHz)) * w
+    }
+
+    var body: some View {
+        GeometryReader { g in
+            Canvas { ctx, size in
+                ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(white: 0.08)))
+                // mřížka po 500 Hz
+                var hz = (model.waterfallFromHz / 500).rounded(.up) * 500
+                while hz < model.waterfallToHz {
+                    var p = Path(); let xx = x(hz, size.width)
+                    p.move(to: CGPoint(x: xx, y: 0)); p.addLine(to: CGPoint(x: xx, y: size.height))
+                    ctx.stroke(p, with: .color(.white.opacity(0.12)), lineWidth: 1)
+                    hz += 500
+                }
+                let line = model.waterfall.spectrumLine
+                if line.count > 1 {
+                    var p = Path()
+                    let dx = size.width / CGFloat(line.count - 1)
+                    for (i, v) in line.enumerated() {
+                        let pt = CGPoint(x: CGFloat(i) * dx, y: size.height - 2 - CGFloat(max(0, min(1, v))) * (size.height - 6))
+                        if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                    }
+                    var fill = p
+                    fill.addLine(to: CGPoint(x: size.width, y: size.height)); fill.addLine(to: CGPoint(x: 0, y: size.height)); fill.closeSubpath()
+                    ctx.fill(fill, with: .linearGradient(Gradient(colors: [.green.opacity(0.45), .green.opacity(0.05)]),
+                                                        startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
+                    ctx.stroke(p, with: .color(.green), lineWidth: 1.2)
+                }
+                for (hz, color) in [(model.mark, Color.yellow), (model.space, Color.orange)] {
+                    var p = Path(); let xx = x(hz, size.width)
+                    p.move(to: CGPoint(x: xx, y: 0)); p.addLine(to: CGPoint(x: xx, y: size.height))
+                    ctx.stroke(p, with: .color(color.opacity(0.9)), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { loc in
+                let hz = model.waterfallFromHz + Double(loc.x / g.size.width) * (model.waterfallToHz - model.waterfallFromHz)
+                Task { await model.tune(toMarkHz: hz) }
+            }
+            .overlay(ScrollWheelCatcher { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } })
+            .help("Spektrum · klik = naladit mark · kolečko = squelch")
+        }
+    }
+}

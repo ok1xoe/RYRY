@@ -13,7 +13,9 @@ public struct WaterfallRenderer: Sendable {
     public let width: Int, height: Int
     private var pixels: [UInt32]           // bajty v paměti R,G,B,A (UInt32 little-endian 0xAABBGGRR)
     private var peak: Float = 1
-    public private(set) var lastRow: [Float] = []   // spektrum posledního řádku (pro čárové spektrum)
+    public private(set) var lastRow: [Float] = []   // spektrum posledního řádku (0…1)
+    /// Vyhlazené čárové spektrum (0…1): rychlý náběh, pomalejší doznívání – jako FFT okno MMTTY.
+    public private(set) var spectrumLine: [Float] = []
 
     public init(width: Int, height: Int) {
         self.width = max(1, width); self.height = max(1, height)
@@ -56,6 +58,13 @@ public struct WaterfallRenderer: Sendable {
         peak = max(frameMax, peak * 0.995, 1)      // pomalu klesající automatické zesílení
         for x in 0..<width { pixels[x] = Self.color(row[x] / peak) }
         lastRow = row.map { $0 / peak }
+        if spectrumLine.count != width { spectrumLine = lastRow }
+        else {
+            for x in 0..<width {
+                let v = lastRow[x], o = spectrumLine[x]
+                spectrumLine[x] = v > o ? v : o * 0.6 + v * 0.4
+            }
+        }
     }
 
     public func row(_ y: Int) -> [Pixel] {
