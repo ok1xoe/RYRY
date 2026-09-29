@@ -1,6 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import AppUI
 import QSOLog
+import Settings
 import SwiftUI
 
 struct QSOPanel: View {
@@ -9,6 +10,18 @@ struct QSOPanel: View {
     static let hm: DateFormatter = {
         let f = DateFormatter(); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm 'místně'"; return f
     }()
+
+    static func contestTitle(_ c: ContestSettings) -> String {
+        let f: String
+        switch c.format {
+        case .serial: f = c.exchange.isEmpty ? "RST + číslo" : "RST + výměna"
+        case .cqrj: f = "CQ/RJ"
+        case .bartg: f = "BARTG"
+        case .ped: f = "PED"
+        case .wae: f = "WAE + QTC"
+        }
+        return c.name.isEmpty ? "závod · \(f)" : "\(c.name) · \(f)"
+    }
 
     /// Popisek v levém sloupci mřížky.
     func label(_ t: String) -> some View {
@@ -20,41 +33,46 @@ struct QSOPanel: View {
         // a do šířky se přizpůsobuje – dlouhé texty se zalamují místo ořezu.
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("QSO").font(.headline)
-                Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
-                    GridRow {
-                        label("Call")
-                        QSOField(model: model, label: "", field: "call").font(.title3.monospaced()).gridCellColumns(3)
+                HStack {
+                    Text("QSO").font(.headline)
+                    if model.settings.contest.enabled {
+                        Text(Self.contestTitle(model.settings.contest)).font(.caption).foregroundStyle(.secondary)
                     }
-                    if let c = model.dxcc {
-                        let local = Date().addingTimeInterval(c.utcOffsetHours * 3600)
-                        GridRow {
-                            label("Země")
-                            Text("\(c.name) · \(c.continent) · CQ \(c.cqZone) · ITU \(c.ituZone) · \(Self.hm.string(from: local))")
-                                .font(.caption).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .gridCellColumns(3)
+                }
+                Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
+                    // pole podle závodu (bez závodu běžné QSO, v závodě jen výměna daného formátu)
+                    ForEach(Array(QSOLayout.rows(for: model.settings.contest).enumerated()), id: \.offset) { _, row in
+                        switch row {
+                        case .single(let field, let title):
+                            GridRow {
+                                label(title)
+                                QSOField(model: model, label: "", field: field)
+                                    .font(field == "call" ? .title3.monospaced() : .body).gridCellColumns(3)
+                            }
+                        case .pair(let f1, let t1, let f2, let t2):
+                            GridRow {
+                                label(t1); QSOField(model: model, label: "", field: f1)
+                                label(t2); QSOField(model: model, label: "", field: f2)
+                            }
+                        case .country:
+                            if let c = model.dxcc {
+                                let local = Date().addingTimeInterval(c.utcOffsetHours * 3600)
+                                GridRow {
+                                    label("Země")
+                                    Text("\(c.name) · \(c.continent) · CQ \(c.cqZone) · ITU \(c.ituZone) · \(Self.hm.string(from: local))")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .gridCellColumns(3)
+                                }
+                            }
                         }
                     }
-                    GridRow { label("Name"); QSOField(model: model, label: "", field: "name").gridCellColumns(3) }
-                    GridRow { label("QTH"); QSOField(model: model, label: "", field: "qth").gridCellColumns(3) }
-                    GridRow { label("Locator"); QSOField(model: model, label: "", field: "locator").gridCellColumns(3) }
-                    GridRow {
-                        label("RST s"); QSOField(model: model, label: "599", field: "rstSent")
-                        label("RST r"); QSOField(model: model, label: "599", field: "rstRcvd")
-                    }
-                    GridRow {
-                        label("Nr s"); QSOField(model: model, label: "", field: "serialSent")
-                        label("Nr r"); QSOField(model: model, label: "", field: "serialRcvd")
-                    }
-                    GridRow { label("Exch r"); QSOField(model: model, label: "", field: "exchangeRcvd").gridCellColumns(3) }
-                    GridRow { label("Notes"); QSOField(model: model, label: "", field: "notes").gridCellColumns(3) }
                 }
                 HStack {
                     Button("Log") { Task { await model.logQSO() } }.help("Zalogovat (⌘L)")
                     Button("Clear") { Task { await model.clearQSO() } }
                 }
-                if model.qtcEnabled { QTCPanel(model: model) }
+                if QSOLayout.showsQTC(model.settings.contest) { QTCPanel(model: model) }
                 if !model.previousQSOs.isEmpty {
                     Text("Předchozí spojení (\(model.previousQSOs.count))").font(.subheadline.bold())
                     ForEach(model.previousQSOs.prefix(20)) { r in
