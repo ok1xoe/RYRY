@@ -135,9 +135,17 @@ public enum QTCText {
     /// Opakovaný řádek na žádost AGN: `3 1310 OK2PBR 015 1310 OK2PBR 015` → (3, řádek).
     public static func parseIndexedLine(_ s: String) -> (Int, QTCLine)? {
         let tok = tokens(s)
-        guard tok.count >= 4, tok[0].count <= 2, let idx = Int(tok[0]), (1...10).contains(idx),
-              triple(tok, 1) != nil else { return nil }
-        guard let l = parseLine(tok.dropFirst().joined(separator: " ")) else { return nil }
+        if tok.count >= 4, tok[0].count <= 2, let idx = Int(tok[0]), (1...10).contains(idx), triple(tok, 1) != nil,
+           let l = parseLine(tok.dropFirst().joined(separator: " ")) {
+            return (idx, l)
+        }
+        // číslo řádku slepené s předchozím textem („BKKA8 0803 BY4AOM 176 0803 BY4AOM 176“) – jen když je řádek
+        // zopakovaný dvakrát (tak se AGN posílá), jinak by šlo splést s šumem
+        guard tok.count >= 7, triple(tok, 1) != nil, let l = parseLine(tok.dropFirst().joined(separator: " ")),
+              triple(tok, 4) == l else { return nil }
+        let digits = tok[0].reversed().prefix { $0.isNumber }
+        guard (1...2).contains(digits.count), digits.count < tok[0].count,
+              let idx = Int(String(digits.reversed())), (1...10).contains(idx) else { return nil }
         return (idx, l)
     }
 

@@ -119,3 +119,10 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     #expect(!QTCText.looksLikeLine("QTC 12/10 QTC 12/10"))
     #expect(!QTCText.looksLikeLine("BKKQKM"))
 }
+
+@Test func gluedAGNRepeatIsIndexed() {
+    let r = QTCText.parseIndexedLine("BKKA8 0803 BY4AOM 176 0803 BY4AOM 176 BKNWU")
+    #expect(r?.0 == 8 && r?.1 == QTCLine(time: "0803", call: "BY4AOM", serial: 176))
+    #expect(QTCText.parseIndexedLine("BKKA8 0803 BY4AOM 176") == nil)      // bez zopakování ne (mohlo by jít o šum)
+    #expect(QTCText.parseIndexedLine("QRZ12 0803 BY4AOM 176 0803 BY4AOM 176")?.0 == nil)   // 12 není číslo řádku 1–10
+}
