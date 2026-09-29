@@ -29,6 +29,13 @@ private func layout(_ enabled: Bool, _ f: ContestFormat = .serial, exchange: Str
     #expect(!QSOLayout.showsQTC(c))
 }
 
+@Test func arrlRoundupHasStateField() {
+    let c = ContestSettings.preset(.arrlRoundup, year: 2027)
+    #expect(QSOLayout.rows(for: c) == [.single("call", "Call"), .country, .pair("rstSent", "RST s", "rstRcvd", "RST r"),
+                                       .pair("serialSent", "Nr s", "serialRcvd", "Nr r"), .single("exchangeRcvd", "Stát/prov. r"),
+                                       .single("notes", "Notes")])
+}
+
 @Test func zoneFormatLayoutAndClicks() {
     #expect(layout(true, .zone) == [.single("call", "Call"), .country, .pair("rstSent", "RST s", "rstRcvd", "RST r"),
                                     .pair("exchangeSent", "Zóna s", "exchangeRcvd", "Zóna r"), .single("notes", "Notes")])

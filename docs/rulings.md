@@ -341,3 +341,25 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Rychlost ve stavovém řádku v `TimelineView(.periodic(by: 30))` (`logStats(now:)`) – klesá i bez provozu.
 - Zálohy: `backupLogNow` je async (kopírování v `Task.detached`); automatická záloha nejvýše jedna najednou (příznak), selhání hlášeno jen jednou za relaci.
 - `make-app.sh`: architektury v `MMTTY_ARCHS` (ne `ARCHS`, kterou exportuje Xcode).
+
+## Násobiče v závodech (okno Násobiče, štítek NEW MULT)
+Jen násobiče (body a skóre se nepočítají). Logika `AppCore/Multipliers.swift` (`MultiplierRule`, `MultiplierCalculator`, `MultiplierTally`, `WPX`), přepočet v `AppModel` jen při změně logu nebo závodu/značky (ne při překreslení); NEW MULT se vyhodnocuje při změně QSO okna nebo pásma. Pravidla ověřena v oficiálních pravidlech 30. 9. 2026:
+
+| Závod | Násobiče | Po pásmech / jednou | Zvláštnosti | Zdroj |
+|---|---|---|---|---|
+| ARRL RTTY Roundup | země DXCC kromě USA a Kanady; státy USA (48 + DC); kanadské provincie a teritoria + LB (14) | jednou za závod | KH6, KL7 jsou země, ne státy. Stát/provincie z pole „Stát/prov. r“ (přidáno do QSO okna jen pro tuto předvolbu) | https://contests.arrl.org/ContestRules/RTTY-RU-Rules.pdf – ověřeno |
+| CQ WPX RTTY | prefixy WPX | jednou za závod | PA/N8BJQ = PA0, XEFTJW = XE0, /P /M /MM /A /E /J /QRP se ignorují, portable designátor = prefix | https://cqwpxrtty.com/rules.htm – ověřeno; **/číslice (W1ABC/3 = W3) v pravidlech není – neověřeno**, použita obvyklá praxe |
+| BARTG HF RTTY | země DXCC (včetně JA, W, VE, VK); oblasti JA/W/VE/VK; kontinenty | země a oblasti po pásmech, kontinenty jednou (max. 6) | kontinenty se ve skóre násobí zvlášť (tady jen počet) | bartg-hf-rtty-rules-2025-v3.pdf (bartg.org.uk) – ověřeno |
+| SARTG WW RTTY | země DXCC (včetně VK, VE, JA, W); oblasti VK/VE/JA/W | po pásmech | | https://www.sartg.com/contest/wwrules.htm – ověřeno |
+| CQ WW RTTY | CQ zóny; země DXCC + seznam WAE (IT9, GM/s, TA1, 4U1V, JW/b, IG9); W/VE QTH (48 států + DC, 14 oblastí VE) | po pásmech | KH6, KL7 jen země; USA a Kanada jsou země; MM jen zóna. Zóna z přijaté výměny („05 NY“), jinak z DXCC | https://www.cqwwrtty.com/rules.htm – ověřeno |
+| Makrothen RTTY | žádné | – | body podle vzdálenosti lokátorů × váha pásma; okno jen informuje | https://www.pl259.org/makrothen/makrothen-rules/ – ověřeno |
+| JARTS WW RTTY | země DXCC kromě JA/W/VE/VK; oblasti JA/W/VE/VK | po pásmech | oblast = poslední číslice prefixu, portable designátor bez číslice = 0 | https://jarl.org/English/4_Library/A-4-3_Contests/rtty_rules_en.html – ověřeno |
+| WAE DX RTTY | země seznamu WAE; u W, VE, VK, ZL, ZS, JA, BY, PY a RA8/RA9/RA0 číselné oblasti (W1 = K1 = KA1, VE1 = VO1 = VY1) | po pásmech | RTTY §12: evropské i mimoevropské násobiče platí pro všechny stanice (na rozdíl od CW/SSB, kde mimoevropské stanice počítají jen Evropu a evropské jen mimo-Evropu). Váhy pásem 80 m × 4, 40 m × 3, 20/15/10 m × 2 → „s váhou pásem“. QTC nejsou násobiče | https://www.darc.de/der-club/referate/conteste/wae-dx-contest/en/wae-rules/ – ověřeno |
+| OK DX RTTY | stanice mimo OK/OL: země DXCC + každá stanice OK/OL; stanice OK/OL: země DXCC | po pásmech | druh podle vlastní značky (Nastavení → Stanice). **Zda OK počítá i jako země DXCC vedle stanic OK/OL, pravidla výslovně neuvádějí – počítá se obojí (neověřeno)** | http://okrtty.crk.cz/index.php?page=english – ověřeno |
+
+- Neověřené části se v okně Násobiče zobrazují oranžově („Neověřeno: …“).
+- Počítají se spojení od `contest.effectiveStart` bez ohledu na mód; spojení bez známého pásma přispívají jen k násobičům „jednou za závod“. Vlastní závod (bez předvolby) a vypnutý závod = žádné násobiče.
+- Země = primární prefix z cty.dat (`CountryDB.lookup(_:wae:)`; `wae: true` najde i entity „*“ ze seznamu WAE, `count` dál jen DXCC). Oblasti: poslední číslice prefixu WPX (proto /číslice a portable designátor fungují stejně), jen pro země s oblastmi podle pravidel.
+- Prefix WPX: vše až po poslední číslici, za kterou následuje písmeno (YB0ABC1 = YB0); designátor = část, která není celou značkou (končí číslicí nebo nemá číslici), jinak nejkratší.
+- Stát/provincie: první slovo výměny ze seznamu (s aliasy NWT, NF, PEI, PQ, YK …), jen u spojení se zemí K / VE. Zóna: první číslo 1–40 (nejvýš dvouciferné) z výměny.
+- Štítek NEW MULT (zelený) vedle DUPE v QSO okně: které násobiče by spojení přineslo a na kterém pásmu; při DUPE se nezobrazuje.

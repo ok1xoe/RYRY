@@ -176,6 +176,7 @@ struct MMTTY4MacApp: App {
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
                 Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
                 Button(L("Spoty")) { openWindow(id: "spots") }
+                Button(L("Násobiče")) { openWindow(id: "multipliers") }
                 Divider()
                 Toggle(L("2. dekodér"), isOn: Binding(get: { model.settings.decoders.secondEnabled },
                                                       set: { v in Task { await model.setSecondDecoder(v) } }))
@@ -192,6 +193,9 @@ struct MMTTY4MacApp: App {
             .windowResizability(.contentSize)
         Window(L("Spoty"), id: "spots") {
             SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        Window(L("Násobiče"), id: "multipliers") {
+            MultipliersWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
         Window(L("Kanály"), id: "channels") {
             ChannelsWindow(model: model).environment(\.showHints, model.settings.display.showHints)

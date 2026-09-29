@@ -61,6 +61,14 @@ struct QSOPanel: View {
                                                 .background(.red, in: RoundedRectangle(cornerRadius: 4))
                                                 .hint(L("Duplicita: se stanicí už je v tomto závodě spojení na stejném pásmu a módu"))
                                         }
+                                        if !model.isDupe, !model.newMultiplier.isEmpty {
+                                            Text("NEW MULT").font(.caption.bold()).foregroundStyle(.white)
+                                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                                .background(.green, in: RoundedRectangle(cornerRadius: 4))
+                                                .hint(L("Nový násobič: %@", model.newMultiplier.text))
+                                            Text(model.newMultiplier.text).font(.caption).foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
                                     }.gridCellColumns(3)
                                 } else {
                                     QSOField(model: model, label: "", field: field).gridCellColumns(3)
