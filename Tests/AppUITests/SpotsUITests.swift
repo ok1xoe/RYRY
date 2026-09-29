@@ -28,7 +28,7 @@ final class SpotFakeRig: Rig, @unchecked Sendable {
 }
 
 @MainActor
-private func spotModel(rig: Rig, configure: (inout AppSettings) -> Void = { _ in }) -> AppModel {
+func spotModel(rig: Rig, configure: (inout AppSettings) -> Void = { _ in }) -> AppModel {
     let dir = tempDir()
     var s = AppSettings()
     s.station.call = "OK1XOE"
@@ -45,7 +45,7 @@ private func spotModel(rig: Rig, configure: (inout AppSettings) -> Void = { _ in
                     }, spectrumFPS: 0)
 }
 
-private let spot = Spot(frequencyKHz: 14080.0, call: "DL1ABC", spotter: "W3LPL-#", comment: "RTTY 25 dB", time: Date(),
+let spot = Spot(frequencyKHz: 14080.0, call: "DL1ABC", spotter: "W3LPL-#", comment: "RTTY 25 dB", time: Date(),
                         mode: "RTTY", snr: 25, source: .rbn)
 
 @Test @MainActor func doubleClickTunesRigWithOffsetAndFillsCall() async throws {

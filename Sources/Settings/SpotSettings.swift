@@ -18,6 +18,8 @@ public struct SpotSettings: Codable, Sendable, Equatable {
     public var maxAgeMinutes = 30
     /// Posun frekvence rigu proti frekvenci spotu (Hz): rádio v LSB/AFSK s mark 2125 Hz potřebuje +2125.
     public var offsetHz = 0.0
+    /// Štítky spotů (band map) ve vodopádu a spektru.
+    public var showInWaterfall = true
 
     public static let ageRange = 1...240
     public static let offsetRange = -10_000.0...10_000.0
@@ -25,7 +27,7 @@ public struct SpotSettings: Codable, Sendable, Equatable {
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case clusterEnabled, clusterHost, clusterPort, clusterCommands, rbnEnabled, rbnHost, rbnPort, rttyOnly, maxAgeMinutes, offsetHz
+        case clusterEnabled, clusterHost, clusterPort, clusterCommands, rbnEnabled, rbnHost, rbnPort, rttyOnly, maxAgeMinutes, offsetHz, showInWaterfall
     }
 
     static func validHost(_ h: String) -> Bool {
@@ -49,5 +51,6 @@ public struct SpotSettings: Codable, Sendable, Equatable {
         rttyOnly = c.tolerant(.rttyOnly, x.rttyOnly, w, s)
         let a = c.tolerant(.maxAgeMinutes, x.maxAgeMinutes, w, s); maxAgeMinutes = Self.ageRange.contains(a) ? a : x.maxAgeMinutes
         let o = c.tolerant(.offsetHz, x.offsetHz, w, s); offsetHz = Self.offsetRange.contains(o) ? o : x.offsetHz
+        showInWaterfall = c.tolerant(.showInWaterfall, x.showInWaterfall, w, s)
     }
 }

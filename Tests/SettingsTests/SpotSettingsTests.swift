@@ -26,3 +26,14 @@ import Testing
     #expect(o.clusterCommands == ["sh/dx"])
     #expect(!o.rttyOnly)
 }
+
+@Test func spotShowInWaterfallDefaultsTrueAndIsTolerant() throws {
+    #expect(AppSettings().spots.showInWaterfall)
+    let dir = tmp()
+    try #"{"spots":{"rttyOnly":false}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+    #expect(SettingsStore(directory: dir).load().0.spots.showInWaterfall)            // chybějící klíč = výchozí
+    try #"{"spots":{"showInWaterfall":"ne"}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+    #expect(SettingsStore(directory: dir).load().0.spots.showInWaterfall)            // neplatná hodnota = výchozí
+    try #"{"spots":{"showInWaterfall":false}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+    #expect(!SettingsStore(directory: dir).load().0.spots.showInWaterfall)
+}

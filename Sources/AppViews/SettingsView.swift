@@ -492,6 +492,7 @@ struct SpotsTab: View {
             }
             Section {
                 Toggle(L("Jen RTTY"), isOn: $s.spots.rttyOnly)
+                Toggle(L("Spoty ve vodopádu"), isOn: $s.spots.showInWaterfall)
                 NumberRow(title: L("Stáří spotů"), value: $s.spots.maxAgeMinutes, range: SpotSettings.ageRange, unit: "min")
                 LabeledContent(L("Posun frekvence rigu")) {
                     HStack {
