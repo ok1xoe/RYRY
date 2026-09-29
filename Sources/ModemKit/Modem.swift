@@ -45,6 +45,9 @@ public protocol Modem: AnyObject {
     /// XY scope: zapnout sběr a číst dávky bodů (modemy bez XY vrací nil).
     func setXYScope(_ on: Bool)
     func xyScope() -> [XYPoint]?
+    /// Scope demodulátoru (ladění): zapnout sběr a číst hotové dávky (všechny zdroje).
+    func setDemodScope(_ on: Bool)
+    func demodScope() -> DemodScope?
     /// Zářez na kmitočtu (pravé tlačítko ve spektru, jako MMTTY); modemy bez notch nic nedělají.
     func notchClick(hz: Double)
 }
@@ -55,4 +58,6 @@ public extension Modem {
     func setXYScope(_ on: Bool) {}
     func xyScope() -> [XYPoint]? { nil }
     func notchClick(hz: Double) {}
+    func setDemodScope(_ on: Bool) {}
+    func demodScope() -> DemodScope? { nil }
 }

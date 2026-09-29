@@ -145,6 +145,15 @@ size_t rttycore_read_xy(RTTYCore* core, float* x, float* y, size_t max);
 /* Pravé tlačítko ve spektru MMTTY: s typem notch nastaví zářez na hz (a zapne LMS/notch),
    při už zapnutém posune předchozí zářez do druhého. S typem LMS nedělá nic. */
 void   rttycore_notch_click(RTTYCore* core, double hz);
+/* Scope demodulátoru (MMTTY TTScope): zapnout/vypnout sběr dávek po 8192 vzorcích.
+   Zdroj 0 = výstup filtrů, 1 = detektor, 2 = LPF (integrátor), 3 = ATC (jen se zapnutým ATC).
+   ready = 1, když je dávka (bit + sync) plná. read vrací 0, dokud zdroj není plný; dávku nemaže
+   (lze číst všechny zdroje téhož okamžiku). mark/space jsou úrovně / 32768, bit 0/1,
+   sync: 1 = vzorkování bitu, −1 = start bit, −0,5 = stop bit. rearm spustí sběr další dávky. */
+void   rttycore_set_scope(RTTYCore* core, int on);
+int    rttycore_scope_ready(RTTYCore* core);
+size_t rttycore_read_scope(RTTYCore* core, int source, float* mark, float* space, float* bit, float* sync, size_t max);
+void   rttycore_scope_rearm(RTTYCore* core);
 /* Poslední spektrum (CFFT::m_fft), vrací počet binů; *binHz = šířka binu. */
 size_t rttycore_spectrum(RTTYCore* core, float* out, size_t max, double* binHz);
 

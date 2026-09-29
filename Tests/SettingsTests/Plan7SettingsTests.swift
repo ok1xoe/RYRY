@@ -52,3 +52,24 @@ import Testing
     #expect(s.macros[1].text == "%M")                         // vlastní makra se nemění
     #expect(AppSettings.defaultMacros.allSatisfy { !$0.text.contains("%M") })
 }
+
+// Plán 8 / T1, T2
+@Test func messagesAndMacroColors() throws {
+    let s0 = AppSettings()
+    #expect(s0.messages.count >= 3 && s0.messages.allSatisfy { !$0.name.isEmpty && !$0.text.isEmpty })
+    let store = SettingsStore(directory: tmp())
+    var s = AppSettings()
+    s.messages = [Macro(name: "Rig", text: "RIG IS IC-7300 %m\\")]
+    s.macros[0].color = "#FF8800"
+    try store.save(s)
+    let l = store.load().0
+    #expect(l.messages.count == 1 && l.messages[0].name == "Rig")
+    #expect(l.macros[0].color == "#FF8800" && l.macros[1].color == nil)
+    // neplatná barva → bez barvy, starý soubor bez messages → výchozí
+    let dir = tmp()
+    try ##"{"macros":[{"name":"A","text":"x","color":"orange"},{"name":"B","text":"y","color":"#12345G"}]}"##
+        .write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+    let o = SettingsStore(directory: dir).load().0
+    #expect(o.macros[0].color == nil && o.macros[1].color == nil)
+    #expect(o.messages == AppSettings.defaultMessages)
+}

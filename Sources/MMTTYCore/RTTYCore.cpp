@@ -635,6 +635,44 @@ extern "C" size_t rttycore_read_fsk_codes(RTTYCore* c, uint8_t* out, size_t max)
 // --- XY scope (CFSKDEM::m_XYScopeMark/Space, sběr po dávkách jako v TMmttyWd::UpdateXYScope) ---
 static const int kXYSize = 512;
 
+static void scopeCollect(CFSKDEM& d) {
+    for (int i = 0; i < 4; i++) { d.m_ScopeMark[i].Collect(SCOPESIZE); d.m_ScopeSpace[i].Collect(SCOPESIZE); }
+    d.m_ScopeSync.Collect(SCOPESIZE); d.m_ScopeBit.Collect(SCOPESIZE);
+}
+
+extern "C" void rttycore_set_scope(RTTYCore* c, int on) {
+    if (!c) return;
+    CoreScope scope(&c->ctx);
+    c->dem->m_Scope = 0;                       // jako TTScope: nejdřív vypnout, pak připravit a zapnout
+    if (on) { scopeCollect(*c->dem); c->dem->m_Scope = 1; }
+}
+
+extern "C" size_t rttycore_read_scope(RTTYCore* c, int src, float* m, float* s, float* b, float* y, size_t max) {
+    if (!c || !m || !s || !b || !y || src < 0 || src > 3 || !c->dem->m_Scope) return 0;
+    CoreScope scope(&c->ctx);
+    CFSKDEM& d = *c->dem;
+    CScope &sm = d.m_ScopeMark[src], &ss = d.m_ScopeSpace[src];
+    if (!sm.GetFlag() || !ss.GetFlag() || !d.m_ScopeBit.GetFlag() || !d.m_ScopeSync.GetFlag()) return 0;
+    size_t n = size_t(std::min(std::min(sm.m_ScopeSize, ss.m_ScopeSize), std::min(d.m_ScopeBit.m_ScopeSize, d.m_ScopeSync.m_ScopeSize)));
+    if (n > max) n = max;
+    for (size_t i = 0; i < n; i++) {
+        m[i] = float(sm.pScopeData[i] / 32768.0); s[i] = float(ss.pScopeData[i] / 32768.0);
+        b[i] = float(d.m_ScopeBit.pScopeData[i] / 8192.0); y[i] = float(d.m_ScopeSync.pScopeData[i] / 8192.0);
+    }
+    return n;
+}
+
+extern "C" int rttycore_scope_ready(RTTYCore* c) {
+    if (!c || !c->dem->m_Scope) return 0;
+    return (c->dem->m_ScopeBit.GetFlag() && c->dem->m_ScopeSync.GetFlag()) ? 1 : 0;
+}
+
+extern "C" void rttycore_scope_rearm(RTTYCore* c) {
+    if (!c || !c->dem->m_Scope) return;
+    CoreScope scope(&c->ctx);
+    scopeCollect(*c->dem);
+}
+
 extern "C" void rttycore_set_xy(RTTYCore* c, int on) {
     if (!c) return;
     CoreScope scope(&c->ctx);

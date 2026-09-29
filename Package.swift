@@ -65,7 +65,7 @@ let package = Package(
         .testTarget(name: "AppUITests", dependencies: ["AppUI", "AppCore", "Engine", "Settings", "ModemKit", "AudioIO",
                                                        "Keying", "RigControl", "RTTYModem", "RTTYSignalKit", "TestSupport", "WaveFile"]),
         .target(name: "AppViews", dependencies: ["AppUI", "AppCore", "QSOLog", "Settings", "AudioIO", "Keying",
-                                                  "ModemKit", "Engine", "RigControl"]),
+                                                  "ModemKit", "Engine", "RigControl", "RTTYModem"]),
         .executableTarget(name: "MMTTY4MacApp", dependencies: ["AppViews", "AppUI"]),
         .target(name: "DXCC"),
         .testTarget(name: "DXCCTests", dependencies: ["DXCC"]),

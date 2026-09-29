@@ -61,3 +61,11 @@ private func rec(_ call: String, _ time: String, sent: Int?, rcvd: Int?, exS: St
     #expect(t.contains("X-CATEGORY: SINGLE-OP ALL LOW\r\n") && t.contains("CATEGORY-POWER: LOW\r\n"))
     #expect(!t.contains("CATEGORY-SINGLE-OP"))
 }
+
+@Test func cabrilloBartgExchangeHasSerialAndTime() {
+    var r = QSORecord(call: "DL1ABC", timeOn: ISO8601DateFormatter().date(from: "2026-09-29T12:03:00Z")!)
+    r.frequency = 14_083_000; r.rstSent = "599"; r.rstRcvd = "599"
+    r.serialSent = 15; r.exchangeSent = "1203"; r.serialRcvd = 7; r.exchangeRcvd = "1159"
+    let t = Cabrillo.export([r], header: CabrilloHeader(callsign: "OK1XOE", contest: "BARTG-RTTY"))
+    #expect(t.contains("QSO: 14083 RY 2026-09-29 1203 OK1XOE        599 015 1203 DL1ABC        599 007 1159"))
+}

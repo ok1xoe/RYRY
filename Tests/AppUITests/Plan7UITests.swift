@@ -228,3 +228,96 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     try #"{"display":{"fromHz":0,"toHz":5500}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     #expect(SettingsStore(directory: dir).load().0.display.toHz == 3000)
 }
+
+// Plán 8 / T3: scope v AppModel (dotazování jen když je zapnutý)
+@Test @MainActor func demodScopeInModel() async throws {
+    let f = Fixture()
+    await f.model.start()
+    f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
+    await f.pump(30)
+    await f.model.pollDemodScope()
+    #expect(f.model.demodScope == nil)                   // vypnutý
+    await f.model.setDemodScope(true)
+    f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
+    await f.pump(30)
+    await f.model.pollDemodScope()
+    let d = try #require(f.model.demodScope)
+    #expect(d.bit.count == 8192 && d.marks[0].count == 8192 && d.marks[2].count == 8192)
+    // zmrazený záznam se dalšími dávkami nepřepíše (a obsahuje všechny zdroje pro přepínání)
+    f.model.scopeFrozen = true
+    f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
+    await f.pump(30)
+    await f.model.pollDemodScope()
+    #expect(f.model.demodScope == d)
+    await f.model.stop()
+}
+
+// Plán 8 / T1: zprávy v modelu – uložení a odeslání
+@Test @MainActor func messagesSavedAndSent() async throws {
+    let f = Fixture()
+    await f.model.start()
+    await f.model.saveMessages([Macro(name: "A", text: "TEST %m\\")])
+    #expect(f.model.settings.messages.map(\.name) == ["A"])
+    #expect(SettingsStore(directory: f.dir).load().0.messages.map(\.name) == ["A"])
+    await f.model.runMessage(0)
+    await f.pump(20)
+    #expect(await f.engine.state == .tx || f.audio.tx.count > 0)
+    await f.model.rxNow()
+    await f.model.stop()
+}
+
+// Plán 8 / T5: klik na slovo v závodních formátech (MMTTY StoreZone/StoreQTH/StoreNR/StoreUTC)
+func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = true) -> [String: String] {
+    var q = QSOFields(); q.call = "DL1ABC"; q.exchangeRcvd = exch
+    return Dictionary(uniqueKeysWithValues: WordClassifier.contestUpdate(w, format: f, serialMode: serialMode, current: q))
+}
+
+@Test func contestUpdateCQRJ() {
+    #expect(cu("14", .cqrj) == ["exchangeRcvd": "14"])
+    #expect(cu("59914", .cqrj) == ["exchangeRcvd": "14"])
+    #expect(cu("OH", .cqrj, exch: "14") == ["exchangeRcvd": "14 OH"])
+    #expect(cu("15", .cqrj, exch: "14 OH") == ["exchangeRcvd": "15 OH"])
+    #expect(cu("NY", .cqrj, exch: "05 OH") == ["exchangeRcvd": "05 NY"])
+    #expect(cu("599", .cqrj) == ["rstRcvd": "599"])
+    #expect(cu("TU", .cqrj).isEmpty)
+}
+
+@Test func contestUpdateBARTG() {
+    #expect(cu("015", .bartg) == ["serialRcvd": "15"])
+    #expect(cu("599015", .bartg) == ["serialRcvd": "15"])
+    #expect(cu("1203", .bartg) == ["exchangeRcvd": "1203"])
+    #expect(cu("12:03", .bartg) == ["exchangeRcvd": "1203"])
+    #expect(cu("2599", .bartg) == ["serialRcvd": "2599"])          // neplatný čas → číslo (MMTTY StoreUTC → StoreNR)
+    #expect(cu("TU", .bartg).isEmpty)
+}
+
+@Test @MainActor func pedClickAlwaysSetsCall() async throws {
+    let f = Fixture()
+    f.configure = { $0.contest.enabled = true; $0.contest.format = .ped }
+    await f.model.start()
+    await f.model.insertWord("DL1ABC")
+    await f.model.insertWord("OK2PBR")                       // i když značka už je vyplněná
+    await f.settle()
+    #expect(f.model.qso.call == "OK2PBR" && f.model.qso.serialSent == nil)
+    await f.model.stop()
+}
+
+// Review plán 8 #1: formát závodu z dialogu Nastavení se musí uložit
+@Test @MainActor func contestFormatAppliedFromSettingsDialog() async throws {
+    let f = Fixture()
+    await f.model.start()
+    let base = f.model.settings
+    var d = base; d.contest.enabled = true; d.contest.format = .bartg
+    await f.model.applySettings(d, baseline: base)
+    #expect(f.model.settings.contest.format == .bartg)
+    #expect(SettingsStore(directory: f.dir).load().0.contest.format == .bartg)
+    await f.model.stop()
+}
+
+// Review plán 8 #4, #5
+@Test func contestUpdateEdgeCases() {
+    #expect(cu("OK", .cqrj, exch: "04") == ["exchangeRcvd": "04 OK"])      // Oklahoma
+    #expect(cu("AR", .cqrj, exch: "04") == ["exchangeRcvd": "04 AR"])      // Arkansas
+    #expect(cu("TU", .cqrj).isEmpty)
+    #expect(cu("01203", .bartg) == ["exchangeRcvd": "1203"])               // MMTTY StoreUTC: > 3 číslice = čas, je-li platný
+}

@@ -225,6 +225,24 @@ public final class RTTYModem: Modem, @unchecked Sendable {
 
     public func notchClick(hz: Double) { rttycore_notch_click(core, hz) }
 
+    /// Názvy zdrojů scope demodulátoru (MMTTY TTScope „Source“).
+    public static let scopeSources = ["Filtr", "Det.", "LPF", "ATC"]
+    public func setDemodScope(_ on: Bool) { rttycore_set_scope(core, on ? 1 : 0) }
+    public func demodScope() -> DemodScope? {
+        guard rttycore_scope_ready(core) != 0 else { return nil }      // bez zbytečných alokací při každém snímku
+        let n = 8192
+        var m = [Float](repeating: 0, count: n), s = m, b = m, y = m
+        var marks: [[Float]] = [], spaces: [[Float]] = []
+        for src in 0..<Self.scopeSources.count {
+            let got = rttycore_read_scope(core, Int32(src), &m, &s, &b, &y, n)
+            marks.append(Array(m[..<got])); spaces.append(Array(s[..<got]))
+        }
+        let len = marks.map(\.count).max() ?? 0
+        rttycore_scope_rearm(core)
+        guard len > 0 else { return nil }
+        return DemodScope(marks: marks, spaces: spaces, bit: Array(b[..<len]), sync: Array(y[..<len]))
+    }
+
     /// Poslední plná dávka bodů XY scope (x = mark, y = space), nebo nil.
     public func xyScope() -> [XYPoint]? {
         var x = [Float](repeating: 0, count: 512), y = x

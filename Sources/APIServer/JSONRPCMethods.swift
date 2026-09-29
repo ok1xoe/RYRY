@@ -100,6 +100,14 @@ extension JSONRPCServer {
             s.startedTx = true
             return true
         case "macro.stop": await app.stopMacroRepeat(); return true
+        case "msg.list":
+            return await app.settings.messages.enumerated().map { ["index": $0, "name": $1.name, "text": $1.text] as [String: Any] }
+        case "msg.run":
+            let i = try int(p, "index")
+            do { try await app.runMessage(index: i) } catch AppError.badMessage(let n) { throw RPCError.params("zpráva \(n) neexistuje") }
+            catch { throw RPCError(code: -32001, message: "TX odmítnuto: \(error)") }
+            s.startedTx = true
+            return true
         // QSO okno
         case "qso.getCurrent": return Self.encodable(await app.qso)
         case "qso.setField":

@@ -256,11 +256,17 @@ struct ContestTab: View {
     var body: some View {
         Form {
             Toggle("Závodní režim (pořadová čísla, klik na číslo = přijaté číslo)", isOn: $s.contest.enabled)
+            Picker("Formát", selection: $s.contest.format) {
+                Text("RST + pořadové číslo (nebo pevná výměna)").tag(ContestFormat.serial)
+                Text("CQ/RJ – zóna + QTH (CQ WW RTTY)").tag(ContestFormat.cqrj)
+                Text("BARTG – číslo + čas UTC").tag(ContestFormat.bartg)
+                Text("PED – klik = vždy značka, bez čísel").tag(ContestFormat.ped)
+            }
             TextField("Název závodu (Cabrillo CONTEST)", text: $s.contest.name)
             TextField("Kategorie (Cabrillo, oddělit „;“)", text: $s.contest.category)
             Stepper("Další pořadové číslo: \(s.contest.nextSerial)", value: $s.contest.nextSerial, in: 1...99_999)
-            TextField("Odesílaná výměna místo čísla (prázdné = číslo)", text: $s.contest.exchange)
-            Text("Makra: %N = odesílané číslo (nebo výměna), %M = přijaté (jako MMTTY: %r/%N z HisRST, %s/%M z MyRST). Export: Log → Exportovat Cabrillo…")
+            TextField("Odesílaná výměna (CQ/RJ: moje zóna/QTH; RST+číslo: místo čísla, prázdné = číslo)", text: $s.contest.exchange)
+            Text("BARTG: posílá se číslo a čas začátku QSO, %x = číslo, %y = čas. CQ/RJ: klik na číslo = zóna, na text = QTH. Makra: %N = odesílané číslo (nebo výměna), %M = přijaté (jako MMTTY: %r/%N z HisRST, %s/%M z MyRST). Export: Log → Exportovat Cabrillo…")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

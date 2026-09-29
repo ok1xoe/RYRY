@@ -35,7 +35,7 @@ public struct QSOFields: Codable, Sendable, Equatable {
 }
 
 public enum AppError: Error, Equatable, Sendable {
-    case unknownField(String), noLog, badMacro(Int), profile(String), log(String)
+    case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String)
 }
 
 public enum AppEvent: Sendable {
@@ -88,11 +88,27 @@ public actor AppController {
                 countries: CountryDB? = CountryDB.shared) {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
         self.countries = countries
-        if settings.contest.enabled {
-            if settings.contest.exchange.isEmpty { qso.serialSent = settings.contest.nextSerial }
-            else { qso.exchangeSent = settings.contest.exchange }
-        }
+        qso = Self.contestDefaults(settings.contest)
     }
+
+    /// Prázdné QSO okno podle závodního formátu (odesílané číslo nebo pevná výměna).
+    static func contestDefaults(_ c: ContestSettings) -> QSOFields {
+        var q = QSOFields()
+        guard c.enabled else { return q }
+        switch c.format {
+        case .serial:
+            if c.exchange.isEmpty { q.serialSent = c.nextSerial } else { q.exchangeSent = c.exchange }
+        case .cqrj: q.exchangeSent = c.exchange
+        case .bartg: q.serialSent = c.nextSerial                 // čas se doplní se začátkem QSO
+        case .ped: break
+        }
+        return q
+    }
+
+    static let hhmm: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HHmm"; return f
+    }()
 
     public nonisolated func events() -> AsyncStream<AppEvent> { broadcaster.subscribe() }
 
@@ -139,6 +155,7 @@ public actor AppController {
     public func setTxDisabled(_ on: Bool) { txDisabled = on }
     public func tx() async throws {
         if txDisabled { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        lockBARTGTime()
         try await engine.tx()
     }
     public func tune() async throws {
@@ -156,11 +173,31 @@ public actor AppController {
         c.myCall = settings.station.call.uppercased()
         c.hisCall = qso.call; c.name = qso.name; c.qth = qso.qth
         // MMTTY: HisRST = co posílám (%r %N), MyRST = co jsem dostal (%s %M); v závodě „599“ + číslo nebo výměna
-        c.hisRST = qso.rstSent + (qso.serialSent.map { String(format: "%03d", $0) } ?? qso.exchangeSent)
-        c.myRST = qso.rstRcvd + (qso.serialRcvd.map { String(format: "%03d", $0) } ?? qso.exchangeRcvd)
+        // BARTG: do začátku QSO aktuální čas (MMTTY UpdateBARTG každou minutu)
+        let sentExch = isBARTG && qso.exchangeSent.isEmpty ? Self.hhmm.string(from: Date()) : qso.exchangeSent
+        c.hisRST = qso.rstSent + Self.exchangeSuffix(qso.serialSent, sentExch)
+        c.myRST = qso.rstRcvd + Self.exchangeSuffix(qso.serialRcvd, qso.exchangeRcvd)
         c.now = Date()
         c.hisUTCOffsetHours = country(for: qso.call)?.utcOffsetHours
         return c
+    }
+
+    private var isBARTG: Bool { settings.contest.enabled && settings.contest.format == .bartg }
+
+    /// BARTG: první vysílání se zadanou značkou = začátek QSO → čas se zafixuje (MMTTY SetHisUTC).
+    private func lockBARTGTime() {
+        guard isBARTG, !qso.call.isEmpty, qso.exchangeSent.isEmpty else { return }
+        qso.exchangeSent = Self.hhmm.string(from: Date())
+        broadcaster.send(.qsoChanged(qso))
+    }
+
+    /// Část za RST: číslo, výměna, nebo obojí „NNN-výměna“ (MMTTY BARTG „599NNN-HHMM“; %x/%y).
+    static func exchangeSuffix(_ serial: Int?, _ exch: String) -> String {
+        switch (serial, exch.isEmpty) {
+        case (let n?, true): return String(format: "%03d", n)
+        case (let n?, false): return String(format: "%03d", n) + "-" + exch
+        case (nil, _): return exch
+        }
     }
 
     public func runMacro(index: Int) async throws {
@@ -171,6 +208,7 @@ public actor AppController {
 
     private func runMacroOnce(_ index: Int) async throws {
         guard settings.macros.indices.contains(index) else { throw AppError.badMacro(index) }
+        lockBARTGTime()
         let m = MacroEngine.expand(settings.macros[index].text, context: macroContext())
         if txDisabled, m.mode == .send { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
         try await engine.sendMacro(m)
@@ -197,6 +235,17 @@ public actor AppController {
     }
 
     public func setMacros(_ m: [Macro]) { settings.macros = m }
+    public func setMessages(_ m: [Macro]) { settings.messages = m }
+
+    /// Zpráva ze seznamu (MMTTY MsgList) – odešle se stejně jako makro.
+    public func runMessage(index: Int) async throws {
+        guard settings.messages.indices.contains(index) else { throw AppError.badMessage(index) }
+        stopMacroRepeat()
+        lockBARTGTime()
+        let m = MacroEngine.expand(settings.messages[index].text, context: macroContext())
+        if txDisabled, m.mode == .send { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        try await engine.sendMacro(m)
+    }
     public func setStation(_ st: Station) { settings.station = st }
 
     // MARK: QSO
@@ -207,6 +256,8 @@ public actor AppController {
         case "call":
             qso.call = v.uppercased()
             if !v.isEmpty, qso.timeOn == nil { qso.timeOn = Date() }
+            // BARTG: smazaná značka = QSO nezačalo, čas se znovu bere aktuální (MMTTY UpdateBARTG)
+            if v.isEmpty, isBARTG { qso.exchangeSent = ""; qso.timeOn = nil }
         case "name": qso.name = v
         case "qth": qso.qth = v
         case "locator": qso.locator = v.uppercased()
@@ -230,14 +281,14 @@ public actor AppController {
 
     /// Závod: odesílané pořadové číslo (nebo pevná výměna) do prázdného QSO okna.
     private func applyContestDefaults() {
-        guard settings.contest.enabled else { return }
-        if settings.contest.exchange.isEmpty { qso.serialSent = settings.contest.nextSerial }
-        else { qso.exchangeSent = settings.contest.exchange; qso.serialSent = nil }
+        let d = Self.contestDefaults(settings.contest)
+        qso.serialSent = d.serialSent; qso.exchangeSent = d.exchangeSent
     }
 
     @discardableResult
     public func logQSO() async throws -> QSORecord {
         guard let log else { throw AppError.noLog }
+        lockBARTGTime()
         let qso = self.qso                      // snímek – během await se pole mohou změnit
         guard !qso.call.isEmpty else { throw AppError.log("chybí značka") }
         let now = Date()
@@ -265,8 +316,9 @@ public actor AppController {
             }
             // závod: rovnou další spojení s dalším číslem – ale nemazat, co operátor mezitím napsal
             if self.qso == qso { clearQSO() }
-            else if settings.contest.exchange.isEmpty, self.qso.serialSent == r.serialSent {
+            else if settings.contest.sendsSerial, self.qso.serialSent == r.serialSent {
                 self.qso.serialSent = settings.contest.nextSerial
+                if isBARTG { self.qso.exchangeSent = "" }   // čas zalogovaného QSO nedědit
                 broadcaster.send(.qsoChanged(self.qso))
             }
         }

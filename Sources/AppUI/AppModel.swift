@@ -86,6 +86,11 @@ public final class AppModel {
     public private(set) var profileNames: [String?] = []
     public private(set) var xyPoints: [XYPoint] = []
     public private(set) var xyEnabled = false
+    /// Scope demodulátoru (okno „Scope“): poslední dávka, zdroj 0–3, zmrazení (jednorázový záznam).
+    public private(set) var demodScope: DemodScope?
+    public private(set) var demodScopeEnabled = false
+    public var scopeSource = 2
+    public var scopeFrozen = false
     private var sqTarget: Double?
     private var sqChain: Task<Void, Never>?
     var lastSentForTesting = ""
@@ -203,6 +208,7 @@ public final class AppModel {
         if let log { logRecords = await log.query() }
         profileNames = profileStore.load().map { $0?.name }
         if xyEnabled { await engine.setXYScope(true) }
+        if demodScopeEnabled { await engine.setDemodScope(true) }
         let st = await engine.state
         logger.info("start: stav \(st.rawValue, privacy: .public)")
         await startAPIs(app)
@@ -233,6 +239,7 @@ public final class AppModel {
                 if let f = await engine.spectrum(), let self {
                     self.waterfall.push(f, fromHz: self.waterfallFromHz, toHz: self.waterfallToHz)
                     if self.xyEnabled, let pts = await engine.xyScope() { self.xyPoints = pts }
+                    await self.pollDemodScope()
                 }
                 try? await Task.sleep(for: .milliseconds(interval))
             }
@@ -280,7 +287,7 @@ public final class AppModel {
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
                 take(\.display.timestamps); take(\.display.fontSize)
-                take(\.contest.enabled); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
+                take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial)
                 return m
             }
@@ -460,6 +467,11 @@ public final class AppModel {
     public func tune() async { guard let app else { return }; await run("Tune") { try await app.tune() } }
     public func runMacro(_ i: Int) async { guard let app else { return }; await run("Makro F\(i + 1)") { try await app.runMacro(index: i) } }
     public func stopMacro() async { await app?.stopMacroRepeat() }
+    public func runMessage(_ i: Int) async {
+        guard let app else { return }
+        let name = settings.messages.indices.contains(i) ? settings.messages[i].name : "\(i + 1)"
+        await run("Zpráva \(name)") { try await app.runMessage(index: i) }
+    }
 
     /// Odešle z editoru část podle režimu (znak = vše, slovo = do poslední mezery, řádek = do posledního konce řádku).
     public func sendDraft(mode: SendMode) async {
@@ -538,8 +550,14 @@ public final class AppModel {
         let word = w.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters.subtracting(CharacterSet(charactersIn: "/"))))
         let kind = WordClassifier.classify(word)
         // závod: po zadání značky jdou čísla a výměna do přijatých polí (MMTTY TMmttyWd::PBoxRxMouseDown)
+        // PED: každé kliknuté slovo je značka protistanice
+        if settings.contest.enabled, settings.contest.format == .ped {
+            if !word.isEmpty { await setQSOField("call", String(word.uppercased().prefix(16))) }
+            return
+        }
         if settings.contest.enabled, !qso.call.isEmpty, kind != .call {
-            if let (field, v) = WordClassifier.contestField(word, serialMode: settings.contest.exchange.isEmpty) {
+            for (field, v) in WordClassifier.contestUpdate(word, format: settings.contest.format,
+                                                           serialMode: settings.contest.exchange.isEmpty, current: qso) {
                 await setQSOField(field, v)
             }
             return
@@ -562,6 +580,12 @@ public final class AppModel {
         var s = settings; s.macros = m; settings = s
         await app?.setMacros(m)
         do { try settingsStore.save(s) } catch { note("Makra nelze uložit: \(error)") }
+    }
+
+    public func saveMessages(_ m: [Macro]) async {
+        var s = settings; s.messages = m; settings = s
+        await app?.setMessages(m)
+        do { try settingsStore.save(s) } catch { note("Zprávy nelze uložit: \(error)") }
     }
 
     public func profiles() -> [Profile?] { profileStore.load() }
@@ -601,6 +625,18 @@ public final class AppModel {
         xyEnabled = on
         if !on { xyPoints = [] }
         await app?.engine.setXYScope(on)
+    }
+
+    public func setDemodScope(_ on: Bool) async {
+        demodScopeEnabled = on
+        if !on { demodScope = nil }
+        await app?.engine.setDemodScope(on)
+    }
+
+    /// Jedno načtení dávky scope (volá smyčka spektra; pro testy ručně). Zmrazený scope se nepřepisuje.
+    public func pollDemodScope() async {
+        guard demodScopeEnabled, !scopeFrozen, let d = await app?.engine.demodScope() else { return }
+        demodScope = d
     }
 
     /// Jedno načtení XY bodů (volá smyčka spektra; pro testy ručně).
