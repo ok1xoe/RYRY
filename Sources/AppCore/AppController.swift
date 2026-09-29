@@ -205,6 +205,7 @@ public actor AppController {
     @discardableResult
     public func logQSO() async throws -> QSORecord {
         guard let log else { throw AppError.noLog }
+        let qso = self.qso                      // snímek – během await se pole mohou změnit
         guard !qso.call.isEmpty else { throw AppError.log("chybí značka") }
         let now = Date()
         var r = QSORecord(call: qso.call, timeOn: qso.timeOn ?? now, mode: await engine.currentMode().adifMode)

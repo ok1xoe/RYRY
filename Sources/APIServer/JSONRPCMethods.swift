@@ -101,8 +101,8 @@ extension JSONRPCServer {
         // log
         case "log.query":
             guard let log = app.log else { throw RPCError(code: -32003, message: "log není k dispozici") }
-            let from = (p["from"] as? String).flatMap(Self.iso.date(from:))
-            let to = (p["to"] as? String).flatMap(Self.iso.date(from:))
+            let from = (p["from"] as? String).flatMap(ISODates.parse)
+            let to = (p["to"] as? String).flatMap(ISODates.parse)
             let recs = await log.query(call: p["call"] as? String, from: from, to: to, limit: (p["limit"] as? NSNumber)?.intValue)
             return recs.map(Self.recordJSON)
         case "log.update":
@@ -117,7 +117,12 @@ extension JSONRPCServer {
                 obj = base
             }
             guard let obj, let d = try? JSONSerialization.data(withJSONObject: obj) else { throw RPCError.params("chybí 'record' nebo {id, fields}") }
-            let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+            let dec = JSONDecoder()
+            dec.dateDecodingStrategy = .custom { d in
+                let s = try d.singleValueContainer().decode(String.self)
+                guard let v = ISODates.parse(s) else { throw DecodingError.dataCorrupted(.init(codingPath: d.codingPath, debugDescription: s)) }
+                return v
+            }
             guard let r = try? dec.decode(QSORecord.self, from: d) else { throw RPCError.params("neplatný záznam") }
             do { try await app.updateQSO(r) } catch { throw RPCError(code: -32003, message: "\(error)") }
             return true
@@ -133,7 +138,6 @@ extension JSONRPCServer {
             let fps = min(20, max(1, (p["fps"] as? NSNumber)?.doubleValue ?? 10))
             let bins = (p["bins"] as? NSNumber)?.intValue
             s.subscribe(["spectrum"])
-            s.spectrumTask?.cancel()
             s.spectrumTask = Task { [weak s] in
                 while !Task.isCancelled, let s, !s.isClosed {
                     if let f = await engine.spectrum() { s.notify("spectrum", Self.spectrumJSON(f, bins: bins)) }
@@ -141,7 +145,7 @@ extension JSONRPCServer {
                 }
             }
             return true
-        case "spectrum.stopStream": s.spectrumTask?.cancel(); s.unsubscribe(["spectrum"]); return true
+        case "spectrum.stopStream": s.spectrumTask = nil; s.unsubscribe(["spectrum"]); return true
         // události
         case "events.subscribe":
             guard let ev = p["events"] as? [String] else { throw RPCError.params("chybí 'events' (array)") }

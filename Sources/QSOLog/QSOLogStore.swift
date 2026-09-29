@@ -14,10 +14,25 @@ public actor QSOLogStore {
     /// Log se nepodařilo přečíst → zápisy se odmítají, aby se nepřepsal.
     private var readFailed = false
 
-    private static let encoder: JSONEncoder = {
-        let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]; return e
+    /// ISO 8601 s milisekundami; čte i starší zápis bez desetin.
+    static let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .custom { d, enc in
+            var c = enc.singleValueContainer(); try c.encode(ISODates.format(d))
+        }
+        e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]; return e
     }()
-    private static let decoder: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
+    static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .custom { dec in
+            let s = try dec.singleValueContainer().decode(String.self)
+            guard let date = ISODates.parse(s) else {
+                throw DecodingError.dataCorrupted(.init(codingPath: dec.codingPath, debugDescription: "datum \(s)"))
+            }
+            return date
+        }
+        return d
+    }()
 
     public init(directory: URL, baseName: String = "mmtty4mac") throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -85,7 +100,8 @@ public actor QSOLogStore {
         return String(decoding: d, as: UTF8.self) + "\n"
     }
 
-    public func append(_ r: QSORecord) throws {
+    public func append(_ rec: QSORecord) throws {
+        var r = rec; r.call = QSORecord.normalizeCall(r.call)
         try checkWritable()
         try appendLine(try jsonLine(r), to: jsonlURL)        // zdroj pravdy – chyba = spojení nezalogováno
         records.append(r)
@@ -125,7 +141,8 @@ public actor QSOLogStore {
         }
     }
 
-    public func update(_ r: QSORecord) throws {
+    public func update(_ rec: QSORecord) throws {
+        var r = rec; r.call = QSORecord.normalizeCall(r.call)
         guard let i = records.firstIndex(where: { $0.id == r.id }) else { throw QSOLogError.notFound(r.id) }
         var recs = records; recs[i] = r
         try rewrite(recs)
@@ -156,4 +173,14 @@ public actor QSOLogStore {
     public func rebuildADIF() throws {
         try atomicWrite(ADIF.header() + records.map(ADIF.record).joined(), to: adifURL)
     }
+}
+
+/// ISO 8601 (UTC) s milisekundami i bez nich.
+public enum ISODates {
+    nonisolated(unsafe) static let frac: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
+    }()
+    nonisolated(unsafe) static let plain = ISO8601DateFormatter()
+    public static func format(_ d: Date) -> String { frac.string(from: d) }
+    public static func parse(_ s: String) -> Date? { frac.date(from: s) ?? plain.date(from: s) }
 }

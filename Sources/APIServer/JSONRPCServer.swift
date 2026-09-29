@@ -21,8 +21,15 @@ final class ClientSession: @unchecked Sendable {
     private let lock = NSLock()
     private var inFlight = 0
     private var subs: Set<String> = []
-    private(set) var isClosed = false
-    var spectrumTask: Task<Void, Never>?
+    private var _closed = false
+    var isClosed: Bool { lock.withLock { _closed } }
+    private var _spectrumTask: Task<Void, Never>?
+    var spectrumTask: Task<Void, Never>? {
+        get { lock.withLock { _spectrumTask } }
+        set { let old = lock.withLock { () -> Task<Void, Never>? in let o = _spectrumTask; _spectrumTask = newValue; return o }
+              if old != nil, old != newValue { old?.cancel() } }
+    }
+    private var inboxCount = 0
     /// Příchozí požadavky – zpracují se postupně jedním úkolem (zachování pořadí).
     let inbox: AsyncStream<String>
     let inboxContinuation: AsyncStream<String>.Continuation
@@ -34,12 +41,23 @@ final class ClientSession: @unchecked Sendable {
 
     init(sink: WSSink, maxQueue: Int) {
         self.sink = sink; self.maxQueue = maxQueue
-        (inbox, inboxContinuation) = AsyncStream.makeStream(of: String.self, bufferingPolicy: .bufferingNewest(1000))
+        (inbox, inboxContinuation) = AsyncStream.makeStream(of: String.self, bufferingPolicy: .unbounded)
     }
 
     func subscribe(_ names: [String]) { lock.withLock { subs.formUnion(names) } }
     func unsubscribe(_ names: [String]) { lock.withLock { subs.subtract(names) } }
     func isSubscribed(_ name: String) -> Bool { lock.withLock { subs.contains(name) || subs.contains("*") } }
+
+    /// Příchozí požadavek do fronty; při přetečení (klient posílá rychleji, než se zpracuje) chyba a zavření.
+    func enqueue(_ text: String) {
+        let over = lock.withLock { () -> Bool in inboxCount += 1; return inboxCount > maxQueue }
+        if over {
+            sendJSON(["jsonrpc": "2.0", "id": NSNull(), "error": ["code": -32600, "message": "too many pending requests"]])
+            close(); return
+        }
+        inboxContinuation.yield(text)
+    }
+    func dequeued() { lock.withLock { inboxCount -= 1 } }
 
     func sendJSON(_ obj: [String: Any]) {
         guard let d = try? JSONSerialization.data(withJSONObject: obj, options: [.withoutEscapingSlashes]) else { return }
@@ -48,12 +66,12 @@ final class ClientSession: @unchecked Sendable {
 
     func send(_ text: String) {
         let over: Bool = lock.withLock {
-            if isClosed { return false }
+            if _closed { return false }
             if inFlight >= maxQueue { return true }
             inFlight += 1; return false
         }
         if over { close(); return }
-        if lock.withLock({ isClosed }) { return }
+        if lock.withLock({ _closed }) { return }
         sink.send(text) { [weak self] err in
             guard let self else { return }
             self.lock.withLock { self.inFlight -= 1 }
@@ -67,9 +85,9 @@ final class ClientSession: @unchecked Sendable {
     }
 
     func close() {
-        let first: Bool = lock.withLock { if isClosed { return false }; isClosed = true; return true }
+        let first: Bool = lock.withLock { if _closed { return false }; _closed = true; return true }
         guard first else { return }
-        spectrumTask?.cancel()
+        spectrumTask = nil
         inboxContinuation.finish()
         sink.close()
         onClose?()
@@ -141,6 +159,7 @@ public final class JSONRPCServer: @unchecked Sendable {
         session.worker = Task { [weak self, weak session] in
             for await text in inbox {
                 guard let self, let session else { return }
+                session.dequeued()
                 await self.handle(text, session)
             }
         }
@@ -159,7 +178,7 @@ public final class JSONRPCServer: @unchecked Sendable {
             let meta = ctx?.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata
             switch meta?.opcode {
             case .text?:
-                s.inboxContinuation.yield(String(decoding: data ?? Data(), as: UTF8.self))
+                s.enqueue(String(decoding: data ?? Data(), as: UTF8.self))
             case .close?: s.close(); return
             case .binary?:
                 s.sendJSON(["jsonrpc": "2.0", "id": NSNull(), "error": ["code": -32600, "message": "binary frames not supported"]])
@@ -234,7 +253,7 @@ public final class JSONRPCServer: @unchecked Sendable {
 
     nonisolated(unsafe) static let iso = ISO8601DateFormatter()   // jen čtení (thread-safe)
     static func encodable<T: Encodable>(_ v: T) -> Any {
-        let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601
+        let e = JSONEncoder(); e.dateEncodingStrategy = .custom { d, enc in var c = enc.singleValueContainer(); try c.encode(ISODates.format(d)) }
         guard let d = try? e.encode(v), let o = try? JSONSerialization.jsonObject(with: d) else { return NSNull() }
         return o
     }

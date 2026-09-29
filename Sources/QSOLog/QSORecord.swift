@@ -28,6 +28,10 @@ public struct QSORecord: Codable, Sendable, Equatable, Identifiable {
 
     public var band: String? { Bands.band(forHz: frequency) }
 
+    public static func normalizeCall(_ c: String) -> String {
+        c.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+
     /// Značka bez /P, /M, prefixu země apod. (nejdelší část mezi lomítky).
     public static func baseCall(_ call: String) -> String {
         let parts = call.uppercased().split(separator: "/").map(String.init)
