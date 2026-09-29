@@ -115,8 +115,19 @@ public actor Engine {
         return pttReady
     }
 
+    private var finished = false
+
     public func stop() async {
-        guard state != .stopped, everStarted else { return }
+        guard everStarted, !finished else { return }
+        if state == .stopped {
+            // start selhal (např. zvuk) – jen ukončit proudy událostí, ať odběratelé nečekají věčně
+            finished = true
+            await ptt?.forceOff()
+            modem.finishEvents()
+            broadcaster.finish()
+            return
+        }
+        finished = true
         epoch += 1
         let wasTx = state != .rx
         setState(.stopped)                      // hned: souběžné příkazy už nic nespustí

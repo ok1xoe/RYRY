@@ -74,3 +74,20 @@ func slowEngine() throws -> (Engine, SlowRig) {
     await e.stop()
     await #expect(throws: EngineError.notRunning) { try await e.start() }
 }
+
+/// Start selže (zvuk) → stop() musí ukončit proud událostí (odběratelé nesmí viset).
+@Test func stopAfterFailedStartFinishesEvents() async throws {
+    let audio = FakeAudioBackend(); audio.failStart = true
+    let e = Engine(modem: try RTTYModem(), audio: audio, config: EngineConfig(),
+                   serialFactory: { _ in FakeSerialPort() }, clock: ManualClock(), autoRun: false)
+    let ev = e.events()
+    await #expect(throws: EngineError.self) { try await e.start() }
+    await e.stop()
+    let done = Task { for await _ in ev {}; return true }
+    let finished = await withTaskGroup(of: Bool.self) { g in
+        g.addTask { await done.value }
+        g.addTask { try? await Task.sleep(for: .seconds(2)); return false }
+        let r = await g.next()!; g.cancelAll(); return r
+    }
+    #expect(finished)
+}
