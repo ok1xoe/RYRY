@@ -81,8 +81,10 @@ public enum TextCAT {
 
     public static let frequencyQuery = "FA;"
     public static func setFrequency(_ hz: Double, dialect: Dialect) -> String {
-        let digits = dialect == .yaesu ? 9 : 11
-        return "FA" + String(format: "%0\(digits)d", Int(hz.rounded())) + ";"
+        setFrequency(hz, digits: dialect == .yaesu ? 9 : 11)
+    }
+    public static func setFrequency(_ hz: Double, digits: Int) -> String {
+        "FA" + String(format: "%0\(min(max(digits, 6), 11))d", Int(hz.rounded())) + ";"
     }
     public static func parseFrequency(_ s: String) -> Double? {
         guard s.hasPrefix("FA"), s.hasSuffix(";") else { return nil }
@@ -124,9 +126,10 @@ public enum TextCAT {
         case .kenwood:
             if n == "PKTUSB" { return "MD2;DA1;" }
             if n == "PKTLSB" { return "MD1;DA1;" }
-            return kenwoodModes.first { $0.1 == n }.map { "MD\($0.0);" }
+            return kenwoodModes.first { $0.1 == n }.map { "MD\($0.0);DA0;" }       // opustit datový režim
         case .elecraft:
             if n == "PKTUSB" { return "MD6;DT0;" }                   // DATA A
+            if n == "PKTLSB" { return "MD9;DT0;" }                   // DATA A reverse
             return kenwoodModes.first { $0.1 == n }.map { "MD\($0.0);" }
         }
     }

@@ -11,7 +11,7 @@ public enum RigFactory {
         case .flrig: return FlrigClient(host: r.host, port: r.effectivePort)
         case .cat:
             guard !r.serialPort.isEmpty else { return NoRig() }
-            let t = SerialCATTransport(path: r.serialPort, baud: r.baud, stopBits: r.stopBits)
+            let t = SerialCATTransport(path: r.serialPort, baud: r.baud, stopBits: r.stopBits, rts: r.effectiveCatRTS)
             let p: CATProtocol
             switch r.catProtocol {
             case .icom: p = .icom(address: UInt8(clamping: r.civAddress))

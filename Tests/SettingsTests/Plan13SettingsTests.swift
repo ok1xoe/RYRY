@@ -34,8 +34,11 @@ import Testing
     #expect(KeyBinding(key: "F2", modifiers: [.shift]).display == "⇧F2")
     #expect(KeyBinding(key: "1", modifiers: [.command, .option, .option]).display == "⌥⌘1")
     #expect(KeyBinding(key: "return", modifiers: [.control]).display == "⌃↩")
+    #expect(RigSettings().catRTS == nil)
     #expect(KeyBinding(key: "f13").isValid && KeyBinding.none.isValid)
     #expect(!KeyBinding(key: "a").isValid)                       // samotné písmeno – kolize s psaním
+    #expect(!KeyBinding(key: "space").isValid && !KeyBinding(key: "return").isValid && !KeyBinding(key: "left").isValid)
+    #expect(KeyBinding(key: "return", modifiers: [.command]).isValid)
     #expect(!KeyBinding(key: "f21").isValid && !KeyBinding(key: "").isValid && !KeyBinding(key: "ab", modifiers: [.command]).isValid)
     var s = AppSettings()
     #expect(s.binding(for: .macro(12)) == KeyBinding(key: "f1", modifiers: [.shift]))

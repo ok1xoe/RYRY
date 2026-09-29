@@ -83,6 +83,9 @@ public struct RigSettings: Codable, Sendable, Equatable {
     public var civAddress = 0x94
     /// Číslo modelu hamlib (`rigctld -l`), 1 = Dummy.
     public var hamlibModel = 1
+    /// RTS na portu CAT zapnuté (nil = podle protokolu: Yaesu ano – menu „CAT RTS“).
+    public var catRTS: Bool?
+    public var effectiveCatRTS: Bool { catRTS ?? (catProtocol == .yaesu) }
     public init() {}
     public var effectivePort: Int { port ?? (type == .flrig ? 12345 : 4532) }
     public static let baudRates = [4800, 9600, 19200, 38400, 57600, 115200]
@@ -90,7 +93,7 @@ public struct RigSettings: Codable, Sendable, Equatable {
     public static let icomAddresses: [(String, Int)] = [("IC-7300", 0x94), ("IC-7610", 0x98), ("IC-705", 0xA4), ("IC-9700", 0xA2),
                                                         ("IC-7100", 0x88), ("IC-7851", 0x8E), ("IC-7600", 0x7A), ("IC-7000", 0x70),
                                                         ("IC-7410", 0x80), ("IC-718", 0x5E), ("IC-7300MK2", 0xB6)]
-    enum CodingKeys: String, CodingKey { case type, host, port, serialPort, baud, stopBits, catProtocol, civAddress, hamlibModel }
+    enum CodingKeys: String, CodingKey { case type, host, port, serialPort, baud, stopBits, catProtocol, civAddress, hamlibModel, catRTS }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "rig", x = RigSettings()
         type = c.tolerant(.type, x.type, w, s); host = c.tolerant(.host, x.host, w, s); port = c.tolerant(.port, x.port, w, s)
@@ -100,6 +103,7 @@ public struct RigSettings: Codable, Sendable, Equatable {
         catProtocol = c.tolerant(.catProtocol, x.catProtocol, w, s)
         let a = c.tolerant(.civAddress, x.civAddress, w, s); civAddress = (1...0xDF).contains(a) ? a : x.civAddress
         let m = c.tolerant(.hamlibModel, x.hamlibModel, w, s); hamlibModel = m > 0 ? m : x.hamlibModel
+        catRTS = c.tolerant(.catRTS, x.catRTS, w, s)
     }
 }
 

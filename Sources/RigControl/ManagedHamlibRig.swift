@@ -21,6 +21,10 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     private var process: Process?
     private var stderrText = ""
     private var failedAt: ContinuousClock.Instant?
+    /// Probíhající spuštění – souběžné dotazy (poll, PTT, zkouška) čekají na totéž, nespouští další rigctld.
+    private var starting: Task<Void, Error>?
+    /// Kolikrát se rigctld spouštěl (pro testy).
+    public private(set) var startCount = 0
     /// Po neúspěšném spuštění se rigctld znovu nespouští dřív než za tuto dobu (dotazování rigu běží stále).
     static let retryAfter: Duration = .seconds(10)
 
@@ -95,18 +99,30 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
             self.lock.withLock { self.stderrText = String((self.stderrText + String(decoding: d, as: UTF8.self)).suffix(2000)) }
         }
         do { try p.run() } catch { throw RigError.protocolError("rigctld: \(error.localizedDescription)") }
-        lock.withLock { process = p; stderrText = "" }
+        lock.withLock { process = p; stderrText = ""; startCount += 1 }
     }
 
     private func stopProcess() {
         let p = lock.withLock { () -> Process? in let p = process; process = nil; return p }
         guard let p else { return }
         (p.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
-        if p.isRunning { p.terminate(); p.waitUntilExit() }
+        guard p.isRunning else { return }
+        p.terminate()
+        // nereaguje-li rigctld na SIGTERM do 2 s, ukončit natvrdo (jinak by visel stop Engine i konec aplikace)
+        let deadline = Date().addingTimeInterval(2)
+        while p.isRunning, Date() < deadline { usleep(20_000) }
+        if p.isRunning { kill(p.processIdentifier, SIGKILL); p.waitUntilExit() }
     }
 
     public func connect() async throws {
-        do { try await start() } catch {
+        let t: Task<Void, Error> = lock.withLock {
+            if let s = starting { return s }
+            let s = Task { try await self.start() }
+            starting = s
+            return s
+        }
+        defer { lock.withLock { if starting == t { starting = nil } } }
+        do { try await t.value } catch {
             lock.withLock { failedAt = .now }
             throw error
         }
@@ -121,6 +137,12 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     }
 
     private func start() async throws {
+        if isRunning { return }
+        // na portu už něco naslouchá (rigctld po pádu aplikace, jiný program) – nepřipojovat se k cizímu procesu
+        if (try? await client.connect()) != nil {
+            await client.disconnect()
+            throw RigError.protocolError("TCP port \(tcpPort) je obsazený (běží jiný rigctld?) – zvol jiný místní port")
+        }
         try startProcess()
         let deadline = ContinuousClock.now + startTimeout
         while true {
@@ -133,6 +155,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
                     await client.disconnect(); stopProcess()
                     throw RigError.protocolError(msg.isEmpty ? "rádio neodpovídá (\(error))" : "rigctld: \(msg)")
                 }
+                guard isRunning else { await client.disconnect(); throw RigError.protocolError("rigctld skončil") }
                 return
             } catch let e as RigError where !(e == .offline || e == .timeout) { throw e } catch {
                 let alive = isRunning

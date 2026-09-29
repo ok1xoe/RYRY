@@ -59,3 +59,19 @@ private let listing = """
     await #expect(throws: RigError.offline) { try await bad.frequency() }   // v době odkladu hned offline
     #expect(ContinuousClock.now - t0 < .milliseconds(200))
 }
+
+// Review 5: souběžné dotazy spustí jediný rigctld; obsazený TCP port = srozumitelná chyba
+@Test func managedRigctldSingleStartAndBusyPort() async throws {
+    guard let bin = ManagedHamlibRig.findRigctld() else { return }
+    let port = UInt16(45_000 + Int.random(in: 0..<900))
+    let a = ManagedHamlibRig(binary: bin, model: 1, serialPort: "", baud: 0, tcpPort: port)
+    async let f1 = a.frequency()
+    async let f2 = a.frequency()
+    async let f3 = a.frequency()
+    _ = try await (f1, f2, f3)
+    #expect(a.startCount == 1)
+    let b = ManagedHamlibRig(binary: bin, model: 1, serialPort: "", baud: 0, tcpPort: port)   // port drží `a`
+    await #expect(throws: RigError.self) { try await b.connect() }
+    #expect(!b.isRunning)
+    await a.disconnect()
+}
