@@ -507,6 +507,21 @@ public final class AppModel {
         var d = QTCReceiveDraft(); d.counterpart = qso.call
         qtcReceive = d
         qtcRxStart = rxAppendedTotal
+        // série mohla přijít dřív, než operátor příjem otevřel: začít od poslední zmínky protistanice
+        // (např. „OK1XOE DE K3LR YES QTC 9/5 QRV?“) v posledních 3000 znacích příjmu
+        let back = min(3000, rxAppendedTotal - rxTrimmedTotal)
+        let tail = rxTail(back).filter { !$0.echo }.map(\.text).joined()
+        let all = rxTail(back).map(\.text).joined()
+        if !d.counterpart.isEmpty, tail.uppercased().contains(d.counterpart.uppercased()),
+           let r = all.uppercased().range(of: d.counterpart.uppercased(), options: .backwards) {
+            qtcRxStart = rxAppendedTotal - all.distance(from: r.lowerBound, to: all.endIndex)
+        }
+    }
+
+    /// „QRV – přijmout“: otevře příjem QTC a odvysílá QRV (protistanice pak posílá sérii).
+    public func qtcQRVReceive() async {
+        if qtcReceive == nil { startQTCReceive() }
+        await qtcPhrase(.qrv)
     }
     public func cancelQTCReceive() { qtcReceive = nil }
     /// Ruční úprava přijímané série (hlavička „n/k“, řádek „HHMM ZNAČKA NNN“; prázdné = smazat).

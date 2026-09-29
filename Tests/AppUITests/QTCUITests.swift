@@ -123,3 +123,30 @@ import Settings
     #expect(f.model.qtcSeries.isEmpty)
     await f.model.stop()
 }
+
+// Série přišla dřív, než operátor otevřel příjem → příjem začne od poslední zmínky protistanice
+@Test @MainActor func lateReceiveStartLooksBackToCounterpart() async throws {
+    let f = await waeFixture()
+    await f.model.setQSOField("call", "K3LR")
+    f.model.appendRx("OK1XOE DE DL5XYZ QTC 3/2 QRV?\r\n1111 AA1AA 001\r\n", echo: false)     // starší, jiná stanice
+    f.model.appendRx("OK1XOE DE K3LR YES QTC 9/2 QRV? BK", echo: false)
+    f.model.appendRx("QRV", echo: true)
+    f.model.appendRx("\r\nQTC 9/2 QTC 9/2\r\n0707 BY4AOM 101\r\n0714 A71A 174\r\nBK", echo: false)
+    f.model.startQTCReceive()
+    f.model.qtcFillFromRx()
+    let d = try #require(f.model.qtcReceive)
+    #expect(d.number == 9 && d.count == 2)
+    #expect(d.lines.compactMap { $0 }.map(\.call) == ["BY4AOM", "A71A"])
+    await f.model.stop()
+}
+
+@Test @MainActor func qrvStartsReceiveAndTransmits() async throws {
+    let f = await waeFixture()
+    await f.model.setQSOField("call", "K3LR")
+    await f.model.qtcQRVReceive()
+    #expect(f.model.qtcReceive?.counterpart == "K3LR")
+    await f.pump(5)
+    #expect(await f.engine.state != .rx || f.audio.tx.count > 0)
+    await f.model.rxNow()
+    await f.model.stop()
+}
