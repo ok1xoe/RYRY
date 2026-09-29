@@ -143,6 +143,7 @@
 </ul>
 <figure><a href="../img/cs-log.png"><img src="../img/cs-log.png" alt="Okno Log" loading="lazy"></a>
   <figcaption>Okno Log (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): hledání, oprava dvojklikem, mazání. Dole je cesta k otevřenému logu, menu <b>Log</b> (nový, otevřít, uložit jako, export ADIF), import ADIF a export Cabrillo. Záložka QTC ukazuje série QTC ze závodu WAE.</figcaption></figure>
+<p><b>Zálohy:</b> log se jednou denně zálohuje do složky <code>backup</code> vedle logu (posledních 10 záloh); ručně Soubor → Zálohovat log teď. <b>Import z MMTTY:</b> Soubor → Importovat z MMTTY… načte makra, zprávy, značku, parametry modemu a klávesové zkratky ze souboru <code>Mmtty.ini</code> z Windows; před importem ukáže náhled a co přepíše.</p>
 <p>Log se ukládá do <code>~/Documents/mmtty4mac</code> jako JSONL a zároveň jako ADIF (<code>mmtty4mac.adi</code>), který přečte každý logger. Starý log z MMTTY v MMTTY exportujte do ADIF a v mmtty4mac importujte – duplicity se přeskočí.</p>
 <h3>Správa logu</h3>
 <p>Každý log je samostatný soubor – třeba jeden pro běžný provoz a jeden pro každý závod. V menu <b>Soubor</b>:</p>
@@ -167,6 +168,9 @@
 </div>
 <p><b>Duplicity:</b> když se stanicí už máte v tomto závodě spojení na stejném pásmu a módu, zobrazí se u značky červené <b>DUPE</b>. Zalogovat lze i tak.</p>
 <p>Formáty výměny: RST + pořadové číslo (nebo pevná výměna), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Pořadová čísla se po zalogování zvyšují sama. Body a násobiče aplikace nepočítá.</p>
+<h3>ESM – Enter posílá zprávy (Run / S&amp;P)</h3>
+<p>Po zapnutí v Nastavení → Závod → ESM pošle Enter v poli Call nebo výměny makro podle stavu spojení, podobně jako v N1MM: <b>Run</b> (voláte CQ) – CQ → výměna → TU a zalogování; <b>S&amp;P</b> (odpovídáte) – moje značka → výměna a zalogování. Režim přepnete v hlavičce QSO panelu nebo <kbd>⌃</kbd><kbd>R</kbd>; panel ukazuje, co Enter pošle. Během vysílání Enter nic neposílá a prázdné makro se nikdy neodešle.</p>
+<p><b>Rychlost:</b> ve stavovém řádku je v závodě počet spojení a rychlost za posledních 10 a 60 minut (spojení za hodinu); v okně Log jsou počty podle pásem.</p>
 <h3>WAE a QTC</h3>
 <p>Ve formátu WAE je v QSO okně panel QTC: <b>QTC?</b> se zeptá protistanice, <b>QRV – přijmout</b> otevře příjem série, <b>Poslat…</b> připraví a odvysílá sérii z vašeho logu. Aplikace hlídá pravidla – nejvýše 10 QTC na dvojici stanic, jen mezi kontinenty, každé spojení jen jednou. Přijaté řádky se plní klikem na slova nebo tlačítkem <b>Načíst z příjmu</b>.</p>
 </section>
@@ -198,7 +202,7 @@
 <table>
   <tr><th>Služba</th><th>Kde zapnout</th><th>Co dělá</th></tr>
   <tr><td>Callbook (QRZ.com, HamQTH)</td><td>Nastavení → API a log</td><td>doplní jméno, QTH a lokátor protistanice</td></tr>
-  <tr><td>DX cluster a RBN</td><td>Nastavení → Spoty, okno Okno → Spoty</td><td>seznam RTTY spotů; dvojklik naladí rig a vloží značku (posun frekvence pro LSB/AFSK nastavíte)</td></tr>
+  <tr><td>DX cluster a RBN</td><td>Nastavení → Spoty, okno Okno → Spoty</td><td>seznam RTTY spotů; dvojklik naladí rig a vloží značku (posun frekvence pro LSB/AFSK nastavíte); spoty v propustném pásmu se zobrazí jako štítky přímo ve vodopádu (zelená = nová stanice, oranžová = v logu, červená = duplicita), klik naladí mark</td></tr>
   <tr><td>LoTW, eQSL, Club Log</td><td>Nastavení → Online, okno Log → Nahrát</td><td>nahraje dosud nenahraná spojení (LoTW přes program TQSL); volitelně automaticky po zalogování</td></tr>
   <tr><td>Aktualizace</td><td>menu aplikace → Zkontrolovat aktualizace…</td><td>upozorní na novou verzi a stáhne DMG (nic neinstaluje samo)</td></tr>
 </table>
