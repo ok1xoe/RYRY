@@ -71,3 +71,13 @@ func converterPreservesTone(from: Double, to: Double) throws {
     _ = AudioDevices.defaultInput()
     _ = AudioDevices.defaultOutput()
 }
+
+@Test func requestClearIsAppliedByConsumer() {
+    let r = RingBuffer(capacity: 16)
+    r.write([1, 2, 3, 4])
+    r.requestClear()
+    var out = [Float](repeating: 0, count: 8)
+    #expect(r.read(into: &out, count: 8) == 0)
+    r.write([5])
+    #expect(r.read(into: &out, count: 8) == 1 && out[0] == 5)
+}

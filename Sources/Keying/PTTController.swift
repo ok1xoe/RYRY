@@ -1,4 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import Foundation
 import RigControl
 
 public enum PTTMethod: String, Sendable, Equatable, Codable, CaseIterable { case none, cat, rts, dtr, rtsDtr }
@@ -60,12 +61,19 @@ public final class PTTController: @unchecked Sendable {
             try? port.setRTS(invert)
             try? port.setDTR(invert)
         }
-        if method == .cat, let rig {
-            _ = try? await withThrowingTaskGroup(of: Void.self) { g in
-                g.addTask { try await rig.setPTT(false) }
-                g.addTask { try await Task.sleep(for: .seconds(2)); throw RigError.timeout }
-                try await g.next(); g.cancelAll()
+        // CAT vypnout vždy, když je rig (i při RTS/DTR PTT – rig mohl být zaklíčován jinudy).
+        // Čeká max. 2 s a nečeká na úkol, který zrušení ignoruje.
+        if let rig {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                let once = Once()
+                Task { try? await rig.setPTT(false); if once.first() { cont.resume() } }
+                Task { try? await Task.sleep(for: .seconds(2)); if once.first() { cont.resume() } }
             }
         }
     }
+}
+
+final class Once: @unchecked Sendable {
+    private let lock = NSLock(); private var done = false
+    func first() -> Bool { lock.lock(); defer { lock.unlock() }; if done { return false }; done = true; return true }
 }

@@ -22,4 +22,6 @@ public final class RingBuffer: @unchecked Sendable {
         return a.withUnsafeMutableBufferPointer { cring_read(r, $0.baseAddress, n) }
     }
     public func clear() { cring_clear(r) }
+    /// Vyprázdnění z vlákna producenta (provede konzument při dalším čtení).
+    public func requestClear() { cring_request_clear(r) }
 }

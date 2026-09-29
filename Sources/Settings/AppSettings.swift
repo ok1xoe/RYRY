@@ -166,9 +166,9 @@ public struct AppSettings: Codable, Sendable, Equatable {
         e.audio.inputChannel = audio.inputChannel; e.audio.outputChannel = audio.outputChannel
         e.audio.outputGain = audio.outputGain
         e.ptt = ptt.method; e.pttPort = ptt.port; e.pttInvert = ptt.invert
-        e.txDelay = .milliseconds(max(0, ptt.txDelayMs))
-        e.pttTail = .milliseconds(max(0, ptt.pttTailMs))
-        e.pttTimeout = .seconds(max(1, ptt.pttTimeoutS))
+        e.txDelay = .milliseconds(min(max(0, ptt.txDelayMs), 10_000))
+        e.pttTail = .milliseconds(min(max(0, ptt.pttTailMs), 10_000))
+        e.pttTimeout = .seconds(min(max(1, ptt.pttTimeoutS), 86_400))
         switch (fsk.output, fsk.port) {
         case (.fskUART, let p?): e.txOutput = .fskUART(path: p)
         case (.fskSoft, let p?): e.txOutput = .fskSoft(path: p, line: fsk.line)

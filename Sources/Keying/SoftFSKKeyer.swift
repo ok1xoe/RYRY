@@ -15,6 +15,7 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
     private let clock: Clock
     private let cond = NSCondition()
     private var queue: [UInt8] = []
+    private var head = 0                     // čtecí index (bez removeFirst v real-time smyčce)
     private var sending = 0
     private var running = false
     private var generation = 0
@@ -62,6 +63,7 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
 
     public func send(codes: [UInt8]) {
         cond.lock()
+        if head > 0 && head * 2 >= queue.count { queue.removeFirst(head); head = 0 }   // úklid mimo RT vlákno
         queue += codes
         cond.signal()
         cond.unlock()
@@ -69,7 +71,7 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
 
     public var pending: Int {
         cond.lock(); defer { cond.unlock() }
-        return queue.count + sending
+        return queue.count - head + sending
     }
 
     public func finish(timeout: Duration) async {
@@ -80,7 +82,7 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
     public func stop() {
         cond.lock()
         running = false
-        queue.removeAll()
+        queue.removeAll(); head = 0
         sending = 0
         generation += 1
         let done = exited
@@ -112,20 +114,19 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
         var nextStart: UInt64 = 0
         while true {
             cond.lock()
-            while queue.isEmpty && running && generation == gen { cond.wait() }
+            while head >= queue.count && running && generation == gen { cond.wait() }
             guard running, generation == gen else { cond.unlock(); break }
-            let code = queue.removeFirst()
+            let code = queue[head]; head += 1
             sending = 1
             cond.unlock()
 
             let now = clock.now()
             let t0 = max(now, nextStart)          // navazující znak bez mezery
             let ita2 = UARTFSKKeyer.reverse5(code)
-            var levels: [Bool] = [false]          // start = space
-            for b in 0..<5 { levels.append(ita2 & (1 << b) != 0) }
             var last: Bool? = nil
             var aborted = false
-            for (i, mark) in levels.enumerated() {
+            for i in 0..<6 {                      // start (space) + 5 datových bitů, bez alokací
+                let mark = i == 0 ? false : (ita2 & (1 << (i - 1)) != 0)
                 clock.sleep(untilNanos: t0 + UInt64((Double(i) * bitNs).rounded()))
                 if isAborted(gen) { aborted = true; break }
                 if mark != last { setLevel(mark: mark); last = mark }

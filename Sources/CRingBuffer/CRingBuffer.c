@@ -9,6 +9,7 @@ struct CRingBuffer {
     float* buf;
     _Atomic size_t head;     /* zápis (producent) */
     _Atomic size_t tail;     /* čtení (konzument) */
+    _Atomic int clear_req;   /* producent žádá o vyprázdnění */
 };
 
 CRingBuffer* cring_create(size_t capacity) {
@@ -19,6 +20,7 @@ CRingBuffer* cring_create(size_t capacity) {
     if (!r->buf) { free(r); return NULL; }
     atomic_init(&r->head, 0);
     atomic_init(&r->tail, 0);
+    atomic_init(&r->clear_req, 0);
     return r;
 }
 
@@ -44,7 +46,13 @@ size_t cring_write(CRingBuffer* r, const float* src, size_t n) {
     return n;
 }
 
+void cring_request_clear(CRingBuffer* r) { atomic_store_explicit(&r->clear_req, 1, memory_order_release); }
+
 size_t cring_read(CRingBuffer* r, float* dst, size_t n) {
+    if (atomic_exchange_explicit(&r->clear_req, 0, memory_order_acq_rel)) {
+        size_t h = atomic_load_explicit(&r->head, memory_order_acquire);
+        atomic_store_explicit(&r->tail, h, memory_order_release);
+    }
     size_t t = atomic_load_explicit(&r->tail, memory_order_relaxed);
     size_t h = atomic_load_explicit(&r->head, memory_order_acquire);
     size_t avail = (h + r->cap - t) % r->cap;

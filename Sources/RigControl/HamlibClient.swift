@@ -36,6 +36,10 @@ public final class HamlibClient: Rig {
     }
 
     public func setMode(_ mode: String) async throws {
+        // jen název módu (USB, PKTUSB, RTTY…) – nic, co by vložilo další příkaz rigctld
+        guard !mode.isEmpty, mode.count <= 16, mode.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }) else {
+            throw RigError.protocolError("neplatný mód '\(mode)'")
+        }
         try Self.checkRPRT(try await conn.request("M \(mode) 0", responseLines: 1))
     }
 

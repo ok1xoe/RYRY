@@ -15,3 +15,5 @@ size_t cring_available(const CRingBuffer* r);
 size_t cring_capacity(const CRingBuffer* r);
 /* Zahodí obsah (volat z konzumenta). */
 void   cring_clear(CRingBuffer* r);
+/* Požádá konzumenta o zahození obsahu (volá producent); provede se při příštím cring_read. */
+void   cring_request_clear(CRingBuffer* r);

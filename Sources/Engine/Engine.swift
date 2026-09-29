@@ -68,7 +68,8 @@ public actor Engine {
 
     private func nanos(_ d: Duration) -> UInt64 {
         let c = d.components
-        return UInt64(max(0, c.seconds)) * 1_000_000_000 + UInt64(max(0, c.attoseconds / 1_000_000_000))
+        let secs = UInt64(min(max(0, c.seconds), 1_000_000))          // max. ~11 dní, bez přetečení
+        return secs * 1_000_000_000 + UInt64(max(0, c.attoseconds / 1_000_000_000))
     }
 
     // MARK: Start/stop

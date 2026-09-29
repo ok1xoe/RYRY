@@ -7,16 +7,24 @@ public protocol XMLRPCTransport: Sendable {
 }
 
 /// XML-RPC přes HTTP POST (flrig: http://host:12345/RPC2).
+/// URLSession se při zániku transportu ukončí (jinak by zůstávala po každém restartu).
+final class SessionBox: @unchecked Sendable {
+    let session: URLSession
+    init(_ s: URLSession) { session = s }
+    deinit { session.finishTasksAndInvalidate() }
+}
+
 public struct HTTPXMLRPCTransport: XMLRPCTransport {
     let url: URL
-    let session: URLSession
+    private let box: SessionBox
+    var session: URLSession { box.session }
 
     public init(url: URL, timeout: TimeInterval = 2) {
         self.url = url
         let cfg = URLSessionConfiguration.ephemeral
         cfg.timeoutIntervalForRequest = timeout
         cfg.timeoutIntervalForResource = timeout
-        session = URLSession(configuration: cfg)
+        box = SessionBox(URLSession(configuration: cfg))
     }
 
     public func call(_ method: String, _ params: [XMLRPCValue]) async throws -> XMLRPCValue {

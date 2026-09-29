@@ -135,7 +135,7 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
         return samples.count
     }
 
-    public func clearTx() { txRing.clear() }
+    public func clearTx() { txRing.requestClear() }     // render vlákno (konzument) zahodí při dalším čtení
 
     public var txQueued: Int { Int(Double(txRing.available) * modemRate / deviceOutRate) }
 }
