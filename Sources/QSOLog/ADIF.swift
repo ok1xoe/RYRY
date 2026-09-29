@@ -2,9 +2,9 @@
 import Foundation
 
 public enum ADIF {
-    static let version = "3.1.4"
+    public static let version = "3.1.4"
 
-    static func field(_ name: String, _ value: String?) -> String {
+    public static func field(_ name: String, _ value: String?) -> String {
         guard let v = value, !v.isEmpty else { return "" }
         return "<\(name):\(v.utf8.count)>\(v) "
     }
@@ -24,7 +24,12 @@ public enum ADIF {
             + "<EOH>\n"
     }
 
-    public static func record(_ r: QSORecord) -> String {
+    /// Záznam pro trvalý log/export: navíc s příznaky nahrání (LOTW_QSL_SENT, EQSL_QSL_SENT, CLUBLOG_QSO_UPLOAD_STATUS + data).
+    public static func record(_ r: QSORecord) -> String { record(r, includeUploadStatus: true) }
+    /// Záznam pro odeslání službě: bez příznaků nahrání.
+    public static func uploadRecord(_ r: QSORecord) -> String { record(r, includeUploadStatus: false) }
+
+    static func record(_ r: QSORecord, includeUploadStatus: Bool) -> String {
         var s = field("CALL", r.call)
         s += field("QSO_DATE", dateFmt.string(from: r.timeOn)) + field("TIME_ON", timeFmt.string(from: r.timeOn))
         if let t = r.timeOff { s += field("QSO_DATE_OFF", dateFmt.string(from: t)) + field("TIME_OFF", timeFmt.string(from: t)) }
@@ -38,8 +43,19 @@ public enum ADIF {
         s += field("CQZ", r.cqZone.map(String.init)) + field("ITUZ", r.ituZone.map(String.init))
         s += field("COMMENT", r.comment) + field("STATION_CALLSIGN", r.stationCallsign)
         s += field("APP_MMTTY4MAC_ID", r.id.uuidString)
+        if includeUploadStatus {
+            for (t, sent, date) in uploadFields {
+                if let d = r.uploads?[t.rawValue] { s += field(sent.0, sent.1) + field(date, dateFmt.string(from: d)) }
+            }
+        }
         return s + "<EOR>\n"
     }
+
+    static let uploadFields: [(UploadTarget, (String, String), String)] = [
+        (.lotw, ("LOTW_QSL_SENT", "Y"), "LOTW_QSLSDATE"),
+        (.eqsl, ("EQSL_QSL_SENT", "Y"), "EQSL_QSLSDATE"),
+        (.clublog, ("CLUBLOG_QSO_UPLOAD_STATUS", "Y"), "CLUBLOG_QSO_UPLOAD_DATE"),
+    ]
 
     /// Rozparsuje záznamy (za <EOH>). Délky jsou v bajtech UTF-8.
     public static func parse(_ text: String) -> [[String: String]] {
@@ -92,6 +108,9 @@ extension ADIF {
             r.comment = s("COMMENT") ?? s("NOTES"); r.stationCallsign = s("STATION_CALLSIGN")
             r.country = s("COUNTRY"); r.continent = s("CONT")
             r.cqZone = s("CQZ").flatMap { Int($0) }; r.ituZone = s("ITUZ").flatMap { Int($0) }
+            for (t, sent, dateKey) in uploadFields where f[sent.0]?.uppercased() == sent.1 {
+                r.markUploaded(t, at: date(f[dateKey], "000000") ?? on)
+            }
             out.append(r)
         }
         return ImportResult(records: out, skipped: skipped)

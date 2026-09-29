@@ -425,6 +425,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var txWindow = TxWindowSettings()
     /// Vlastní klávesové zkratky (id příkazu → zkratka); chybějící = výchozí.
     public var shortcuts: [String: KeyBinding] = [:]
+    /// Nahrávání na LoTW / eQSL / Club Log.
+    public var upload = UploadSettings()
     public init() {}
     public static let macroCount = 16
 
@@ -448,7 +450,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     ]
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, rtty, macros, log,
-                                             clock, rttyCore, contest, display, messages, txWindow, shortcuts }
+                                             clock, rttyCore, contest, display, messages, txWindow, shortcuts, upload }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -476,6 +478,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         messages = c.contains(.messages) ? c.tolerant(.messages, TolerantArray<Macro>(), w, s).items : x.messages
         txWindow = c.tolerant(.txWindow, x.txWindow, w, s)
         shortcuts = c.tolerant(.shortcuts, TolerantDict<KeyBinding>(), w, s).items.filter { $0.value.isValid }
+        upload = c.tolerant(.upload, x.upload, w, s)
     }
 
     /// Konfigurace Engine z nastavení.

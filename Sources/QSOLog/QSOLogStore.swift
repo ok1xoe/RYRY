@@ -165,6 +165,16 @@ public actor QSOLogStore {
         try rewrite(recs)
     }
 
+    /// Označí spojení jako nahraná na službu (jediný přepis logu). Vrací počet změněných záznamů.
+    @discardableResult
+    public func markUploaded(ids: [UUID], target: UploadTarget, at: Date = Date()) throws -> Int {
+        let set = Set(ids)
+        var recs = records, n = 0
+        for i in recs.indices where set.contains(recs[i].id) { recs[i].markUploaded(target, at: at); n += 1 }
+        if n > 0 { try rewrite(recs) }
+        return n
+    }
+
     public func delete(id: UUID) throws {
         guard records.contains(where: { $0.id == id }) else { throw QSOLogError.notFound(id) }
         try rewrite(records.filter { $0.id != id })
