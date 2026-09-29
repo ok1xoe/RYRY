@@ -12,34 +12,56 @@ public struct SettingsView: View {
     @State private var draft = AppSettings()
     @State private var baseline = AppSettings()       // stav, ze kterého koncept vyšel
     @State private var loaded = false
+    /// Vybraná záložka (spouštěcí parametr `-settingsTab N` pro snímky obrazovky).
+    @State private var tab = UserDefaults.standard.integer(forKey: "settingsTab")
     public init(model: AppModel) { self.model = model }
 
     public var body: some View {
         VStack(spacing: 0) {
-            TabView {
-                StationTab(s: $draft).tabItem { Text("Stanice") }
-                AudioTab(s: $draft, model: model).tabItem { Text("Zvuk") }
-                PTTTab(s: $draft).tabItem { Text("PTT / FSK") }
-                RigTab(s: $draft).tabItem { Text("Rig") }
-                ModemTab(model: model, s: $draft).tabItem { Text("Modem") }
-                ContestTab(s: $draft).tabItem { Text("Závod") }
-                DisplayTab(s: $draft).tabItem { Text("Zobrazení") }
-                APITab(s: $draft).tabItem { Text("API a log") }
+            TabView(selection: $tab) {
+                StationTab(s: $draft).tabItem { Label("Stanice", systemImage: "person.crop.circle") }.tag(0)
+                AudioTab(s: $draft, model: model).tabItem { Label("Zvuk", systemImage: "waveform") }.tag(1)
+                PTTTab(s: $draft).tabItem { Label("PTT / FSK", systemImage: "cable.connector") }.tag(2)
+                RigTab(s: $draft).tabItem { Label("Rig", systemImage: "antenna.radiowaves.left.and.right") }.tag(3)
+                ModemTab(model: model, s: $draft).tabItem { Label("Modem", systemImage: "slider.horizontal.3") }.tag(4)
+                ContestTab(s: $draft).tabItem { Label("Závod", systemImage: "trophy") }.tag(5)
+                DisplayTab(s: $draft).tabItem { Label("Zobrazení", systemImage: "paintpalette") }.tag(6)
+                APITab(s: $draft).tabItem { Label("API a log", systemImage: "network") }.tag(7)
             }
-            .padding()
+            Divider()
             HStack {
-                Text("Změny se projeví po Použít (restart zvuku, rigu a API).").font(.caption).foregroundStyle(.secondary)
+                Image(systemName: "info.circle").foregroundStyle(.secondary)
+                Text("Změny se projeví po Použít (restart zvuku, rigu a API). Parametry modemu platí hned.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Vrátit") { draft = model.settings; baseline = draft }
                 Button("Použít") {
                     let d = draft, b = baseline
                     Task { await model.applySettings(d, baseline: b); draft = model.settings; baseline = draft }
                 }.keyboardShortcut(.defaultAction)
-            }.padding([.horizontal, .bottom])
+            }.padding(12)
         }
-        .frame(width: 680, height: 560)
+        .frame(width: 720, height: 640)
         .onAppear { if !loaded { draft = model.settings; baseline = draft; loaded = true } }
         .onDisappear { loaded = false }                  // příště načíst aktuální stav
+    }
+}
+
+/// Řádek s číslem, jednotkou a krokovačem (hodnota vidět v poli, ne v popisku).
+struct NumberRow: View {
+    let title: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    var step = 1
+    var unit = ""
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 4) {
+                TextField("", value: $value, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 70)
+                Text(unit).foregroundStyle(.secondary).frame(minWidth: 18, alignment: .leading)
+                Stepper("", value: $value, in: range, step: step).labelsHidden()
+            }
+        }
     }
 }
 
@@ -47,11 +69,16 @@ struct StationTab: View {
     @Binding var s: AppSettings
     var body: some View {
         Form {
-            TextField("Značka", text: $s.station.call)
-            TextField("Lokátor", text: $s.station.locator)
-            TextField("Jméno", text: $s.station.name)
-            TextField("QTH", text: $s.station.qth)
+            Section {
+                TextField("Značka", text: $s.station.call, prompt: Text("OK1ABC"))
+                TextField("Lokátor", text: $s.station.locator, prompt: Text("JO70FB"))
+                TextField("Jméno", text: $s.station.name, prompt: Text("Tomáš"))
+                TextField("QTH", text: $s.station.qth, prompt: Text("Praha"))
+            } header: { Text("Moje stanice") } footer: {
+                Text("Značka se posílá v makrech (%m) a podle ní se určuje zóna a kontinent (DXCC).")
+            }
         }
+        .formStyle(.grouped)
     }
 }
 
@@ -63,35 +90,46 @@ struct AudioTab: View {
     @State private var result = ""
     var body: some View {
         Form {
-            Picker("Vstup (RX)", selection: $s.audio.inputUID) {
-                Text("Výchozí").tag(String?.none)
-                ForEach(devices.filter { $0.inputChannels > 0 }, id: \.uid) { Text($0.name).tag(String?.some($0.uid)) }
-            }
-            Picker("Kanál vstupu", selection: $s.audio.inputChannel) {
-                Text("Levý").tag(AudioChannel.left); Text("Pravý").tag(AudioChannel.right); Text("Mono").tag(AudioChannel.mono)
-            }
-            Picker("Výstup (TX)", selection: $s.audio.outputUID) {
-                Text("Výchozí").tag(String?.none)
-                ForEach(devices.filter { $0.outputChannels > 0 }, id: \.uid) { Text($0.name).tag(String?.some($0.uid)) }
-            }
-            Picker("Kanál výstupu", selection: $s.audio.outputChannel) {
-                Text("Levý").tag(AudioChannel.left); Text("Pravý").tag(AudioChannel.right); Text("Oba").tag(AudioChannel.mono)
-            }
-            Slider(value: $s.audio.outputGain, in: 0...1) { Text("Hlasitost TX") }
-            Section("Kalibrace hodin zvukové karty") {
-                HStack {
-                    Text("RX korekce")
-                    Spacer()
-                    TextField("", value: $s.clock.rxPPM, format: .number.precision(.fractionLength(0...2))).frame(width: 90)
-                    Text("ppm").foregroundStyle(.secondary)
+            Section("Příjem") {
+                Picker("Vstup", selection: $s.audio.inputUID) {
+                    Text("Výchozí").tag(String?.none)
+                    ForEach(devices.filter { $0.inputChannels > 0 }, id: \.uid) { Text($0.name).tag(String?.some($0.uid)) }
                 }
-                HStack {
-                    Text("TX korekce")
-                    Spacer()
-                    TextField("", value: $s.clock.txPPM, format: .number.precision(.fractionLength(0...2))).frame(width: 90)
-                    Text("ppm").foregroundStyle(.secondary)
+                Picker("Kanál", selection: $s.audio.inputChannel) {
+                    Text("Levý").tag(AudioChannel.left); Text("Pravý").tag(AudioChannel.right); Text("Mono").tag(AudioChannel.mono)
                 }
-                HStack {
+            }
+            Section("Vysílání") {
+                Picker("Výstup", selection: $s.audio.outputUID) {
+                    Text("Výchozí").tag(String?.none)
+                    ForEach(devices.filter { $0.outputChannels > 0 }, id: \.uid) { Text($0.name).tag(String?.some($0.uid)) }
+                }
+                Picker("Kanál", selection: $s.audio.outputChannel) {
+                    Text("Levý").tag(AudioChannel.left); Text("Pravý").tag(AudioChannel.right); Text("Oba").tag(AudioChannel.mono)
+                }
+                LabeledContent("Hlasitost") {
+                    HStack {
+                        Slider(value: $s.audio.outputGain, in: 0...1)
+                        Text("\(Int(s.audio.outputGain * 100)) %").monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
+                    }
+                }
+            }
+            Section {
+                LabeledContent("Korekce RX") {
+                    HStack(spacing: 4) {
+                        TextField("", value: $s.clock.rxPPM, format: .number.precision(.fractionLength(0...2)))
+                            .multilineTextAlignment(.trailing).frame(width: 90)
+                        Text("ppm").foregroundStyle(.secondary)
+                    }
+                }
+                LabeledContent("Korekce TX") {
+                    HStack(spacing: 4) {
+                        TextField("", value: $s.clock.txPPM, format: .number.precision(.fractionLength(0...2)))
+                            .multilineTextAlignment(.trailing).frame(width: 90)
+                        Text("ppm").foregroundStyle(.secondary)
+                    }
+                }
+                LabeledContent {
                     Button(measuring ? "Měřím…" : "Změřit (30 s)") {
                         measuring = true; result = ""
                         Task {
@@ -104,12 +142,12 @@ struct AudioTab: View {
                                          r.rx.map { String(format: "%.1f", $0) } ?? "—", r.tx.map { String(format: "%.1f", $0) } ?? "—")
                         }
                     }.disabled(measuring)
-                    Text(result).font(.caption).foregroundStyle(.secondary)
-                }
-                Text("Core Audio měří skutečnou vzorkovací frekvenci zařízení proti hodinám systému (NTP). Korekce ± 20 000 ppm.")
-                    .font(.caption).foregroundStyle(.secondary)
+                } label: { Text(result.isEmpty ? "Měření" : result).foregroundStyle(result.isEmpty ? .primary : .secondary) }
+            } header: { Text("Kalibrace hodin zvukové karty") } footer: {
+                Text("Core Audio měří skutečnou vzorkovací frekvenci zařízení proti hodinám systému (NTP). Rozsah ± 20 000 ppm.")
             }
         }
+        .formStyle(.grouped)
         .onAppear { devices = AudioDevices.all() }
     }
 }
@@ -119,37 +157,49 @@ struct PTTTab: View {
     @State private var ports: [String] = []
     var body: some View {
         Form {
-            Section("PTT") {
+            Section {
                 Picker("Metoda", selection: $s.ptt.method) {
                     Text("Žádná (VOX)").tag(PTTMethod.none); Text("CAT (rig)").tag(PTTMethod.cat)
                     Text("RTS").tag(PTTMethod.rts); Text("DTR").tag(PTTMethod.dtr); Text("RTS + DTR").tag(PTTMethod.rtsDtr)
                 }
-                Picker("Port", selection: $s.ptt.port) {
+                Picker("Sériový port", selection: $s.ptt.port) {
                     Text("—").tag(String?.none)
                     ForEach(ports, id: \.self) { Text($0).tag(String?.some($0)) }
                 }
+                .disabled(![.rts, .dtr, .rtsDtr].contains(s.ptt.method))
                 Toggle("Invertovat", isOn: $s.ptt.invert)
-                Stepper("Zpoždění TX: \(s.ptt.txDelayMs) ms", value: $s.ptt.txDelayMs, in: 0...2000, step: 10)
-                Stepper("Doběh PTT: \(s.ptt.pttTailMs) ms", value: $s.ptt.pttTailMs, in: 0...2000, step: 10)
-                Stepper("PTT časovač: \(s.ptt.pttTimeoutS) s", value: $s.ptt.pttTimeoutS, in: 10...3600, step: 10)
+            } header: { Text("PTT") }
+            Section {
+                NumberRow(title: "Zpoždění TX", value: $s.ptt.txDelayMs, range: 0...2000, step: 10, unit: "ms")
+                NumberRow(title: "Doběh PTT", value: $s.ptt.pttTailMs, range: 0...2000, step: 10, unit: "ms")
+                NumberRow(title: "Bezpečnostní časovač", value: $s.ptt.pttTimeoutS, range: 10...3600, step: 10, unit: "s")
+            } header: { Text("Časování") } footer: {
+                Text("Časovač vypne vysílání, pokud trvá déle (ochrana proti zaseknutému PTT).")
             }
-            Section("Výstup") {
+            Section {
                 Picker("Režim", selection: $s.fsk.output) {
                     Text("AFSK (zvuk)").tag(FSKOutputKind.afsk)
                     Text("FSK – UART TxD (FTDI)").tag(FSKOutputKind.fskUART)
                     Text("FSK – softwarové časování").tag(FSKOutputKind.fskSoft)
                 }
-                Picker("FSK port", selection: $s.fsk.port) {
-                    Text("—").tag(String?.none)
-                    ForEach(ports, id: \.self) { Text($0).tag(String?.some($0)) }
+                Group {
+                    Picker("Port FSK", selection: $s.fsk.port) {
+                        Text("—").tag(String?.none)
+                        ForEach(ports, id: \.self) { Text($0).tag(String?.some($0)) }
+                    }
+                    Picker("Linka", selection: $s.fsk.line) {
+                        Text("TxD (break)").tag(FSKLine.txdBreak); Text("DTR").tag(FSKLine.dtr); Text("RTS").tag(FSKLine.rts)
+                    }
+                    .disabled(s.fsk.output != .fskSoft)
+                    Toggle("Invertovat FSK", isOn: $s.fsk.invert)
+                    Toggle("Zvuk i při FSK", isOn: $s.fsk.audioDuringFSK)
                 }
-                Picker("Linka (soft)", selection: $s.fsk.line) {
-                    Text("TxD (break)").tag(FSKLine.txdBreak); Text("DTR").tag(FSKLine.dtr); Text("RTS").tag(FSKLine.rts)
-                }
-                Toggle("Invertovat FSK", isOn: $s.fsk.invert)
-                Toggle("Zvuk i při FSK", isOn: $s.fsk.audioDuringFSK)
+                .disabled(s.fsk.output == .afsk)
+            } header: { Text("Klíčování") } footer: {
+                Text("AFSK = RTTY zvukem (rádio v SSB/DATA). FSK = klíčování sériovou linkou (rádio v režimu FSK/RTTY).")
             }
         }
+        .formStyle(.grouped)
         .onAppear { ports = POSIXSerialPort.availablePorts() }
     }
 }
@@ -158,14 +208,21 @@ struct RigTab: View {
     @Binding var s: AppSettings
     var body: some View {
         Form {
-            Picker("Ovládání rigu", selection: $s.rig.type) {
-                Text("Žádné").tag(RigType.none); Text("hamlib rigctld").tag(RigType.hamlib); Text("flrig").tag(RigType.flrig)
+            Section {
+                Picker("Ovládání", selection: $s.rig.type) {
+                    Text("Žádné").tag(RigType.none); Text("hamlib rigctld").tag(RigType.hamlib); Text("flrig").tag(RigType.flrig)
+                }
+                Group {
+                    TextField("Adresa", text: $s.rig.host)
+                    TextField("Port", value: $s.rig.port, format: .number.grouping(.never),
+                              prompt: Text(s.rig.type == .flrig ? "12345" : "4532"))
+                }
+                .disabled(s.rig.type == .none)
+            } header: { Text("Rig (CAT)") } footer: {
+                Text("hamlib: spusťte např. „rigctld -m <model> -r /dev/cu.X -s <baud>“. flrig: stačí spuštěný flrig. Prázdný port = výchozí.")
             }
-            TextField("Host", text: $s.rig.host)
-            TextField("Port (prázdné = výchozí)", value: $s.rig.port, format: .number.grouping(.never))
-            Text("hamlib: spusťte např. `rigctld -m <model> -r /dev/cu.X -s <baud>`; flrig: spuštěný flrig.")
-                .font(.caption).foregroundStyle(.secondary)
         }
+        .formStyle(.grouped)
     }
 }
 
@@ -173,23 +230,34 @@ struct APITab: View {
     @Binding var s: AppSettings
     var body: some View {
         Form {
-            Section("API") {
+            Section {
                 Toggle("fldigi XML-RPC", isOn: $s.api.fldigiEnabled)
-                TextField("Port", value: $s.api.fldigiPort, format: .number.grouping(.never))
+                LabeledContent("Port") {
+                    TextField("", value: $s.api.fldigiPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                }.disabled(!s.api.fldigiEnabled)
                 Toggle("JSON-RPC (WebSocket)", isOn: $s.api.jsonRPCEnabled)
-                TextField("Port", value: $s.api.jsonRPCPort, format: .number.grouping(.never))
-                Toggle("Povolit přístup ze sítě (bez autentizace!)", isOn: $s.api.allowRemote)
+                LabeledContent("Port") {
+                    TextField("", value: $s.api.jsonRPCPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                }.disabled(!s.api.jsonRPCEnabled)
+                Toggle("Povolit přístup ze sítě", isOn: $s.api.allowRemote)
+            } header: { Text("API pro loggery") } footer: {
+                Text(s.api.allowRemote ? "Pozor: API nemá autentizaci a umí zapnout vysílač – zapínejte jen v důvěryhodné síti."
+                                       : "API naslouchá jen na tomto Macu (127.0.0.1).")
+                    .foregroundStyle(s.api.allowRemote ? .orange : .secondary)
             }
-            Section("Log") {
-                HStack {
-                    TextField("Adresář", text: $s.log.directory)
-                    Button("Vybrat…") {
-                        let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false; p.canCreateDirectories = true
-                        if p.runModal() == .OK, let u = p.url { s.log.directory = u.path }
+            Section {
+                LabeledContent("Adresář") {
+                    HStack {
+                        Text(s.log.directory).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
+                        Button("Vybrat…") {
+                            let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false; p.canCreateDirectories = true
+                            if p.runModal() == .OK, let u = p.url { s.log.directory = u.path }
+                        }
                     }
                 }
-            }
+            } header: { Text("Log") } footer: { Text("Spojení (JSONL + ADIF) a série QTC se ukládají do tohoto adresáře.") }
         }
+        .formStyle(.grouped)
     }
 }
 
@@ -212,13 +280,53 @@ struct ModemTab: View {
 
     func descriptors(_ f: (String) -> Bool) -> [ParameterDescriptor] { model.descriptors.filter { f($0.id) } }
 
+    /// České popisky parametrů (popisy z jádra jsou anglicky kvůli API).
+    static let czech: [String: String] = [
+        "baud": "Rychlost", "mark": "Mark", "shift": "Shift", "reverse": "Reverse (prohodit mark/space)",
+        "afc": "AFC", "afcMode": "Režim AFC", "afcSquelch": "Práh AFC", "afcTime": "Časová konstanta AFC",
+        "afcSweep": "Rozsah hledání AFC", "afcMaxDev": "Max. odchylka AFC (0 = bez omezení)", "afcGate": "AFC jen při otevřeném squelchi",
+        "net": "NET (TX na kmitočtu RX)", "atc": "ATC", "squelch": "Squelch", "squelchLevel": "Úroveň squelche",
+        "demodType": "Demodulátor", "iirBandwidth": "Šířka IIR", "firTaps": "Odbočky FIR", "integrator": "Integrátor",
+        "smoothFreq": "Vyhlazení", "lpfFreq": "Mez LPF", "lpfOrder": "Řád LPF", "majority": "Majoritní logika",
+        "ignoreFraming": "Ignorovat chyby rámce", "bitLength": "Délka znaku (bity)", "stopBits": "Stop bity", "parity": "Parita",
+        "limiterAGC": "AGC limiteru", "limiterOversampling": "Převzorkování limiteru", "uos": "Unshift on space (RX)",
+        "diddle": "Diddle", "echo": "Echo vysílání", "bpf": "Vstupní BPF", "bpfWidth": "Přesah BPF",
+        "lms": "Zářez / LMS", "txGain": "Úroveň TX výstupu",
+        "aa6yq": "Filtr AA6YQ", "aa6yqBpfTaps": "AA6YQ – odbočky BPF", "aa6yqBpfWidth": "AA6YQ – přesah BPF",
+        "aa6yqBefTaps": "AA6YQ – odbočky zádrže", "aa6yqBefWidth": "AA6YQ – polovina šířky zádrže",
+        "lmsType": "Typ (zářez / LMS)", "notchFreq": "Zářez", "notch2Freq": "Druhý zářez", "twoNotch": "Dva zářezy",
+        "notchTaps": "Odbočky zářezu", "lmsTaps": "Odbočky LMS", "lmsMu2": "LMS 2μ", "lmsGamma": "LMS γ", "lmsDelay": "Zpoždění LMS",
+        "lmsAGC": "AGC LMS", "lmsInvert": "Invertovat výstup LMS", "lmsBPF": "LMS s BPF",
+        "pllVcoGain": "Zisk VCO", "pllLoopOrder": "Řád smyčkového LPF", "pllLoopFc": "Mez smyčkového LPF",
+        "pllOutOrder": "Řád výstupního LPF", "pllOutFc": "Mez výstupního LPF",
+        "txBPF": "TX BPF", "txLPF": "TX LPF (tvarování)", "txLPFFreq": "Mez TX LPF", "charWait": "Čekání mezi znaky",
+        "charWaitDiddle": "Čekání vyplnit diddle", "randomDiddle": "Náhodný diddle",
+    ]
+
+    static func choiceName(_ id: String, _ v: String) -> String {
+        switch (id, v) {
+        case ("afcMode", "free"): return "volný"
+        case ("afcMode", "fixed"): return "pevný shift"
+        case ("afcMode", "ham"): return "HAM (170 Hz)"
+        case ("afcMode", "fsk"): return "FSK"
+        case ("integrator", "average"): return "klouzavý průměr"
+        case ("integrator", "lpf"): return "IIR LPF"
+        case ("diddle", "off"): return "vypnuto"
+        case ("lmsType", "notch"): return "zářez"
+        case ("parity", "none"): return "žádná"
+        case ("parity", "even"): return "sudá"
+        case ("parity", "odd"): return "lichá"
+        default: return v.uppercased() == v ? v : v.uppercased()
+        }
+    }
+
     var body: some View {
         Form {
-            Section("Jádro (projeví se po Použít)") {
+            Section {
                 Toggle("Japonský Baudot (J-BELL)", isOn: $s.rttyCore.japanese)
                 Toggle("LTRS/FIGS posílat dvakrát", isOn: $s.rttyCore.doubleShift)
                 Toggle("TX unshift on space", isOn: $s.rttyCore.txUOS)
-            }
+            } header: { Text("Jádro") } footer: { Text("Tato tři nastavení se projeví po Použít (modem se vytvoří znovu).") }
             ForEach(Self.groups, id: \.0) { g in
                 Section(g.0) { ForEach(descriptors(g.1), id: \.id) { d in row(d) } }
             }
@@ -230,19 +338,25 @@ struct ModemTab: View {
     }
 
     @ViewBuilder func row(_ d: ParameterDescriptor) -> some View {
+                let title = Self.czech[d.id] ?? d.label
                 switch d.kind {
-                case .bool: Toggle(d.label, isOn: model.boolBinding(d.id))
+                case .bool: Toggle(title, isOn: model.boolBinding(d.id))
                 case .choice(let opts):
-                    Picker(d.label, selection: model.choiceBinding(d.id)) { ForEach(opts, id: \.self) { Text($0).tag($0) } }
+                    Picker(title, selection: model.choiceBinding(d.id)) { ForEach(opts, id: \.self) { Text(Self.choiceName(d.id, $0)).tag($0) } }
                 case .double(let r, let unit):
-                    HStack {
-                        Text(d.label)
-                        Spacer()
-                        TextField("", value: model.doubleBinding(d.id), format: .number).frame(width: 90)
-                        Text(unit ?? "").foregroundStyle(.secondary).frame(width: 30, alignment: .leading)
-                    }.help("\(r.lowerBound)…\(r.upperBound)")
+                    LabeledContent(title) {
+                        HStack(spacing: 4) {
+                            TextField("", value: model.doubleBinding(d.id), format: .number).multilineTextAlignment(.trailing).frame(width: 90)
+                            Text(unit ?? "").foregroundStyle(.secondary).frame(width: 28, alignment: .leading)
+                        }
+                    }.help("\(r.lowerBound.formatted())…\(r.upperBound.formatted())")
                 case .int(let r):
-                    Stepper("\(d.label): \(intValue(d.id))", value: intBinding(d.id), in: r)
+                    LabeledContent(title) {
+                        HStack(spacing: 4) {
+                            TextField("", value: intBinding(d.id), format: .number).multilineTextAlignment(.trailing).frame(width: 70)
+                            Stepper("", value: intBinding(d.id), in: r).labelsHidden()
+                        }
+                    }
                 }
     }
     func intValue(_ id: String) -> Int { if case .int(let i)? = model.param(id) { return i }; return 0 }
@@ -253,42 +367,71 @@ struct ModemTab: View {
 
 struct ContestTab: View {
     @Binding var s: AppSettings
+
+    var exchangeHint: String {
+        switch s.contest.format {
+        case .serial: return "Prázdné = posílá se pořadové číslo; jinak tento text (např. stát)."
+        case .cqrj: return "Moje zóna a QTH, např. „15“ nebo „05 NY“."
+        case .zone: return "Prázdné = moje CQ zóna podle značky (DXCC)."
+        case .bartg, .wae, .ped: return "V tomto formátu se nepoužívá."
+        }
+    }
+
     var body: some View {
         Form {
-            Menu("Předvolba závodu…") {
-                ForEach(ContestPreset.allCases, id: \.self) { p in
-                    Button(p.title) {
-                        let serial = s.contest.nextSerial
-                        s.contest = ContestSettings.preset(p, year: Calendar(identifier: .gregorian).component(.year, from: Date()))
-                        if p == .waeRTTY { s.contest.nextSerial = max(1, serial) }
+            Section {
+                Toggle("Závodní režim", isOn: $s.contest.enabled)
+                LabeledContent("Předvolba") {
+                    Menu("Vybrat závod…") {
+                        ForEach(ContestPreset.allCases, id: \.self) { p in
+                            Button(p.title) {
+                                let serial = s.contest.nextSerial
+                                s.contest = ContestSettings.preset(p, year: Calendar(identifier: .gregorian).component(.year, from: Date()))
+                                if p == .waeRTTY { s.contest.nextSerial = max(1, serial) }
+                            }
+                        }
+                    }.fixedSize()
+                }
+            } footer: { Text("Předvolba nastaví název, formát výměny a začátek známého závodu.") }
+            Section {
+                Picker("Formát výměny", selection: $s.contest.format) {
+                    Text("RST + pořadové číslo").tag(ContestFormat.serial)
+                    Text("RST + CQ zóna (OK DX RTTY)").tag(ContestFormat.zone)
+                    Text("CQ/RJ – zóna + QTH").tag(ContestFormat.cqrj)
+                    Text("BARTG – číslo + čas UTC").tag(ContestFormat.bartg)
+                    Text("WAE – číslo + QTC").tag(ContestFormat.wae)
+                    Text("PED – klik = značka").tag(ContestFormat.ped)
+                }
+                TextField("Odesílaná výměna", text: $s.contest.exchange, prompt: Text("automaticky"))
+                    .disabled([.bartg, .wae, .ped].contains(s.contest.format))
+                NumberRow(title: "Další pořadové číslo", value: $s.contest.nextSerial, range: 1...99_999)
+                    .disabled(!s.contest.sendsSerial)
+            } header: { Text("Výměna") } footer: { Text(exchangeHint) }
+            .disabled(!s.contest.enabled)
+            Section {
+                TextField("Název (CONTEST)", text: $s.contest.name, prompt: Text("např. OK-DX-RTTY"))
+                TextField("Kategorie", text: $s.contest.category, prompt: Text("OPERATOR: SINGLE-OP; POWER: LOW"))
+                LabeledContent("Začátek (UTC)") {
+                    HStack {
+                        if s.contest.start != nil {
+                            DatePicker("", selection: Binding(get: { s.contest.start ?? Date() }, set: { s.contest.start = $0 }))
+                                .labelsHidden().environment(\.timeZone, TimeZone(identifier: "UTC")!)
+                            Button("Zrušit") { s.contest.start = nil }
+                        } else {
+                            Text("posledních 72 h").foregroundStyle(.secondary)
+                        }
+                        Button("Teď") { s.contest.start = Date() }
                     }
                 }
+            } header: { Text("Cabrillo a začátek") } footer: {
+                Text("Kategorie jako „KLÍČ: hodnota“ oddělené středníkem. QTC (WAE) počítá jen spojení od začátku závodu. Export: Log → Exportovat Cabrillo…")
             }
-            .help("Nastaví název, formát výměny a začátek známého závodu")
-            Toggle("Závodní režim (pořadová čísla, klik na číslo = přijaté číslo)", isOn: $s.contest.enabled)
-            Picker("Formát", selection: $s.contest.format) {
-                Text("RST + pořadové číslo (nebo pevná výměna)").tag(ContestFormat.serial)
-                Text("CQ/RJ – zóna + QTH (CQ WW RTTY)").tag(ContestFormat.cqrj)
-                Text("BARTG – číslo + čas UTC").tag(ContestFormat.bartg)
-                Text("PED – klik = vždy značka, bez čísel").tag(ContestFormat.ped)
-                Text("WAE – RST + číslo a výměna QTC").tag(ContestFormat.wae)
-                Text("RST + CQ zóna (OK DX RTTY)").tag(ContestFormat.zone)
-            }
-            TextField("Název závodu (Cabrillo CONTEST)", text: $s.contest.name)
-            TextField("Kategorie (Cabrillo, oddělit „;“)", text: $s.contest.category)
-            Stepper("Další pořadové číslo: \(s.contest.nextSerial)", value: $s.contest.nextSerial, in: 1...99_999)
-            HStack {
-                DatePicker("Začátek závodu (UTC)", selection: Binding(get: { s.contest.start ?? Date() }, set: { s.contest.start = $0 }))
-                    .environment(\.timeZone, TimeZone(identifier: "UTC")!)
-                Button("Teď") { s.contest.start = Date() }
-                Button("Nenastaveno") { s.contest.start = nil }.disabled(s.contest.start == nil)
-            }
-            Text(s.contest.start == nil ? "Bez začátku: QTC počítá spojení za posledních 72 h." : "QTC (WAE) počítá jen spojení a série od začátku závodu.")
-                .font(.caption).foregroundStyle(.secondary)
-            TextField("Odesílaná výměna (CQ/RJ: moje zóna/QTH; RST+číslo: místo čísla, prázdné = číslo)", text: $s.contest.exchange)
-            Text("BARTG: posílá se číslo a čas začátku QSO, %x = číslo, %y = čas. CQ/RJ: klik na číslo = zóna, na text = QTH. Makra: %N = odesílané číslo (nebo výměna), %M = přijaté (jako MMTTY: %r/%N z HisRST, %s/%M z MyRST). Export: Log → Exportovat Cabrillo…")
-                .font(.caption).foregroundStyle(.secondary)
+            .disabled(!s.contest.enabled)
+            Section {
+                Text("%N odesílané číslo nebo výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST").font(.callout)
+            } header: { Text("Makra") }
         }
+        .formStyle(.grouped)
     }
 }
 
@@ -299,7 +442,7 @@ struct DisplayTab: View {
                                                      ("0–4000 Hz", 0, 4000)]
     var body: some View {
         Form {
-            Section("Spektrum a vodopád") {
+            Section {
                 Picker("Rozsah", selection: Binding(get: { "\(Int(s.display.fromHz))-\(Int(s.display.toHz))" },
                                                     set: { v in
                     if let r = Self.ranges.first(where: { "\(Int($0.1))-\(Int($0.2))" == v }) { s.display.fromHz = r.1; s.display.toHz = r.2 }
@@ -307,12 +450,23 @@ struct DisplayTab: View {
                     ForEach(Self.ranges, id: \.0) { r in Text(r.0).tag("\(Int(r.1))-\(Int(r.2))") }
                 }
                 Toggle("Automatické zesílení", isOn: $s.display.autoGain)
-                Slider(value: $s.display.gainDB, in: -30...30, step: 1) { Text("Zesílení \(Int(s.display.gainDB)) dB") }
-            }
+                LabeledContent("Zesílení") {
+                    HStack {
+                        Slider(value: $s.display.gainDB, in: -30...30, step: 1)
+                        Text("\(Int(s.display.gainDB)) dB").monospacedDigit().foregroundStyle(.secondary).frame(width: 48, alignment: .trailing)
+                    }
+                }
+            } header: { Text("Spektrum a vodopád") } footer: { Text("Rozsah a zesílení jdou měnit i v menu v levém horním rohu spektra.") }
             Section("Text") {
-                Stepper("Velikost písma: \(Int(s.display.fontSize))", value: $s.display.fontSize, in: 9...32)
+                LabeledContent("Velikost písma") {
+                    HStack(spacing: 4) {
+                        Text("\(Int(s.display.fontSize)) pt").monospacedDigit()
+                        Stepper("", value: $s.display.fontSize, in: 9...32).labelsHidden()
+                    }
+                }
                 Toggle("Časové značky UTC při přepnutí TX/RX", isOn: $s.display.timestamps)
             }
         }
+        .formStyle(.grouped)
     }
 }
