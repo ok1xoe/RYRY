@@ -22,8 +22,8 @@ struct TopBar: View {
                         .font(.headline).frame(width: 44)
                 }
                 .help("Přepnout TX/RX (⌘T)")
-                Button("Tune") { Task { await model.tune() } }
-                Button("Stop") { Task { await model.rxNow() } }
+                Button("Tune") { Task { await model.tune() } }.fixedSize()
+                Button("Stop") { Task { await model.rxNow() } }.fixedSize()
                     .keyboardShortcut(.escape, modifiers: [])
                     .help("Okamžitě RX (Esc)")
                 Text(model.state.rawValue.uppercased())
@@ -32,12 +32,13 @@ struct TopBar: View {
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
                 Picker("Demod", selection: model.choiceBinding("demodType")) {
                     ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
-                }.fixedSize()
+                }.labelsHidden().fixedSize().help("Demodulátor")
                 Button("HAM") { Task { await model.hamShift() } }.help("Shift 170 Hz")
                 ProfileMenu(model: model)
                 Spacer()
                 Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")
                     .font(.system(.title3, design: .monospaced))
+                    .lineLimit(1).fixedSize()
                     .foregroundStyle(model.rig?.online == true ? .primary : .secondary)
                     .help(model.rig?.online == true ? "Rig online" : "Rig offline")
                 SignalMeter(level: model.signalLevel, open: model.squelchOpen).frame(width: 80, height: 12)
