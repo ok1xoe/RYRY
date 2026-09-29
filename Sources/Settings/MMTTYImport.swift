@@ -357,7 +357,7 @@ public enum MMTTYImport {
         if !r.shortcuts.isEmpty {
             var probe = AppSettings(); probe.shortcuts = r.shortcuts
             let n = probe.conflictingShortcuts().count
-            if n > 0 { r.warnings.append(L("Po importu se %ld zkratek kryje s jinou; upravte je v Nastavení → Zkratky.", n)) }
+            if n > 0 { r.warnings.append(L("Po importu se %ld zkratek kryje s jinou; upravte je v Nastavení → Klávesy.", n)) }
         }
 
         // shrnutí
