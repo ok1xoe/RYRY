@@ -100,6 +100,8 @@
   <li>The <b>mouse wheel</b> over the waterfall changes the squelch level, <b>right-click</b> places a notch against interference.</li>
   <li><b>AFC</b> tracks the signal (right-click: only with open squelch, range limit), <b>NET</b> transmits on the RX frequency, <b>REV</b> swaps mark and space, <b>ATC</b> and <b>SQ</b> work as in MMTTY.</li>
   <li><b>Filters</b> (menu next to Shift): BPF, AA6YQ, notch/LMS, UOS. <b>XY</b> shows the cross tuning indicator.</li>
+  <li><b>Call highlighting:</b> in the RX text your call is red, stations already in the log blue, new ones bold and dupes struck through. When someone calls you, a sound plays (optionally a notification).</li>
+  <li><b>Watching:</b> in Settings → Spots you can watch chosen calls and new countries (on the band or at all) in spots and in the RX text.</li>
   <li><b>Click a word</b> in the received text to put it into the QSO window – call, RST, number or name by word type.</li>
 </ul>
 <h3>Second decoder and multi-channel decoding</h3>
@@ -139,6 +141,8 @@
 <ul>
   <li><b>Band:</b> without a connected rig choose the band below the QSO fields or enter the frequency in kHz – it is written to the log and kept for the next QSOs. With a rig the frequency comes from the radio.</li>
   <li><b>Super Check Partial:</b> while typing a call, known calls (from MASTER.SCP and your log) are suggested below the Call field; “≈” marks calls differing by one character – they help correct a miscopied call. Download MASTER.SCP in Settings → Contest.</li>
+  <li><b>Beam heading:</b> below the country you see the azimuth and distance to the other station (from the locator, otherwise by country) and the long path.</li>
+  <li><b>Frequency:</b> click the frequency in the top bar (or <kbd>⌥</kbd><kbd>⌘</kbd><kbd>F</kbd>) to enter a frequency or pick a band – the rig retunes (not while transmitting).</li>
   <li><b>Callbook:</b> after entering a call the name, QTH and locator are filled from QRZ.com or HamQTH (Settings → API and log → Callbook; the password is kept in the Keychain).</li>
 </ul>
 <figure><a href="../img/en-log.png"><img src="../img/en-log.png" alt="Log window" loading="lazy"></a>
@@ -171,6 +175,9 @@
 <h3>ESM – Enter Sends Message (Run / S&amp;P)</h3>
 <p>When enabled in Settings → Contest → ESM, Enter in the Call or exchange field sends a macro depending on the QSO state, much like N1MM: <b>Run</b> (calling CQ) – CQ → exchange → TU and log; <b>S&amp;P</b> (answering) – my call → exchange and log. Switch the mode in the QSO panel header or with <kbd>⌃</kbd><kbd>R</kbd>; the panel shows what Enter will send. Enter sends nothing while transmitting and an empty macro is never sent.</p>
 <p><b>Rate:</b> in a contest the status bar shows the QSO count and the rate over the last 10 and 60 minutes (QSOs per hour); the Log window shows counts per band.</p>
+<h3>Multipliers and band map</h3>
+<p><b>Window → Multipliers</b> shows, for the selected preset, the worked multipliers per band (DXCC countries, CQ zones, WPX prefixes, states and provinces, call areas…) and the missing ones for finite sets. For the entered call a green <b>NEW MULT</b> appears in the QSO window. Rules that could not be verified in the official contest rules are marked in the window. <b>Window → Band Map</b> shows the RTTY segment of the band with spots by frequency and the rig position; a click tunes the rig and puts the call in.</p>
+<p><b>Call history:</b> a file in N1MM Call History format (Settings → Contest) prefills the other station's name, locator and exchange (e.g. zone).</p>
 <h3>WAE and QTC</h3>
 <p>In the WAE format the QSO window has a QTC panel: <b>QTC?</b> asks the other station, <b>QRV – receive</b> opens receiving a series, <b>Send…</b> prepares and sends a series from your log. The app enforces the rules – max. 10 QTC per pair of stations, only between continents, each QSO only once. Received lines are filled by clicking words or with <b>Load from RX</b>.</p>
 </section>
