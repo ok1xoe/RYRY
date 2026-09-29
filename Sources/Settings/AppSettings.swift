@@ -465,6 +465,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var shortcuts: [String: KeyBinding] = [:]
     /// Nahrávání na LoTW / eQSL / Club Log.
     public var upload = UploadSettings()
+    /// DX cluster a RBN spoty.
+    public var spots = SpotSettings()
     public init() {}
     public static let macroCount = 16
 
@@ -489,7 +491,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty,
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
-                                             shortcuts, updates, upload }
+                                             shortcuts, updates, upload, spots }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -520,6 +522,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         updates = c.tolerant(.updates, x.updates, w, s)
         shortcuts = c.tolerant(.shortcuts, TolerantDict<KeyBinding>(), w, s).items.filter { $0.value.isValid }
         upload = c.tolerant(.upload, x.upload, w, s)
+        spots = c.tolerant(.spots, x.spots, w, s)
     }
 
     /// Konfigurace Engine z nastavení.

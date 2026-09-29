@@ -168,6 +168,7 @@ struct MMTTY4MacApp: App {
                 Button("Log") { openWindow(id: "log") }.shortcut(model.settings.binding(for: .openLog))
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
                 Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
+                Button(L("Spoty")) { openWindow(id: "spots") }
             }
         }
         Window("Log – " + model.settings.log.name, id: "log") { LogWindow(model: model).environment(\.showHints, model.settings.display.showHints) }
@@ -176,6 +177,9 @@ struct MMTTY4MacApp: App {
         }
         Window(L("Aktualizace"), id: "update") { UpdateWindow(model: updates) }
             .windowResizability(.contentSize)
+        Window(L("Spoty"), id: "spots") {
+            SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
         Settings { SettingsView(model: model).environment(\.showHints, model.settings.display.showHints) }
     }
 }
