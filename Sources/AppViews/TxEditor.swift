@@ -2,6 +2,7 @@
 import AppUI
 import Engine
 import SwiftUI
+import Localization
 
 struct TxEditor: View {
     @Bindable var model: AppModel
@@ -11,14 +12,14 @@ struct TxEditor: View {
             HStack {
                 Text("TX").font(.caption.bold()).foregroundStyle(.secondary)
                 Picker("", selection: $model.sendMode) {
-                    Text("po znacích").tag(SendMode.char)
-                    Text("po slovech").tag(SendMode.word)
-                    Text("po řádcích").tag(SendMode.line)
+                    Text(L("po znacích")).tag(SendMode.char)
+                    Text(L("po slovech")).tag(SendMode.word)
+                    Text(L("po řádcích")).tag(SendMode.line)
                 }.pickerStyle(.segmented).frame(width: 260)
                 Spacer()
                 MessagesMenu(model: model)
-                Button("Odeslat vše") { Task { await model.sendDraft(mode: .char) } }
-                Button("Smazat") { model.txDraft = "" }
+                Button(L("Odeslat vše")) { Task { await model.sendDraft(mode: .char) } }
+                Button(L("Smazat")) { model.txDraft = "" }
             }
             TextEditor(text: $model.txDraft)
                 .font(.system(size: model.settings.display.fontSize, design: .monospaced))

@@ -3,25 +3,26 @@ import AppUI
 import QSOLog
 import Settings
 import SwiftUI
+import Localization
 
 struct QSOPanel: View {
     @Bindable var model: AppModel
     /// Místní čas protistanice (hh:mm).
     static let hm: DateFormatter = {
-        let f = DateFormatter(); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm 'místně'"; return f
+        let f = DateFormatter(); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm"; return f
     }()
 
     static func contestTitle(_ c: ContestSettings) -> String {
         let f: String
         switch c.format {
-        case .serial: f = c.exchange.isEmpty ? "RST + číslo" : "RST + výměna"
+        case .serial: f = c.exchange.isEmpty ? L("RST + číslo") : L("RST + výměna")
         case .cqrj: f = "CQ/RJ"
         case .bartg: f = "BARTG"
         case .ped: f = "PED"
         case .wae: f = "WAE + QTC"
-        case .zone: f = "RST + CQ zóna"
+        case .zone: f = L("RST + CQ zóna")
         }
-        return c.name.isEmpty ? "závod · \(f)" : "\(c.name) · \(f)"
+        return c.name.isEmpty ? L("závod") + " · \(f)" : "\(c.name) · \(f)"
     }
 
     /// Popisek v levém sloupci mřížky.
@@ -59,8 +60,8 @@ struct QSOPanel: View {
                             if let c = model.dxcc {
                                 let local = Date().addingTimeInterval(c.utcOffsetHours * 3600)
                                 GridRow {
-                                    label("Země")
-                                    Text("\(c.name) · \(c.continent) · CQ \(c.cqZone) · ITU \(c.ituZone) · \(Self.hm.string(from: local))")
+                                    label(L("Země"))
+                                    Text("\(c.name) · \(c.continent) · CQ \(c.cqZone) · ITU \(c.ituZone) · \(Self.hm.string(from: local)) \(L("místně"))")
                                         .font(.caption).foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                         .gridCellColumns(3)
@@ -70,12 +71,12 @@ struct QSOPanel: View {
                     }
                 }
                 HStack {
-                    Button("Log") { Task { await model.logQSO() } }.help("Zalogovat (⌘L)")
+                    Button("Log") { Task { await model.logQSO() } }.help(L("Zalogovat (⌘L)"))
                     Button("Clear") { Task { await model.clearQSO() } }
                 }
                 if QSOLayout.showsQTC(model.settings.contest) { QTCPanel(model: model) }
                 if !model.previousQSOs.isEmpty {
-                    Text("Předchozí spojení (\(model.previousQSOs.count))").font(.subheadline.bold())
+                    Text(L("Předchozí spojení (%ld)", model.previousQSOs.count)).font(.subheadline.bold())
                     ForEach(model.previousQSOs.prefix(20)) { r in
                         VStack(alignment: .leading) {
                             Text(r.timeOn.formatted(date: .abbreviated, time: .shortened)).font(.caption)

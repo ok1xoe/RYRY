@@ -4,6 +4,7 @@ import AppUI
 import QSOLog
 import SwiftUI
 import UniformTypeIdentifiers
+import Localization
 
 /// Uloží log ve formátu Cabrillo: dialog s rozsahem (UTC, výchozí posledních 48 h) a volbou „jen závodní spojení“.
 @MainActor public func exportCabrillo(_ model: AppModel) {
@@ -17,9 +18,9 @@ import UniformTypeIdentifiers
         return dp
     }
     let from = picker(Date().addingTimeInterval(-48 * 3600)), to = picker(Date().addingTimeInterval(3600))
-    let only = NSButton(checkboxWithTitle: "Jen závodní spojení (s číslem nebo výměnou)", target: nil, action: nil)
+    let only = NSButton(checkboxWithTitle: L("Jen závodní spojení (s číslem nebo výměnou)"), target: nil, action: nil)
     only.state = model.settings.contest.enabled ? .on : .off
-    let row1 = NSStackView(views: [NSTextField(labelWithString: "Od (UTC):"), from, NSTextField(labelWithString: "do:"), to])
+    let row1 = NSStackView(views: [NSTextField(labelWithString: L("Od (UTC):")), from, NSTextField(labelWithString: L("do:")), to])
     let box = NSStackView(views: [row1, only]); box.orientation = .vertical; box.alignment = .leading
     box.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
     p.accessoryView = box
@@ -47,7 +48,7 @@ public struct LogWindow: View {
 
     public var body: some View {
         TabView {
-            qsoList.tabItem { Text("Spojení (\(model.logRecords.count))") }
+            qsoList.tabItem { Text(L("Spojení (%ld)", model.logRecords.count)) }
             QTCLogView(model: model).tabItem { Text("QTC (\(model.qtcSummary.points))") }
         }
     }
@@ -80,40 +81,40 @@ public struct LogWindow: View {
         VStack(spacing: 0) {
             Table(filtered, selection: $selection) {
                 Group {
-                    TableColumn("Čas (UTC)") { (r: QSORecord) in Text(Self.timeLabel(r)).monospacedDigit() }.width(min: 120, ideal: 140)
-                    TableColumn("Značka") { (r: QSORecord) in Text(r.call).bold() }.width(min: 80, ideal: 100)
-                    TableColumn("Pásmo") { (r: QSORecord) in Text(r.band ?? "") }.width(50)
+                    TableColumn(L("Čas (UTC)")) { (r: QSORecord) in Text(Self.timeLabel(r)).monospacedDigit() }.width(min: 120, ideal: 140)
+                    TableColumn(L("Značka")) { (r: QSORecord) in Text(r.call).bold() }.width(min: 80, ideal: 100)
+                    TableColumn(L("Pásmo")) { (r: QSORecord) in Text(r.band ?? "") }.width(50)
                     TableColumn("kHz") { (r: QSORecord) in Text(Self.khzLabel(r)) }.width(70)
-                    TableColumn("Mód") { (r: QSORecord) in Text(r.mode) }.width(50)
+                    TableColumn(L("Mód")) { (r: QSORecord) in Text(r.mode) }.width(50)
                 }
                 Group {
                     TableColumn("RST s/r") { (r: QSORecord) in Text(Self.rstLabel(r)) }.width(70)
                     TableColumn("Nr s/r") { (r: QSORecord) in Text(Self.nrLabel(r)) }.width(70)
-                    TableColumn("Jméno") { (r: QSORecord) in Text(r.name ?? "") }
+                    TableColumn(L("Jméno")) { (r: QSORecord) in Text(r.name ?? "") }
                     TableColumn("QTH") { (r: QSORecord) in Text(r.qth ?? "") }
-                    TableColumn("Země") { (r: QSORecord) in Text(r.country ?? "") }
+                    TableColumn(L("Země")) { (r: QSORecord) in Text(r.country ?? "") }
                 }
                 TableColumn("QTC") { (r: QSORecord) in Text(qtcLabel(r.call)).monospacedDigit() }.width(70)
             }
             .contextMenu(forSelectionType: QSORecord.ID.self) { ids in
                 if let id = ids.first, let r = model.logRecords.first(where: { $0.id == id }) {
-                    Button("Upravit…") { editing = r }
-                    Button("Smazat…", role: .destructive) { confirmDelete = r }
+                    Button(L("Upravit…")) { editing = r }
+                    Button(L("Smazat…"), role: .destructive) { confirmDelete = r }
                 }
             } primaryAction: { ids in
                 if let id = ids.first { editing = model.logRecords.first { $0.id == id } }
             }
             HStack {
-                Text("\(filtered.count) spojení").foregroundStyle(.secondary)
+                Text(L("%ld spojení", filtered.count)).foregroundStyle(.secondary)
                 Spacer()
-                Button("Exportovat Cabrillo…") { exportCabrillo(model) }
+                Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
             }.padding(6).font(.caption)
         }
-        .searchable(text: $search, prompt: "Značka nebo jméno")
+        .searchable(text: $search, prompt: L("Značka nebo jméno"))
         .sheet(item: $editing) { r in QSOEditor(record: r) { new in Task { await model.updateLog(new) } } }
-        .confirmationDialog("Smazat spojení?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
+        .confirmationDialog(L("Smazat spojení?"), isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
                             presenting: confirmDelete) { r in
-            Button("Smazat \(r.call)", role: .destructive) { Task { await model.deleteLog(r.id) } }
+            Button(L("Smazat %@", r.call), role: .destructive) { Task { await model.deleteLog(r.id) } }
         }
         .frame(minWidth: 700, minHeight: 300)
     }
@@ -134,22 +135,22 @@ struct QSOEditor: View {
 
     var body: some View {
         Form {
-            TextField("Značka", text: Binding(get: { record.call }, set: { record.call = $0.uppercased() }))
-            DatePicker("Začátek (UTC)", selection: $record.timeOn)
+            TextField(L("Značka"), text: Binding(get: { record.call }, set: { record.call = $0.uppercased() }))
+            DatePicker(L("Začátek (UTC)"), selection: $record.timeOn)
                 .environment(\.timeZone, TimeZone(identifier: "UTC")!)
                 .environment(\.timeZone, TimeZone(identifier: "UTC")!)
-            TextField("Frekvence (Hz)", value: $record.frequency, format: .number)
-            TextField("Mód", text: $record.mode)
-            TextField("RST odeslané", text: text(\.rstSent))
-            TextField("RST přijaté", text: text(\.rstRcvd))
-            TextField("Jméno", text: text(\.name))
+            TextField(L("Frekvence (Hz)"), value: $record.frequency, format: .number)
+            TextField(L("Mód"), text: $record.mode)
+            TextField(L("RST odeslané"), text: text(\.rstSent))
+            TextField(L("RST přijaté"), text: text(\.rstRcvd))
+            TextField(L("Jméno"), text: text(\.name))
             TextField("QTH", text: text(\.qth))
-            TextField("Lokátor", text: text(\.grid))
-            TextField("Poznámka", text: text(\.comment))
+            TextField(L("Lokátor"), text: text(\.grid))
+            TextField(L("Poznámka"), text: text(\.comment))
             HStack {
                 Spacer()
-                Button("Zrušit") { dismiss() }
-                Button("Uložit") { onSave(record); dismiss() }.keyboardShortcut(.defaultAction)
+                Button(L("Zrušit")) { dismiss() }
+                Button(L("Uložit")) { onSave(record); dismiss() }.keyboardShortcut(.defaultAction)
             }
         }
         .padding()
@@ -170,7 +171,7 @@ struct QTCLogView: View {
     var body: some View {
         VStack(spacing: 0) {
             if model.qtcSeries.isEmpty {
-                Text("Žádné série QTC. QTC se vyměňují ve formátu závodu WAE (Nastavení → Závod).")
+                Text(L("Žádné série QTC. QTC se vyměňují ve formátu závodu WAE (Nastavení → Závod)."))
                     .foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
@@ -183,34 +184,34 @@ struct QTCLogView: View {
                             HStack {
                                 Image(systemName: s.direction == .sent ? "arrow.up.right" : "arrow.down.left")
                                     .foregroundStyle(s.direction == .sent ? .orange : .green)
-                                Text(s.direction == .sent ? "Odesláno" : "Přijato").frame(width: 70, alignment: .leading)
+                                Text(s.direction == .sent ? L("Odesláno") : L("Přijato")).frame(width: 70, alignment: .leading)
                                 Text("QTC \(s.number)/\(s.groupSize)").monospacedDigit().frame(width: 80, alignment: .leading)
                                 Text(s.counterpart).bold().frame(width: 100, alignment: .leading)
                                 Text(Self.fmt.string(from: s.time)).monospacedDigit()
                                 Text(Bands.band(forHz: s.frequency) ?? "").foregroundStyle(.secondary).frame(width: 50)
                                 Spacer()
-                                Text("\(s.count) b.").monospacedDigit()
+                                Text(L("%ld b.", s.count)).monospacedDigit()
                             }
                         }
                         .contextMenu {
-                            Button("Upravit…") { editing = s }
-                            Button("Smazat…", role: .destructive) { confirmDelete = s }
+                            Button(L("Upravit…")) { editing = s }
+                            Button(L("Smazat…"), role: .destructive) { confirmDelete = s }
                         }
                     }
                 }
             }
             HStack {
                 let sum = model.qtcSummary
-                Text("Série: \(sum.seriesCount) · odesláno \(sum.sent) QTC · přijato \(sum.received) QTC · body za QTC \(sum.points) · QSO \(model.logRecords.count)")
+                Text(L("Série: %ld · odesláno %ld QTC · přijato %ld QTC · body za QTC %ld · QSO %ld", sum.seriesCount, sum.sent, sum.received, sum.points, model.logRecords.count))
                     .foregroundStyle(.secondary)
                 Spacer()
             }.padding(6).font(.caption)
         }
         .task { await model.refreshQTCSeries() }
         .sheet(item: $editing) { s in QTCSeriesEditor(series: s) { new in Task { await model.updateQTCSeries(new) } } }
-        .confirmationDialog("Smazat sérii QTC?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
+        .confirmationDialog(L("Smazat sérii QTC?"), isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
                             presenting: confirmDelete) { s in
-            Button("Smazat QTC \(s.number)/\(s.groupSize) (\(s.counterpart))", role: .destructive) { Task { await model.deleteQTCSeries(s.id) } }
+            Button(L("Smazat QTC %ld/%ld (%@)", s.number, s.groupSize, s.counterpart), role: .destructive) { Task { await model.deleteQTCSeries(s.id) } }
         }
     }
 }
@@ -226,20 +227,20 @@ struct QTCSeriesEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(series.direction == .sent ? "Odeslaná série QTC" : "Přijatá série QTC").font(.headline)
+            Text(series.direction == .sent ? L("Odeslaná série QTC") : L("Přijatá série QTC")).font(.headline)
             Form {
-                TextField("Protistanice", text: $series.counterpart)
-                Stepper("Číslo série: \(series.number)", value: $series.number, in: 1...999)
+                TextField(L("Protistanice"), text: $series.counterpart)
+                Stepper(L("Číslo série: %ld", series.number), value: $series.number, in: 1...999)
             }
-            Text("Řádky (HHMM ZNAČKA NNN):").font(.caption)
+            Text(L("Řádky (HHMM ZNAČKA NNN):")).font(.caption)
             TextEditor(text: $text).font(.system(.body, design: .monospaced)).frame(minHeight: 180)
             if parsed.contains(where: { $0 == nil }) || parsed.count > 10 || parsed.isEmpty {
-                Text("Každý řádek musí mít tvar „HHMM ZNAČKA NNN“, 1–10 řádků.").font(.caption).foregroundStyle(.red)
+                Text(L("Každý řádek musí mít tvar „HHMM ZNAČKA NNN“, 1–10 řádků.")).font(.caption).foregroundStyle(.red)
             }
             HStack {
                 Spacer()
-                Button("Zrušit") { dismiss() }
-                Button("Uložit") {
+                Button(L("Zrušit")) { dismiss() }
+                Button(L("Uložit")) {
                     var s = series
                     s.counterpart = s.counterpart.uppercased()
                     s.lines = parsed.compactMap { $0 }

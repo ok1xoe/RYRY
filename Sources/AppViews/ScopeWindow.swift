@@ -3,6 +3,7 @@ import AppUI
 import ModemKit
 import RTTYModem
 import SwiftUI
+import Localization
 
 /// Scope demodulátoru (MMTTY „Digital Scope“): průběhy mark/space ze zvoleného místa demodulátoru,
 /// rozhodnutý bit a synchronizace (start/stop bity). Slouží k ladění parametrů demodulátoru.
@@ -15,21 +16,21 @@ public struct ScopeWindow: View {
     public var body: some View {
         VStack(spacing: 6) {
             HStack {
-                Picker("Zdroj", selection: $model.scopeSource) {
-                    ForEach(Array(RTTYModem.scopeSources.enumerated()), id: \.offset) { i, n in Text(n).tag(i) }
+                Picker(L("Zdroj"), selection: $model.scopeSource) {
+                    ForEach(Array(RTTYModem.scopeSources.enumerated()), id: \.offset) { i, _ in Text(Self.sourceName(i)).tag(i) }
                 }.pickerStyle(.segmented).fixedSize()
-                Toggle("Zmrazit", isOn: $model.scopeFrozen).toggleStyle(.button)
-                    .help("Podržet poslední záznam (jednorázové zachycení)")
+                Toggle(L("Zmrazit"), isOn: $model.scopeFrozen).toggleStyle(.button)
+                    .help(L("Podržet poslední záznam (jednorázové zachycení)"))
                 Spacer()
-                Text("Šířka").font(.caption)
+                Text(L("Šířka")).font(.caption)
                 Slider(value: $width, in: 256...8192).frame(width: 140)
-                Text("Posun").font(.caption)
+                Text(L("Posun")).font(.caption)
                 Slider(value: $offset, in: 0...1).frame(width: 140)
             }
             if model.scopeSource == 3 && model.param("atc") != .bool(true) {
-                Text("Zdroj ATC vyžaduje zapnuté ATC.").font(.caption).foregroundStyle(.secondary)
+                Text(L("Zdroj ATC vyžaduje zapnuté ATC.")).font(.caption).foregroundStyle(.secondary)
             } else if let d = model.demodScope, d.marks.indices.contains(model.scopeSource), d.marks[model.scopeSource].isEmpty {
-                Text("Tento zdroj se u zvoleného demodulátoru neplní.").font(.caption).foregroundStyle(.secondary)
+                Text(L("Tento zdroj se u zvoleného demodulátoru neplní.")).font(.caption).foregroundStyle(.secondary)
             }
             Canvas { ctx, size in draw(ctx, size) }
                 .background(Color.black)
@@ -42,7 +43,7 @@ public struct ScopeWindow: View {
                     }.font(.caption2).padding(6)
                 }
             if model.demodScope == nil {
-                Text("Čekám na data… (scope sbírá při příjmu dávky po 8192 vzorcích)").font(.caption).foregroundStyle(.secondary)
+                Text(L("Čekám na data… (scope sbírá při příjmu dávky po 8192 vzorcích)")).font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(8)
@@ -89,6 +90,17 @@ public struct ScopeWindow: View {
             var p = Path(); let y = lane * CGFloat(k)
             p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: size.width, y: y))
             ctx.stroke(p, with: .color(.white.opacity(0.12)), lineWidth: 1)
+        }
+    }
+}
+
+extension ScopeWindow {
+    /// Názvy zdrojů scope (pořadí jako RTTYModem.scopeSources).
+    static func sourceName(_ i: Int) -> String {
+        switch i {
+        case 0: return L("Filtr")
+        case 1: return L("Det.")
+        default: return RTTYModem.scopeSources[i]
         }
     }
 }

@@ -6,6 +6,7 @@ import DXCC
 import AudioIO
 import Engine
 import Foundation
+import Localization
 import Keying
 import ModemKit
 import Observation
@@ -95,7 +96,7 @@ public final class AppModel {
     private var sqChain: Task<Void, Never>?
     var lastSentForTesting = ""
     private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
-    static let micWaitMessage = "Čekám na povolení přístupu k mikrofonu (systémový dialog)…"
+    static var micWaitMessage: String { L("Čekám na povolení přístupu k mikrofonu (systémový dialog)…") }
     public var waterfallFromHz: Double { settings.display.fromHz }
     public var waterfallToHz: Double { settings.display.toHz }
 
@@ -107,7 +108,7 @@ public final class AppModel {
         d.gainDB = min(30, max(-30, d.gainDB))
         settings.display = d
         syncDisplay()
-        do { try settingsStore.save(settings) } catch { note("Nastavení nelze uložit: \(error)") }
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
     }
 
     private func syncDisplay() {
@@ -181,7 +182,7 @@ public final class AppModel {
         let engine = engineFactory(settings, rig)
         let log: QSOLogStore?
         do { log = try QSOLogStore(directory: URL(fileURLWithPath: settings.log.directory)) }
-        catch { log = nil; note("Log nedostupný: \(error)") }
+        catch { log = nil; note(L("Log nedostupný: %@", "\(error)")) }
         if let log { for w in await log.warnings { note(w) } }
         let qtc = try? QTCStore(directory: URL(fileURLWithPath: settings.log.directory))
         let app = AppController(settings: settings, engine: engine, log: log, profiles: profileStore, qtc: qtc)
@@ -198,11 +199,11 @@ public final class AppModel {
         let micOK = await Self.microphoneAccess()
         messages.removeAll { $0 == Self.micWaitMessage }       // dialog vyřízen
         if !micOK {
-            note("Přístup k mikrofonu zamítnut – povolte ho v Nastavení systému → Soukromí → Mikrofon. Příjem nefunguje.")
+            note(L("Přístup k mikrofonu zamítnut – povolte ho v Nastavení systému → Soukromí → Mikrofon. Příjem nefunguje."))
         }
         do { try await app.start() }
-        catch EngineError.audio(let m) { note("Zvuk nefunguje: \(m) – zkontrolujte zařízení a oprávnění k mikrofonu") }
-        catch { note("Start selhal: \(error)") }
+        catch EngineError.audio(let m) { note(L("Zvuk nefunguje: %@ – zkontrolujte zařízení a oprávnění k mikrofonu", m)) }
+        catch { note(L("Start selhal: %@", "\(error)")) }
         qso = await app.qso                              // např. odesílané číslo závodu
         await refreshQTCSeries()
         state = await engine.state
@@ -223,12 +224,12 @@ public final class AppModel {
         if settings.api.fldigiEnabled {
             let s = FldigiXMLRPCServer(app: app, host: host, port: UInt16(clamping: settings.api.fldigiPort))
             do { let p = try await s.start(); fldigi = s; parts.append("fldigi XML-RPC :\(p)") }
-            catch { note("fldigi XML-RPC nespuštěno (port \(settings.api.fldigiPort) obsazen?): \(error)") }
+            catch { note(L("fldigi XML-RPC nespuštěno (port %ld obsazen?): %@", Int(settings.api.fldigiPort), "\(error)")) }
         }
         if settings.api.jsonRPCEnabled {
             let s = JSONRPCServer(app: app, host: host, port: UInt16(clamping: settings.api.jsonRPCPort))
             do { let p = try await s.start(); json = s; parts.append("JSON-RPC :\(p)") }
-            catch { note("JSON-RPC nespuštěno (port \(settings.api.jsonRPCPort) obsazen?): \(error)") }
+            catch { note(L("JSON-RPC nespuštěno (port %ld obsazen?): %@", Int(settings.api.jsonRPCPort), "\(error)")) }
         }
         apiStatus = parts.isEmpty ? "API vypnuto" : parts.joined(separator: " · ")
     }
@@ -293,12 +294,12 @@ public final class AppModel {
                 take(\.contest.nextSerial); take(\.contest.start)
                 return m
             }
-            do { try self.settingsStore.save(merge(self.settings)) } catch { self.note("Nastavení nelze uložit: \(error)") }
+            do { try self.settingsStore.save(merge(self.settings)) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
             if let app = self.app, await app.engine.state != .rx { await app.rxNow() }
             await self.stopNow()
             // znovu sloučit: během zastavování mohl přijít .contestSerial (makro s %l)
             let merged = merge(self.settings)
-            do { try self.settingsStore.save(merged) } catch { self.note("Nastavení nelze uložit: \(error)") }
+            do { try self.settingsStore.save(merged) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
             self.settings = merged
             self.syncDisplay()
             if !self.qtcEnabled { self.qtcReceive = nil; self.qtcPendingCache = nil }
@@ -325,7 +326,7 @@ public final class AppModel {
         case .engine(.modem(.shift(let f))): fig = f
         case .engine(.rig(let r)): rig = r
         case .engine(.error(let err)): note("\(err)")
-        case .engine(.pttTimeout): note("PTT časovač vypnul vysílání")
+        case .engine(.pttTimeout): note(L("PTT časovač vypnul vysílání"))
         case .error(let m): note(m)
         case .qsoChanged(let q):
             let callChanged = q.call != qso.call
@@ -335,7 +336,7 @@ public final class AppModel {
         case .qtcChanged: Task { await self.refreshQTC(); await self.refreshQTCSeries() }
         case .contestSerial(let n):
             settings.contest.nextSerial = n
-            do { try settingsStore.save(settings) } catch { note("Nastavení nelze uložit: \(error)") }
+            do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
         case .qsoUpdated, .qsoDeleted: Task { await self.refreshLog(); await self.refreshQTC() }
         case .paramsChanged(let p):
             params = p
@@ -403,7 +404,7 @@ public final class AppModel {
 
     public enum WAVError: Error, LocalizedError {
         case tooLong
-        public var errorDescription: String? { "Soubor je delší než 2 hodiny." }
+        public var errorDescription: String? { L("Soubor je delší než 2 hodiny.") }
     }
 
     /// Přehraje WAV (libovolná frekvence, převzorkuje se na 11025 Hz) místo vstupu zvukovky (MMTTY „Play“).
@@ -593,7 +594,7 @@ public final class AppModel {
     /// Uloží přijatou sérii (jen prvních k řádků); vrací true při úspěchu – teprve pak potvrdit R R ALL OK.
     @discardableResult
     public func qtcSaveReceived() async -> Bool {
-        guard let app, let d = qtcReceive, let n = d.number else { note("QTC: chybí hlavička série (n/k)"); return false }
+        guard let app, let d = qtcReceive, let n = d.number else { note(L("QTC: chybí hlavička série (n/k)")); return false }
         let lines = d.lines.prefix(d.count ?? 10).compactMap { $0 }
         var ok = false
         await run("QTC") { try await app.saveReceivedQTC(counterpart: d.counterpart, number: n, declaredCount: d.count, lines: lines); ok = true }
@@ -635,12 +636,12 @@ public final class AppModel {
 
     public func rxNow() async { await app?.rxNow() }
     public func tune() async { guard let app else { return }; await run("Tune") { try await app.tune() } }
-    public func runMacro(_ i: Int) async { guard let app else { return }; await run("Makro F\(i + 1)") { try await app.runMacro(index: i) } }
+    public func runMacro(_ i: Int) async { guard let app else { return }; await run(L("Makro F%ld", i + 1)) { try await app.runMacro(index: i) } }
     public func stopMacro() async { await app?.stopMacroRepeat() }
     public func runMessage(_ i: Int) async {
         guard let app else { return }
         let name = settings.messages.indices.contains(i) ? settings.messages[i].name : "\(i + 1)"
-        await run("Zpráva \(name)") { try await app.runMessage(index: i) }
+        await run(L("Zpráva %@", name)) { try await app.runMessage(index: i) }
     }
 
     /// Odešle z editoru část podle režimu (znak = vše, slovo = do poslední mezery, řádek = do posledního konce řádku).
@@ -665,7 +666,7 @@ public final class AppModel {
 
     public func setParam(_ id: String, _ v: ParameterValue) async {
         guard let app else { return }
-        await run("Parametr \(id)") { try await app.setModemParam(id, v) }
+        await run(L("Parametr %@", id)) { try await app.setModemParam(id, v) }
         await refreshParams()
         settings.rtty[id] = v
         try? settingsStore.save(settings)
@@ -752,20 +753,20 @@ public final class AppModel {
     public func saveMacros(_ m: [Macro]) async {
         var s = settings; s.macros = m; settings = s
         await app?.setMacros(m)
-        do { try settingsStore.save(s) } catch { note("Makra nelze uložit: \(error)") }
+        do { try settingsStore.save(s) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
     }
 
     public func saveMessages(_ m: [Macro]) async {
         var s = settings; s.messages = m; settings = s
         await app?.setMessages(m)
-        do { try settingsStore.save(s) } catch { note("Zprávy nelze uložit: \(error)") }
+        do { try settingsStore.save(s) } catch { note(L("Zprávy nelze uložit: %@", "\(error)")) }
     }
 
     public func profiles() -> [Profile?] { profileStore.load() }
     public func loadProfile(_ slot: Int) async {
         guard let app else { return }
         var ok = false
-        await run("Profil") { try await app.loadProfile(slot); ok = true }
+        await run(L("Profil")) { try await app.loadProfile(slot); ok = true }
         await refreshParams()
         guard ok else { return }                    // nenačtený profil nastavení nemění
         settings.rtty = params
@@ -773,7 +774,7 @@ public final class AppModel {
     }
     public func saveProfile(_ slot: Int, name: String) async {
         guard let app else { return }
-        await run("Profil") { try await app.saveProfile(slot, name: name) }
+        await run(L("Profil")) { try await app.saveProfile(slot, name: name) }
         profileNames = profileStore.load().map { $0?.name }
     }
 

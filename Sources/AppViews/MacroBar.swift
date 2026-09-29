@@ -3,6 +3,7 @@ import AppKit
 import AppUI
 import Settings
 import SwiftUI
+import Localization
 
 struct MacroBar: View {
     @Bindable var model: AppModel
@@ -23,7 +24,7 @@ struct MacroBar: View {
                         .keyboardShortcut(Self.key(i), modifiers: i < 12 ? [] : .shift)
                         .buttonStyle(.borderedProminentIf(i < macros.count && macros[i].color != nil,
                                                           color: i < macros.count ? Color(hex: macros[i].color) : nil))
-                        .contextMenu { Button("Upravit…") { editing = i } }
+                        .contextMenu { Button(L("Upravit…")) { editing = i } }
                         .disabled(i >= macros.count || macros[i].text.isEmpty)
                     }
                 }
@@ -63,24 +64,24 @@ struct MacroEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Makro \(MacroBar.keyName(index))").font(.headline)
-            TextField("Název", text: $name)
+            Text(L("Makro %@", MacroBar.keyName(index))).font(.headline)
+            TextField(L("Název"), text: $name)
             TextEditor(text: $text).font(.system(.body, design: .monospaced)).frame(minHeight: 120)
             HStack {
-                Toggle("Barva tlačítka", isOn: $useColor)
+                Toggle(L("Barva tlačítka"), isOn: $useColor)
                 ColorPicker("", selection: $color, supportsOpacity: false).labelsHidden().disabled(!useColor)
                 Spacer()
             }
             HStack {
-                Text("Opakovat po (s, 0 = ne):")
+                Text(L("Opakovat po (s, 0 = ne):"))
                 TextField("", value: $repeatSec, format: .number).frame(width: 60)
             }
-            Text("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %N odesílané číslo · %M přijaté číslo · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX")
+            Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %N odesílané číslo · %M přijaté číslo · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX"))
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()
-                Button("Zrušit") { dismiss() }
-                Button("Uložit") {
+                Button(L("Zrušit")) { dismiss() }
+                Button(L("Uložit")) {
                     var m = model.settings.macros
                     while m.count <= index { m.append(Macro(name: "", text: "")) }
                     m[index] = Macro(name: name, text: text.replacingOccurrences(of: "\n", with: "\r\n"),

@@ -203,3 +203,15 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Nový formát „RST + CQ zóna“ (`zone`) pro OK DX RTTY Contest (ČRK: výměna RST + CQ zóna, CONTEST: OK-DX-RTTY): moje zóna z DXCC, zóna protistanice předvyplněná z DXCC (klik na číslo 1–40 ji přepíše).
 - Předvolby závodů (OK DX RTTY: sobota 3. celého víkendu v prosinci; WAE RTTY: 2. celý víkend v listopadu) nastaví název, formát a začátek.
 - Body a násobiče OK DX RTTY se nepočítají (vyhodnocení / logger).
+
+## Předvolby závodů (9) a „Vlastní nastavení“
+- Předvolby ARRL RU, CQ WPX, BARTG HF, SARTG, CQ WW, Makrothen, JARTS, WAE, OK DX RTTY; termín podle obvyklého pravidla („n-tý celý víkend“), výběr nastaví nejbližší ještě neskončený termín. Přesné datum ověřit v pravidlech.
+- Zvolená předvolba se ukládá (`contest.preset`, null = vlastní); starší soubor bez pole ji odvodí z názvu a formátu. CQ WW (CQ/RJ) bez výměny posílá vlastní zónu z DXCC.
+
+## Jazyky rozhraní
+- Klíč překladu = původní český text v kódu (`L("…")`, gettext styl) – bez přejmenování stovek textů; chybějící překlad zůstane česky.
+- Jazyk = JSON `{"code","name","version","strings":{čeština → překlad}}`; přibalená angličtina `Resources/Languages/en.json`, vlastní soubory se nahrají do `Application Support/mmtty4mac/Languages` (stejný kód přebije přibalený). Šablona pro překladatele = angličtina s kódem „xx“.
+- Volba jazyka platí hned ve všech oknech (Observation) a pamatuje se v UserDefaults `language`, ne v settings.json – je to volba rozhraní, nečeká na „Použít“. Spouštěcí parametr `-language en`.
+- Nepřekládají se obecné radioamatérské a technické termíny (TX, RX, RST, QSO, QTC, AFC, NET, Log, Call…), vysílané texty (makra, QTC fráze) a data logu/API.
+- Úplnost hlídá test `englishCatalogIsComplete` (všechny `L("…")` ve zdrojích mají anglický překlad se stejnými zástupnými znaky); údržba: `scripts/i18n-extract.py [--update]`.
+- Standardní položky menu macOS (Nastavení…, Ukončit…) řídí jazyk systému, ne tato volba.

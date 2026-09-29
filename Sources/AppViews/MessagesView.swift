@@ -3,22 +3,23 @@ import AppKit
 import AppUI
 import Settings
 import SwiftUI
+import Localization
 
 /// Nabídka seznamu zpráv (MMTTY MsgList): výběr = odeslat jako makro.
 struct MessagesMenu: View {
     @Bindable var model: AppModel
     @State private var editing = false
     var body: some View {
-        Menu("Zprávy") {
+        Menu(L("Zprávy")) {
             ForEach(Array(model.settings.messages.enumerated()), id: \.offset) { i, m in
-                Button(m.name.isEmpty ? "Zpráva \(i + 1)" : m.name) { Task { await model.runMessage(i) } }
+                Button(m.name.isEmpty ? L("Zpráva %ld", i + 1) : m.name) { Task { await model.runMessage(i) } }
                     .disabled(m.text.isEmpty)
             }
             if !model.settings.messages.isEmpty { Divider() }
-            Button("Upravit zprávy…") { editing = true }
+            Button(L("Upravit zprávy…")) { editing = true }
         }
         .fixedSize()
-        .help("Seznam uložených zpráv – výběr zprávu odešle (syntaxe maker)")
+        .help(L("Seznam uložených zpráv – výběr zprávu odešle (syntaxe maker)"))
         .sheet(isPresented: $editing) { MessagesEditor(model: model) }
     }
 }
@@ -39,16 +40,16 @@ struct MessagesEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Seznam zpráv").font(.headline)
+            Text(L("Seznam zpráv")).font(.headline)
             HStack(alignment: .top, spacing: 10) {
                 VStack(spacing: 4) {
                     List(selection: $sel) {
-                        ForEach(rows) { r in Text(r.m.name.isEmpty ? "(bez názvu)" : r.m.name).tag(r.id) }
+                        ForEach(rows) { r in Text(r.m.name.isEmpty ? L("(bez názvu)") : r.m.name).tag(r.id) }
                             .onMove { rows.move(fromOffsets: $0, toOffset: $1) }
                     }
                     .frame(width: 180)
                     HStack {
-                        Button { let r = Row(m: Macro(name: "Nová", text: "")); rows.append(r); sel = r.id } label: { Image(systemName: "plus") }
+                        Button { let r = Row(m: Macro(name: L("Nová"), text: "")); rows.append(r); sel = r.id } label: { Image(systemName: "plus") }
                         Button {
                             NSApp.keyWindow?.makeFirstResponder(nil)        // dokončit rozepsané pole ještě před smazáním
                             if let s = sel { rows.removeAll { $0.id == s }; sel = rows.first?.id }
@@ -59,22 +60,22 @@ struct MessagesEditor: View {
                 }
                 if let s = sel, rows.contains(where: { $0.id == s }) {
                     VStack(alignment: .leading) {
-                        TextField("Název", text: binding(s, \.name))
+                        TextField(L("Název"), text: binding(s, \.name))
                         TextEditor(text: Binding(get: { binding(s, \.text).wrappedValue.replacingOccurrences(of: "\r\n", with: "\n") },
                                                  set: { binding(s, \.text).wrappedValue = $0.replacingOccurrences(of: "\n", with: "\r\n") }))
                             .font(.system(.body, design: .monospaced))
                     }
                     .id(s)                                           // při změně výběru nové pole, žádný přenos stavu
                 } else {
-                    Text("Vyberte zprávu vlevo").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Text(L("Vyberte zprávu vlevo")).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            Text("Syntaxe jako makra: %c %m %n %r %g … · \\ na konci = RX · # na konci = zůstat TX · %l = zalogovat")
+            Text(L("Syntaxe jako makra: %c %m %n %r %g … · \\ na konci = RX · # na konci = zůstat TX · %l = zalogovat"))
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()
-                Button("Zrušit") { dismiss() }
-                Button("Uložit") {
+                Button(L("Zrušit")) { dismiss() }
+                Button(L("Uložit")) {
                     NSApp.keyWindow?.makeFirstResponder(nil)
                     let m = rows.map(\.m); Task { await model.saveMessages(m) }; dismiss()
                 }.keyboardShortcut(.defaultAction)
