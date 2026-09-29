@@ -40,6 +40,7 @@ struct QSOPanel: View {
                 Button("Log") { Task { await model.logQSO() } }.help("Zalogovat (⌘L)")
                 Button("Clear") { Task { await model.clearQSO() } }
             }
+            if model.qtcEnabled { QTCPanel(model: model) }
             if !model.previousQSOs.isEmpty {
                 Text("Předchozí spojení (\(model.previousQSOs.count))").font(.subheadline.bold())
                 List(model.previousQSOs.prefix(20)) { r in

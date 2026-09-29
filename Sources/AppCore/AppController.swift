@@ -35,7 +35,7 @@ public struct QSOFields: Codable, Sendable, Equatable {
 }
 
 public enum AppError: Error, Equatable, Sendable {
-    case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String)
+    case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String), qtc(String)
 }
 
 public enum AppEvent: Sendable {
@@ -44,6 +44,8 @@ public enum AppEvent: Sendable {
     case qsoLogged(QSORecord), qsoUpdated(QSORecord), qsoDeleted(UUID)
     /// Parametry modemu se změnily (GUI, API, profil) – aktuální hodnoty.
     case paramsChanged([String: ParameterValue])
+    /// WAE: série QTC se změnily (odeslána nebo přijata).
+    case qtcChanged
     /// Závod: další pořadové číslo se změnilo (po zalogování) – klient ho uloží do nastavení.
     case contestSerial(Int)
     case error(String)
@@ -84,10 +86,15 @@ public actor AppController {
     /// Databáze zemí DXCC (cty.dat); nil = bez zjišťování zemí.
     public nonisolated let countries: CountryDB?
 
+    /// Série QTC (WAE DX Contest); nil = bez QTC.
+    public nonisolated let qtcStore: QTCStore?
+    /// Odeslaná série čekající na potvrzení příjemce (R R ALL OK).
+    private var pendingQTC: QTCSeries?
+
     public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil,
-                countries: CountryDB? = CountryDB.shared) {
+                countries: CountryDB? = CountryDB.shared, qtc: QTCStore? = nil) {
         self.settings = settings; self.engine = engine; self.log = log; self.profiles = profiles
-        self.countries = countries
+        self.countries = countries; self.qtcStore = qtc
         qso = Self.contestDefaults(settings.contest)
     }
 
@@ -101,6 +108,7 @@ public actor AppController {
         case .cqrj: q.exchangeSent = c.exchange
         case .bartg: q.serialSent = c.nextSerial                 // čas se doplní se začátkem QSO
         case .ped: break
+        case .wae: q.serialSent = c.nextSerial
         }
         return q
     }
@@ -325,6 +333,105 @@ public actor AppController {
         return r
     }
 
+    // MARK: QTC (WAE DX Contest)
+
+    public struct QTCStatus: Sendable, Equatable {
+        public var available: [QTCLine]        // co lze stanici poslat
+        public var exchanged: Int              // už vyměněno (odeslaná + přijatá), max. 10
+        public var nextSeries: Int
+        public var differentContinent: Bool?   // v RTTY jen mezi kontinenty; nil = neznámý kontinent
+        public var points: Int                 // body za QTC celkem
+    }
+
+    private func planner() async -> QTCPlanner {
+        QTCPlanner(records: await log?.records ?? [], series: await qtcStore?.series ?? [], since: settings.contest.effectiveStart)
+    }
+
+    public func qtcStatus(for call: String) async -> QTCStatus {
+        let p = await planner()
+        let mine = country(for: settings.station.call)?.continent, his = country(for: call)?.continent
+        let diff: Bool? = (mine != nil && his != nil) ? mine != his : nil
+        return QTCStatus(available: call.isEmpty ? [] : p.available(for: call), exchanged: p.exchanged(with: call),
+                         nextSeries: p.nextSeriesNumber, differentContinent: diff, points: p.points)
+    }
+
+    /// Odešle sérii QTC stanici v QSO okně (uloží se až po `confirmSentQTC`).
+    /// Kontroluje pravidla: jiný kontinent, limit dvojice, řádky nenahlášené a ne o této stanici.
+    public func sendQTC(_ lines: [QTCLine]) async throws {
+        guard qtcStore != nil else { throw AppError.qtc("QTC není k dispozici") }
+        let call = qso.call
+        guard !call.isEmpty else { throw AppError.qtc("chybí značka protistanice") }
+        guard !lines.isEmpty, lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("série musí mít 1–10 QTC") }
+        let st = await qtcStatus(for: call)
+        if st.differentContinent == false { throw AppError.qtc("\(call) je na stejném kontinentu – v RTTY QTC nelze") }
+        if pendingQTC?.counterpart == call, pendingQTC?.lines == lines {
+            // stejná série znovu (před potvrzením) – číslo i limity už ověřené
+        } else {
+            guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("s \(call) už vyměněno \(st.exchanged) QTC") }
+            guard Set(lines).isSubset(of: Set(st.available)) else { throw AppError.qtc("řádky nejsou pro \(call) povolené (už nahlášené nebo o této stanici)") }
+        }
+        let number = pendingQTC?.counterpart == call ? pendingQTC!.number : st.nextSeries
+        let series = QTCSeries(direction: .sent, number: number, counterpart: call, time: Date(),
+                               frequency: await engine.rigStatus?.frequency, lines: lines)
+        try await sendPlain(QTCText.body(number: number, lines: lines))
+        pendingQTC = series                          // až po úspěšném předání k vysílání
+    }
+
+    /// Zopakuje řádek odesílané série (index od 1, na žádost AGN N).
+    public func repeatQTC(index: Int) async throws {
+        guard let p = pendingQTC, (1...p.count).contains(index) else { throw AppError.qtc("není co opakovat") }
+        try await sendPlain(QTCText.repeatLine(p.lines[index - 1], index: index))
+    }
+
+    /// Příjemce potvrdil – série se zaloguje.
+    public func confirmSentQTC() async throws {
+        guard let p = pendingQTC, let store = qtcStore else { throw AppError.qtc("žádná odeslaná série") }
+        do { try await store.append(p) } catch { throw AppError.qtc("\(error)") }
+        pendingQTC = nil
+        broadcaster.send(.qtcChanged)
+    }
+
+    public func cancelSentQTC() { pendingQTC = nil }
+    public var pendingQTCSeries: QTCSeries? { pendingQTC }
+
+    /// Uloží přijatou sérii (protistanice se předává explicitně – QSO okno se mezitím mohlo vyčistit).
+    public func saveReceivedQTC(counterpart: String, number: Int, declaredCount: Int?, lines: [QTCLine]) async throws {
+        guard let store = qtcStore else { throw AppError.qtc("QTC není k dispozici") }
+        let call = counterpart.uppercased()
+        guard !call.isEmpty else { throw AppError.qtc("chybí značka protistanice") }
+        guard number > 0, !lines.isEmpty else { throw AppError.qtc("prázdná série") }
+        let st = await qtcStatus(for: call)
+        if st.differentContinent == false { throw AppError.qtc("\(call) je na stejném kontinentu – v RTTY QTC nelze") }
+        guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc("s \(call) už vyměněno \(st.exchanged) QTC") }
+        let s = QTCSeries(direction: .received, number: number, counterpart: call, time: Date(),
+                          frequency: await engine.rigStatus?.frequency, lines: lines,
+                          declaredCount: declaredCount.flatMap { $0 != lines.count ? $0 : nil })
+        do { try await store.append(s) } catch { throw AppError.qtc("\(error)") }
+        broadcaster.send(.qtcChanged)
+    }
+
+    /// Krátké provozní zprávy QTC.
+    public enum QTCPhrase: Sendable { case ask, qrvQuery, qrv, agn(Int), allOK }
+    public func sendQTCPhrase(_ p: QTCPhrase) async throws {
+        let c = qso.call.isEmpty ? "" : "\(qso.call) "
+        let t: String
+        switch p {
+        case .ask: t = "\(c)QTC? QTC? BK"
+        case .qrvQuery: t = "\(c)QRV? QRV? BK"
+        case .qrv: t = "\(c)QRV QRV BK"
+        case .agn(let n): t = "\(c)AGN \(n) \(n) BK"
+        case .allOK: t = "\(c)R R ALL OK QSL BK"
+        }
+        try await sendPlain("\r\n" + t + "\r\n")
+    }
+
+    /// Text bez maker: vysílat a po dovysílání RX.
+    private func sendPlain(_ text: String) async throws {
+        if txDisabled { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        // bez MacroEngine.expand: značky v QTC se nesmí vykládat jako proměnné (%…) ani řídicí znaky
+        try await engine.sendMacro(MacroResult.plain(text, end: .rxAfter))
+    }
+
     /// Země DXCC pro značku (nil = neznámá nebo /MM).
     public nonisolated func country(for call: String) -> CountryInfo? { countries?.lookup(call) }
 
@@ -333,10 +440,13 @@ public actor AppController {
     public func cabrillo(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
         var recs = await log?.query(from: from, to: to) ?? []
         if contestOnly { recs = recs.filter { $0.serialSent != nil || !($0.exchangeSent ?? "").isEmpty } }
+        let qtcFrom = from ?? (settings.contest.enabled ? settings.contest.effectiveStart : nil)
+        let qtc = await qtcStore?.series.filter { s in
+            (qtcFrom.map { s.time >= $0 } ?? true) && (to.map { s.time <= $0 } ?? true) } ?? []
         var h = CabrilloHeader(callsign: settings.station.call, contest: settings.contest.name)
         h.categories = settings.contest.category.split(separator: ";").map(String.init)
         h.locator = settings.station.locator; h.name = settings.station.name
-        return Cabrillo.export(recs, header: h)
+        return Cabrillo.export(recs, header: h, qtc: qtc)
     }
 
     public func updateQSO(_ r0: QSORecord) async throws {

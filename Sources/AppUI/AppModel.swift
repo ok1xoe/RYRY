@@ -183,7 +183,8 @@ public final class AppModel {
         do { log = try QSOLogStore(directory: URL(fileURLWithPath: settings.log.directory)) }
         catch { log = nil; note("Log nedostupný: \(error)") }
         if let log { for w in await log.warnings { note(w) } }
-        let app = AppController(settings: settings, engine: engine, log: log, profiles: profileStore)
+        let qtc = try? QTCStore(directory: URL(fileURLWithPath: settings.log.directory))
+        let app = AppController(settings: settings, engine: engine, log: log, profiles: profileStore, qtc: qtc)
         self.app = app
         let events = app.events()
         eventTask = Task { [weak self] in
@@ -288,7 +289,7 @@ public final class AppModel {
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
                 take(\.display.timestamps); take(\.display.fontSize)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
-                take(\.contest.nextSerial)
+                take(\.contest.nextSerial); take(\.contest.start)
                 return m
             }
             do { try self.settingsStore.save(merge(self.settings)) } catch { self.note("Nastavení nelze uložit: \(error)") }
@@ -299,6 +300,7 @@ public final class AppModel {
             do { try self.settingsStore.save(merged) } catch { self.note("Nastavení nelze uložit: \(error)") }
             self.settings = merged
             self.syncDisplay()
+            if !self.qtcEnabled { self.qtcReceive = nil; self.qtcPendingCache = nil }
             await self.startNow()
         }
     }
@@ -327,12 +329,13 @@ public final class AppModel {
         case .qsoChanged(let q):
             let callChanged = q.call != qso.call
             qso = q
-            if callChanged { Task { await self.refreshPrevious() } }
-        case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious() }
+            if callChanged { Task { await self.refreshPrevious(); await self.refreshQTC() } }
+        case .qsoLogged(let r): logRecords.insert(r, at: 0); Task { await self.refreshPrevious(); await self.refreshQTC() }
+        case .qtcChanged: Task { await self.refreshQTC() }
         case .contestSerial(let n):
             settings.contest.nextSerial = n
             do { try settingsStore.save(settings) } catch { note("Nastavení nelze uložit: \(error)") }
-        case .qsoUpdated, .qsoDeleted: Task { await self.refreshLog() }
+        case .qsoUpdated, .qsoDeleted: Task { await self.refreshLog(); await self.refreshQTC() }
         case .paramsChanged(let p):
             params = p
             if case .double(let m)? = p["mark"] { mark = m }
@@ -429,6 +432,132 @@ public final class AppModel {
         wavToken = UUID()
         wavPlaying = false
         await app?.engine.stopPlayback()
+    }
+
+    // MARK: QTC (WAE DX Contest)
+
+    /// Stav QTC pro stanici v QSO okně (jen ve formátu WAE).
+    public private(set) var qtcStatus: AppController.QTCStatus?
+    public var qtcEnabled: Bool { settings.contest.enabled && settings.contest.format == .wae }
+
+    public func refreshQTC() async {
+        guard qtcEnabled, let app else { qtcStatus = nil; return }
+        qtcStatus = await app.qtcStatus(for: qso.call)
+    }
+
+    public var qtcPending: QTCSeries? { qtcPendingCache }
+    private var qtcPendingCache: QTCSeries?
+    public func qtcSend(_ lines: [QTCLine]) async {
+        guard let app else { return }
+        await run("QTC") { try await app.sendQTC(lines) }
+        qtcPendingCache = await app.pendingQTCSeries
+    }
+    public func qtcRepeat(_ index: Int) async { guard let app else { return }; await run("QTC") { try await app.repeatQTC(index: index) } }
+    public func qtcConfirmSent() async {
+        guard let app else { return }
+        await run("QTC") { try await app.confirmSentQTC() }
+        qtcPendingCache = await app.pendingQTCSeries
+        await refreshQTC()
+    }
+    public func qtcCancelSent() async { await app?.cancelSentQTC(); qtcPendingCache = nil }
+    public func qtcPhrase(_ p: AppController.QTCPhrase) async { guard let app else { return }; await run("QTC") { try await app.sendQTCPhrase(p) } }
+
+    /// Rozepsaná přijímaná série: hlavička n/k a řádky; `cursor` = další vyplňovaný řádek a pole (0 čas, 1 značka, 2 číslo).
+    public struct QTCReceiveDraft: Equatable, Sendable {
+        public var number: Int?, count: Int?
+        /// Od koho se přijímá (značka v QSO okně při „Přijmout…“ – okno se mezitím může vyčistit).
+        public var counterpart = ""
+        public var lines: [QTCLine?] = Array(repeating: nil, count: 10)
+        public var row = 0, field = 0
+        var partial = (time: "", call: "")
+        public init() {}
+        public static func == (a: Self, b: Self) -> Bool {
+            a.number == b.number && a.count == b.count && a.lines == b.lines && a.row == b.row && a.field == b.field
+                && a.counterpart == b.counterpart
+        }
+    }
+    public var qtcReceive: QTCReceiveDraft?
+    private var qtcRxStart = 0
+
+    public func startQTCReceive() {
+        var d = QTCReceiveDraft(); d.counterpart = qso.call
+        qtcReceive = d
+        qtcRxStart = rxAppendedTotal
+    }
+    public func cancelQTCReceive() { qtcReceive = nil }
+    /// Ruční úprava přijímané série (hlavička „n/k“, řádek „HHMM ZNAČKA NNN“; prázdné = smazat).
+    public func qtcSetHeader(_ text: String) {
+        guard var d = qtcReceive else { return }
+        if let (n, k) = QTCText.parseHeader(text) { d.number = n; d.count = k } else if text.isEmpty { d.number = nil; d.count = nil }
+        qtcReceive = d
+    }
+    public func qtcSetLine(_ i: Int, _ text: String) {
+        guard var d = qtcReceive, d.lines.indices.contains(i) else { return }
+        d.lines[i] = text.trimmingCharacters(in: .whitespaces).isEmpty ? nil : QTCText.parseLine(text)
+        qtcReceive = d
+    }
+
+    /// Rozebere text přijatý od začátku příjmu QTC: hlavička n/k, řádky „HHMM ZNAČKA NNN“ v pořadí
+    /// (nečitelný řádek nechá prázdné místo, aby AGN N žádalo správný řádek) a opakování „N HHMM ZNAČKA NNN …“ na pozici N.
+    public func qtcFillFromRx() {
+        guard var d = qtcReceive else { return }
+        let text = rxTail(rxAppendedTotal - qtcRxStart).filter { !$0.echo }.map(\.text).joined()
+        var lines: [QTCLine?] = Array(repeating: nil, count: 10)
+        var next = 0
+        for raw in text.components(separatedBy: CharacterSet(charactersIn: "\r\n")) where !raw.isEmpty {
+            var rest = raw
+            if raw.uppercased().contains("QTC"), let (n, k) = QTCText.parseHeader(raw) {
+                d.number = n; d.count = k
+                // řádek QTC přilepený za hlavičkou (ztracené CR/LF)
+                let tok = raw.uppercased().split(separator: " ")
+                guard let last = tok.lastIndex(where: { $0.contains("/") }) else { continue }
+                rest = tok[(last + 1)...].joined(separator: " ")
+                if rest.isEmpty { continue }
+            }
+            if let (idx, l) = QTCText.parseIndexedLine(rest) { lines[idx - 1] = l; continue }
+            if let l = QTCText.parseLine(rest) {
+                if next < lines.count, !lines.contains(l) { lines[next] = l; next += 1 }
+            } else if QTCText.looksLikeLine(rest), next < lines.count {
+                next += 1                                                  // poškozený řádek: místo zůstane prázdné
+            }
+        }
+        d.lines = lines
+        let k = d.count ?? 10
+        d.row = min(lines.firstIndex { $0 == nil } ?? k, max(0, k - 1)); d.field = 0
+        qtcReceive = d
+    }
+
+    /// Klik na slovo během příjmu QTC: hlavička n/k, pak postupně čas, značka, číslo.
+    func qtcInsertWord(_ w: String) {
+        guard var d = qtcReceive else { return }
+        let u = w.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if u.contains("/"), let (n, k) = QTCText.parseHeader(u), !u.contains(where: \.isLetter) {
+            d.number = n; d.count = k; qtcReceive = d; return
+        }
+        switch d.field {
+        case 0:
+            guard u.count == 4, let v = Int(u), v / 100 < 24, v % 100 < 60 else { return }
+            d.partial.time = u; d.field = 1
+        case 1:
+            guard u.count >= 3, u.contains(where: \.isLetter), u.contains(where: \.isNumber) else { return }
+            d.partial.call = u; d.field = 2
+        default:
+            guard u.count <= 5, let n = Int(u), d.row < min(d.lines.count, d.count ?? 10) else { return }
+            d.lines[d.row] = QTCLine(time: d.partial.time, call: d.partial.call, serial: n)
+            d.row += 1; d.field = 0; d.partial = ("", "")
+        }
+        qtcReceive = d
+    }
+
+    /// Uloží přijatou sérii (jen prvních k řádků); vrací true při úspěchu – teprve pak potvrdit R R ALL OK.
+    @discardableResult
+    public func qtcSaveReceived() async -> Bool {
+        guard let app, let d = qtcReceive, let n = d.number else { note("QTC: chybí hlavička série (n/k)"); return false }
+        let lines = d.lines.prefix(d.count ?? 10).compactMap { $0 }
+        var ok = false
+        await run("QTC") { try await app.saveReceivedQTC(counterpart: d.counterpart, number: n, declaredCount: d.count, lines: lines); ok = true }
+        if ok { qtcReceive = nil; await refreshQTC() }
+        return ok
     }
 
     /// Země DXCC aktuální značky v QSO okně (nil = neznámá).
@@ -549,6 +678,7 @@ public final class AppModel {
     }
 
     public func insertWord(_ w: String) async {
+        if qtcReceive != nil, qtcEnabled { qtcInsertWord(w); return }    // příjem QTC má přednost před QSO oknem
         let word = w.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters.subtracting(CharacterSet(charactersIn: "/"))))
         let kind = WordClassifier.classify(word)
         // závod: po zadání značky jdou čísla a výměna do přijatých polí (MMTTY TMmttyWd::PBoxRxMouseDown)

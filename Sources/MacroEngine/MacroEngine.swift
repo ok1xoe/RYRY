@@ -26,6 +26,12 @@ public struct MacroResult: Sendable, Equatable {
     public var startsTx = false
     public var logQSO = false
 
+    public init() {}
+    /// Prostý text bez proměnných a řídicích znaků (např. QTC); `end` = co po odvysílání.
+    public static func plain(_ text: String, end: MacroEnd) -> MacroResult {
+        var m = MacroResult(); m.outputs = [.text(text)]; m.end = end; return m
+    }
+
     public var plainText: String {
         outputs.map {
             switch $0 {

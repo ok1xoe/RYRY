@@ -56,6 +56,21 @@ extension JSONRPCServer {
                 do { try await app.setModemParam(k, pv) } catch { throw RPCError(code: -32602, message: "\(k): \(error)") }
             }
             return (await app.modemParams()).mapValues(Self.toJSON)
+        case "qtc.status":
+            let cur = await app.qso.call
+            let call = (p["call"] as? String) ?? cur
+            let st = await app.qtcStatus(for: call)
+            var o: [String: Any] = ["call": call, "exchanged": st.exchanged, "nextSeries": st.nextSeries, "points": st.points,
+                                    "available": st.available.map { ["time": $0.time, "call": $0.call, "serial": $0.serial] }]
+            o["differentContinent"] = st.differentContinent.map { $0 as Any } ?? NSNull()
+            return o
+        case "qtc.list":
+            let series = await app.qtcStore?.series ?? []
+            return series.map { s -> [String: Any] in
+                ["id": s.id.uuidString, "direction": s.direction.rawValue, "number": s.number, "count": s.count,
+                 "counterpart": s.counterpart, "time": ISODates.format(s.time),
+                 "lines": s.lines.map { ["time": $0.time, "call": $0.call, "serial": $0.serial] }]
+            }
         case "dxcc.lookup":
             guard let call = p["call"] as? String, !call.isEmpty else { throw RPCError.params("chybí 'call'") }
             guard let ci = app.country(for: call) else { return NSNull() }

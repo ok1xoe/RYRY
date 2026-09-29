@@ -94,6 +94,8 @@ Notifikace (bez `id`, jen odebírané):
 | `log.query` | `{call?, from?, to?, limit?}` (ISO 8601) | záznamy od nejnovějšího |
 | `msg.list` / `msg.run` | – / `{index}` | seznam zpráv (MMTTY MsgList), odeslání jako makro |
 | `log.exportCabrillo` | `{from?, to?, contestOnly?}` (ISO 8601; `contestOnly` = jen spojení s číslem/výměnou) | `{text}` – Cabrillo 3.0 (hlavička z nastavení stanice a závodu) |
+| `qtc.status` | `{call?}` (výchozí = značka v QSO okně) | WAE: `{call, exchanged, nextSeries, points, differentContinent, available:[{time, call, serial}]}` |
+| `qtc.list` | – | uložené série QTC `[{id, direction, number, count, counterpart, time, lines}]` |
 | `dxcc.lookup` | `{call}` | `{name, prefix, continent, cqZone, ituZone, latitude, longitude, utcOffset}` nebo `null` |
 | `log.update` / `log.delete` | `{record}` nebo `{id, fields:{…}}` / `{id}` | |
 | `spectrum.get` | `{bins?}` | `{binHz, magnitudes}` |
