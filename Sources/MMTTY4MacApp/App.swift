@@ -138,6 +138,7 @@ struct MMTTY4MacApp: App {
                 Button(L("Uložit log jako…")) { FileActions.saveLogAs(model) }.keyboardShortcut("s", modifiers: [.command, .shift])
                 Button(L("Exportovat ADIF…")) { FileActions.exportADIF(model) }
                 Button(L("Importovat ADIF…")) { FileActions.importADIF(model) }
+                Button(L("Importovat z MMTTY…")) { FileActions.importMMTTY(model) }
                 Divider()
             }
             CommandGroup(after: .newItem) {

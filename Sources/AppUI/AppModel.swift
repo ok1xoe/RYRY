@@ -1306,6 +1306,39 @@ public final class AppModel {
         do { try settingsStore.save(s) } catch { note(L("Zprávy nelze uložit: %@", "\(error)")) }
     }
 
+    // MARK: Import z MMTTY
+
+    /// Načte Mmtty.ini (nic nemění); parametry se ověřují proti popisům modemu.
+    public func previewMMTTYImport(_ url: URL) throws -> MMTTYImportResult {
+        let data = try Data(contentsOf: url)
+        let descs = descriptors.isEmpty ? ((try? RTTYModem())?.parameters ?? []) : descriptors
+        return MMTTYImport.parse(data: data, descriptors: descs)
+    }
+
+    /// Uloží vybrané části importu stejnou cestou jako dialogy: makra/zprávy (`saveMacros`/`saveMessages`),
+    /// parametry (`setParam`), stanice a zkratky (`applySettings` – restartuje zvuk).
+    public func applyMMTTYImport(_ r: MMTTYImportResult, options: MMTTYImportOptions) async {
+        if options.contains(.macros), let m = r.macros { await saveMacros(m) }
+        if options.contains(.messages), let m = r.messages { await saveMessages(m) }
+        if options.contains(.modem) {
+            // mark před shiftem: setParam(mark) zachovává shift, setParam(shift) pak nastaví space
+            for id in r.rtty.keys.sorted(by: { ($0 == "mark" ? 0 : $0 == "shift" ? 1 : 2, $0) < ($1 == "mark" ? 0 : $1 == "shift" ? 1 : 2, $1) }) {
+                guard let v = r.rtty[id] else { continue }
+                if app != nil { await setParam(id, v) } else {
+                    settings.rtty[id] = v
+                    try? settingsStore.save(settings)
+                }
+            }
+        }
+        var opts = options; opts.remove([.macros, .messages, .modem])
+        if !opts.isEmpty, (opts.contains(.station) && r.station != nil) || (opts.contains(.shortcuts) && !r.shortcuts.isEmpty) {
+            let base = settings
+            var s = settings
+            r.apply(to: &s, options: opts)
+            await applySettings(s, baseline: base)
+        }
+    }
+
     public func profiles() -> [Profile?] { profileStore.load() }
     public func loadProfile(_ slot: Int) async {
         guard let app else { return }

@@ -55,7 +55,7 @@ let package = Package(
         .target(name: "MacroEngine"),
         .testTarget(name: "MacroEngineTests", dependencies: ["MacroEngine"]),
         .target(name: "Settings", dependencies: ["Engine", "AudioIO", "Keying", "ModemKit", "Localization"]),
-        .testTarget(name: "SettingsTests", dependencies: ["Settings", "Engine", "AudioIO", "Keying", "ModemKit"]),
+        .testTarget(name: "SettingsTests", dependencies: ["Settings", "Engine", "AudioIO", "Keying", "ModemKit", "RTTYModem"]),
         .target(name: "AppCore", dependencies: ["Engine", "Settings", "QSOLog", "MacroEngine", "ModemKit", "RigControl", "DXCC", "Localization"]),
         .testTarget(name: "AppCoreTests", dependencies: ["DXCC", "AppCore", "Engine", "Settings", "QSOLog", "ModemKit", "RigControl",
                                                          "RTTYModem", "RTTYSignalKit", "TestSupport", "AudioIO", "Keying"]),
