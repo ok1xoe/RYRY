@@ -121,3 +121,15 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - JSON-RPC dates now carry fractional seconds (strict .iso8601 clients)
 - loadProfile saves settings even if load failed; rtty-tool --demod value not pre-validated; XY batch may be one poll old
 - draft typed during RX is sent when a macro without '\\' switches drain→tx (matches MMTTY)
+
+## Plán 7 (zbývající funkce MMTTY)
+
+### Rozhodnutí
+- Kalibrace hodin v ppm místo kalibrovaného kmitočtu (11024,62 Hz) – macOS resampluje z 44,1/48 kHz, ppm nezávisí na zařízení; cena omylu: převod jednotek.
+- ClockAdj (ruční srovnání čar časového signálu) nahrazen měřením `kAudioDevicePropertyActualSampleRate` (Core Audio proti hodinám systému/NTP); cena omylu: virtuální zařízení (BlackHole) hlásí nominál → 0 ppm.
+- DXCC z `cty.dat` (AD1C) místo `ARRL.DX` – aktuální, obsahuje UTC offset a zóny; cena omylu: parser ARRL.DX.
+- `%g`/`%f` jako MMTTY SetGreetingString: neznámá země → HELLO / prázdné (dřív pozdrav podle UTC).
+- Závod: formát „599 + číslo“ nebo pevná výměna; po zalogování se QSO okno v závodě vyčistí a přidělí další číslo. Speciální formáty MMTTY (CQ/RJ, BARTG s časem, PED) se neportují – pokryje je volná výměna.
+- Neportováno: MsgList (nahrazuje 16 maker), barvy tlačítek maker, ladicí scope demodulátoru, japonské logy a konverze logů.
+- `cty.dat` v `Contents/Resources` aplikace (ne SPM resource bundle – ten by v kořeni `.app` rozbil podpis).
+- Test RX korekce hodin ověřuje kmitočet AFC, ne dekódování (RTTY snese i 1,5 % chybu hodin).

@@ -85,12 +85,15 @@ Notifikace (bez `id`, jen odebírané):
 | `modem.getParams` | – | `{baud: 45.45, mark: 2125, shift: 170, afc: true, …}` |
 | `modem.setParams` | `{params:{…}}` | aktuální parametry. Neplatná hodnota → `-32602` |
 | `modem.describeParams` | – | `[{id, label, type, min, max, unit, options, default}]` |
+| `modem.notch` | `{hz}` (0–3000) | zářez na kmitočtu jako pravé tlačítko ve spektru MMTTY; vrací parametry |
 | `profile.list` / `load` / `save` / `delete` | `{slot}` / `{slot, name}` | 16 slotů |
 | `rig.status` / `rig.getFreq` | – | `{online, frequency, mode}` |
 | `rig.setFreq` / `rig.setMode` | `{hz}` / `{mode}` | chyba rigu `-32002` |
-| `macro.list` / `macro.run` / `macro.stop` | – / `{index}` / – | makra (syntaxe MMTTY). Makro s `repeatSeconds` se opakuje (CQ smyčka), dokud nepřijde znak, `macro.stop` nebo `engine.rxNow` |
+| `macro.list` / `macro.run` / `macro.stop` | – / `{index}` (0–15) / – | makra (syntaxe MMTTY). Makro s `repeatSeconds` se opakuje (CQ smyčka), dokud nepřijde znak, `macro.stop` nebo `engine.rxNow` |
 | `qso.getCurrent` / `qso.setField` / `qso.clear` / `qso.log` | `{name, value}` | QSO okno. `qso.log` vrací záznam |
 | `log.query` | `{call?, from?, to?, limit?}` (ISO 8601) | záznamy od nejnovějšího |
+| `log.exportCabrillo` | `{from?, to?}` (ISO 8601) | `{text}` – Cabrillo 3.0 (hlavička z nastavení stanice a závodu) |
+| `dxcc.lookup` | `{call}` | `{name, prefix, continent, cqZone, ituZone, latitude, longitude, utcOffset}` nebo `null` |
 | `log.update` / `log.delete` | `{record}` nebo `{id, fields:{…}}` / `{id}` | |
 | `spectrum.get` | `{bins?}` | `{binHz, magnitudes}` |
 | `spectrum.stream` / `stopStream` | `{fps≤20, bins?}` | notifikace `spectrum` |
