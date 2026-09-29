@@ -1,5 +1,6 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import AppCore
+import AppKit
 import AppUI
 import QSOLog
 import SwiftUI
@@ -96,7 +97,7 @@ struct QTCPanel: View {
                                                set: { model.qtcSetHeader($0) }))
                     .frame(width: 60).font(.caption.monospaced())
                 Spacer()
-                Button("Načíst z příjmu") { model.qtcFillFromRx() }.help("Rozebrat text přijatý od „Přijmout…“")
+                Button("Načíst z příjmu") { NSApp.keyWindow?.makeFirstResponder(nil); model.qtcFillFromRx() }.help("Rozebrat text přijatý od „Přijmout…“")
             }
             ForEach(0..<min(rows, 10), id: \.self) { i in
                 HStack {
@@ -104,6 +105,8 @@ struct QTCPanel: View {
                     TextField("HHMM ZNAČKA NNN", text: Binding(get: { d.lines[i].map(QTCText.line) ?? "" },
                                                               set: { model.qtcSetLine(i, $0) }))
                         .font(.caption.monospaced())
+                        // nové pole při změně obsahu z příjmu – rozepsané (prázdné) pole nesmí načtený řádek přepsat
+                        .id("\(i)-\(d.lines[i].map(QTCText.line) ?? "")")
                     Button("AGN") { Task { await model.qtcPhrase(.agn(i + 1)) } }.controlSize(.mini)
                 }
             }
@@ -112,6 +115,7 @@ struct QTCPanel: View {
                 Button("QRV") { Task { await model.qtcPhrase(.qrv) } }
                 Button("Uložit – R R ALL OK") {
                     // nejdřív uložit; potvrzení odeslat jen když se série opravdu zapsala
+                    NSApp.keyWindow?.makeFirstResponder(nil)
                     Task { if await model.qtcSaveReceived() { await model.qtcPhrase(.allOK) } }
                 }
                 .disabled(d.number == nil || !d.lines.contains { $0 != nil })

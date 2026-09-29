@@ -501,7 +501,9 @@ public final class AppModel {
     /// (nečitelný řádek nechá prázdné místo, aby AGN N žádalo správný řádek) a opakování „N HHMM ZNAČKA NNN …“ na pozici N.
     public func qtcFillFromRx() {
         guard var d = qtcReceive else { return }
-        let text = rxTail(rxAppendedTotal - qtcRxStart).filter { !$0.echo }.map(\.text).joined()
+        // vlastní vysílání (echo) vynechat, ale jeho místo je konec řádku: protistanice po mém „AGN 8“
+        // často začne bez CR/LF a text by se slepil s koncem série („BKKA8 0803 …“)
+        let text = rxTail(rxAppendedTotal - qtcRxStart).map { $0.echo ? "\n" : $0.text }.joined()
         var lines: [QTCLine?] = Array(repeating: nil, count: 10)
         var next = 0
         for raw in text.components(separatedBy: CharacterSet(charactersIn: "\r\n")) where !raw.isEmpty {

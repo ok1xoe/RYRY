@@ -90,3 +90,20 @@ import Settings
     #expect(f.model.qso.call == "DL1ABC")
     await f.model.stop()
 }
+
+// Chyba z ukázky: druhé „Načíst z příjmu“ po AGN nedoplnilo řádek 8
+@Test @MainActor func agnRepeatAfterEchoFillsRow() async throws {
+    let f = await waeFixture()
+    await f.model.setQSOField("call", "K3LR")
+    f.model.startQTCReceive()
+    f.model.appendRx("K3LR QRV QRV BK\r\n", echo: true)
+    f.model.appendRx("QTC 12/10 QTC 12/10\r\n0712 JA3YBK 118\r\n0719 UA9CDC 204\r\n0725 VK4KW 067\r\n0734 ZS1ADD 093\r\n0741 PY2ZEA 150\r\n0752 LU1DX 041\r\n0758 VU2PTT 022\r\n083 BY4AOM 176\r\n0811 JE1CKA 233\r\n0820 ZL3IO 087\r\nBKKA", echo: false)
+    f.model.qtcFillFromRx()
+    #expect(f.model.qtcReceive?.lines[7] == nil && f.model.qtcReceive?.lines[8]?.call == "JE1CKA")
+    // jako na pásmu: moje AGN (echo) a opakování protistanice bez úvodního CR/LF → „BKKA8 0803 …“
+    f.model.appendRx("\r\nK3LR AGN 8 8 BK\r\n", echo: true)
+    f.model.appendRx("8 0803 BY4AOM 176 0803 BY4AOM 176 BKNWU", echo: false)
+    f.model.qtcFillFromRx()
+    #expect(f.model.qtcReceive?.lines[7] == QTCLine(time: "0803", call: "BY4AOM", serial: 176))
+    await f.model.stop()
+}
