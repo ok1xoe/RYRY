@@ -246,3 +246,16 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     #expect(f.model.scopeSource == 1)
     await f.model.stop()
 }
+
+// Plán 8 / T1: zprávy v modelu – uložení a odeslání
+@Test @MainActor func messagesSavedAndSent() async throws {
+    let f = Fixture()
+    await f.model.start()
+    await f.model.saveMessages([Macro(name: "A", text: "TEST %m\\")])
+    #expect(f.model.settings.messages.map(\.name) == ["A"])
+    #expect(SettingsStore(directory: f.dir).load().0.messages.map(\.name) == ["A"])
+    await f.model.runMessage(0)
+    #expect(await f.engine.state != .rx)
+    await f.model.rxNow()
+    await f.model.stop()
+}

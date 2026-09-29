@@ -147,3 +147,16 @@ func makeDXCCApp() throws -> Harness {
     await h.app.rxNow()
     await h.app.stop()
 }
+
+// Plán 8 / T1: seznam zpráv se odesílá jako makro
+@Test func runMessageSendsExpandedText() async throws {
+    let h = try makeApp(ptt: .none)
+    try await h.app.start()
+    await h.app.setMessages([Macro(name: "Rig", text: "RIG %m\\")])
+    try await h.app.setQSOField("call", "DL1ABC")
+    try await h.app.runMessage(index: 0)
+    await run(h) { await h.engine.state == .rx && h.audio.tx.count > 11025 }
+    #expect(h.audio.tx.count > 11025)
+    await #expect(throws: AppError.badMessage(5)) { try await h.app.runMessage(index: 5) }
+    await h.app.stop()
+}

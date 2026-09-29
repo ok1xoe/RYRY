@@ -467,6 +467,11 @@ public final class AppModel {
     public func tune() async { guard let app else { return }; await run("Tune") { try await app.tune() } }
     public func runMacro(_ i: Int) async { guard let app else { return }; await run("Makro F\(i + 1)") { try await app.runMacro(index: i) } }
     public func stopMacro() async { await app?.stopMacroRepeat() }
+    public func runMessage(_ i: Int) async {
+        guard let app else { return }
+        let name = settings.messages.indices.contains(i) ? settings.messages[i].name : "\(i + 1)"
+        await run("Zpráva \(name)") { try await app.runMessage(index: i) }
+    }
 
     /// Odešle z editoru část podle režimu (znak = vše, slovo = do poslední mezery, řádek = do posledního konce řádku).
     public func sendDraft(mode: SendMode) async {
@@ -569,6 +574,12 @@ public final class AppModel {
         var s = settings; s.macros = m; settings = s
         await app?.setMacros(m)
         do { try settingsStore.save(s) } catch { note("Makra nelze uložit: \(error)") }
+    }
+
+    public func saveMessages(_ m: [Macro]) async {
+        var s = settings; s.messages = m; settings = s
+        await app?.setMessages(m)
+        do { try settingsStore.save(s) } catch { note("Zprávy nelze uložit: \(error)") }
     }
 
     public func profiles() -> [Profile?] { profileStore.load() }

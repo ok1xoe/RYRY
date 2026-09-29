@@ -97,15 +97,23 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public var name: String
     public var text: String
     public var repeatSeconds: Double?
-    public init(name: String, text: String, repeatSeconds: Double? = nil) {
-        self.name = name; self.text = text; self.repeatSeconds = repeatSeconds
+    /// Barva tlačítka `#RRGGBB` (MMTTY: barva tlačítka makra); nil = výchozí.
+    public var color: String?
+    public init(name: String, text: String, repeatSeconds: Double? = nil, color: String? = nil) {
+        self.name = name; self.text = text; self.repeatSeconds = repeatSeconds; self.color = Self.validColor(color)
     }
     static var fallback: Macro { Macro(name: "", text: "") }
-    enum CodingKeys: String, CodingKey { case name, text, repeatSeconds }
+    /// Jen `#RRGGBB`, jinak nil.
+    public static func validColor(_ c: String?) -> String? {
+        guard let c, c.count == 7, c.first == "#", c.dropFirst().allSatisfy(\.isHexDigit) else { return nil }
+        return c.uppercased()
+    }
+    enum CodingKeys: String, CodingKey { case name, text, repeatSeconds, color }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "macro"
         name = c.tolerant(.name, "", w, s); text = c.tolerant(.text, "", w, s)
         repeatSeconds = c.tolerant(.repeatSeconds, nil, w, s)
+        color = Self.validColor(c.tolerant(.color, nil, w, s))
     }
 }
 
@@ -200,6 +208,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var rttyCore = RTTYCoreSettings()
     public var contest = ContestSettings()
     public var display = DisplaySettings()
+    /// Seznam zpráv (MMTTY MsgList): pojmenované delší texty se syntaxí maker.
+    public var messages: [Macro] = AppSettings.defaultMessages
     public init() {}
     public static let macroCount = 16
 
@@ -223,7 +233,14 @@ public struct AppSettings: Codable, Sendable, Equatable {
     ]
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, rtty, macros, log,
-                                             clock, rttyCore, contest, display }
+                                             clock, rttyCore, contest, display, messages }
+
+    /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
+    public static let defaultMessages: [Macro] = [
+        Macro(name: "Stanice", text: "\r\nRGR %c DE %m  %g DEAR %n\r\nTHANK YOU FOR THE NICE REPORT.\r\nUR RST %r %r %r\r\nMY NAME IS ...\r\nRIG IS ... ANT IS ...\r\nHOW COPY? BTU %c DE %m KN\r\n\\"),
+        Macro(name: "Final", text: "\r\nOK DEAR %n\r\nMANY THANKS FOR THE NICE QSO.\r\nQSL VIA BURO. CUL AND BEST 73\r\n%c DE %m TU SK SK\r\n%l\\"),
+        Macro(name: "Final 2", text: "\r\nTNX AGAIN DEAR %n CU SK\r\n\\"),
+    ]
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "settings", x = AppSettings()
         schemaVersion = c.tolerant(.schemaVersion, x.schemaVersion, w, s)
@@ -241,6 +258,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         log = c.tolerant(.log, x.log, w, s)
         clock = c.tolerant(.clock, x.clock, w, s); rttyCore = c.tolerant(.rttyCore, x.rttyCore, w, s)
         contest = c.tolerant(.contest, x.contest, w, s); display = c.tolerant(.display, x.display, w, s)
+        messages = c.contains(.messages) ? c.tolerant(.messages, TolerantArray<Macro>(), w, s).items : x.messages
     }
 
     /// Konfigurace Engine z nastavení.

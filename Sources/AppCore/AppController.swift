@@ -35,7 +35,7 @@ public struct QSOFields: Codable, Sendable, Equatable {
 }
 
 public enum AppError: Error, Equatable, Sendable {
-    case unknownField(String), noLog, badMacro(Int), profile(String), log(String)
+    case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String)
 }
 
 public enum AppEvent: Sendable {
@@ -197,6 +197,16 @@ public actor AppController {
     }
 
     public func setMacros(_ m: [Macro]) { settings.macros = m }
+    public func setMessages(_ m: [Macro]) { settings.messages = m }
+
+    /// Zpráva ze seznamu (MMTTY MsgList) – odešle se stejně jako makro.
+    public func runMessage(index: Int) async throws {
+        guard settings.messages.indices.contains(index) else { throw AppError.badMessage(index) }
+        stopMacroRepeat()
+        let m = MacroEngine.expand(settings.messages[index].text, context: macroContext())
+        if txDisabled, m.mode == .send { throw EngineError.pttUnavailable("TX zakázáno (rx_only)") }
+        try await engine.sendMacro(m)
+    }
     public func setStation(_ st: Station) { settings.station = st }
 
     // MARK: QSO

@@ -43,3 +43,17 @@ import Testing
     let bad = try await c.call("dxcc.lookup", [:])
     #expect((bad["error"] as? [String: Any])?["code"] as? Int == -32602)
 }
+
+@Test func jsonRPCMessages() async throws {
+    let h = try await makeAPIHarness()
+    let (srv, port) = try await jsonServer(h)
+    defer { srv.stop() }
+    let c = WSClient(port: port)
+    let l = try await c.call("msg.list")
+    #expect(((l["result"] as? [[String: Any]])?.count ?? 0) >= 3)
+    let r = try await c.call("msg.run", ["index": 0])
+    #expect(r["result"] as? Bool == true)
+    _ = try await c.call("engine.rxNow")
+    let bad = try await c.call("msg.run", ["index": 99])
+    #expect((bad["error"] as? [String: Any])?["code"] as? Int == -32602)
+}

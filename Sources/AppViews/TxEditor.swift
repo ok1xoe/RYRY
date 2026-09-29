@@ -16,6 +16,7 @@ struct TxEditor: View {
                     Text("po řádcích").tag(SendMode.line)
                 }.pickerStyle(.segmented).frame(width: 260)
                 Spacer()
+                MessagesMenu(model: model)
                 Button("Odeslat vše") { Task { await model.sendDraft(mode: .char) } }
                 Button("Smazat") { model.txDraft = "" }
             }
