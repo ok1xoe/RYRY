@@ -21,6 +21,18 @@ public struct SuperCheck: Sendable {
             .filter { !$0.isEmpty && !$0.hasPrefix("#") }
     }
 
+    /// Přesná shoda značky (binární hledání v seřazeném seznamu).
+    public func contains(_ call: String) -> Bool {
+        let p = Array(call.trimmingCharacters(in: .whitespaces).uppercased().utf8)
+        guard !p.isEmpty else { return false }
+        var lo = 0, hi = calls.count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if calls[mid].lexicographicallyPrecedes(p) { lo = mid + 1 } else { hi = mid }
+        }
+        return lo < calls.count && calls[lo] == p
+    }
+
     public func partial(_ s: String) -> [String] {
         let p = Array(s.uppercased().utf8)
         guard p.count >= Self.minPartial else { return [] }

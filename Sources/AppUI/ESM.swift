@@ -30,18 +30,31 @@ public enum ESM {
 
     public enum Received: Equatable, Sendable { case none, partial, complete }
 
-    /// Pole přijaté výměny podle rozložení QSO okna (bez RST, které je předvyplněné 599).
+    /// Pole přijaté výměny podle rozložení QSO okna (bez RST, které je předvyplněné 599): přijatá pole dvojic
+    /// i samostatné řádky přijaté výměny (ARRL RU „Stát/prov. r“).
     public static func receivedFields(_ c: ContestSettings) -> [String] {
         QSOLayout.rows(for: c).compactMap { row in
-            if case .pair(_, _, let rcvd, _) = row, rcvd != "rstRcvd" { return rcvd }
-            return nil
+            switch row {
+            case .pair(_, _, let rcvd, _) where rcvd != "rstRcvd": return rcvd
+            case .single(let f, _) where f.hasSuffix("Rcvd"): return f
+            default: return nil
+            }
         }
     }
 
+    /// Skupiny přijatých polí: skupina je kompletní, když je vyplněné aspoň jedno její pole.
+    /// ARRL RTTY Roundup: W/VE posílají stát/provincii, ostatní číslo → číslo NEBO stát.
+    public static func receivedGroups(_ c: ContestSettings) -> [[String]] {
+        let f = receivedFields(c)
+        if c.isRoundupStateExchange, Set(f) == ["serialRcvd", "exchangeRcvd"] { return [f] }
+        return f.map { [$0] }
+    }
+
     public static func received(_ q: QSOFields, _ c: ContestSettings) -> Received {
-        let fields = receivedFields(c)
-        let filled = fields.filter { !(q.value($0) ?? "").trimmingCharacters(in: .whitespaces).isEmpty }.count
-        if filled == fields.count { return .complete }        // i formát bez výměny (PED)
+        let groups = receivedGroups(c)
+        func has(_ f: String) -> Bool { !(q.value(f) ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+        let filled = groups.filter { $0.contains(where: has) }.count
+        if filled == groups.count { return .complete }        // i formát bez výměny (PED)
         return filled == 0 ? .none : .partial
     }
 

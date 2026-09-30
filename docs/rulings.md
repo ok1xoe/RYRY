@@ -400,3 +400,17 @@ Jen násobiče (body a skóre se nepočítají). Logika `AppCore/Multipliers.swi
 - Prefix WPX: vše až po poslední číslici, za kterou následuje písmeno (YB0ABC1 = YB0); designátor = část, která není celou značkou (končí číslicí nebo nemá číslici), jinak nejkratší.
 - Stát/provincie: první slovo výměny ze seznamu (s aliasy NWT, NF, PEI, PQ, YK …), jen u spojení se zemí K / VE. Zóna: první číslo 1–40 (nejvýš dvouciferné) z výměny.
 - Štítek NEW MULT (zelený) vedle DUPE v QSO okně: které násobiče by spojení přineslo a na kterém pásmu; při DUPE se nezobrazuje.
+
+## Kontrola plánu 17
+Opravy nálezů kontroly větve plan17 (každá podložená testem v `Tests/AppCoreTests/Plan17ReviewTests.swift` / `Tests/AppUITests/Plan17ReviewUITests.swift`):
+- **ESM v ARRL RTTY Roundup**: přijatá výměna jsou i samostatné řádky `…Rcvd` rozložení; v RU (`ContestSettings.isRoundupStateExchange`) stačí číslo NEBO stát/provincie (`ESM.receivedGroups`). Klik na slovo v příjmu v RU: stát USA (48 + DC) / kanadská oblast (i aliasy NWT, PEI …; i slova, která jsou jinak stop slova – OK, DE, ON) → „Stát/prov. r“, čísla dál do čísla (`Multipliers.stateOrProvince`).
+- **Historie značek – Loc1**: do lokátoru jen platný Maidenhead (`Geo.maidenhead`); jinak je Loc1 stát/provincie a použije se ve výměně CQ/RJ (když chybí sloupec State) a v ARRL RU.
+- **Historie značek – ARRL RU**: stát/provincie (State, Loc1 nebo Exch1, jen platný stát/provincie, jen W/VE) do „Stát/prov. r“.
+- **Historie značek – označení**: jakékoli ruční `setQSOField` pole (i se shodnou hodnotou) zruší jeho označení „z historie“ – potvrzená hodnota se při změně značky nemaže.
+- **Přeladění během TX**: kontrola je v `AppController.setFrequency` podle stavu enginu (keying/pttOn/tx/drain/pttOff → `AppError.transmitting`, zastavený engine → `AppError.engineStopped`); platí pro GUI i API. `AppModel` (spot, zadání frekvence, tlačítka pásem, klik v band mapě) hlásí zvlášť „během vysílání“ a „engine neběží“ (`TuneOutcome.notRunning`).
+- **Band mapa**: stav spotů z `AppModel.logIndex` (O(1) na spot, stejné pravidlo jako `DupeCheck`), index se přestaví i při zapnutí/vypnutí závodu a změně jeho začátku. Okno Spoty používá `AppModel.spotLogIndex` (udržovaný s logem). Okno band mapy čte ruční frekvenci QSO jen když pásmo neurčí ruční volba ani rig.
+- **Potřebné ze šumu**: nová země z příjmu jen pro značku známou ze Super Check Partial (MASTER.SCP + log) nebo z logu, po „DE“/„CQ“, nebo přijatou aspoň 2× za 10 min (`RxCallSightings`). Hlídané značky hned, spoty beze změny.
+- **Souhrn spotů**: první potřebný spot hned jako řádek, další během 5 s jeden souhrnný řádek „Potřebné: N (…)“ (nejvýš 5 značek jmenovitě).
+- **Násobiče**: zalogované spojení se přičte (`MultiplierCalculator.add`), úplný přepočet jen při načtení/změně logu a změně závodu/značky.
+- **Zoom band mapy trackpadem**: posuny se sčítají, 1 krok na 20 bodů, setrvačnost se ignoruje, kolečko myši = krok na událost (`ScrollZoomAccumulator`).
+- Varování buildu: `RxTextView.echoKey` je `nonisolated`, oznámení nezachytává `UNUserNotificationCenter` v `@Sendable` obsluze.

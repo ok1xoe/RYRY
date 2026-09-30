@@ -21,7 +21,7 @@ public enum QSOLayout {
         switch c.format {
         case .serial:
             // ARRL RTTY Roundup: W/VE posílají stát/provincii místo čísla (násobič) – přijatá výměna zvlášť
-            if c.exchange.isEmpty, c.selectedPreset == .arrlRoundup {
+            if c.isRoundupStateExchange {
                 return base + [serial, .single("exchangeRcvd", L("Stát/prov. r")), notes]
             }
             return base + [c.exchange.isEmpty ? serial : .pair("exchangeSent", "Exch s", "exchangeRcvd", "Exch r"), notes]

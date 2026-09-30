@@ -45,7 +45,7 @@ public struct SpotsWindow: View {
 
     public var body: some View {
         let feed = model.spotFeed
-        let index = SpotLogIndex(model.logRecords)
+        let index = model.spotLogIndex
         let rows = feed.visible
         VStack(spacing: 6) {
             HStack(spacing: 14) {

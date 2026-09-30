@@ -165,6 +165,31 @@ public struct AlertThrottle: Sendable {
     }
 }
 
+/// Výskyty značek v příjmu za posledních `window` sekund (potvrzení značky proti šumu). Paměť je omezená.
+public struct RxCallSightings: Sendable {
+    public static let window: TimeInterval = 600
+    private var seen: [String: [Date]] = [:]
+    public let maxKeys: Int
+    public init(maxKeys: Int = 2000) { self.maxKeys = max(1, maxKeys) }
+    public var count: Int { seen.count }
+
+    /// Zaznamená výskyt značky a vrátí počet jejích výskytů v okně (včetně tohoto).
+    public mutating func record(_ call: String, now: Date) -> Int {
+        var list = (seen[call] ?? []).filter { now.timeIntervalSince($0) < Self.window }
+        list.append(now)
+        if list.count > 3 { list.removeFirst(list.count - 3) }
+        seen[call] = list
+        if seen.count > maxKeys {
+            seen = seen.filter { k, v in k == call || v.contains { now.timeIntervalSince($0) < Self.window } }
+            if seen.count > maxKeys {
+                let old = seen.filter { $0.key != call }.sorted { ($0.value.last ?? .distantPast) < ($1.value.last ?? .distantPast) }
+                for (k, _) in old.prefix(seen.count - maxKeys) { seen[k] = nil }
+            }
+        }
+        return list.count
+    }
+}
+
 /// Dělí přijímaný text (po znacích i po částech) na dokončená slova; echo vlastního vysílání přeskakuje
 /// a ukončuje rozdělané slovo. Značka rozdělená mezi dvě přidání se tak nalezne jednou, celá.
 public struct RxWordScanner: Sendable {

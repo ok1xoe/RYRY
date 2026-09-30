@@ -309,11 +309,14 @@ public struct MultiplierCalculator: Sendable {
     /// Násobiče ze spojení od začátku závodu.
     public func tally(records: [QSORecord], since: Date) -> MultiplierTally {
         var t = MultiplierTally(rule: rule)
-        guard rule.hasMultipliers else { return t }
-        for r in records.sorted(by: { $0.timeOn < $1.timeOn }) where r.timeOn >= since {
-            t.add(hits(r), band: r.band)
-        }
+        for r in records.sorted(by: { $0.timeOn < $1.timeOn }) { add(r, to: &t, since: since) }
         return t
+    }
+
+    /// Přidá jedno spojení do průběžného součtu (po zalogování; bez přepočtu celého logu).
+    public func add(_ r: QSORecord, to t: inout MultiplierTally, since: Date) {
+        guard rule.hasMultipliers, r.timeOn >= since else { return }
+        t.add(hits(r), band: r.band)
     }
 }
 
@@ -344,6 +347,12 @@ public enum Multipliers {
     }
     static func province(in exchange: String?) -> String? {
         tokens(exchange).lazy.map { aliases[$0] ?? $0 }.first { provinceSet.contains($0) }
+    }
+    /// Jedno slovo jako stát USA (48 + DC) nebo kanadská oblast (i zkratky NWT, PEI …); jinak nil.
+    public static func stateOrProvince(_ word: String) -> String? {
+        let w = word.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let n = aliases[w] ?? w
+        return stateSet.contains(n) || provinceSet.contains(n) ? n : nil
     }
 
     static let bandOrder = ["2190m", "630m", "160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m",

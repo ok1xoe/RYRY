@@ -21,12 +21,12 @@ import UserNotifications
 
     public func notify(title: String, body: String) {
         guard canNotify, !NSApplication.shared.isActive else { return }
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { st in
+        UNUserNotificationCenter.current().getNotificationSettings { @Sendable st in
             guard st.authorizationStatus == .authorized || st.authorizationStatus == .provisional else { return }
             let c = UNMutableNotificationContent()
             c.title = title; c.body = body
-            center.add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
+            // centrum se nezachytává (není Sendable) – získá se znovu v obsluze
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
         }
     }
 }

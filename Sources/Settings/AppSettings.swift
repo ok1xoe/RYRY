@@ -388,6 +388,8 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     public init() {}
     /// Předvolba platná pro UI: jen dokud formát odpovídá předvolbě.
     public var selectedPreset: ContestPreset? { preset.flatMap { $0.format == format ? $0 : nil } }
+    /// ARRL RTTY Roundup s pořadovými čísly: W/VE posílají místo čísla stát/provincii (pole „Stát/prov. r“).
+    public var isRoundupStateExchange: Bool { enabled && format == .serial && exchange.isEmpty && selectedPreset == .arrlRoundup }
     public var effectiveStart: Date { start ?? Date().addingTimeInterval(-72 * 3600) }
 
     /// Nastavení podle předvolby závodu v daném roce. `locator` = vlastní lokátor (výměna Makrothenu).

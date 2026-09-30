@@ -116,3 +116,26 @@ public enum BandMapFilter {
             .sorted { $0.timeOn > $1.timeOn }
     }
 }
+
+/// Zoom stupnice kolečkem myši / trackpadem. Trackpad posílá mnoho malých posunů (a setrvačnost), proto se posuny
+/// sčítají a zoomuje se po krocích (1 krok na `pointsPerStep` bodů); setrvačnost se ignoruje. Kolečko = krok na událost.
+public struct ScrollZoomAccumulator: Sendable, Equatable {
+    public static let pointsPerStep = 20.0
+    public private(set) var accumulated = 0.0
+    public init() {}
+
+    /// `precise` = trackpad / Magic Mouse (posun v bodech), jinak kolečko (řádky). `momentum` = setrvačnost po gestu.
+    /// Vrací počet kroků (kladné = přiblížit, záporné = oddálit, 0 = zatím nic).
+    public mutating func feed(deltaY: Double, precise: Bool, momentum: Bool) -> Int {
+        guard deltaY.isFinite, !momentum, deltaY != 0 else { return 0 }
+        guard precise else { accumulated = 0; return deltaY > 0 ? 1 : -1 }
+        if accumulated != 0, (accumulated > 0) != (deltaY > 0) { accumulated = 0 }     // změna směru začíná znovu
+        accumulated += deltaY
+        let steps = Int((accumulated / Self.pointsPerStep).rounded(.towardZero))
+        accumulated -= Double(steps) * Self.pointsPerStep
+        return steps
+    }
+
+    /// Nové gesto (začátek dotyku) – zbytek z minula se zahodí.
+    public mutating func reset() { accumulated = 0 }
+}

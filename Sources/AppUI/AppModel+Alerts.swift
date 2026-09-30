@@ -24,15 +24,18 @@ extension AppModel {
 
     /// Přestaví index logu (start, přepnutí logu, změna záznamů).
     func rebuildLogIndex() {
-        logIndex = LogIndex(records: logRecords, contestSince: contestSinceForIndex, country: { [app] in
+        logIndexSince = contestSinceForIndex
+        logIndex = LogIndex(records: logRecords, contestSince: logIndexSince, country: { [app] in
             app?.country(for: $0).map { CountryRef(key: $0.primaryPrefix, name: $0.name) }
         })
+        spotLogIndex = SpotLogIndex(logRecords)
         highlightBand = currentBand
         highlightVersion &+= 1
     }
 
     func addToLogIndex(_ r: QSORecord) {
-        logIndex.add(r, contestSince: contestSinceForIndex, country: countryRef)
+        logIndex.add(r, contestSince: logIndexSince, country: countryRef)
+        spotLogIndex.add(r)
         highlightVersion &+= 1
     }
 
@@ -77,34 +80,76 @@ extension AppModel {
         guard neededActive else { return }
         let reasons = neededReasons(for: spot)
         guard !reasons.isEmpty else { return }
-        emitNeeded(call: spot.call, band: spot.band, reasons: reasons, source: L("spot"), interval: 3600)
+        emitNeeded(call: spot.call, band: spot.band, reasons: reasons, source: L("spot"), interval: 3600, batch: true)
     }
 
-    private func emitNeeded(call: String, band: String?, reasons: [NeededCheck.Reason], source: String, interval: TimeInterval) {
+    private func emitNeeded(call: String, band: String?, reasons: [NeededCheck.Reason], source: String, interval: TimeInterval,
+                            batch: Bool = false) {
         let now = alertClock()
         guard alertThrottle.allow(NeededCheck.dedupeKey(call: call, band: band) + "|" + source, now: now, interval: interval) else { return }
         let text = Self.neededText(reasons)
-        note(L("Potřebné (%@): %@ – %@", source, call, text))
+        if batch { queueNeededSummary(call: call, text: text, source: source, now: now) }
+        else { note(L("Potřebné (%@): %@ – %@", source, call, text)) }
         // zvuk a oznámení nejvýš jednou za 3 s (po připojení ke clusteru přijde dávka spotů)
         guard alertThrottle.allow("needed-sound", now: now, interval: 3) else { return }
         if settings.alerts.neededSound { alertSink.playSound() }
         if settings.alerts.neededNotification { alertSink.notify(title: L("Potřebná stanice: %@", call), body: text) }
     }
 
+    /// Interval souhrnného řádku „Potřebné: N (…)“ ve stavovém řádku.
+    static let neededSummaryInterval: TimeInterval = 5
+
+    /// Spoty: první potřebný hned jako řádek, další během `neededSummaryInterval` do jednoho souhrnu.
+    private func queueNeededSummary(call: String, text: String, source: String, now: Date) {
+        if neededPending.isEmpty, neededLastLine.map({ now.timeIntervalSince($0) >= Self.neededSummaryInterval }) ?? true {
+            note(L("Potřebné (%@): %@ – %@", source, call, text))
+            neededLastLine = now
+            return
+        }
+        neededPending.append("\(call) – \(text)")
+        guard neededFlushTask == nil else { return }
+        neededFlushTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.neededSummaryInterval))
+            self?.flushNeededSummary()
+        }
+    }
+
+    /// Vypíše čekající souhrn (nejvýš 5 značek jmenovitě).
+    func flushNeededSummary() {
+        neededFlushTask?.cancel(); neededFlushTask = nil
+        guard !neededPending.isEmpty else { return }
+        let n = neededPending.count
+        let list = neededPending.prefix(5).joined(separator: "; ") + (n > 5 ? "; …" : "")
+        note(L("Potřebné: %ld (%@)", n, list))
+        neededPending = []
+        neededLastLine = alertClock()
+    }
+
     /// Přijatý text: dokončená slova se zkontrolují na moji značku a potřebné značky. Echo se přeskakuje.
+    ///
+    /// Šum RTTY tvoří náhodné „značky“: nová země se z příjmu hlásí jen u značky, kterou zná Super Check Partial
+    /// nebo log, která následuje po DE/CQ, nebo která přišla aspoň 2× během 10 minut. Hlídané značky se hlásí hned.
     func scanRxForAlerts(_ s: String, echo: Bool) {
         let words = rxScanner.feed(s, echo: echo)
+        if echo { rxPrevWord = "" }
         guard !words.isEmpty else { return }
         let my = myBaseCall
+        let now = alertClock()
         for w in words {
+            let prev = rxPrevWord
+            rxPrevWord = WordClassifier.callCandidate(w) ?? ""
             guard let call = WordClassifier.callCandidate(w) else { continue }
             let base = QSORecord.baseCall(call)
             if !my.isEmpty, base.count >= 3, base == my {
                 alertMyCall(call)
             } else if neededActive, WordClassifier.classify(call) == .call {
+                let seen = rxCallSightings.record(base, now: now)
                 let reasons = NeededCheck.check(call: call, band: currentBand, country: countryRef(call),
                                                 settings: settings.alerts, index: logIndex)
-                if !reasons.isEmpty { emitNeeded(call: call, band: currentBand, reasons: reasons, source: L("příjem"), interval: 600) }
+                guard !reasons.isEmpty else { continue }
+                let confirmed = reasons.contains(.watched) || prev == "DE" || prev == "CQ" || seen >= 2
+                    || logIndex.worked(call) || superCheck.contains(call) || superCheck.contains(base)
+                if confirmed { emitNeeded(call: call, band: currentBand, reasons: reasons, source: L("příjem"), interval: 600) }
             }
         }
     }

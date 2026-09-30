@@ -70,7 +70,14 @@ public final class AppModel {
     private let engineFactory: EngineFactory
     private let spectrumFPS: Double
 
-    public private(set) var settings: AppSettings { didSet { if multiplierKey != multiplierKeyApplied { refreshMultipliers() } } }
+    public private(set) var settings: AppSettings {
+        didSet {
+            if multiplierKey != multiplierKeyApplied { refreshMultipliers() }
+            if oldValue.contest.enabled != settings.contest.enabled || oldValue.contest.start != settings.contest.start {
+                rebuildLogIndex()                                              // duplicity: závod zapnut/vypnut, jiný začátek
+            }
+        }
+    }
     public private(set) var state: EngineState = .stopped
     public private(set) var rxRuns: [RxRun] = []
     public private(set) var rxCharCount = 0
@@ -88,9 +95,22 @@ public final class AppModel {
     public internal(set) var rig: RigStatus? { didSet { if currentBand != Self.band(oldValue, qso) { refreshNewMultiplier() } } }
     public private(set) var qso = QSOFields() { didSet { refreshNewMultiplier() } }
     public private(set) var previousQSOs: [QSORecord] = []
-    public private(set) var logRecords: [QSORecord] = [] { didSet { refreshMultipliers() } }
-    /// Index logu pro zvýrazňování značek a hlídání (viz RxAlerts.swift, AppModel+Alerts.swift).
+    /// Změna logu přepočte násobiče celé; zalogování jednoho spojení je jen přičte (`addLoggedRecord`).
+    public private(set) var logRecords: [QSORecord] = [] { didSet { if !logRecordsIncremental { refreshMultipliers() } } }
+    private var logRecordsIncremental = false
+    /// Index logu pro zvýrazňování značek, hlídání a band mapu (viz RxAlerts.swift, AppModel+Alerts.swift).
     public internal(set) var logIndex = LogIndex()
+    /// Začátek závodu, se kterým je `logIndex` sestavený (duplicity).
+    var logIndexSince: Date?
+    /// Index „v logu / na pásmu“ pro okno Spoty (udržovaný spolu s `logIndex`, ne při každém překreslení).
+    public internal(set) var spotLogIndex = SpotLogIndex()
+    /// Výskyty značek v příjmu (potvrzení „potřebné“ ze šumu) a předchozí slovo příjmu (DE/CQ před značkou).
+    var rxCallSightings = RxCallSightings()
+    var rxPrevWord = ""
+    /// Souhrn upozornění ze spotů (dávka po připojení ke clusteru = jeden řádek).
+    var neededPending: [String] = []
+    var neededLastLine: Date?
+    var neededFlushTask: Task<Void, Never>?
     /// Zvýšení znamená změnu stavu ovlivňující styl značek (log, pásmo, nastavení) – okno příjmu přestyluje konec textu.
     public internal(set) var highlightVersion = 0
     var highlightBand: String?
@@ -418,7 +438,7 @@ public final class AppModel {
                 try? settingsStore.save(settings)
             }
         case .qsoLogged(let r):
-            logRecords.insert(r, at: 0)
+            addLoggedRecord(r)
             addToLogIndex(r)
             backupLogIfDue()
             if historyCalls.insert(r.call).inserted { rebuildSuperCheck() }
@@ -586,7 +606,7 @@ public final class AppModel {
     public private(set) var scpCount = 0
     private var scpMaster: [String] = []
     private var historyCalls: Set<String> = []
-    private var superCheck = SuperCheck(calls: [])
+    private(set) var superCheck = SuperCheck(calls: [])
 
     func refreshDupe() async { isDupe = await app?.dupe() ?? false }
 
@@ -614,7 +634,22 @@ public final class AppModel {
         Bands.band(forHz: rig?.online == true ? rig?.frequency : qso.frequency)
     }
 
+    /// Počet úplných přepočtů násobičů (test: zalogování nepřepočítává celý log).
+    private(set) var multiplierFullRecomputes = 0
+
+    /// Zalogované spojení: do logu a průběžně do násobičů (bez přepočtu celého logu).
+    private func addLoggedRecord(_ r: QSORecord) {
+        logRecordsIncremental = true
+        logRecords.insert(r, at: 0)
+        logRecordsIncremental = false
+        guard let calc = multiplierCalculator, var t = multipliers else { return }
+        calc.add(r, to: &t, since: settings.contest.effectiveStart)
+        multipliers = t
+        refreshNewMultiplier()
+    }
+
     func refreshMultipliers() {
+        multiplierFullRecomputes += 1
         multiplierKeyApplied = multiplierKey
         let db = countryDB
         let own = db?.lookup(settings.station.call)?.primaryPrefix
@@ -1371,13 +1406,11 @@ public final class AppModel {
         let off = min(max(settings.spots.offsetHz, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound)
         let hz = spot.frequencyHz + off
         if let app, settings.rig.type != .none {
-            if state != .rx {
-                // nikdy nepřelaďovat zaklíčovaný vysílač (jiné pásmo pod zátěží, cizí kmitočet)
-                note(L("Během vysílání se rig nepřelaďuje – spot použijte po přechodu na RX."))
-            } else {
-                do { try await app.setFrequency(hz) }
-                catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
-            }
+            // nikdy nepřelaďovat zaklíčovaný vysílač (jiné pásmo pod zátěží, cizí kmitočet) – hlídá AppController
+            do { try await app.setFrequency(hz) }
+            catch AppError.transmitting { note(L("Během vysílání se rig nepřelaďuje – spot použijte po přechodu na RX.")) }
+            catch AppError.engineStopped { note(Self.engineStoppedMessage) }
+            catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
         } else {
             await setQSOField("freq", String(format: "%.1f", spot.frequencyHz / 1000))   // bez rigu: frekvence spotu do logu
         }
@@ -1391,9 +1424,12 @@ public final class AppModel {
         case rig            // rig přeladěn
         case manual         // bez rigu: ruční frekvence QSO
         case rejectedTX     // během vysílání se rig nepřelaďuje
+        case notRunning     // engine neběží (zvuk nespuštěn) – rig není připojený
         case invalid        // neplatný vstup
         case failed         // rig frekvenci nepřijal
     }
+
+    static var engineStoppedMessage: String { L("Engine neběží (zvuk nespuštěn?) – rig nelze přeladit.") }
 
     /// Požadavek na otevření zadání frekvence (zkratka / menu); horní lišta ho zobrazí a shodí.
     public var showFrequencyEntry = false
@@ -1406,12 +1442,14 @@ public final class AppModel {
             return .invalid
         }
         if let app, settings.rig.type != .none {
-            if state != .rx {
+            do { try await app.setFrequency(kHz * 1000); return .rig }
+            catch AppError.transmitting {
                 note(L("Během vysílání se rig nepřelaďuje – frekvenci zadejte po přechodu na RX."))
                 return .rejectedTX
-            }
-            do { try await app.setFrequency(kHz * 1000); return .rig }
-            catch {
+            } catch AppError.engineStopped {
+                note(Self.engineStoppedMessage)
+                return .notRunning
+            } catch {
                 note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", kHz), "\(error)"))
                 return .failed
             }
@@ -1584,7 +1622,8 @@ public final class AppModel {
         }
         if settings.contest.enabled, !qso.call.isEmpty, kind != .call {
             for (field, v) in WordClassifier.contestUpdate(word, format: settings.contest.format,
-                                                           serialMode: settings.contest.exchange.isEmpty, current: qso) {
+                                                           serialMode: settings.contest.exchange.isEmpty,
+                                                           roundup: settings.contest.isRoundupStateExchange, current: qso) {
                 await setQSOField(field, v)
             }
             return

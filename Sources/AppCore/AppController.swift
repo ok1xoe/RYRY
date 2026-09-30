@@ -56,6 +56,10 @@ public struct QSOFields: Codable, Sendable, Equatable {
 
 public enum AppError: Error, Equatable, Sendable {
     case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String), qtc(String), badValue(String)
+    /// Během vysílání se rig nepřelaďuje.
+    case transmitting
+    /// Engine neběží (zvuk nespuštěn / zastaveno) – rig není připojený.
+    case engineStopped
 }
 
 public enum AppEvent: Sendable {
@@ -327,8 +331,8 @@ public actor AppController {
             manualFrequencySetThisSession = true
         default: throw AppError.unknownField(name)
         }
-        if name != "call" {                                // ruční změna pole zruší jeho označení „z historie“ / „z DXCC“
-            if let m = qso.historyFilled[name], qso.value(name) != m { qso.historyFilled[name] = nil }
+        if name != "call" {                                // ruční zadání pole (i shodné hodnoty) zruší označení „z historie“; změna zruší „z DXCC“
+            qso.historyFilled[name] = nil
             if name == "exchangeRcvd", qso.exchangeRcvd != dxccFilledZone { dxccFilledZone = nil }
         }
         broadcaster.send(.qsoChanged(qso))
@@ -632,7 +636,16 @@ public actor AppController {
 
     // MARK: Rig a modem
 
-    public func setFrequency(_ hz: Double) async throws { try await engine.setRigFrequency(hz) }
+    /// Přeladí rig. Během vysílání (zaklíčovaný vysílač) a se zastaveným enginem odmítne – stav se bere z enginu,
+    /// takže platí pro GUI i API (vzor `notchClick`).
+    public func setFrequency(_ hz: Double) async throws {
+        let st = await engine.state
+        if Self.transmittingStates.contains(st) { throw AppError.transmitting }
+        if st == .stopped { throw AppError.engineStopped }
+        try await engine.setRigFrequency(hz)
+    }
+    /// Stavy enginu, kdy je vysílač zaklíčovaný nebo se klíčuje.
+    public static let transmittingStates: Set<EngineState> = [.keying, .pttOn, .tx, .drain, .pttOff]
     public func setRigMode(_ m: String) async throws { try await engine.setRigMode(m) }
     public func modemParam(_ id: String) async -> ParameterValue? { await engine.modemParam(id) }
     public func setModemParam(_ id: String, _ v: ParameterValue) async throws {
@@ -643,7 +656,7 @@ public actor AppController {
     /// Zářez na kmitočtu (pravé tlačítko ve spektru jako MMTTY).
     public func notchClick(hz: Double) async {
         // MMTTY: během vysílání se kliky do spektra ignorují
-        guard ![.keying, .pttOn, .tx, .drain, .pttOff].contains(await engine.state) else { return }
+        guard !Self.transmittingStates.contains(await engine.state) else { return }
         await engine.withModem { $0.notchClick(hz: hz) }
         broadcaster.send(.paramsChanged(await engine.modemParams()))
     }

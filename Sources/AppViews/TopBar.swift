@@ -278,6 +278,7 @@ struct FrequencyControl: View {
             switch r {
             case .invalid: error = L("Zadejte kHz, 100 až 500 000")
             case .rejectedTX: error = L("Během vysílání se rig nepřelaďuje")
+            case .notRunning: error = L("Engine neběží – rig nelze přeladit")
             case .failed: error = L("Rig frekvenci nepřijal")
             case .rig, .manual: shown = false
             }

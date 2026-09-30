@@ -36,7 +36,7 @@ struct RxTextView: NSViewRepresentable {
     }
 
     /// Značka v textu vysílání (echo) – zvýraznění ji přeskakuje.
-    static let echoKey = NSAttributedString.Key("cz.ok1xoe.mmtty4mac.echo")
+    nonisolated static let echoKey = NSAttributedString.Key("cz.ok1xoe.mmtty4mac.echo")
     /// Kolik posledních znaků se přestyluje při změně stavu (zalogování, změna pásma).
     static let restyleTail = 5000
 

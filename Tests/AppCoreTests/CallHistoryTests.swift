@@ -187,14 +187,8 @@ private func historyApp(_ f: ContestFormat, contestOn: Bool = true, fillEmptyOnl
     #expect(q.name.isEmpty && q.locator.isEmpty && q.exchangeRcvd == "15" && q.historyFilled.isEmpty)
 }
 
-@Test func historyMarkerSurvivesUnchangedCommitButNotEdit() async throws {
-    let h = try await historyApp(.zone)
-    try await h.app.setQSOField("call", "DL1ABC")
-    try await h.app.setQSOField("name", "HANS")                        // pole jen opustil, beze změny
-    #expect(await h.app.qso.historyFilled["name"] == "HANS")
-    try await h.app.setQSOField("name", "Hanz")
-    #expect(await h.app.qso.historyFilled["name"] == nil)
-}
+// (dříve historyMarkerSurvivesUnchangedCommitButNotEdit – kontrola plánu 17: ruční zadání i shodné hodnoty
+// zruší označení, viz Plan17ReviewTests.historyMarkerClearedByAnyManualSet)
 
 @Test func historyFilledNotSerialized() throws {
     var q = QSOFields(); q.call = "X"; q.historyFilled = ["name": "A"]

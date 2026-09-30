@@ -121,24 +121,36 @@ public struct CallHistory: Sendable, Equatable {
 
     // MARK: Mapování na pole QSO
 
-    /// Hodnoty pro pole QSO okna (jen neprázdné) podle formátu závodu. `isNorthAmerica` = W/VE (stát ve výměně CQ/RJ);
-    /// nil = neznámá země, stát se přidá, pokud v historii je.
+    /// Hodnoty pro pole QSO okna (jen neprázdné) podle formátu závodu. `isNorthAmerica` = W/VE (stát ve výměně CQ/RJ
+    /// a ARRL RU); nil = neznámá země, stát se přidá, pokud v historii je.
+    ///
+    /// Loc1 jde do lokátoru jen jako platný Maidenhead lokátor; jinak (historie závodů W/VE) je to stát/provincie
+    /// a použije se ve výměně CQ/RJ a ARRL RU.
     public func fields(for e: CallHistoryEntry, contest c: ContestSettings, isNorthAmerica: Bool?) -> [String: String] {
         var r: [String: String] = [:]
         if !e.name.isEmpty { r["name"] = e.name }
-        if !e.loc.isEmpty { r["locator"] = e.loc }
+        let locIsGrid = !e.loc.isEmpty && Geo.maidenhead(e.loc) != nil
+        if locIsGrid { r["locator"] = e.loc }
+        let locState = locIsGrid ? "" : e.loc
         guard c.enabled else { return r }
+        let na = isNorthAmerica ?? true
         switch c.format {
         case .zone:
             if let z = e.cqZone { r["exchangeRcvd"] = String(z) }
         case .cqrj:
             if let z = e.cqZone {
                 var x = String(z)
-                if !e.state.isEmpty, isNorthAmerica ?? true { x += " " + e.state }
+                let st = !e.state.isEmpty ? e.state : (Multipliers.stateOrProvince(locState) ?? "")
+                if !st.isEmpty, na { x += " " + st }
                 r["exchangeRcvd"] = x
             }
         case .serial:
-            if !c.exchange.isEmpty, !e.exch.isEmpty { r["exchangeRcvd"] = e.exch }
+            if c.isRoundupStateExchange {
+                // W/VE posílají stát/provincii (ostatní pořadové číslo – to z historie nebereme)
+                if na, let st = [e.state, locState, e.exch].lazy.compactMap(Multipliers.stateOrProvince).first {
+                    r["exchangeRcvd"] = st
+                }
+            } else if !c.exchange.isEmpty, !e.exch.isEmpty { r["exchangeRcvd"] = e.exch }
         case .bartg, .wae, .ped: break
         }
         return r

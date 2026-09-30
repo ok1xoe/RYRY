@@ -42,7 +42,9 @@ public struct BandMapWindow: View {
     }
 
     var band: String? {
-        RTTYBandPlan.selectBand(choice: bandChoice, rigHz: rigKHz.map { $0 * 1000 }, manualHz: model.qso.frequency)
+        // ruční frekvenci QSO číst jen když ruční volba ani rig pásmo neurčí (jinak by každá změna QSO okna překreslovala mapu)
+        RTTYBandPlan.selectBand(choice: bandChoice, rigHz: rigKHz.map { $0 * 1000 }, manualHz: nil)
+            ?? RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: model.qso.frequency)
     }
 
     func scale(for band: String) -> BandScale {
@@ -58,11 +60,9 @@ public struct BandMapWindow: View {
         let feed = model.spotFeed
         let spots = BandMapFilter.spots(feed.book.byID.values.map { $0 }, band: band, rttyOnly: feed.rttyOnly,
                                         maxAgeMinutes: max(1, feed.config.maxAgeMinutes), now: now)
-        let index = SpotLogIndex(model.logRecords)
-        let since = model.settings.contest.enabled ? model.settings.contest.effectiveStart : nil
         var out: [Entry] = []
         for s in spots where scale.contains(kHz: s.frequencyKHz) {
-            let st = AppModel.spotStatus(s, index: index, records: model.logRecords, contestSince: since)
+            let st = model.spotStatus(s)                         // index logu v AppModel: O(1) na spot
             let age = BandMapFilter.ageMinutes(of: s, now: now)
             out.append(Entry(id: "s|" + s.id, kHz: s.frequencyKHz, text: "\(s.call)  \(L("%ld min", age))", color: st.color, spot: s,
                              tip: String(format: "%@ · %.1f kHz · %@ · %@", s.call, s.frequencyKHz, st.legend,
@@ -180,9 +180,9 @@ public struct BandMapWindow: View {
                         .frame(maxWidth: .infinity).padding(.top, 8)
                         .offset(x: 0, y: 0)
                 }
-                ScrollWheelZoom { dy, fromTop in
+                ScrollWheelZoom { steps, fromTop in
                     let f = sc.kHz(forY: fromTop * h, height: h)
-                    zoom(dy > 0 ? 0.85 : 1 / 0.85, band: band, around: f)
+                    zoom(pow(0.85, Double(steps)), band: band, around: f)
                 }
                 .allowsHitTesting(false)
             }
@@ -194,23 +194,27 @@ public struct BandMapWindow: View {
 }
 
 /// Kolečko myši nad oblastí: lokální monitor událostí (SwiftUI na macOS nemá pohled pro scrollWheel).
-/// Vrací směr (dy > 0 = kolečko dopředu = přiblížit) a relativní polohu kurzoru shora (0…1).
+/// Vrací počet kroků zoomu (> 0 = přiblížit; trackpad se sčítá, viz `ScrollZoomAccumulator`) a polohu kurzoru shora (0…1).
 private struct ScrollWheelZoom: NSViewRepresentable {
-    var onScroll: (CGFloat, Double) -> Void
+    var onScroll: (Int, Double) -> Void
 
     final class Coordinator {
         var monitor: Any?
-        var onScroll: (CGFloat, Double) -> Void = { _, _ in }
+        var accumulator = ScrollZoomAccumulator()
+        var onScroll: (Int, Double) -> Void = { _, _ in }
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         let c = context.coordinator
         c.monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak v] e in
-            guard let v, let w = v.window, e.window === w, abs(e.scrollingDeltaY) > 0.01 else { return e }
+            guard let v, let w = v.window, e.window === w else { return e }
             let p = v.convert(e.locationInWindow, from: nil)
             guard v.bounds.contains(p), v.bounds.height > 0 else { return e }
-            c.onScroll(e.scrollingDeltaY, Double(1 - p.y / v.bounds.height))
+            if e.phase.contains(.began) { c.accumulator.reset() }
+            let steps = c.accumulator.feed(deltaY: Double(e.scrollingDeltaY), precise: e.hasPreciseScrollingDeltas,
+                                           momentum: !e.momentumPhase.isEmpty)
+            if steps != 0 { c.onScroll(steps, Double(1 - p.y / v.bounds.height)) }
             return nil
         }
         return v
