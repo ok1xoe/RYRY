@@ -2,23 +2,23 @@
 import Foundation
 
 public enum ClusterCommandError: Error, Equatable, Sendable {
-    /// DX cluster není připojený (nebo ještě není přihlášený).
+    /// The DX cluster is not connected (or not logged in yet).
     case notConnected
     case empty
     case tooLong
-    /// Řádek obsahuje řídicí znak (C0, DEL, C1, oddělovač řádku/odstavce U+2028/U+2029).
+    /// The line contains a control character (C0, DEL, C1, line/paragraph separator U+2028/U+2029).
     case controlCharacter
-    /// Spot (`dx …`) bez kmitočtu nebo bez značky (např. makro `dx %k %c` s prázdnou značkou nebo bez rigu).
+    /// A spot (`dx …`) without a frequency or a call (e.g. the macro `dx %k %c` with an empty call or without a rig).
     case incompleteSpot
-    /// Odeslání selhalo na úrovni spojení (TCP).
+    /// Sending failed at the connection level (TCP).
     case sendFailed(String)
 }
 
-/// Kontrola řádku odesílaného do DX clusteru: žádné řídicí znaky, nejvýš 250 znaků, neprázdný, spot úplný.
+/// Check of a line sent to the DX cluster: no control characters, at most 250 characters, non-empty, spot complete.
 public enum ClusterCommand {
     public static let maxLength = 250
 
-    /// Vrátí řádek bez okrajových mezer a bez koncového CR/LF, nebo vyhodí chybu.
+    /// Returns the line without surrounding spaces and without a trailing CR/LF, or throws an error.
     public static func validate(_ raw: String) throws -> String {
         var s = raw
         while s.last == "\r\n" || s.last == "\n" || s.last == "\r" { s.removeLast() }
@@ -30,13 +30,13 @@ public enum ClusterCommand {
         return s
     }
 
-    /// C0, DEL, C1 (U+0080–U+009F) a U+2028/U+2029 – server by je mohl brát jako konec řádku nebo řízení terminálu.
+    /// C0, DEL, C1 (U+0080–U+009F) and U+2028/U+2029 – the server could take them as an end of line or terminal control.
     static func isControl(_ u: Unicode.Scalar) -> Bool {
         u.value < 0x20 || (0x7F...0x9F).contains(u.value) || u.value == 0x2028 || u.value == 0x2029
     }
 
-    /// Spot `dx <kHz> <značka> [komentář]` (pořadí kmitočtu a značky libovolné) bez kmitočtu nebo značky.
-    /// Značka = slovo s písmenem i číslicí, kmitočet = kladné číslo.
+    /// Spot `dx <kHz> <call> [comment]` (the order of frequency and call is arbitrary) without a frequency or a call.
+    /// Call = a word with both a letter and a digit, frequency = a positive number.
     static func isIncompleteSpot(_ s: String) -> Bool {
         guard s.lowercased().hasPrefix("dx ") else { return false }
         let words = s.split(separator: " ").dropFirst().map(String.init)

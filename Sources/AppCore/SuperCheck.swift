@@ -1,9 +1,9 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Super Check Partial: databáze známých značek (MASTER.SCP + značky z logu).
-/// `partial` = značky obsahující zadanou část (`?` = libovolný znak), `near` = značky lišící se o jeden znak
-/// (záměna, chybějící nebo přebývající znak) – oprava chybně přijaté značky.
+/// Super Check Partial: a database of known calls (MASTER.SCP + calls from the log).
+/// `partial` = calls containing the given part (`?` = any character), `near` = calls differing by one character
+/// (a substitution, a missing or an extra character) – correcting a mis-received call.
 public struct SuperCheck: Sendable {
     private let calls: [[UInt8]]
     public var count: Int { calls.count }
@@ -15,13 +15,13 @@ public struct SuperCheck: Sendable {
         self.calls = set.sorted().map { Array($0.utf8) }
     }
 
-    /// Obsah MASTER.SCP: jedna značka na řádek, `#` = komentář.
+    /// Contents of MASTER.SCP: one call per line, `#` = comment.
     public static func parse(_ text: String) -> [String] {
         text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty && !$0.hasPrefix("#") }
     }
 
-    /// Přesná shoda značky (binární hledání v seřazeném seznamu).
+    /// Exact call match (binary search in the sorted list).
     public func contains(_ call: String) -> Bool {
         let p = Array(call.trimmingCharacters(in: .whitespaces).uppercased().utf8)
         guard !p.isEmpty else { return false }
@@ -66,7 +66,7 @@ public struct SuperCheck: Sendable {
         return false
     }
 
-    /// Právě jedna úprava (záměna, vložení, smazání).
+    /// Exactly one edit (substitution, insertion, deletion).
     static func oneEdit(_ a: [UInt8], _ b: [UInt8]) -> Bool {
         if a.count == b.count { return zip(a, b).filter { $0 != $1 }.count == 1 }
         let (l, s) = a.count > b.count ? (a, b) : (b, a)

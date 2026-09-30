@@ -1,12 +1,12 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Odstraní telnetové příkazy (IAC) z proudu a připraví zdvořilé odpovědi (na DO → WONT, na WILL → DONT).
+/// Removes telnet commands (IAC) from the stream and prepares polite replies (to DO → WONT, to WILL → DONT).
 struct TelnetFilter {
     private enum St { case normal, iac, option(UInt8), sub, subIAC }
     private var st = St.normal
 
-    /// Vrací čistý text a bajty, které je třeba odeslat zpět.
+    /// Returns the clean text and the bytes that need to be sent back.
     mutating func process(_ data: Data) -> (text: Data, reply: Data) {
         var text = Data(), reply = Data()
         for b in data {
@@ -32,7 +32,7 @@ struct TelnetFilter {
     }
 }
 
-/// Skládá bajty do řádků; nedokončený zbytek (výzva „login:“) je k dispozici v `pending`.
+/// Assembles bytes into lines; an unfinished remainder (the "login:" prompt) is available in `pending`.
 struct LineSplitter {
     private var buf = Data()
 
@@ -43,20 +43,20 @@ struct LineSplitter {
             lines.append(Self.decode(buf[buf.startIndex..<i]))
             buf.removeSubrange(buf.startIndex...i)
         }
-        if buf.count > 8192 { buf.removeAll() }         // ochrana proti nekonečnému řádku
+        if buf.count > 8192 { buf.removeAll() }         // protection against an endless line
         return lines
     }
 
     var pending: String { Self.decode(buf) }
 
     static func decode(_ d: Data) -> String {
-        let clean = d.filter { $0 >= 32 || $0 == 9 }    // bez CR, BEL, NUL…
+        let clean = d.filter { $0 >= 32 || $0 == 9 }    // without CR, BEL, NUL…
         return String(data: clean, encoding: .utf8) ?? String(decoding: clean.map { UInt16($0) }, as: UTF16.self)
     }
 }
 
 enum TelnetPrompt {
-    /// Výzva k zadání značky: „login:“, „Please enter your call:“, „callsign:“…
+    /// Prompt to enter the call: "login:", "Please enter your call:", "callsign:"…
     static func isLogin(_ s: String) -> Bool {
         let t = s.trimmingCharacters(in: .whitespaces).lowercased()
         guard let last = t.last, ":?>".contains(last), t.count < 80 else { return false }

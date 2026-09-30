@@ -1,7 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Jedno spojení. Zdroj pravdy je JSONL (Codable), ADIF se z něj odvozuje.
+/// A single QSO. The source of truth is JSONL (Codable), ADIF is derived from it.
 public struct QSORecord: Codable, Sendable, Equatable, Identifiable {
     public var id: UUID
     public var call: String
@@ -21,12 +21,12 @@ public struct QSORecord: Codable, Sendable, Equatable, Identifiable {
     public var exchangeRcvd: String?
     public var comment: String?
     public var stationCallsign: String?
-    // DXCC (z cty.dat při zalogování)
+    // DXCC (from cty.dat at logging time)
     public var country: String?
     public var continent: String?
     public var cqZone: Int?
     public var ituZone: Int?
-    /// Kdy bylo spojení nahráno na online služby (klíč = `UploadTarget.rawValue`). Starší logy pole nemají.
+    /// When the QSO was uploaded to online services (key = `UploadTarget.rawValue`). Older logs lack the field.
     public var uploads: [String: Date]?
 
     public init(id: UUID = UUID(), call: String, timeOn: Date, mode: String = "RTTY") {
@@ -44,14 +44,14 @@ public struct QSORecord: Codable, Sendable, Equatable, Identifiable {
         c.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
 
-    /// Značka bez /P, /M, prefixu země apod. (nejdelší část mezi lomítky).
+    /// Call without /P, /M, a country prefix and the like (the longest part between slashes).
     public static func baseCall(_ call: String) -> String {
         let parts = call.uppercased().split(separator: "/").map(String.init)
         return parts.max { $0.count < $1.count } ?? call.uppercased()
     }
 }
 
-/// Online služby, na které se spojení nahrávají.
+/// Online services the QSOs are uploaded to.
 public enum UploadTarget: String, Codable, Sendable, CaseIterable { case lotw, eqsl, clublog }
 
 public enum Bands {
@@ -61,7 +61,7 @@ public enum Bands {
         ("17m", 18.068, 18.168), ("15m", 21.0, 21.45), ("12m", 24.89, 24.99), ("10m", 28.0, 29.7),
         ("6m", 50, 54), ("4m", 70, 71), ("2m", 144, 148), ("1.25m", 222, 225), ("70cm", 420, 450),
     ]
-    /// Krátkovlnná pásma + 6 m od nejnižšího – jediný zdroj seznamu pro zaškrtávátka filtru spotů.
+    /// HF bands + 6 m from the lowest one – the single source of the list for the spot filter checkboxes.
     public static let hfAnd6m: [String] = table.filter { $0.1 >= 1.8 && $0.2 <= 54 }.map(\.0)
     public static func band(forHz hz: Double?) -> String? {
         guard let hz, hz.isFinite else { return nil }

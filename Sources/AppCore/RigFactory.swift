@@ -3,7 +3,7 @@ import Foundation
 import RigControl
 import Settings
 
-/// Ovládání rádia podle nastavení (aplikace i rtty-tool).
+/// Radio control according to the settings (the app as well as rtty-tool).
 public enum RigFactory {
     public static func make(_ r: RigSettings) -> Rig {
         switch r.type {

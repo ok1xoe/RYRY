@@ -2,15 +2,15 @@
 import Foundation
 import DXCC
 
-/// Zeměpisné výpočty pro směr antény a vzdálenost k protistanici (čistá logika bez UI).
+/// Geographic calculations for the antenna heading and the distance to the other station (pure logic without UI).
 public enum Geo {
-    /// Zeměpisná poloha ve stupních: šířka + na sever, délka + na východ.
+    /// Geographic position in degrees: latitude + to the north, longitude + to the east.
     public struct Coordinate: Sendable, Equatable {
         public var lat: Double, lon: Double
         public init(lat: Double, lon: Double) { self.lat = lat; self.lon = lon }
     }
 
-    /// Odkud poloha pochází: z lokátoru (střed čtverce), nebo jen podle země DXCC (přibližně).
+    /// Where the position comes from: from the locator (the center of the square), or only by DXCC country (approximately).
     public enum Source: Sendable, Equatable { case locator, country }
 
     public struct Position: Sendable, Equatable {
@@ -19,7 +19,7 @@ public enum Geo {
         public init(coordinate: Coordinate, source: Source) { self.coordinate = coordinate; self.source = source }
     }
 
-    /// Směr a vzdálenost krátkou i dlouhou cestou (long path = opačný směr, zbytek obvodu Země).
+    /// Heading and distance, short and long path (long path = the opposite heading, the rest of the Earth's circumference).
     public struct Beam: Sendable, Equatable {
         public var shortAzimuth: Double
         public var shortKm: Double
@@ -29,14 +29,14 @@ public enum Geo {
         public var remoteSource: Source
     }
 
-    /// Střední poloměr Země (km) pro velkokružnicovou vzdálenost.
+    /// Mean radius of the Earth (km) for the great-circle distance.
     public static let earthRadiusKm = 6371.0
-    /// Obvod Země (km) pro dlouhou cestu.
+    /// Circumference of the Earth (km) for the long path.
     public static let circumferenceKm = 40075.0
 
     // MARK: Maidenhead
 
-    /// Střed čtverce Maidenhead lokátoru o 4, 6 nebo 8 znacích (`JO70`, `JO70fc`, `JO70FC55`); neplatný → nil.
+    /// Center of a Maidenhead locator square of 4, 6 or 8 characters (`JO70`, `JO70fc`, `JO70FC55`); invalid → nil.
     public static func maidenhead(_ locator: String) -> Coordinate? {
         let s = Array(locator.trimmingCharacters(in: .whitespacesAndNewlines).uppercased().unicodeScalars)
         guard [4, 6, 8].contains(s.count) else { return nil }
@@ -51,7 +51,7 @@ public enum Geo {
         guard let fl = letter(s[0], upTo: 82), let fa = letter(s[1], upTo: 82),     // A–R
               let dl = digit(s[2]), let da = digit(s[3]) else { return nil }
         var lon = -180 + fl * 20 + dl * 2, lat = -90 + fa * 10 + da
-        var w = 2.0, h = 1.0                                                          // rozměr aktuálního čtverce
+        var w = 2.0, h = 1.0                                                          // size of the current square
         if s.count >= 6 {
             guard let sl = letter(s[4], upTo: 88), let sa = letter(s[5], upTo: 88) else { return nil }   // A–X
             lon += sl * (5.0 / 60); lat += sa * (2.5 / 60)
@@ -65,9 +65,9 @@ public enum Geo {
         return Coordinate(lat: lat + h / 2, lon: lon + w / 2)
     }
 
-    // MARK: Vzdálenost a azimut
+    // MARK: Distance and azimuth
 
-    /// Velkokružnicová vzdálenost (haversine) v km, krátká cesta.
+    /// Great-circle distance (haversine) in km, short path.
     public static func distanceKm(_ a: Coordinate, _ b: Coordinate) -> Double {
         let p1 = a.lat * .pi / 180, p2 = b.lat * .pi / 180
         let dp = p2 - p1, dl = (b.lon - a.lon) * .pi / 180
@@ -75,7 +75,7 @@ public enum Geo {
         return 2 * earthRadiusKm * asin(min(1, sqrt(h)))
     }
 
-    /// Počáteční azimut z `a` do `b` ve stupních 0..<360 (0 = sever); pro totožné body 0.
+    /// Initial azimuth from `a` to `b` in degrees 0..<360 (0 = north); 0 for identical points.
     public static func bearing(from a: Coordinate, to b: Coordinate) -> Double {
         let p1 = a.lat * .pi / 180, p2 = b.lat * .pi / 180, dl = (b.lon - a.lon) * .pi / 180
         let y = sin(dl) * cos(p2)
@@ -101,16 +101,16 @@ public enum Geo {
         beam(from: own.coordinate, to: remote.coordinate, ownSource: own.source, remoteSource: remote.source)
     }
 
-    // MARK: Výběr zdroje polohy
+    // MARK: Position source selection
 
-    /// Poloha stanice: platný lokátor má přednost, jinak střed země DXCC (souřadnice z cty.dat, východ kladně).
+    /// Station position: a valid locator wins, otherwise the DXCC country center (coordinates from cty.dat, east positive).
     public static func position(locator: String, country: CountryInfo?) -> Position? {
         if let c = maidenhead(locator) { return Position(coordinate: c, source: .locator) }
         guard let country else { return nil }
         return Position(coordinate: Coordinate(lat: country.latitude, lon: country.longitude), source: .country)
     }
 
-    /// Vzdálenost v km s mezerou po tisících (`1 234`), zaokrouhleno na celé km.
+    /// Distance in km with a space between thousands (`1 234`), rounded to whole km.
     public static func formatKm(_ km: Double) -> String {
         let n = Int(km.rounded())
         let digits = String(abs(n))
@@ -123,11 +123,11 @@ public enum Geo {
     }
 }
 
-/// Zadání frekvence v kHz z textu (horní lišta).
+/// Frequency entry in kHz from text (the top bar).
 public enum FrequencyInput {
     public static let rangeKHz = 100.0...500_000.0
 
-    /// „14080“, „14080,5“, „14080.5 kHz“, „14.08 MHz“ → kHz; mimo rozsah 100 kHz – 500 MHz nebo nesmysl → nil.
+    /// "14080", "14080,5", "14080.5 kHz", "14.08 MHz" → kHz; outside the range 100 kHz – 500 MHz or nonsense → nil.
     public static func parseKHz(_ text: String) -> Double? {
         var t = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var mult = 1.0

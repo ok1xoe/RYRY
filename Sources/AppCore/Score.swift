@@ -5,37 +5,37 @@ import Localization
 import QSOLog
 import Settings
 
-// Bodování a skóre závodů. Pravidla a zdroje: docs/rulings.md, „Bodování a skóre“.
+// Contest scoring and score. Rules and sources: docs/rulings.md, "Scoring and score".
 
-/// Jak se z bodů a násobičů spočítá výsledné skóre.
+/// How the resulting score is computed from points and multipliers.
 public enum ScoreFormula: Sendable, Equatable {
-    /// Body × násobiče (CQ WW, WPX, ARRL RU, SARTG, JARTS, OK DX).
+    /// Points × multipliers (CQ WW, WPX, ARRL RU, SARTG, JARTS, OK DX).
     case pointsTimesMultipliers
-    /// Body × násobiče po pásmech × kontinenty (BARTG HF).
+    /// Points × per-band multipliers × continents (BARTG HF).
     case pointsTimesMultipliersTimesContinents
-    /// (QSO + QTC) × násobiče s váhou pásem (WAE).
+    /// (QSO + QTC) × band-weighted multipliers (WAE).
     case qsoPlusQTCTimesWeightedMultipliers
-    /// Součet bodů (Makrothen – bez násobičů).
+    /// Sum of points (Makrothen – without multipliers).
     case pointsSum
 }
 
-/// Vztah protistanice k vlastní stanici (pro body podle země a kontinentu).
+/// Relation of the other station to my own station (for points by country and continent).
 public enum ScoreRelation: Sendable, Equatable {
     case sameCountry, sameContinent, otherContinent
 }
 
-/// Pravidla bodování jednoho závodu.
+/// Scoring rules of a single contest.
 public struct ScoreRule: Sendable, Equatable {
     public var preset: ContestPreset
     public var formula: ScoreFormula
-    /// Pravidlo ověřené v oficiálních pravidlech závodu (zdroj v `source`).
+    /// A rule verified in the official contest rules (the source is in `source`).
     public var verified: Bool
     public var source: String
 
-    /// Pásma s vyšším bodováním (WPX, OK DX: 80 a 40 m).
+    /// Bands with higher scoring (WPX, OK DX: 80 and 40 m).
     static let lowBands: Set<String> = ["80m", "40m"]
 
-    /// Pravidla pro závodní nastavení; nil = mimo závod nebo vlastní (nerozpoznaný) závod.
+    /// Rules for the contest settings; nil = outside a contest or a custom (unrecognized) contest.
     public static func rule(for contest: ContestSettings) -> ScoreRule? {
         guard contest.enabled, let p = contest.selectedPreset else { return nil }
         return rule(for: p)
@@ -52,7 +52,7 @@ public struct ScoreRule: Sendable, Equatable {
         return ScoreRule(preset: p, formula: formula, verified: true, source: MultiplierRule.rule(for: p).source)
     }
 
-    /// Popis bodování pro okno Skóre (překládá se při zobrazení – sleduje přepnutí jazyka).
+    /// Description of the scoring for the Score window (translated at display time – follows a language switch).
     public var pointsNote: String {
         switch preset {
         case .arrlRoundup: L("1 bod za spojení; stejnou stanici jen jednou na pásmu. Skóre = body × násobiče.")
@@ -67,7 +67,7 @@ public struct ScoreRule: Sendable, Equatable {
         }
     }
 
-    /// Neověřené nebo nejednoznačné části (prázdné = vše ověřeno); překládá se při zobrazení.
+    /// Unverified or ambiguous parts (empty = everything verified); translated at display time.
     public var unverifiedNote: String {
         switch preset {
         case .cqwpxRTTY, .sartgRTTY, .cqwwRTTY, .okDXRTTY:
@@ -78,13 +78,13 @@ public struct ScoreRule: Sendable, Equatable {
         }
     }
 
-    /// Body závisí na vlastní zemi/kontinentu (nebo násobiče na vlastní zemi) – bez ní je výsledek chybný.
+    /// The points depend on my own country/continent (or the multipliers on my own country) – without it the result is wrong.
     var needsOwnCountry: Bool { preset != .makrothen }
 
-    /// Body za spojení podle vztahu k vlastní stanici a pásma (Makrothen se počítá zvlášť); nil vztah = nejnižší hodnota.
+    /// Points for a QSO by the relation to my own station and the band (Makrothen separately); nil relation = the lowest value.
     public func points(relation: ScoreRelation?, band: String?) -> Int {
         let low = band.map(Self.lowBands.contains) ?? false
-        let v: (Int, Int, Int)                         // stejná země, stejný kontinent, jiný kontinent
+        let v: (Int, Int, Int)                         // same country, same continent, other continent
         switch preset {
         case .arrlRoundup, .bartgHF, .waeRTTY, .makrothen: return 1
         case .cqwpxRTTY: v = low ? (2, 4, 6) : (1, 2, 3)
@@ -100,7 +100,7 @@ public struct ScoreRule: Sendable, Equatable {
         }
     }
 
-    /// Váha pásma Makrothenu.
+    /// Makrothen band weight.
     static func makrothenFactor(_ band: String?) -> Double {
         switch band {
         case "80m": return 2
@@ -110,66 +110,66 @@ public struct ScoreRule: Sendable, Equatable {
     }
 }
 
-/// Součty jednoho pásma.
+/// Totals of a single band.
 public struct BandScore: Sendable, Equatable {
-    /// Spojení včetně duplicit.
+    /// QSOs including dupes.
     public var qsos = 0
     public var dupes = 0
     public var points = 0
-    /// QTC (WAE) podle kmitočtu série.
+    /// QTC (WAE) by the frequency of the series.
     public var qtc = 0
     public init(qsos: Int = 0, dupes: Int = 0, points: Int = 0, qtc: Int = 0) {
         self.qsos = qsos; self.dupes = dupes; self.points = points; self.qtc = qtc
     }
 }
 
-/// Průběžné skóre závodu: po pásmech QSO, duplicity, body, QTC; násobiče; výsledné skóre.
+/// Running contest score: QSOs, dupes, points, QTC per band; multipliers; the resulting score.
 public struct ScoreTally: Sendable, Equatable {
-    /// Pásmo neznámé (spojení bez kmitočtu).
+    /// Band unknown (a QSO without a frequency).
     public static let unknownBand = "?"
     public let rule: ScoreRule
     public private(set) var multipliers: MultiplierTally
     public private(set) var perBand: [String: BandScore] = [:]
-    /// Okno závodu zafixované při úplném výpočtu: počítají se spojení a QTC v [since, until); until nil = bez konce.
-    /// Přírůstek (`ScoreCalculator.add`) používá totéž okno – výsledek je stejný jako úplný přepočet.
+    /// The contest window fixed at the full computation: QSOs and QTC in [since, until) are counted; until nil = no end.
+    /// The incremental path (`ScoreCalculator.add`) uses the same window – the result is the same as a full recomputation.
     public let since: Date
     public let until: Date?
-    /// Vlastní země neznámá (chybí značka stanice nebo cty.dat) – body podle země/kontinentu nejsou správné.
+    /// My own country is unknown (the station call or cty.dat is missing) – the points by country/continent are not correct.
     public internal(set) var ownCountryUnknown = false
-    /// Makrothen: chybí vlastní lokátor – všechna spojení mají 0 bodů.
+    /// Makrothen: my own locator is missing – all QSOs have 0 points.
     public internal(set) var ownLocatorMissing = false
-    /// Odpracované stanice (`DupeCheck.key`) pro duplicity.
+    /// Worked stations (`DupeCheck.key`) for dupes.
     private var worked: Set<String> = []
 
     public init(rule: ScoreRule, multiplierRule: MultiplierRule, since: Date = .distantPast, until: Date? = nil) {
         self.rule = rule; multipliers = MultiplierTally(rule: multiplierRule); self.since = since; self.until = until
     }
 
-    /// Spojení/QTC v čase `t` patří do závodu.
+    /// A QSO/QTC at time `t` belongs to the contest.
     public func inWindow(_ t: Date) -> Bool { t >= since && (until.map { t < $0 } ?? true) }
 
     public func band(_ b: String) -> BandScore { perBand[b] ?? BandScore() }
-    /// Pásma se spojením nebo QTC, od nejdelšího; neznámé pásmo na konci.
+    /// Bands with QSOs or QTC, from the longest one; the unknown band at the end.
     public var bands: [String] { Multipliers.sortBands(Array(perBand.keys)) }
 
     public var qsos: Int { perBand.values.reduce(0) { $0 + $1.qsos } }
     public var dupes: Int { perBand.values.reduce(0) { $0 + $1.dupes } }
     public var points: Int { perBand.values.reduce(0) { $0 + $1.points } }
     public var qtc: Int { perBand.values.reduce(0) { $0 + $1.qtc } }
-    /// Násobiče po pásmech (bez „jednou za závod“) – BARTG: země a oblasti.
+    /// Per-band multipliers (without "once per contest") – BARTG: countries and areas.
     public var bandMultipliers: Int { multipliers.total - multipliers.onceCount }
-    /// Kontinenty (BARTG).
+    /// Continents (BARTG).
     public var continents: Int { multipliers.worked(.continent, band: nil).count }
-    /// Násobiče v řádku Celkem tabulky okna Skóre: u BARTG jen po pásmech (kontinenty jsou ve vzorci zvlášť).
+    /// Multipliers in the Total row of the Score table: with BARTG only per-band ones (continents are separate in the formula).
     public var tableMultiplierTotal: Int {
         rule.formula == .pointsTimesMultipliersTimesContinents ? bandMultipliers : multipliers.total
     }
-    /// Řádek „Za závod“ v tabulce: násobiče jednou za závod, které jsou součástí součtu (u BARTG ne – kontinenty zvlášť).
+    /// The "Per contest" table row: multipliers once per contest that are part of the total (not BARTG – continents separately).
     public var showsOnceMultiplierRow: Bool {
         rule.formula != .pointsTimesMultipliersTimesContinents && multipliers.rule.components.contains { !$0.perBand }
     }
 
-    /// Násobitel ve vzorci skóre.
+    /// The multiplier factor in the score formula.
     public var multiplierFactor: Int {
         switch rule.formula {
         case .pointsTimesMultipliers: return multipliers.total
@@ -187,7 +187,7 @@ public struct ScoreTally: Sendable, Equatable {
         }
     }
 
-    /// Vzorec výsledného skóre s čísly („Body 123 × násobiče 45 = 5 535“).
+    /// The resulting score formula with numbers ("Points 123 × multipliers 45 = 5 535").
     public var formulaText: String {
         let f = Self.format
         switch rule.formula {
@@ -202,7 +202,7 @@ public struct ScoreTally: Sendable, Equatable {
         }
     }
 
-    /// Celé číslo s mezerou (nezlomitelnou) po tisících: 5 535.
+    /// A whole number with a (non-breaking) space between thousands: 5 535.
     public static func format(_ n: Int) -> String {
         let s = String(n.magnitude)
         var out = ""
@@ -220,11 +220,11 @@ public struct ScoreTally: Sendable, Equatable {
         s.qsos += 1
         if worked.insert(key).inserted { s.points += points } else { s.dupes += 1 }
         perBand[b] = s
-        // závod bez násobičů (Makrothen): tally násobičů zůstává prázdný jako dřív (okno Násobiče: 0 spojení)
+        // a contest without multipliers (Makrothen): the multiplier tally stays empty as before (Multipliers window: 0 QSOs)
         if multipliers.rule.hasMultipliers { multipliers.add(hits, band: r.band) }
     }
 
-    /// QTC série v okně závodu (WAE); ostatní závody QTC nepočítají.
+    /// QTC series in the contest window (WAE); other contests do not count QTC.
     public mutating func setQTC(_ series: [QTCSeries]) {
         for k in perBand.keys { perBand[k]?.qtc = 0 }
         guard rule.formula == .qsoPlusQTCTimesWeightedMultipliers else { return }
@@ -234,14 +234,14 @@ public struct ScoreTally: Sendable, Equatable {
     }
 }
 
-/// Výpočet bodů a skóre podle pravidel závodu.
+/// Computation of points and score according to the contest rules.
 public struct ScoreCalculator: Sendable {
     public let rule: ScoreRule
     public let multipliers: MultiplierCalculator
     let lookup: @Sendable (String, Bool) -> CountryInfo?
-    /// Vlastní země (pro body podle země a kontinentu).
+    /// My own country (for points by country and continent).
     let own: CountryInfo?
-    /// Vlastní čtverec lokátoru (4 znaky) pro Makrothen.
+    /// My own locator square (4 characters) for Makrothen.
     let ownSquare: String?
 
     public init(rule: ScoreRule, multiplierRule: MultiplierRule, ownCall: String, ownLocator: String,
@@ -252,7 +252,7 @@ public struct ScoreCalculator: Sendable {
         ownSquare = Self.square(ownLocator)
     }
 
-    /// Kalkulátor pro předvolbu; vlastní země se určí z vlastní značky.
+    /// Calculator for a preset; my own country is determined from my own call.
     public init(preset: ContestPreset, ownCall: String, ownLocator: String, countries: CountryDB?) {
         let lookup: @Sendable (String, Bool) -> CountryInfo? = { call, wae in countries?.lookup(call, wae: wae) }
         let own = countries?.lookup(ownCall)?.primaryPrefix
@@ -260,14 +260,14 @@ public struct ScoreCalculator: Sendable {
                   ownCall: ownCall, ownLocator: ownLocator, lookup: lookup)
     }
 
-    /// Vztah protistanice k vlastní stanici; nil = země jedné ze stanic neznámá.
+    /// Relation of the other station to my own station; nil = the country of one of the stations is unknown.
     public func relation(_ call: String) -> ScoreRelation? {
         guard let a = own, let b = lookup(QSORecord.normalizeCall(call), multipliers.rule.waeList) else { return nil }
         if a.primaryPrefix == b.primaryPrefix { return .sameCountry }
         return a.continent == b.continent ? .sameContinent : .otherContinent
     }
 
-    /// Body za spojení (bez ohledu na duplicitu).
+    /// Points for a QSO (regardless of dupe status).
     public func points(_ r: QSORecord) -> Int {
         if rule.preset == .makrothen {
             guard let own = ownSquare, let dx = Self.square(in: r.exchangeRcvd) ?? Self.square(r.grid ?? "") else { return 0 }
@@ -278,7 +278,7 @@ public struct ScoreCalculator: Sendable {
         return rule.points(relation: relation(r.call), band: r.band)
     }
 
-    /// Úplný výpočet ze spojení v okně závodu [since, until) (a QTC série u WAE); okno se v tally zafixuje.
+    /// Full computation from the QSOs in the contest window [since, until) (and WAE QTC series); the tally fixes the window.
     public func tally(records: [QSORecord], qtc: [QTCSeries], since: Date, until: Date? = nil) -> ScoreTally {
         var t = ScoreTally(rule: rule, multiplierRule: multipliers.rule, since: since, until: until)
         t.ownCountryUnknown = rule.needsOwnCountry && own == nil
@@ -288,7 +288,7 @@ public struct ScoreCalculator: Sendable {
         return t
     }
 
-    /// Přidá jedno zalogované spojení (bez přepočtu celého logu) – v okně závodu zafixovaném v `t`.
+    /// Adds one logged QSO (without recomputing the whole log) – within the contest window fixed in `t`.
     public func add(_ r: QSORecord, to t: inout ScoreTally) {
         guard t.inWindow(r.timeOn) else { return }
         t.add(record: r, points: points(r), hits: multipliers.rule.hasMultipliers ? multipliers.hits(r) : [])
@@ -296,24 +296,24 @@ public struct ScoreCalculator: Sendable {
 
     // MARK: Makrothen
 
-    /// Poloměr Země podle pravidel Makrothenu (km).
+    /// Earth radius per the Makrothen rules (km).
     static let makrothenRadiusKm = 6378.16
 
-    /// Vzdálenost středů čtverců (4 znaky) v celých km (dolů) podle pravidel Makrothenu.
+    /// Distance between square centers (4 characters) in whole km (rounded down) per the Makrothen rules.
     public static func makrothenKm(_ a: String, _ b: String) -> Int? {
         guard let sa = square(a), let sb = square(b), let p = Geo.maidenhead(sa), let q = Geo.maidenhead(sb) else { return nil }
         let km = Geo.distanceKm(p, q) / Geo.earthRadiusKm * makrothenRadiusKm
         return Int(km.rounded(.down))
     }
 
-    /// Čtverec lokátoru (první 4 znaky platného lokátoru 4/6/8 znaků).
+    /// Locator square (the first 4 characters of a valid 4/6/8-character locator).
     static func square(_ locator: String) -> String? {
         let l = locator.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard Geo.maidenhead(l) != nil else { return nil }
         return String(l.prefix(4))
     }
 
-    /// První platný lokátor ve výměně („599 JO70“ → JO70).
+    /// The first valid locator in the exchange ("599 JO70" → JO70).
     static func square(in exchange: String?) -> String? {
         (exchange ?? "").split { !$0.isLetter && !$0.isNumber }.lazy.compactMap { square(String($0)) }.first
     }

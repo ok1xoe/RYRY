@@ -3,21 +3,21 @@ import Foundation
 
 public enum QSOLogError: Error, Equatable, Sendable { case notFound(UUID), io(String) }
 
-/// Log: přírůstkový zápis do .jsonl (zdroj pravdy) a .adi; oprava/mazání atomickým přepsáním.
+/// Log: incremental write into .jsonl (source of truth) and .adi; edit/delete by an atomic rewrite.
 public actor QSOLogStore {
     public let adifURL: URL
     public let jsonlURL: URL
     public private(set) var records: [QSORecord] = []
     public private(set) var warnings: [String] = []
-    /// Poškozené řádky JSONL – zachovávají se při každém přepsání (lze je opravit ručně).
+    /// Corrupted JSONL lines – they are preserved on every rewrite (they can be fixed by hand).
     private var badLines: [String] = []
-    /// Log se nepodařilo přečíst → zápisy se odmítají, aby se nepřepsal.
+    /// The log could not be read → writes are refused so that it does not get overwritten.
     private var readFailed = false
-    /// Velikost a čas změny JSONL po posledním vlastním čtení/zápisu – pozná změnu jinou instancí
-    /// (např. dlouhé nahrávání do LoTW přes restart po Použít).
+    /// JSONL size and modification time after our own last read/write – detects a change by another instance
+    /// (e.g. a long upload to LoTW across a restart after Apply).
     private var signature: [Int] = []
 
-    /// ISO 8601 s milisekundami; čte i starší zápis bez desetin.
+    /// ISO 8601 with milliseconds; also reads the older notation without fractions.
     static let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .custom { d, enc in
@@ -45,7 +45,7 @@ public actor QSOLogStore {
         if fm.fileExists(atPath: jsonlURL.path) {
             do {
                 var data = try Data(contentsOf: jsonlURL)
-                // useknutý poslední řádek (výpadek) → ukončit ho, aby další zápis začal na novém řádku
+                // truncated last line (an outage) → terminate it so that the next write starts on a new line
                 if let last = data.last, last != UInt8(ascii: "\n") {
                     data.append(UInt8(ascii: "\n"))
                     try? Self.appendRaw(Data([UInt8(ascii: "\n")]), to: jsonlURL)
@@ -82,8 +82,8 @@ public actor QSOLogStore {
         return [size, mtime]
     }
 
-    /// Před přepisem logu: když soubor mezitím změnila jiná instance, znovu ho načíst (jinak by přepis ztratil
-    /// spojení zapsaná jinde).
+    /// Before rewriting the log: if another instance has changed the file meanwhile, load it again (otherwise the rewrite
+    /// would lose QSOs written elsewhere).
     private func refreshIfChangedExternally() {
         guard !readFailed, fileSignature() != signature, let d = try? Data(contentsOf: jsonlURL) else { return }
         var recs: [QSORecord] = [], bad: [String] = []
@@ -130,9 +130,9 @@ public actor QSOLogStore {
         var r = rec; r.call = QSORecord.normalizeCall(r.call)
         try checkWritable()
         let external = fileSignature() != signature
-        try appendLine(try jsonLine(r), to: jsonlURL)        // zdroj pravdy – chyba = spojení nezalogováno
+        try appendLine(try jsonLine(r), to: jsonlURL)        // source of truth – an error means the QSO is not logged
         records.append(r)
-        if external { signature = [] } else { signature = fileSignature() }   // cizí změna → příští přepis znovu načte
+        if external { signature = [] } else { signature = fileSignature() }   // external change → the next rewrite reloads
         do { try appendLine(ADIF.record(r), to: adifURL, header: ADIF.header()) }
         catch { warnings.append("ADIF zápis selhal (\(error)); JSONL je v pořádku, ADIF se přegeneruje") }
     }
@@ -158,7 +158,7 @@ public actor QSOLogStore {
         let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
         do {
             try Data(text.utf8).write(to: tmp)
-            let h = try FileHandle(forWritingTo: tmp); try h.synchronize(); try h.close()   // fsync před výměnou
+            let h = try FileHandle(forWritingTo: tmp); try h.synchronize(); try h.close()   // fsync before the swap
             if FileManager.default.fileExists(atPath: url.path) {
                 _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
             } else {
@@ -170,7 +170,7 @@ public actor QSOLogStore {
         }
     }
 
-    /// Hromadný import (ADIF): duplicita = stejné id, nebo stejná značka, pásmo a mód s časem ±1 min.
+    /// Bulk import (ADIF): a dupe = the same id, or the same call, band and mode with a time within ±1 min.
     public func importRecords(_ recs: [QSORecord]) throws -> (added: Int, duplicates: Int) {
         refreshIfChangedExternally()
         var all = records, added = 0, dup = 0
@@ -196,7 +196,7 @@ public actor QSOLogStore {
         try rewrite(recs)
     }
 
-    /// Označí spojení jako nahraná na službu (jediný přepis logu). Vrací počet změněných záznamů.
+    /// Marks the QSOs as uploaded to a service (a single log rewrite). Returns the number of changed records.
     @discardableResult
     public func markUploaded(ids: [UUID], target: UploadTarget, at: Date = Date()) throws -> Int {
         refreshIfChangedExternally()
@@ -227,7 +227,7 @@ public actor QSOLogStore {
         return records.filter { QSORecord.baseCall($0.call) == base }.sorted { $0.timeOn > $1.timeOn }
     }
 
-    /// ADIF obsahuje přesně stejná ID jako JSONL (ve stejném pořadí)?
+    /// Does the ADIF contain exactly the same IDs as the JSONL (in the same order)?
     public func isADIFConsistent() -> Bool { Self.consistent(adifURL, records) }
 
     public func rebuildADIF() throws {
@@ -235,7 +235,7 @@ public actor QSOLogStore {
     }
 }
 
-/// ISO 8601 (UTC) s milisekundami i bez nich.
+/// ISO 8601 (UTC) with and without milliseconds.
 public enum ISODates {
     nonisolated(unsafe) static let frac: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f

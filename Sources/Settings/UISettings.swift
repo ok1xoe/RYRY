@@ -1,11 +1,11 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Volby okna vysílání (MMTTY „Auto send CR/LF with TX button“, „Word wrap on keyboard“).
+/// Transmit window options (MMTTY "Auto send CR/LF with TX button", "Word wrap on keyboard").
 public struct TxWindowSettings: Codable, Sendable, Equatable {
-    /// Při přepnutí na TX tlačítkem nejdřív odvysílat CR LF.
+    /// When switching to TX with the button, transmit CR LF first.
     public var autoCRLF = false
-    /// Zalomit psaný text na tomto sloupci (0 = nezalamovat).
+    /// Wrap the typed text at this column (0 = do not wrap).
     public var wrapColumn = 0
     public static let wrapRange = 20...200
     public init() {}
@@ -18,27 +18,27 @@ public struct TxWindowSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Barevná paleta vodopádu.
+/// Waterfall color palette.
 public enum WaterfallPalette: String, Codable, Sendable, CaseIterable { case classic, gray, heat, green, blue }
-/// Odezva (vyhlazení) čárového spektra – MMTTY „FFT Response“.
+/// Response (smoothing) of the line spectrum – MMTTY "FFT Response".
 public enum FFTResponse: String, Codable, Sendable, CaseIterable {
     case fast, normal, slow
-    /// Váha předchozí hodnoty při doznívání (0 = okamžitě).
+    /// Weight of the previous value while decaying (0 = immediately).
     public var decay: Float { switch self { case .fast: 0.3; case .normal: 0.6; case .slow: 0.85 } }
 }
-/// Velikost XY scope (MMTTY „XYScope Size“).
+/// XY scope size (MMTTY "XYScope Size").
 public enum XYScopeSize: String, Codable, Sendable, CaseIterable {
     case small, medium, large
     public var points: Double { switch self { case .small: 100; case .medium: 160; case .large: 240 } }
 }
-/// Kvalita XY scope (MMTTY „XYScope Quality“): nízká = každý druhý bod.
+/// XY scope quality (MMTTY "XYScope Quality"): low = every other point.
 public enum XYScopeQuality: String, Codable, Sendable, CaseIterable { case low, high }
 
-/// Klávesová zkratka: klávesa („f1“…„f20“, jeden znak, „space“, „return“, „escape“, „tab“, „delete“, šipky)
-/// a modifikátory. Klávesa „none“ = příkaz bez zkratky.
+/// Keyboard shortcut: a key ("f1"…"f20", a single character, "space", "return", "escape", "tab", "delete", arrows)
+/// and modifiers. The key "none" = a command without a shortcut.
 public struct KeyBinding: Codable, Sendable, Hashable {
     public enum Modifier: String, Codable, Sendable, CaseIterable, Comparable {
-        case control, option, shift, command                  // pořadí symbolů jako v menu macOS ⌃⌥⇧⌘
+        case control, option, shift, command                  // symbol order as in the macOS menu ⌃⌥⇧⌘
         public static func < (a: Self, b: Self) -> Bool { allCases.firstIndex(of: a)! < allCases.firstIndex(of: b)! }
         public var symbol: String { switch self { case .control: "⌃"; case .option: "⌥"; case .shift: "⇧"; case .command: "⌘" } }
     }
@@ -56,12 +56,12 @@ public struct KeyBinding: Codable, Sendable, Hashable {
     public var isValid: Bool {
         if isNone { return true }
         if key.hasPrefix("f"), let n = Int(key.dropFirst()), (1...20).contains(n) { return true }
-        if Self.named[key] != nil { return !modifiers.isEmpty }        // Space, Return, šipky… by kolidovaly s psaním
+        if Self.named[key] != nil { return !modifiers.isEmpty }        // Space, Return, arrows… would collide with typing
         guard key.count == 1, let ch = key.first, !ch.isWhitespace, !ch.isNewline else { return false }
-        return !modifiers.isEmpty                               // samotné písmeno by kolidovalo s psaním textu
+        return !modifiers.isEmpty                               // a bare letter would collide with typing text
     }
 
-    /// Zobrazení jako v menu: „⌥⌘1“, „⇧F2“.
+    /// Display as in the menu: "⌥⌘1", "⇧F2".
     public var display: String {
         if isNone { return "—" }
         let k = key.hasPrefix("f") && key.count > 1 ? key.uppercased() : (Self.named[key] ?? key.uppercased())
@@ -75,7 +75,7 @@ public struct KeyBinding: Codable, Sendable, Hashable {
     }
 }
 
-/// Příkazy, kterým lze přiřadit zkratku (MMTTY „Assign ShortCut Keys“).
+/// Commands that can be assigned a shortcut (MMTTY "Assign ShortCut Keys").
 public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
     case macro(Int), toggleTx, rxNow, tune, logQSO, clearQSO, clearRx, stopMacro, openLog, esmMode, enterFrequency
     public static var allCases: [ShortcutCommand] {
@@ -90,7 +90,7 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
         case .enterFrequency: "enterFrequency"
         }
     }
-    /// Výchozí zkratky (dosavadní pevné): F1–F12, ⇧F1–⇧F4, ⌘T, ⌘., ⌘L, ⌘K, ⇧⌘L; ⌃R přepíná Run / S&P, ⌥⌘F zadání frekvence.
+    /// Default shortcuts (the existing fixed ones): F1–F12, ⇧F1–⇧F4, ⌘T, ⌘., ⌘L, ⌘K, ⇧⌘L; ⌃R toggles Run / S&P, ⌥⌘F frequency entry.
     public var defaultBinding: KeyBinding {
         switch self {
         case .macro(let i): i < 12 ? KeyBinding(key: "f\(i + 1)") : KeyBinding(key: "f\(i - 11)", modifiers: [.shift])
@@ -107,10 +107,10 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
 }
 
 extension AppSettings {
-    /// Platná zkratka příkazu (vlastní, jinak výchozí).
+    /// The valid shortcut of a command (custom, otherwise the default).
     public func binding(for c: ShortcutCommand) -> KeyBinding { shortcuts[c.id] ?? c.defaultBinding }
 
-    /// Příkazy se stejnou zkratkou (pro varování v Nastavení).
+    /// Commands with the same shortcut (for a warning in Settings).
     public func conflictingShortcuts() -> [[ShortcutCommand]] {
         var by: [KeyBinding: [ShortcutCommand]] = [:]
         for c in ShortcutCommand.allCases { let b = binding(for: c); if !b.isNone { by[b, default: []].append(c) } }

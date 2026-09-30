@@ -1,7 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Sběrač varování při tolerantním dekódování (předává se přes JSONDecoder.userInfo).
+/// Collector of warnings during tolerant decoding (passed through JSONDecoder.userInfo).
 final class WarningSink: @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String] = []
@@ -18,7 +18,7 @@ extension Decoder {
 }
 
 extension KeyedDecodingContainer {
-    /// Hodnota klíče, nebo výchozí; neplatná hodnota → výchozí + varování.
+    /// The key's value, or the default; an invalid value → the default + a warning.
     func tolerant<T: Decodable>(_ key: Key, _ def: T, _ sink: WarningSink?, _ section: String) -> T {
         guard contains(key) else { return def }
         if (try? decodeNil(forKey: key)) == true { return def }
@@ -29,7 +29,7 @@ extension KeyedDecodingContainer {
     }
 }
 
-/// Přeskočí libovolnou JSON hodnotu (pro posun v nekeyovaném kontejneru po chybě).
+/// Skips an arbitrary JSON value (to advance in an unkeyed container after an error).
 struct Skip: Decodable { init(from decoder: Decoder) throws {} }
 
 struct DynamicKey: CodingKey {
@@ -38,7 +38,7 @@ struct DynamicKey: CodingKey {
     init?(intValue: Int) { stringValue = String(intValue); self.intValue = intValue }
 }
 
-/// Pole, kde vadný prvek nahradí `fallback` (a varování) místo zahození celého pole.
+/// An array where a faulty element is replaced by `fallback` (and a warning) instead of discarding the whole array.
 struct TolerantArray<T: Decodable>: Decodable {
     var items: [T] = []
     init() {}
@@ -59,7 +59,7 @@ struct TolerantArray<T: Decodable>: Decodable {
 
 protocol TolerantFallback { static var fallback: Self { get } }
 
-/// Slovník, kde vadná položka vypadne (s varováním) a ostatní zůstanou.
+/// A dictionary where a faulty entry drops out (with a warning) and the rest stays.
 struct TolerantDict<V: Decodable>: Decodable {
     var items: [String: V] = [:]
     init() {}

@@ -24,9 +24,9 @@ public enum ADIF {
             + "<EOH>\n"
     }
 
-    /// Záznam pro trvalý log/export: navíc s příznaky nahrání (LOTW_QSL_SENT, EQSL_QSL_SENT, CLUBLOG_QSO_UPLOAD_STATUS + data).
+    /// Record for the persistent log/export: also with upload flags (LOTW_QSL_SENT, EQSL_QSL_SENT, CLUBLOG_QSO_UPLOAD_STATUS + dates).
     public static func record(_ r: QSORecord) -> String { record(r, includeUploadStatus: true) }
-    /// Záznam pro odeslání službě: bez příznaků nahrání.
+    /// Record for sending to a service: without upload flags.
     public static func uploadRecord(_ r: QSORecord) -> String { record(r, includeUploadStatus: false) }
 
     static func record(_ r: QSORecord, includeUploadStatus: Bool) -> String {
@@ -57,7 +57,7 @@ public enum ADIF {
         (.clublog, ("CLUBLOG_QSO_UPLOAD_STATUS", "Y"), "CLUBLOG_QSO_UPLOAD_DATE"),
     ]
 
-    /// Rozparsuje záznamy (za <EOH>). Délky jsou v bajtech UTF-8.
+    /// Parses the records (after <EOH>). Lengths are in UTF-8 bytes.
     public static func parse(_ text: String) -> [[String: String]] {
         let b = Array(text.utf8)
         var i = 0
@@ -83,13 +83,13 @@ public enum ADIF {
     }
 }
 
-// MARK: Import (MMTTY a jiné programy exportují ADIF)
+// MARK: Import (MMTTY and other programs export ADIF)
 
 extension ADIF {
     public struct ImportResult: Sendable { public var records: [QSORecord]; public var skipped: Int }
 
-    /// Záznamy ADIF → spojení. Záznam bez značky nebo data/času se přeskočí.
-    /// Jen pásmo bez frekvence → frekvence = dolní okraj pásma (pásmo se v logu odvozuje z frekvence).
+    /// ADIF records → QSOs. A record without a call or without a date/time is skipped.
+    /// Band only without a frequency → frequency = the lower band edge (in the log the band is derived from the frequency).
     public static func importRecords(_ text: String) -> ImportResult {
         var out: [QSORecord] = [], skipped = 0
         for f in parse(text) {
@@ -116,7 +116,7 @@ extension ADIF {
         return ImportResult(records: out, skipped: skipped)
     }
 
-    /// QSO_DATE (yyyyMMdd) + TIME_ON (HHmm nebo HHmmss), UTC.
+    /// QSO_DATE (yyyyMMdd) + TIME_ON (HHmm or HHmmss), UTC.
     static func date(_ d: String?, _ t: String?) -> Date? {
         guard let d, d.count == 8, let t, t.count == 4 || t.count == 6 else { return nil }
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
