@@ -72,6 +72,12 @@ public struct BandScale: Sendable, Equatable {
         place(low: visibleLow + kHz, span: span)
     }
 
+    /// Nastaví dolní okraj rozsahu (šířka se nemění, ořízne se na pásmo).
+    public mutating func moveLow(to low: Double) {
+        guard low.isFinite else { return }
+        place(low: low, span: span)
+    }
+
     private mutating func place(low: Double, span s: Double) {
         let lo = min(max(low, fullLow), fullHigh - s)
         visibleLow = lo; visibleHigh = lo + s

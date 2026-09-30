@@ -15,8 +15,10 @@ public struct BandMapWindow: View {
     @State private var scales: [String: BandScale] = [:]
     @State private var showLogged = true
     @State private var loggedMinutes = 60
-    /// Poslední poloha při tažení (posun stupnice).
-    @State private var dragFrom: CGFloat?
+    /// Pásmo zvolené podle spotů. Zapamatuje se, aby mapa nepřeskakovala, kdykoli počty spotů na pásmech přeskočí.
+    @State private var latchedBand: String?
+    /// Dolní okraj stupnice na začátku tažení; `@GestureState` se sám vynuluje i při zrušení gesta.
+    @GestureState private var panStartLow: Double?
     public init(model: AppModel) { self.model = model }
 
     static let rowHeight: CGFloat = 16
@@ -44,19 +46,31 @@ public struct BandMapWindow: View {
     }
 
     /// Pásma se spoty od nejvíce obsazeného – náhradní volba, když pásmo neurčí rig ani QSO okno.
+    /// Při shodě počtu rozhoduje pořadí pásmového plánu, ne abeceda.
     var spotBands: [String] {
         var n: [String: Int] = [:]
         for s in model.spotFeed.book.byID.values where model.spotFeed.filter.matchesMode(s) {
             if let b = s.band { n[b, default: 0] += 1 }
         }
-        return n.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
+        func order(_ b: String) -> Int { RTTYBandPlan.bands.firstIndex(of: b) ?? RTTYBandPlan.bands.count }
+        return n.sorted { $0.value != $1.value ? $0.value > $1.value : order($0.key) < order($1.key) }.map(\.key)
     }
 
-    /// Nikdy nil: bez rigu a bez frekvence v QSO okně se ukáže pásmo se spoty, jinak výchozí pásmo.
-    var band: String {
+    /// Pásmo z ruční volby, rigu nebo frekvence v QSO okně; nil = nic z toho pásmo neurčuje.
+    var chosenBand: String? {
         // ruční frekvenci QSO číst jen když ruční volba ani rig pásmo neurčí (jinak by každá změna QSO okna překreslovala mapu)
         RTTYBandPlan.selectBand(choice: bandChoice, rigHz: rigKHz.map { $0 * 1000 }, manualHz: nil)
-            ?? RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: model.qso.frequency, spotBands: spotBands)
+            ?? RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: model.qso.frequency)
+    }
+
+    /// Nikdy nil: bez rigu a bez frekvence v QSO okně se ukáže zapamatované pásmo se spoty, jinak výchozí pásmo.
+    var band: String { chosenBand ?? latchedBand ?? RTTYBandPlan.defaultBand }
+
+    /// Zapamatuje pásmo se spoty, dokud pásmo neurčuje rig ani QSO okno. Nepřepisuje se s každým novým spotem,
+    /// aby mapa pod rukama nepřeskakovala (a aby tažení nekončilo na jiném pásmu, než kde začalo).
+    func latchBandIfNeeded() {
+        guard chosenBand == nil, latchedBand == nil, let b = spotBands.first else { return }
+        latchedBand = b
     }
 
     func scale(for band: String) -> BandScale {
@@ -99,6 +113,8 @@ public struct BandMapWindow: View {
         }
         .padding(8)
         .frame(minWidth: 280, minHeight: 360)
+        .onAppear { latchBandIfNeeded() }
+        .onChange(of: model.spotFeed.book.count) { latchBandIfNeeded() }
     }
 
     /// Výběr pásma; „auto“ = podle rigu, frekvence v QSO okně nebo spotů.
@@ -220,15 +236,14 @@ public struct BandMapWindow: View {
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 3)
+                    .updating($panStartLow) { _, start, _ in if start == nil { start = sc.visibleLow } }
                     .onChanged { g in
                         guard h > 0 else { return }
-                        let last = dragFrom ?? g.startLocation.y
                         var s = scale(for: band)
-                        s.pan(by: (g.location.y - last) / h * s.span)     // dolů = k nižším frekvencím
+                        // posun proti poloze na začátku gesta (ne přírůstkově), takže zrušené gesto nenechá zbytek
+                        s.moveLow(to: (panStartLow ?? sc.visibleLow) + g.translation.height / h * s.span)
                         scales[band] = s
-                        dragFrom = g.location.y
                     }
-                    .onEnded { _ in dragFrom = nil }
             )
             .frame(width: g.size.width, height: h, alignment: .topLeading)
         }

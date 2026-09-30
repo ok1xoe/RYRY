@@ -64,6 +64,18 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(s.visibleLow == 14_070 && abs(s.span - span) < 1e-9)
 }
 
+@Test func scaleMovesLowAbsolutely() {
+    var s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
+    s.zoom(by: 0.5, around: 14_085)
+    let span = s.span
+    s.moveLow(to: 14_080)
+    #expect(s.visibleLow == 14_080 && abs(s.span - span) < 1e-9)
+    s.moveLow(to: 14_099)                                  // za horní okraj → ořízne
+    #expect(s.visibleHigh == 14_100 && abs(s.span - span) < 1e-9)
+    s.moveLow(to: .nan)                                    // nesmysl se ignoruje
+    #expect(s.visibleHigh == 14_100)
+}
+
 @Test func scaleConvertsFrequencyAndY() {
     let s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
     #expect(s.visibleLow == 14070 && s.visibleHigh == 14100)
