@@ -2,20 +2,20 @@
 import Foundation
 import ModemKit
 
-/// Doplňkové dekodéry: druhý dekodér (jiný demodulátor na stejném naladění jako hlavní)
-/// a vícekanálové dekódování (samostatné dekodéry na signálech nalezených ve spektru).
+/// Auxiliary decoders: a second decoder (a different demodulator on the same tuning as the main one)
+/// and multi-channel decoding (separate decoders on the signals found in the spectrum).
 public struct AuxDecoderConfig: Sendable, Equatable {
     public static let demodTypes = ["iir", "fir", "pll", "fft"]
     public static let maxChannelLimit = 8
 
     public var secondEnabled = false
-    /// Demodulátor druhého dekodéru; nil = automaticky jiný než hlavní (hlavní IIR → FFT, jinak IIR).
+    /// The second decoder's demodulator; nil = automatically one other than the main (main IIR → FFT, else IIR).
     public var secondDemod: String?
     public var channelsEnabled = false
     public var maxChannels = 4
-    /// Kanál zaniká po tolika sekundách bez signálu.
+    /// A channel disappears after this many seconds without a signal.
     public var channelTimeout: Double = 15
-    /// Rozsah hledání signálů (Hz).
+    /// The range in which signals are searched for (Hz).
     public var fromHz = 200.0, toHz = 3000.0
     public init() {}
 
@@ -23,14 +23,14 @@ public struct AuxDecoderConfig: Sendable, Equatable {
     var clampedChannels: Int { min(Self.maxChannelLimit, max(1, maxChannels)) }
     var clampedTimeout: Double { channelTimeout.isFinite ? min(600, max(1, channelTimeout)) : 15 }
 
-    /// Demodulátor druhého dekodéru pro daný typ hlavního.
+    /// The second decoder's demodulator for a given type of the main one.
     public func resolvedSecondDemod(main: String) -> String {
         if let d = secondDemod, Self.demodTypes.contains(d) { return d }
         return main == "iir" ? "fft" : "iir"
     }
 }
 
-/// Naladění hlavního dekodéru, které doplňkové dekodéry sledují.
+/// The tuning of the main decoder that the auxiliary decoders follow.
 public struct AuxTuning: Sendable, Equatable {
     public var mark: Double, shift: Double, baud: Double, reverse: Bool, demodType: String
     public init(mark: Double = 2125, shift: Double = 170, baud: Double = 45.45, reverse: Bool = false, demodType: String = "iir") {
@@ -38,7 +38,7 @@ public struct AuxTuning: Sendable, Equatable {
     }
 }
 
-/// Kanál vícekanálového dekodéru (id je stálé po dobu života kanálu).
+/// A channel of the multi-channel decoder (the id is stable for the channel's lifetime).
 public struct DecoderChannelInfo: Sendable, Equatable, Identifiable {
     public let id: Int
     public var mark: Double
@@ -46,17 +46,17 @@ public struct DecoderChannelInfo: Sendable, Equatable, Identifiable {
 }
 
 public enum AuxEvent: Sendable, Equatable {
-    /// Znak z druhého dekodéru.
+    /// A character from the second decoder.
     case secondText(Character)
-    /// Znak z kanálu `id`.
+    /// A character from channel `id`.
     case channelText(id: Int, Character)
-    /// Aktuální seznam kanálů (při vzniku/zániku kanálu nebo posunu AFC ≥ 1 Hz).
+    /// The current list of channels (when a channel appears/disappears or AFC shifts by ≥ 1 Hz).
     case channels([DecoderChannelInfo])
 }
 
-/// Doplňkové modemy běží na vlastní sériové frontě mimo actor Engine – hlavní příjem nebrzdí.
-/// Engine sem posílá kopie přijatých bloků; když fronta nestíhá (víc než `maxBacklog` vzorků), bloky se zahazují.
-/// Modemy jen přijímají (nikdy nevysílají).
+/// The auxiliary modems run on their own serial queue outside the Engine actor – they do not slow the main RX.
+/// The Engine sends copies of received blocks here; when the queue lags (over `maxBacklog` samples), blocks are dropped.
+/// The modems only receive (they never transmit).
 final class AuxDecoderHub: @unchecked Sendable {
     typealias Factory = @Sendable () -> (any Modem)?
 
@@ -66,7 +66,7 @@ final class AuxDecoderHub: @unchecked Sendable {
     private let sampleRate: Double
     private let maxBacklog: Int
 
-    // chráněno zámkem
+    // protected by the lock
     private let lock = NSLock()
     private var backlog = 0
     private var droppedSamples = 0
@@ -74,7 +74,7 @@ final class AuxDecoderHub: @unchecked Sendable {
     private var consumers: [UUID: Task<Void, Never>] = [:]
     private var liveModems = 0
 
-    // jen na frontě
+    // queue only
     private final class Decoder {
         let modem: any Modem
         var applied: AuxTuning?
@@ -100,9 +100,9 @@ final class AuxDecoderHub: @unchecked Sendable {
         self.factory = factory; self.emit = emit
     }
 
-    /// Počet vzorků zahozených kvůli přetížení.
+    /// The number of samples dropped because of overload.
     var dropped: Int { lock.withLock { droppedSamples } }
-    /// Počet existujících doplňkových modemů (pro testy úniku).
+    /// The number of live auxiliary modems (for leak tests).
     var modemCount: Int { lock.withLock { liveModems } }
     var consumerCount: Int { lock.withLock { consumers.count } }
 
@@ -111,7 +111,7 @@ final class AuxDecoderHub: @unchecked Sendable {
         queue.async { self.apply(c) }
     }
 
-    /// Kopie přijatého bloku + naladění hlavního dekodéru (+ spektrum pro detekci kanálů).
+    /// A copy of the received block + the main decoder's tuning (+ the spectrum for channel detection).
     func feed(_ block: [Float], tuning: AuxTuning, spectrum: SpectrumFrame?) {
         let n = block.count
         let ok = lock.withLock { () -> Bool in
@@ -122,18 +122,18 @@ final class AuxDecoderHub: @unchecked Sendable {
         }
         guard ok else { return }
         queue.async {
-            // po stop() zbylé bloky jen zahodit (jinak by zastavení čekalo na zpracování až 20 s audia)
+            // after stop() just drop the remaining blocks (otherwise stopping would wait for up to 20 s of audio)
             if !self.lock.withLock({ self.stopped }) { self.process(block, tuning: tuning, spectrum: spectrum) }
             self.lock.withLock { self.backlog -= n }
         }
     }
 
-    /// Počká na zpracování všech dosud zaslaných bloků.
+    /// Waits until all blocks sent so far have been processed.
     func flush() async {
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in queue.async { c.resume() } }
     }
 
-    /// Zpracuje frontu, ukončí všechny modemy a počká na doručení jejich textu.
+    /// Processes the queue, finishes all modems and waits for their text to be delivered.
     func stop() async {
         lock.withLock { stopped = true }
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
@@ -151,7 +151,7 @@ final class AuxDecoderHub: @unchecked Sendable {
         }
     }
 
-    // MARK: Fronta
+    // MARK: Queue
 
     private func apply(_ c: AuxDecoderConfig) {
         config = c
@@ -189,7 +189,7 @@ final class AuxDecoderHub: @unchecked Sendable {
         if let s = second { retire(s.dec); second = nil }
     }
 
-    /// Nastaví parametry, které se od minula změnily (mark jen když `withMark`).
+    /// Sets the parameters that changed since last time (mark only when `withMark`).
     private func sync(_ d: Decoder, _ t: AuxTuning, withMark: Bool) {
         let a = d.applied
         let m = d.modem
@@ -206,7 +206,7 @@ final class AuxDecoderHub: @unchecked Sendable {
             let demod = config.resolvedSecondDemod(main: t.demodType)
             if second?.demod != demod { removeSecond() }
             if second == nil, let d = makeDecoder({ .secondText($0) }) {
-                try? d.modem.set(parameter: "afc", value: .bool(false))     // sleduje ladění hlavního
+                try? d.modem.set(parameter: "afc", value: .bool(false))     // follows the main decoder's tuning
                 try? d.modem.set(parameter: "demodType", value: .string(demod))
                 second = (d, demod)
             }
@@ -239,7 +239,7 @@ final class AuxDecoderHub: @unchecked Sendable {
             if let k = channels.firstIndex(where: { abs($0.mark - m) < near }) {
                 channels[k].lastSeen = now
             } else if channels.count < config.clampedChannels, m >= 100, m + t.shift <= 3000,
-                      !channels.contains(where: { abs($0.mark - m) < t.shift }),   // překryv s existujícím kanálem
+                      !channels.contains(where: { abs($0.mark - m) < t.shift }),   // overlap with an existing channel
                       let d = makeDecoder({ [id = nextId] in .channelText(id: id, $0) }) {
                 try? d.modem.set(parameter: "afc", value: .bool(true))
                 try? d.modem.set(parameter: "mark", value: .double((m * 10).rounded() / 10))
@@ -247,7 +247,7 @@ final class AuxDecoderHub: @unchecked Sendable {
                 nextId += 1
             }
         }
-        // zánik: bez signálu déle než timeout; dva kanály, které AFC stáhlo na stejný signál → starší zůstává
+        // removal: no signal for longer than the timeout; two channels AFC pulled onto the same signal → the older stays
         var keep: [Channel] = []
         for ch in channels {
             if now - ch.lastSeen > config.clampedTimeout || keep.contains(where: { abs($0.mark - ch.mark) < near }) {

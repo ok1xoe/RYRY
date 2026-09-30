@@ -1,4 +1,4 @@
-/// Mód modemu (např. RTTY-45) včetně ADIF označení pro log.
+/// Modem mode (e.g. RTTY-45) including the ADIF designation for the log.
 public struct ModeDescriptor: Sendable, Hashable, Codable {
     public let id: String
     public let displayName: String

@@ -6,8 +6,8 @@ public protocol XMLRPCTransport: Sendable {
     func call(_ method: String, _ params: [XMLRPCValue]) async throws -> XMLRPCValue
 }
 
-/// XML-RPC přes HTTP POST (flrig: http://host:12345/RPC2).
-/// URLSession se při zániku transportu ukončí (jinak by zůstávala po každém restartu).
+/// XML-RPC over HTTP POST (flrig: http://host:12345/RPC2).
+/// The URLSession is shut down when the transport goes away (otherwise it would linger after every restart).
 final class SessionBox: @unchecked Sendable {
     let session: URLSession
     init(_ s: URLSession) { session = s }

@@ -18,14 +18,14 @@ public struct EngineConfig: Sendable, Equatable {
     public var txOutput: TxOutput = .afsk
     public var fskInvert = false
     public var audioDuringFSK = false
-    public var txDelay: Duration = .milliseconds(0)      // PTT → modulace
-    public var pttTail: Duration = .milliseconds(200)    // konec modulace → PTT off
+    public var txDelay: Duration = .milliseconds(0)      // PTT → modulation
+    public var pttTail: Duration = .milliseconds(200)    // end of modulation → PTT off
     public var pttTimeout: Duration = .seconds(600)
     public var rigPollInterval: Duration = .seconds(1)
     public init() {}
 }
 
-/// keying = PTT se právě zapíná; pttOff = PTT se vypíná (doběh nebo přerušení).
+/// keying = PTT is being switched on; pttOff = PTT is being switched off (tail or abort).
 public enum EngineState: String, Sendable { case stopped, rx, keying, pttOn, tx, drain, pttOff }
 
 public enum EngineError: Error, Equatable, Sendable {
@@ -38,15 +38,15 @@ public enum EngineEvent: Sendable {
     case rig(RigStatus)
     case error(EngineError)
     case pttTimeout
-    /// Makro obsahovalo %l – klient (GUI/API) má zalogovat aktuální spojení.
+    /// The macro contained %l – the client (GUI/API) should log the current QSO.
     case logRequested
-    /// Počet znaků/kódů čekajících na odvysílání (při změně, max. 5×/s).
+    /// The number of characters/codes waiting to be transmitted (on change, at most 5×/s).
     case txProgress(Int)
-    /// Druhý dekodér / vícekanálové dekódování.
+    /// Second decoder / multi-channel decoding.
     case aux(AuxEvent)
 }
 
-/// Rozesílá události více odběratelům (každý dostane vlastní AsyncStream).
+/// Broadcasts events to several subscribers (each gets its own AsyncStream).
 final class EventBroadcaster: @unchecked Sendable {
     private let lock = NSLock()
     private var subs: [UUID: AsyncStream<EngineEvent>.Continuation] = [:]

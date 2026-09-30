@@ -1,7 +1,7 @@
 import Foundation
 
-/// Minimalistické čtení a zápis WAV. Zápis PCM 16 bit mono; čtení PCM 16/24/32 bit, float 32 bit
-/// i WAVE_FORMAT_EXTENSIBLE, bere 1. kanál.
+/// Minimal WAV reading and writing. Writes PCM 16 bit mono; reads PCM 16/24/32 bit, float 32 bit
+/// and WAVE_FORMAT_EXTENSIBLE too, taking the 1st channel.
 public enum WaveFile {
     public enum Error: Swift.Error, Equatable, LocalizedError {
         case notWave, unsupportedFormat(String), truncated
@@ -50,7 +50,7 @@ public enum WaveFile {
                 if id == "fmt " {
                     guard body + 16 <= raw.count else { throw Error.truncated }
                     format = u16(body); channels = u16(body + 2); rate = u32(body + 4); bits = u16(body + 14)
-                    // WAVE_FORMAT_EXTENSIBLE: skutečný formát je v prvních 2 bajtech SubFormat GUID
+                    // WAVE_FORMAT_EXTENSIBLE: the real format is in the first 2 bytes of the SubFormat GUID
                     if format == 0xFFFE, size >= 40, body + 26 <= raw.count { format = u16(body + 24) }
                 } else if id == "data" {
                     let ok = (format == 1 && [16, 24, 32].contains(bits)) || (format == 3 && bits == 32)
@@ -83,7 +83,7 @@ public enum WaveFile {
     }
 }
 
-/// Průběžný zápis WAV (PCM 16 bit mono) – nahrávání příjmu. Velikosti v hlavičce se doplní při `close()`.
+/// Streaming WAV writing (PCM 16 bit mono) – RX recording. The header sizes are filled in on `close()`.
 public final class WaveWriter {
     public let url: URL
     public let sampleRate: Int
@@ -92,7 +92,7 @@ public final class WaveWriter {
 
     public init(url: URL, sampleRate: Int) throws {
         self.url = url; self.sampleRate = sampleRate
-        try WaveFile.write(samples: [], sampleRate: sampleRate, to: url)     // hlavička s nulovou délkou
+        try WaveFile.write(samples: [], sampleRate: sampleRate, to: url)     // header with zero length
         handle = try FileHandle(forWritingTo: url)
         try handle.seekToEnd()
     }
@@ -106,7 +106,7 @@ public final class WaveWriter {
         }
         try handle.write(contentsOf: d)
         sampleCount += samples.count
-        try writeSizes()                                   // průběžně – soubor jde přečíst i po pádu aplikace
+        try writeSizes()                                   // as we go – the file is readable even after an app crash
         try handle.seekToEnd()
     }
 
@@ -116,7 +116,7 @@ public final class WaveWriter {
         try handle.seek(toOffset: 40); try handle.write(contentsOf: withUnsafeBytes(of: bytes.littleEndian) { Data($0) })
     }
 
-    /// Doplní velikosti RIFF a data a zavře soubor.
+    /// Fills in the RIFF and data sizes and closes the file.
     public func close() throws {
         try writeSizes()
         try handle.close()

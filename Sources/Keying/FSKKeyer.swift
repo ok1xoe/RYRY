@@ -1,16 +1,16 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 
-/// FSK klíčovač: dostává kódy v pořadí bitů MMTTY (viz rttycore_read_fsk_codes).
+/// FSK keyer: receives codes in MMTTY bit order (see rttycore_read_fsk_codes).
 public protocol FSKKeyer: AnyObject, Sendable {
-    func start() throws          // linka na mark
+    func start() throws          // line to mark
     func send(codes: [UInt8])
-    var pending: Int { get }     // kódy čekající na odvysílání
-    func stop()                  // linka na mark, fronta se zahodí
-    /// Počká, až je vše odvysíláno (UART: tcdrain; soft: prázdná fronta), max. `timeout`.
+    var pending: Int { get }     // codes waiting to be transmitted
+    func stop()                  // line to mark, the queue is discarded
+    /// Waits until everything has been transmitted (UART: tcdrain; soft: empty queue), at most `timeout`.
     func finish(timeout: Duration) async
 }
 
-/// FSK přes UART TxD (45,45 Bd přes IOSSIOSPEED; spolehlivé s FTDI).
+/// FSK via UART TxD (45.45 Bd through IOSSIOSPEED; reliable with FTDI).
 public final class UARTFSKKeyer: FSKKeyer, @unchecked Sendable {
     private let port: SerialPort
     private let baud: Double
@@ -21,7 +21,7 @@ public final class UARTFSKKeyer: FSKKeyer, @unchecked Sendable {
         self.port = port; self.baud = baud; self.invert = invert
     }
 
-    /// MMTTY kód → ITA2 (LSB se vysílá první).
+    /// MMTTY code → ITA2 (the LSB is transmitted first).
     public static func reverse5(_ c: UInt8) -> UInt8 {
         var r: UInt8 = 0
         for b in 0..<5 where c & (1 << b) != 0 { r |= 1 << (4 - b) }
@@ -46,10 +46,10 @@ public final class UARTFSKKeyer: FSKKeyer, @unchecked Sendable {
         do { try port.write(codes.map(Self.reverse5)) } catch { lastError = error }
     }
 
-    public var pending: Int { 0 }   // o časování se stará UART; modulátor dodává kódy v reálném čase
+    public var pending: Int { 0 }   // the UART handles the timing; the modulator supplies codes in real time
 
     public func stop() {
-        port.flushOutput()           // nedovysílané znaky zahodit
+        port.flushOutput()           // discard the characters not yet transmitted
         try? port.setBreak(false)
     }
 

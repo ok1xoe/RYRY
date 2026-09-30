@@ -1,5 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
-// Testovací náhrady hardwaru (nesahají na skutečná zařízení).
+// Test replacements for hardware (they do not touch real devices).
 import Foundation
 import Keying
 
@@ -45,7 +45,7 @@ public final class FakeSerialPort: SerialPort, @unchecked Sendable {
     }
 }
 
-/// Hodiny pro deterministické testy: sleep(until) jen posune čas.
+/// A clock for deterministic tests: sleep(until) only advances the time.
 public final class ManualClock: Clock, @unchecked Sendable {
     private let lock = NSLock()
     private var t: UInt64 = 0

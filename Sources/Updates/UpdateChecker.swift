@@ -3,11 +3,11 @@ import CryptoKit
 import Foundation
 import Localization
 
-/// Síť pro kontrolu aktualizací (v testech nahrazena atrapou).
+/// The network used for update checks (replaced by a stub in tests).
 public protocol UpdateNetwork: Sendable {
-    /// Stáhne malý dokument (appcast, GitHub API).
+    /// Downloads a small document (appcast, GitHub API).
     func fetch(_ url: URL) async throws -> Data
-    /// Stáhne soubor do dočasného umístění; volající ho přesune.
+    /// Downloads a file to a temporary location; the caller moves it.
     func download(_ url: URL) async throws -> URL
 }
 
@@ -22,7 +22,7 @@ public struct URLSessionUpdateNetwork: UpdateNetwork {
     public func fetch(_ url: URL) async throws -> Data {
         var r = URLRequest(url: url)
         r.setValue("application/json", forHTTPHeaderField: "Accept")
-        r.setValue("mmtty4mac", forHTTPHeaderField: "User-Agent")   // GitHub API User-Agent vyžaduje
+        r.setValue("mmtty4mac", forHTTPHeaderField: "User-Agent")   // the GitHub API requires a User-Agent
         let (d, resp) = try await session.data(for: r)
         if let h = resp as? HTTPURLResponse, !(200..<300).contains(h.statusCode) { throw UpdateError.http(h.statusCode) }
         return d
@@ -38,16 +38,16 @@ public struct URLSessionUpdateNetwork: UpdateNetwork {
 }
 
 public enum UpdateOutcome: Sendable, Equatable {
-    case notConfigured               // MMUpdateFeedURL je prázdné
-    case skippedByLimit              // automatická kontrola, dnes už proběhla
+    case notConfigured               // MMUpdateFeedURL is empty
+    case skippedByLimit              // automatic check, already done today
     case upToDate
     case available(UpdateInfo)
-    case skippedVersion(UpdateInfo)  // novější verze, kterou uživatel přeskočil (jen automatická kontrola)
-    case systemTooOld(UpdateInfo)    // novější verze vyžaduje novější macOS
+    case skippedVersion(UpdateInfo)  // a newer version that the user skipped (automatic check only)
+    case systemTooOld(UpdateInfo)    // the newer version requires a newer macOS
     case failed(String)
 }
 
-/// Kontrola aktualizací. Stav (poslední kontrola, přeskočená verze) je v UserDefaults.
+/// Update checking. The state (last check, skipped version) lives in UserDefaults.
 public final class UpdateChecker: @unchecked Sendable {
     public static let lastCheckKey = "updates.lastCheck"
     public static let skippedKey = "updates.skippedVersion"
@@ -72,7 +72,7 @@ public final class UpdateChecker: @unchecked Sendable {
         self.systemVersion = systemVersion; self.now = now
     }
 
-    /// Aktuální verze z Info.plist hlavního balíčku (0.0.0, když chybí).
+    /// The current version from the main bundle's Info.plist (0.0.0 when missing).
     public static func currentVersion(bundle: Bundle = .main) -> AppVersion {
         let v = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
         let b = (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String).flatMap { Int($0) }
@@ -83,7 +83,7 @@ public final class UpdateChecker: @unchecked Sendable {
     public var lastCheck: Date? { defaults.object(forKey: Self.lastCheckKey) as? Date }
     public var skippedVersion: String? { defaults.string(forKey: Self.skippedKey) }
 
-    /// Automatická kontrola smí proběhnout (nejvýš 1× za 24 h; hodiny šly zpět = smí).
+    /// Whether an automatic check may run (at most once per 24 h; the clock went back = it may).
     public func dueForAutomaticCheck() -> Bool {
         guard let last = lastCheck else { return true }
         let d = now().timeIntervalSince(last)
@@ -92,7 +92,7 @@ public final class UpdateChecker: @unchecked Sendable {
 
     public func skip(_ info: UpdateInfo) { defaults.set(info.version.description, forKey: Self.skippedKey) }
 
-    /// `manual` = ruční příkaz z menu: ignoruje denní limit i přeskočenou verzi.
+    /// `manual` = a manual command from the menu: ignores both the daily limit and the skipped version.
     public func check(manual: Bool) async -> UpdateOutcome {
         guard configured else { return .notConfigured }
         guard let feedURL else { return .failed(L("neplatná adresa aktualizací")) }
@@ -127,10 +127,10 @@ public final class UpdateChecker: @unchecked Sendable {
         }
     }
 
-    // MARK: stažení
+    // MARK: download
 
-    /// Stáhne DMG do `directory`, ověří sha256 (je-li známý) a vrátí cílový soubor.
-    /// Soubor se stejným názvem se nepřepisuje (přidá se číslo).
+    /// Downloads the DMG into `directory`, verifies the sha256 (when known) and returns the destination file.
+    /// A file with the same name is not overwritten (a number is appended).
     public static func download(_ info: UpdateInfo, to directory: URL, network: UpdateNetwork) async throws -> URL {
         let tmp = try await network.download(info.url)
         let fm = FileManager.default

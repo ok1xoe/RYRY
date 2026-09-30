@@ -3,8 +3,8 @@ import AudioToolbox
 import AVFoundation
 import Foundation
 
-/// Backend nad dvěma AVAudioEngine (vstup a výstup mohou být různá zařízení).
-/// Render callback výstupu jen čte z lock-free ring bufferu.
+/// A backend over two AVAudioEngines (the input and output may be different devices).
+/// The output render callback only reads from a lock-free ring buffer.
 public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
     private var inEngine: AVAudioEngine?
     private var outEngine: AVAudioEngine?
@@ -37,8 +37,8 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
         stop()
         self.modemRate = modemRate
 
-        // Vstup. Po přepnutí zařízení hlásí inputNode zastaralý formát, proto tap bez formátu
-        // (dostane nativní formát zařízení) a převodník se vytvoří podle prvního bufferu.
+        // Input. After a device switch inputNode reports a stale format, hence a tap without a format
+        // (it gets the device's native format) and the converter is created from the first buffer.
         let ie = AVAudioEngine()
         try Self.setDevice(ie.inputNode, uid: config.inputUID)
         let hwFmt = ie.inputNode.inputFormat(forBus: 0)
@@ -67,7 +67,7 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
             ring.write(c.process(mono))
         }
 
-        // Výstup
+        // Output
         let oe = AVAudioEngine()
         try Self.setDevice(oe.outputNode, uid: config.outputUID)
         let outHW = oe.outputNode.outputFormat(forBus: 0)
@@ -104,11 +104,11 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
         }
         inEngine = ie; outEngine = oe
         failLock.withLock { _failure = nil }
-        // Změna konfigurace (odpojené zařízení, změna formátu) zastaví engine → nahlásit.
+        // A configuration change (disconnected device, format change) stops the engine → report it.
         for (eng, label) in [(ie, "vstup"), (oe, "výstup")] {
             observers.append(NotificationCenter.default.addObserver(
                 forName: .AVAudioEngineConfigurationChange, object: eng, queue: nil) { [weak self, weak eng] _ in
-                    // notifikace chodí i při běžném startu; porucha = engine se zastavil
+                    // the notification also arrives on a normal start; a failure = the engine stopped
                     guard let eng, !eng.isRunning else { return }
                     self?.failLock.withLock { self?._failure = "změna zvukového zařízení (\(label))" }
                 })
@@ -135,7 +135,7 @@ public final class CoreAudioBackend: AudioBackend, @unchecked Sendable {
         return samples.count
     }
 
-    public func clearTx() { txRing.requestClear() }     // render vlákno (konzument) zahodí při dalším čtení
+    public func clearTx() { txRing.requestClear() }     // the render thread (consumer) discards it on the next read
 
     public var txQueued: Int { Int(Double(txRing.available) * modemRate / deviceOutRate) }
 }

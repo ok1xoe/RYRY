@@ -1,7 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Informace o vydání z appcastu nebo GitHub Releases.
+/// Release information from an appcast or from GitHub Releases.
 public struct UpdateInfo: Sendable, Equatable {
     public var version: AppVersion
     public var url: URL
@@ -15,7 +15,7 @@ public struct UpdateInfo: Sendable, Equatable {
         self.minimumSystemVersion = minimumSystemVersion; self.sha256 = sha256
     }
 
-    /// Poznámky ve zvoleném jazyce, jinak anglicky, jinak jakékoli (GitHub: jediný text pod klíčem „“).
+    /// Notes in the chosen language, otherwise English, otherwise any (GitHub: a single text under the key "").
     public func notes(for code: String) -> String {
         notes[code] ?? notes["en"] ?? notes[""] ?? notes.sorted { $0.key < $1.key }.first?.value ?? ""
     }
@@ -27,7 +27,7 @@ public enum UpdateError: Error, Equatable, Sendable {
     case checksumMismatch
 }
 
-/// Rozbor zdroje verzí. Tvar URL rozhoduje: `api.github.com/repos/…/releases/latest` = GitHub, jinak appcast.
+/// Parsing of the version feed. The URL shape decides: `api.github.com/repos/…/releases/latest` = GitHub, else appcast.
 public enum UpdateFeed {
     public static func isGitHub(_ url: URL) -> Bool {
         url.host?.lowercased() == "api.github.com" && url.path.contains("/releases")
@@ -84,7 +84,7 @@ public enum UpdateFeed {
         return UpdateInfo(version: v, url: url, notes: body.isEmpty ? [:] : ["": body], sha256: sha)
     }
 
-    /// Jen https (a http pro lokální ladění na localhost).
+    /// https only (plus http on localhost for local debugging).
     static func downloadURL(_ s: String) -> URL? {
         guard let u = URL(string: s), let scheme = u.scheme?.lowercased(), let host = u.host else { return nil }
         if scheme == "https" { return u }

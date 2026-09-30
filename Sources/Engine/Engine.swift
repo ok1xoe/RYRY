@@ -6,8 +6,8 @@ import MacroEngine
 import ModemKit
 import RigControl
 
-/// Mozek aplikace: RX/TX stavový automat nad modemem, zvukem, PTT, FSK a rigem.
-/// Actor serializuje veškerý přístup k modemu. GUI i API jsou rovnocenní klienti.
+/// The brain of the app: the RX/TX state machine over the modem, audio, PTT, FSK and rig.
+/// The actor serializes all access to the modem. The GUI and the API are equal clients.
 public actor Engine {
     private let modem: any Modem
     private let rig: Rig
@@ -28,30 +28,30 @@ public actor Engine {
     private var txAt: UInt64 = 0
     private var finishedAt: UInt64?
     private var stopRequested = false
-    private var drainRequested = false     // rx() přišlo ještě během pttOn
-    private var pendingMacros: [MacroResult] = []   // makra zadaná během doběhu – spustí se po návratu do RX
+    private var drainRequested = false     // rx() arrived while still in pttOn
+    private var pendingMacros: [MacroResult] = []   // macros entered during the tail – run after the return to RX
     private var rxBuf = [Float](repeating: 0, count: 4096)
     private var txBuf = [Float](repeating: 0, count: 512)
     private var loopTask: Task<Void, Never>?
     private var rigTask: Task<Void, Never>?
     private var modemTask: Task<Void, Never>?
     private var lastRig: RigStatus?
-    /// Zvyšuje se při každém tx/rxNow/stop; po každém await se ověřuje, že příkaz stále platí.
+    /// Incremented on every tx/rxNow/stop; after each await it is checked that the command is still valid.
     private var epoch = 0
     private var lastQueued = 0
     private var lastProgressAt: UInt64 = 0
     private var lastReportedPending = -1
     private var lastPendingReportAt: UInt64 = 0
-    private static let stallNs: UInt64 = 2_000_000_000   // výstup bez pohybu 2 s = zaseknuté zařízení
+    private static let stallNs: UInt64 = 2_000_000_000   // no movement on the output for 2 s = a stuck device
     private var everStarted = false
-    /// Doplňkové dekodéry (druhý dekodér, kanály) – vlastní fronta, jen příjem.
+    /// Auxiliary decoders (the second decoder, the channels) – their own queue, receive only.
     private let auxFactory: (@Sendable () -> (any Modem)?)?
     private var aux: AuxDecoderHub?
     private var auxConfig = AuxDecoderConfig()
     private var auxSpectrumSamples = 0
     private let auxMaxBacklog: Int?
 
-    /// `auxModemFactory`: výroba modemů pro druhý dekodér a kanály (nil = funkce nedostupná).
+    /// `auxModemFactory`: creates the modems for the second decoder and the channels (nil = feature unavailable).
     public init(modem: sending any Modem, rig: Rig = NoRig(), audio: AudioBackend, config: EngineConfig,
                 serialFactory: @escaping @Sendable (String) -> SerialPort = { POSIXSerialPort(path: $0) },
                 clock: Clock = HostClock(), autoRun: Bool = true,
@@ -61,7 +61,7 @@ public actor Engine {
         self.auxFactory = auxModemFactory; self.auxMaxBacklog = auxMaxBacklog
     }
 
-    /// Nový odběratel událostí (broadcast).
+    /// A new event subscriber (broadcast).
     public nonisolated func events() -> AsyncStream<EngineEvent> { broadcaster.subscribe() }
 
     private func setState(_ s: EngineState) {
@@ -77,14 +77,14 @@ public actor Engine {
 
     private func nanos(_ d: Duration) -> UInt64 {
         let c = d.components
-        let secs = UInt64(min(max(0, c.seconds), 1_000_000))          // max. ~11 dní, bez přetečení
+        let secs = UInt64(min(max(0, c.seconds), 1_000_000))          // max. ~11 days, without overflow
         return secs * 1_000_000_000 + UInt64(max(0, c.attoseconds / 1_000_000_000))
     }
 
     // MARK: Start/stop
 
     public func start() async throws {
-        guard !everStarted else { throw EngineError.notRunning }   // Engine je jednorázový
+        guard !everStarted else { throw EngineError.notRunning }   // the Engine is single-use
         everStarted = true
         do { try audio.start(modemRate: modem.sampleRate, config: config.audio) }
         catch { throw EngineError.audio("\(error)") }
@@ -131,7 +131,7 @@ public actor Engine {
     public func stop() async {
         guard everStarted, !finished else { return }
         if state == .stopped {
-            // start selhal (např. zvuk) – jen ukončit proudy událostí, ať odběratelé nečekají věčně
+            // the start failed (e.g. audio) – just finish the event streams so subscribers do not wait forever
             finished = true
             await ptt?.forceOff()
             await rig.disconnect()
@@ -142,7 +142,7 @@ public actor Engine {
         finished = true
         epoch += 1
         let wasTx = state != .rx
-        setState(.stopped)                      // hned: souběžné příkazy už nic nespustí
+        setState(.stopped)                      // right away: concurrent commands start nothing more
         loopTask?.cancel(); rigTask?.cancel()
         loopTask = nil; rigTask = nil
         if wasTx { modem.abortTx() }
@@ -150,8 +150,8 @@ public actor Engine {
         await ptt?.forceOff()
         audio.stop()
         for p in ports.values { p.close() }
-        await rig.disconnect()                   // uvolnit port CAT / ukončit spuštěný rigctld (až po PTT off)
-        // doběhnutí událostí z modemu, pak konec streamů
+        await rig.disconnect()                   // release the CAT port / stop the started rigctld (only after PTT off)
+        // let the modem events drain, then finish the streams
         modem.finishEvents()
         await modemTask?.value
         modemTask = nil
@@ -165,7 +165,7 @@ public actor Engine {
         k.stop()
     }
 
-    // MARK: Příkazy
+    // MARK: Commands
 
     public func tx() async throws { try await beginTx(tune: false) }
     public func tune() async throws { try await beginTx(tune: true) }
@@ -178,7 +178,7 @@ public actor Engine {
         let my = epoch
         drainRequested = false
         setState(.keying)
-        /// Platí příkaz ještě? (mezitím mohl přijít rxNow/stop/jiný tx)
+        /// Is the command still valid? (an rxNow/stop/another tx may have arrived meanwhile)
         func valid() -> Bool { epoch == my && state == .keying }
 
         if !pttReady {
@@ -189,7 +189,7 @@ public actor Engine {
                 throw EngineError.pttUnavailable("PTT \(config.ptt.rawValue) není dostupné")
             }
         }
-        // FSK linka na mark ještě před PTT
+        // the FSK line to mark even before PTT
         do {
             switch config.txOutput {
             case .afsk: keyer = nil
@@ -214,7 +214,7 @@ public actor Engine {
             throw EngineError.pttUnavailable("\(error)")
         }
         guard valid() else {
-            // mezitím rxNow/stop: PTT, které jsme právě zapnuli, hned vypnout
+            // rxNow/stop in the meantime: switch off the PTT we have just switched on
             await ptt?.forceOff()
             return
         }
@@ -228,10 +228,10 @@ public actor Engine {
         setState(.pttOn)
     }
 
-    /// RX po dovysílání textu ve frontě.
+    /// RX once the text in the queue has been transmitted.
     public func rx() {
         switch state {
-        case .keying, .pttOn: drainRequested = true   // po txDelay rovnou dovysílat a přejít na RX
+        case .keying, .pttOn: drainRequested = true   // after txDelay transmit the rest and go to RX
         case .tx: setState(.drain)
         default: break
         }
@@ -250,7 +250,7 @@ public actor Engine {
         await stopKeyer()
         audio.clearTx()
         finishedAt = nil
-        setState(.pttOff)                       // během vypínání nový tx() nic nespustí
+        setState(.pttOff)                       // while switching off, a new tx() starts nothing
         if let error { broadcaster.send(.error(error)) }
         await ptt?.forceOff()
         if epoch == my, state == .pttOff { setState(.rx) }
@@ -260,27 +260,27 @@ public actor Engine {
 
     public func sendRaw(_ codes: [UInt8]) { modem.queueTxRaw(codes) }
 
-    /// Odešle rozvinuté makro (MMTTY OutputStr): TX, výstupy do fronty, `\` = RX po dovysílání.
-    /// Makro do editoru (`#`/`\` na začátku) se neodesílá – to řeší klient; `\` jen zapne TX.
+    /// Sends an expanded macro (MMTTY OutputStr): TX, the outputs into the queue, `\` = RX once transmitted.
+    /// A macro for the editor (`#`/`\` at the start) is not sent – the client handles that; `\` only switches on TX.
     public func sendMacro(_ m: MacroResult) async throws {
         if m.mode == .toEditor {
             if m.logQSO { broadcaster.send(.logRequested) }
             if m.startsTx { try await tx() }
             return
         }
-        // makro bez textu (prázdné, jen %l) nezaklíčuje – TX by visel bez konce; `#` na konci = záměrně TX
+        // a macro without text (empty, only %l) does not key – TX would hang forever; `#` at the end = TX on purpose
         if state == .rx, m.end != .keepTx, m.outputs.allSatisfy(\.isEmpty) {
             if m.logQSO { broadcaster.send(.logRequested) }
             return
         }
-        // doběh už běží (jádro nepřijímá text) → odložit na nový TX po návratu do RX
+        // the tail is already running (the core takes no text) → defer to a new TX after the return to RX
         if state == .pttOff || (state == .drain && stopRequested) {
             pendingMacros.append(m)
             return
         }
         if m.logQSO { broadcaster.send(.logRequested) }
         if state == .rx { try await tx() }
-        // makro bez '\' ruší plánovaný návrat na RX (MMTTY ToTX)
+        // a macro without '\' cancels the planned return to RX (MMTTY ToTX)
         if m.end != .rxAfter {
             if state == .drain { setState(.tx) }
             drainRequested = false
@@ -309,16 +309,16 @@ public actor Engine {
 
     public func withModem<T>(_ body: (any Modem) throws -> T) rethrows -> T { try body(modem) }
 
-    // MARK: DSP krok
+    // MARK: DSP step
 
-    // MARK: Přehrání WAV (MMTTY TSound::Execute: soubor nahrazuje vstup zvukovky)
+    // MARK: WAV playback (MMTTY TSound::Execute: the file replaces the sound card input)
 
     private var playback: [Float] = []
     private var playbackPos = 0
     private var playbackSpeed = 1.0
 
-    /// Přehraje vzorky (na frekvenci modemu) místo vstupu zvukovky. Tempo dává vstup (`speed`× reálný čas),
-    /// `speed` 0 = co nejrychleji. Během vysílání se přehrávání pozastaví.
+    /// Plays samples (at the modem rate) instead of the sound card input. The input sets the pace (`speed`× real time),
+    /// `speed` 0 = as fast as possible. Playback is paused while transmitting.
     public func startPlayback(_ samples: [Float], speed: Double) {
         playback = samples; playbackPos = 0; playbackSpeed = max(0, speed)
     }
@@ -326,21 +326,21 @@ public actor Engine {
     public var playbackRemaining: Int { playback.count - playbackPos }
     public var playbackPosition: Int { playbackPos }
     public var playbackTotal: Int { playback.count }
-    /// Pauza přehrávání (vstup zvukovky se dál zahazuje, jako MMTTY „Pause“).
+    /// Playback pause (the sound card input keeps being discarded, like MMTTY "Pause").
     public private(set) var playbackPaused = false
     public func setPlaybackPaused(_ p: Bool) { playbackPaused = p && !playback.isEmpty }
-    /// Posun na část souboru 0…1 (0 = převinout na začátek).
+    /// Seek to a fraction of the file 0…1 (0 = rewind to the start).
     public func seekPlayback(toFraction f: Double) {
         guard !playback.isEmpty else { return }
         playbackPos = min(playback.count - 1, max(0, Int((Double(playback.count) * f).rounded(.down))))
     }
 
-    // MARK: Nahrávání vstupu (MMTTY „Record WAVE“) – vzorky na frekvenci modemu odebírá aplikace
+    // MARK: Input recording (MMTTY "Record WAVE") – the app consumes the samples at the modem rate
 
     private var recording: [Float]?
     public var isRecording: Bool { recording != nil }
     public func setRecording(_ on: Bool) { recording = on ? (recording ?? []) : nil }
-    /// Odebere dosud nahrané vzorky.
+    /// Takes the samples recorded so far.
     public func drainRecording() -> [Float] {
         guard let r = recording else { return [] }
         recording = []
@@ -361,10 +361,10 @@ public actor Engine {
         if playbackPos >= playback.count { stopPlayback() }
     }
 
-    /// Jeden krok zpracování: RX, TX generování, časovače stavového automatu.
+    /// One processing step: RX, TX generation, the state machine timers.
     public func pump() async {
         guard state != .stopped else { return }
-        // RX (při přehrávání WAV se vstup jen odebere a zahodí; určuje tempo)
+        // RX (during WAV playback the input is only consumed and discarded; it sets the pace)
         while true {
             let n = audio.readRx(into: &rxBuf)
             if n == 0 { break }
@@ -385,18 +385,18 @@ public actor Engine {
 
         let keyed: Set<EngineState> = [.pttOn, .tx, .drain, .pttOff]
         if keyed.contains(state) {
-            // PTT časovač
+            // PTT timer
             if now - pttOnAt > nanos(config.pttTimeout) {
                 broadcaster.send(.pttTimeout)
                 await abortToRx(error: nil)
                 return
             }
-            // selhání zvukového zařízení
+            // audio device failure
             if let f = audio.failure {
                 await abortToRx(error: .audio(f))
                 return
             }
-            // zaseknutý výstup: fronta neklesá a nic se nepřidává
+            // stuck output: the queue does not drop and nothing is added
             let q = audio.txQueued
             if q == 0 || q < lastQueued { lastProgressAt = now }
             lastQueued = q
@@ -432,7 +432,7 @@ public actor Engine {
             }
             if now >= tailDone, audio.txQueued == 0, (keyer?.pending ?? 0) == 0 {
                 let my = epoch
-                await keyer?.finish(timeout: .seconds(3))       // UART buffer dovysílat před PTT off
+                await keyer?.finish(timeout: .seconds(3))       // let the UART buffer finish before PTT off
                 guard epoch == my, state == .pttOff else { return }
                 await stopKeyer()
                 do { try await ptt?.set(false) } catch {
@@ -475,16 +475,16 @@ public actor Engine {
         }
     }
 
-    // MARK: Doplňkové dekodéry
+    // MARK: Auxiliary decoders
 
-    /// Zapne/vypne druhý dekodér a kanály (za běhu, bez restartu).
+    /// Switches the second decoder and the channels on/off (at run time, without a restart).
     public func setAuxDecoders(_ c: AuxDecoderConfig) {
         auxConfig = c
         syncAux()
     }
     public var auxDecoders: AuxDecoderConfig { auxConfig }
 
-    /// Počká, až doplňkové dekodéry zpracují všechen dosud přijatý zvuk (stop() zbytek zahodí).
+    /// Waits until the auxiliary decoders have processed all audio received so far (stop() drops the rest).
     public func flushAuxDecoders() async { await aux?.flush() }
 
     private func syncAux() {
@@ -502,7 +502,7 @@ public actor Engine {
         await a.stop()
     }
 
-    /// Kopie bloku pro doplňkové dekodéry – jen při příjmu (během TX pozastaveno jako hlavní).
+    /// A copy of the block for the auxiliary decoders – only during RX (paused during TX like the main one).
     private func feedAux(_ b: UnsafeBufferPointer<Float>) {
         guard let aux, auxConfig.isActive, state == .rx, b.count > 0 else { return }
         var spec: SpectrumFrame?
@@ -523,7 +523,7 @@ public actor Engine {
         return t
     }
 
-    /// Pro testy: počkat na zpracování zaslaných bloků; stav fronty.
+    /// For tests: wait for the sent blocks to be processed; the queue state.
     func auxFlush() async { await aux?.flush() }
     var auxModemCount: Int { aux?.modemCount ?? 0 }
     var auxDropped: Int { aux?.dropped ?? 0 }
@@ -544,7 +544,7 @@ public actor Engine {
 
     public var rigStatus: RigStatus? { lastRig }
     public var rigName: String { rig.name }
-    /// Probíhá ladění (tune) – pro main.get_trx_status.
+    /// Tuning (tune) is in progress – for main.get_trx_status.
     public var isTuning: Bool { tuneMode && [.keying, .pttOn, .tx, .drain].contains(state) }
 
     public func setRigFrequency(_ hz: Double) async throws {
@@ -557,7 +557,7 @@ public actor Engine {
         await pollRig()
     }
 
-    // MARK: Modem (Sendable přístup pro AppController/API)
+    // MARK: Modem (Sendable access for AppController/API)
 
     public func modemParam(_ id: String) -> ParameterValue? { modem.get(parameter: id) }
     public func setModemParam(_ id: String, _ v: ParameterValue) throws { try modem.set(parameter: id, value: v) }

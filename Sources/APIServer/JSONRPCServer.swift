@@ -7,13 +7,13 @@ import Network
 import QSOLog
 import RigControl
 
-/// Odesílač textových zpráv (WebSocket spojení; v testech náhrada).
+/// A sender of text messages (a WebSocket connection; a stub in tests).
 protocol WSSink: AnyObject, Sendable {
     func send(_ text: String, completion: @escaping @Sendable (Error?) -> Void)
     func close()
 }
 
-/// Stav jednoho klienta: odběry a omezená fronta odchozích zpráv.
+/// The state of a single client: subscriptions and a bounded outgoing message queue.
 final class ClientSession: @unchecked Sendable {
     let id = UUID()
     private let sink: WSSink
@@ -30,12 +30,12 @@ final class ClientSession: @unchecked Sendable {
               if old != nil, old != newValue { old?.cancel() } }
     }
     private var inboxCount = 0
-    /// Příchozí požadavky – zpracují se postupně jedním úkolem (zachování pořadí).
+    /// Incoming requests – processed one after another by a single task (order is preserved).
     let inbox: AsyncStream<String>
     let inboxContinuation: AsyncStream<String>.Continuation
     var worker: Task<Void, Never>?
     var lastSignal = Date.distantPast
-    /// Klient zahájil vysílání – při jeho pádu se TX ukončí (spec 12).
+    /// The client started a transmission – if it dies, TX is ended (spec 12).
     var startedTx = false
     var onClose: (@Sendable () -> Void)?
 
@@ -48,7 +48,7 @@ final class ClientSession: @unchecked Sendable {
     func unsubscribe(_ names: [String]) { lock.withLock { subs.subtract(names) } }
     func isSubscribed(_ name: String) -> Bool { lock.withLock { subs.contains(name) || subs.contains("*") } }
 
-    /// Příchozí požadavek do fronty; při přetečení (klient posílá rychleji, než se zpracuje) chyba a zavření.
+    /// Queues an incoming request; on overflow (the client sends faster than we process) an error and close.
     func enqueue(_ text: String) {
         let over = lock.withLock { () -> Bool in inboxCount += 1; return inboxCount > maxQueue }
         if over {
@@ -111,7 +111,7 @@ struct RPCError: Error {
     static func params(_ m: String) -> RPCError { RPCError(code: -32602, message: m) }
 }
 
-/// JSON-RPC 2.0 přes WebSocket (ws://host:7363/v1).
+/// JSON-RPC 2.0 over WebSocket (ws://host:7363/v1).
 public final class JSONRPCServer: @unchecked Sendable {
     let app: AppController
     private let host: String, port: UInt16, maxQueue: Int
@@ -188,7 +188,7 @@ public final class JSONRPCServer: @unchecked Sendable {
         }
     }
 
-    // MARK: Zpracování požadavku
+    // MARK: Request handling
 
     func handle(_ text: String, _ s: ClientSession) async {
         guard let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)),
@@ -210,7 +210,7 @@ public final class JSONRPCServer: @unchecked Sendable {
         }
     }
 
-    // MARK: Události
+    // MARK: Events
 
     func broadcast(_ e: AppEvent) {
         let sessions = lock.withLock { Array(clients.values) }
@@ -219,7 +219,7 @@ public final class JSONRPCServer: @unchecked Sendable {
         switch e {
         case .engine(.modem(.rxText(let c, let echo))): name = "rx.char"; params = ["char": String(c), "echo": echo]
         case .engine(.state(let st)):
-            if st == .rx { for s in sessions { s.startedTx = false } }   // vysílání skončilo
+            if st == .rx { for s in sessions { s.startedTx = false } }   // the transmission ended
             name = "engine.state"; params = ["state": st.rawValue]
         case .engine(.modem(.signal(let lvl, let sq))):
             let now = Date()
@@ -249,9 +249,9 @@ public final class JSONRPCServer: @unchecked Sendable {
         for s in sessions { s.notify(name, params) }
     }
 
-    // MARK: JSON převody
+    // MARK: JSON conversions
 
-    nonisolated(unsafe) static let iso = ISO8601DateFormatter()   // jen čtení (thread-safe)
+    nonisolated(unsafe) static let iso = ISO8601DateFormatter()   // read-only (thread-safe)
     static func encodable<T: Encodable>(_ v: T) -> Any {
         let e = JSONEncoder(); e.dateEncodingStrategy = .custom { d, enc in var c = enc.singleValueContainer(); try c.encode(ISODates.format(d)) }
         guard let d = try? e.encode(v), let o = try? JSONSerialization.jsonObject(with: d) else { return NSNull() }

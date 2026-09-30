@@ -19,7 +19,7 @@ struct Options {
     var inUID: String?, outUID: String?, ptt = "none", port: String?, rig = "none", fsk: String?
     var call = "", his = ""
     var settingsDir: String?, pttSet = false, rigSet = false, noAPI = false
-    var modemFlags: Set<String> = []      // přepínače modemu zadané na příkazové řádce
+    var modemFlags: Set<String> = []      // modem switches given on the command line
     var positional: [String] = []
 }
 
@@ -78,8 +78,8 @@ func writeWav(_ s: [Float], _ path: String) {
     catch { fail("zápis \(path) selhal: \(error)") }
 }
 
-/// Obsluha SIGINT/SIGTERM mimo hlavní actor (hlavní vlákno blokuje readLine()).
-nonisolated(unsafe) var signalSources: [DispatchSourceSignal] = []   // musí žít po celou dobu běhu
+/// SIGINT/SIGTERM handling outside the main actor (the main thread is blocked in readLine()).
+nonisolated(unsafe) var signalSources: [DispatchSourceSignal] = []   // must stay alive for the whole run
 
 nonisolated func installStopOnSignals(_ engine: Engine) {
     signal(SIGINT, SIG_IGN); signal(SIGTERM, SIG_IGN)
@@ -138,7 +138,7 @@ case "encode":
         out += buf
         if st == .finished { break }
     }
-    writeWav(out + [Float](repeating: 0, count: 2205), o.positional[1])   // + 0,2 s doběh
+    writeWav(out + [Float](repeating: 0, count: 2205), o.positional[1])   // + 0.2 s tail
 
 case "decode":
     guard o.positional.count == 1 else { fail(usage) }
@@ -152,7 +152,7 @@ case "decode":
     }
     configure(m, o)
     let events = m.events
-    let reader = Task.detached {   // mimo main actor, aby četl souběžně s processRx
+    let reader = Task.detached {   // off the main actor so it reads concurrently with processRx
         var text = ""
         for await e in events { if case .rxText(let c, false) = e { text.append(c) } }
         return text
@@ -193,7 +193,7 @@ case "macro":
     print("[konec: \(r.end), režim: \(r.mode)\(r.logQSO ? ", log" : "")]")
 
 case "live":
-    // Nastavení ze souboru (nebo --settings DIR); přepínače příkazové řádky mají přednost.
+    // Settings from the file (or --settings DIR); the command-line switches take precedence.
     let store = SettingsStore(directory: o.settingsDir.map { URL(fileURLWithPath: $0) } ?? SettingsPaths.defaultDirectory)
     var (settings, warnings) = store.load()
     for w in warnings { FileHandle.standardError.write(Data("[nastavení] \(w)\n".utf8)) }
@@ -213,7 +213,7 @@ case "live":
     if o.fsk != nil && settings.fsk.port == nil { fail("--fsk potřebuje --port") }
     if o.rigSet { guard let t = RigType(rawValue: o.rig) else { fail("--rig: \(o.rig)") }; settings.rig.type = t }
     if o.noAPI { settings.api.fldigiEnabled = false; settings.api.jsonRPCEnabled = false }
-    // přepínače modemu z příkazové řádky mají přednost před uloženými parametry (jen zadané)
+    // command-line modem switches take precedence over the saved parameters (only those given)
     if o.modemFlags.contains("baud") { settings.rtty["baud"] = .double(o.baud) }
     if o.modemFlags.contains("mark") { settings.rtty["mark"] = .double(o.mark) }
     if o.modemFlags.contains("shift") { settings.rtty["shift"] = .double(o.shift) }
@@ -259,7 +259,7 @@ case "live":
         do { let p = try await srv.start(); jsonServer = srv; FileHandle.standardError.write(Data("[api] JSON-RPC ws://\(bindHost):\(p)/v1\n".utf8)) }
         catch { FileHandle.standardError.write(Data("[api] JSON-RPC nespuštěno: \(error)\n".utf8)) }
     }
-    // Ctrl-C / SIGTERM: vždy bezpečně vypnout PTT a FSK linku
+    // Ctrl-C / SIGTERM: always switch off PTT and the FSK line safely
     installStopOnSignals(engine)
     FileHandle.standardError.write(Data("mmtty4mac live – text + Enter = vysílat, :q = konec\n".utf8))
     while let line = readLine() {

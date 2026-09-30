@@ -1,7 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Země DXCC pro značku (údaje z cty.dat, formát AD1C).
+/// The DXCC country for a call (data from cty.dat, AD1C format).
 public struct CountryInfo: Sendable, Equatable {
     public var name: String
     public var primaryPrefix: String
@@ -9,15 +9,15 @@ public struct CountryInfo: Sendable, Equatable {
     public var cqZone: Int
     public var ituZone: Int
     public var latitude: Double
-    public var longitude: Double          // východ kladně
-    public var utcOffsetHours: Double     // místní čas = UTC + offset
+    public var longitude: Double          // east positive
+    public var utcOffsetHours: Double     // local time = UTC + offset
 }
 
-/// Databáze zemí z cty.dat (náhrada Country.cpp / ARRL.DX z MMTTY).
+/// Country database from cty.dat (a replacement for Country.cpp / ARRL.DX from MMTTY).
 ///
-/// Hledá nejdřív přesnou značku (`=CALL`), pak nejdelší prefix. Portable značky
-/// (`OK/DL1ABC`, `DL1ABC/KH6`) se hodnotí podle kratší části, `/P`, `/M`, `/QRP` apod. se ignorují,
-/// `/MM` a `/AM` nemají zemi.
+/// It first looks for an exact call (`=CALL`), then for the longest prefix. Portable calls
+/// (`OK/DL1ABC`, `DL1ABC/KH6`) are judged by the shorter part, `/P`, `/M`, `/QRP` etc. are ignored,
+/// `/MM` and `/AM` have no country.
 public struct CountryDB: Sendable {
     public enum Error: Swift.Error, Equatable { case noEntities }
 
@@ -27,12 +27,12 @@ public struct CountryDB: Sendable {
     private let entities: [CountryInfo]
     private var prefixes: [String: (Int, Override)] = [:]
     private var exact: [String: (Int, Override)] = [:]
-    /// Země jen ze seznamu WAE („*“ v cty.dat: Sicílie, Shetlandy, evropské Turecko, …) – indexy do `entities`.
+    /// Countries only in the WAE list ("*" in cty.dat: Sicily, Shetlands, European Turkey, …) – indexes into `entities`.
     private var waePrefixes: [String: (Int, Override)] = [:]
     private var waeExact: [String: (Int, Override)] = [:]
     private let dxccCount: Int
 
-    /// Počet zemí DXCC (bez zemí jen ze seznamu WAE).
+    /// The number of DXCC countries (excluding those only in the WAE list).
     public var count: Int { dxccCount }
 
     public init(contentsOf url: URL) throws {
@@ -52,8 +52,8 @@ public struct CountryDB: Sendable {
             guard let cq = Int(f(1)), let itu = Int(f(2)), let lat = Double(f(4)), let lonW = Double(f(5)),
                   let off = Double(f(6)) else { continue }
             var primary = f(7)
-            // „*“ = entita jen pro WAE/CQ (Sicílie, …), ne země DXCC – běžné hledání ji přeskočí
-            // (prefixy spadnou do mateřské země), hledání s `wae: true` ji najde
+            // "*" = an entity for WAE/CQ only (Sicily, …), not a DXCC country – the normal lookup skips it
+            // (its prefixes fall to the parent country), a lookup with `wae: true` finds it
             let waeOnly = primary.hasPrefix("*")
             if waeOnly { primary.removeFirst() } else { dxcc += 1 }
             let idx = ents.count
@@ -73,7 +73,7 @@ public struct CountryDB: Sendable {
         entities = ents; prefixes = pfx; exact = ex; waePrefixes = wpfx; waeExact = wex; dxccCount = dxcc
     }
 
-    /// `=W1AW(5)[8]{NA}<41.7/72.7>~5.0~` → přesná?, základ, přepisy.
+    /// `=W1AW(5)[8]{NA}<41.7/72.7>~5.0~` → exact?, base, overrides.
     private static func parseAlias(_ t: String) -> (Bool, String, Override) {
         var s = Substring(t)
         let isExact = s.hasPrefix("=")
@@ -126,7 +126,7 @@ public struct CountryDB: Sendable {
     static let modifiers: Set<String> = ["P", "M", "QRP", "QRPP", "A", "B", "LH", "J", "R", "T", "X"]
     static let noCountry: Set<String> = ["MM", "AM"]
 
-    /// Země pro značku. `wae: true` = i země ze seznamu WAE (CQ WW, WAE DX Contest), jinak jen DXCC.
+    /// The country for a call. `wae: true` = WAE-list countries too (CQ WW, WAE DX Contest), otherwise DXCC only.
     public func lookup(_ call: String, wae: Bool = false) -> CountryInfo? {
         let c = call.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !c.isEmpty else { return nil }
@@ -134,37 +134,37 @@ public struct CountryDB: Sendable {
         if let e = exact[c] { return info(e) }
         var parts = c.split(separator: "/").map(String.init)
         if parts.count > 1, parts.contains(where: Self.noCountry.contains) { return nil }
-        // modifikátory (/P, /M, /QRP, /4 …) jen jako přípony – M/, R/, B/ na začátku jsou prefixy zemí
+        // modifiers (/P, /M, /QRP, /4 …) only as suffixes – M/, R/, B/ at the start are country prefixes
         while parts.count > 1, let last = parts.last,
               Self.modifiers.contains(last) || (last.count == 1 && last.first!.isNumber) {
             parts.removeLast()
         }
         guard !parts.isEmpty else { return nil }
         if parts.count == 1 { return longestPrefix(parts[0], wae: wae) }
-        // portable: rozhoduje kratší část (prefix země)
+        // portable: the shorter part decides (the country prefix)
         let p = parts.min { $0.count < $1.count }!
         return longestPrefix(p, wae: wae)
     }
 }
 
 public extension CountryDB {
-    /// Uživatelský soubor (Application Support/mmtty4mac/cty.dat) má přednost před přibaleným.
+    /// A user file (Application Support/mmtty4mac/cty.dat) takes precedence over the bundled one.
     static func defaultURLs() -> [URL] {
         var urls: [URL] = []
         if let sup = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             urls.append(sup.appendingPathComponent("mmtty4mac/cty.dat"))
         }
         if let b = Bundle.main.url(forResource: "cty", withExtension: "dat") { urls.append(b) }
-        // vývoj (swift run / testy): Resources/cty.dat v repozitáři
+        // development (swift run / tests): Resources/cty.dat in the repository
         urls.append(URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("Resources/cty.dat"))
         return urls
     }
 
-    /// Sdílená databáze (načte se jednou při prvním použití).
+    /// The shared database (loaded once on first use).
     static let shared: CountryDB? = loadDefault()
 
-    /// Načte první použitelný soubor, nebo nil.
+    /// Loads the first usable file, or nil.
     static func loadDefault() -> CountryDB? {
         for u in defaultURLs() where FileManager.default.fileExists(atPath: u.path) {
             if let db = try? CountryDB(contentsOf: u) { return db }

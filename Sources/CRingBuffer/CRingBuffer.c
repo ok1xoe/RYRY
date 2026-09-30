@@ -5,11 +5,11 @@
 #include <string.h>
 
 struct CRingBuffer {
-    size_t cap;              /* počet slotů = kapacita + 1 */
+    size_t cap;              /* number of slots = capacity + 1 */
     float* buf;
-    _Atomic size_t head;     /* zápis (producent) */
-    _Atomic size_t tail;     /* čtení (konzument) */
-    _Atomic int clear_req;   /* producent žádá o vyprázdnění */
+    _Atomic size_t head;     /* write (producer) */
+    _Atomic size_t tail;     /* read (consumer) */
+    _Atomic int clear_req;   /* the producer requests a flush */
 };
 
 CRingBuffer* cring_create(size_t capacity) {

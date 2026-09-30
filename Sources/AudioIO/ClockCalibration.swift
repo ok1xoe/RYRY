@@ -2,13 +2,13 @@
 import CoreAudio
 import Foundation
 
-/// Kalibrace hodin zvukové karty (náhrada ClockAdj z MMTTY).
+/// Sound card clock calibration (a replacement for ClockAdj from MMTTY).
 ///
-/// Core Audio průběžně měří skutečnou vzorkovací frekvenci zařízení proti hodinám systému
-/// (`kAudioDevicePropertyActualSampleRate`); odchylka od nominální frekvence v ppm se
-/// použije jako korekce RX/TX modemu.
+/// Core Audio continuously measures the device's actual sample rate against the system clock
+/// (`kAudioDevicePropertyActualSampleRate`); the deviation from the nominal rate in ppm is
+/// used as the RX/TX correction of the modem.
 public enum ClockCalibration {
-    /// Odchylka v ppm z naměřených skutečných frekvencí (medián, nuly = zařízení neběží).
+    /// Deviation in ppm from the measured actual rates (median, zeros = the device is not running).
     public static func ppm(actual: [Double], nominal: Double) -> Double? {
         let v = actual.filter { $0.isFinite && $0 > 0 }.sorted()
         guard !v.isEmpty, nominal > 0 else { return nil }
@@ -16,7 +16,7 @@ public enum ClockCalibration {
         return (med / nominal - 1) * 1e6
     }
 
-    /// Nominální a skutečná frekvence zařízení (skutečná je nenulová jen za běhu).
+    /// Nominal and actual device rate (the actual one is non-zero only while running).
     public static func rates(deviceUID uid: String?, input: Bool) -> (nominal: Double, actual: Double)? {
         let dev = uid.flatMap(AudioDevices.find(uid:)) ?? (input ? AudioDevices.defaultInput() : AudioDevices.defaultOutput())
         guard let dev else { return nil }

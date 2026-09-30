@@ -2,7 +2,7 @@
 import Foundation
 import Network
 
-/// TCP spojení s řádkovým protokolem (request → N řádků odpovědi) s timeoutem.
+/// A TCP connection with a line protocol (request → N response lines) and a timeout.
 public actor LineConnection {
     private let host: String
     private let port: UInt16
@@ -10,7 +10,7 @@ public actor LineConnection {
     private var connection: NWConnection?
     private var buffer = Data()
     private let queue = DispatchQueue(label: "LineConnection")
-    // FIFO zámek: actor se uvnitř request() suspenduje, bez zámku by se požadavky prokládaly.
+    // FIFO lock: the actor suspends inside request(), without the lock the requests would interleave.
     private var busy = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
@@ -59,7 +59,7 @@ public actor LineConnection {
         buffer.removeAll()
     }
 
-    /// Pošle řádek a přečte `responseLines` řádků odpovědi. Při výpadku spojení zavře a hodí `.offline`.
+    /// Sends a line and reads `responseLines` response lines. On a connection failure it closes and throws `.offline`.
     public func request(_ line: String, responseLines: Int) async throws -> [String] {
         await acquire()
         defer { release() }
@@ -74,7 +74,7 @@ public actor LineConnection {
                         .trimmingCharacters(in: .whitespacesAndNewlines)
                     buffer.removeSubrange(buffer.startIndex...r)
                     lines.append(l)
-                    // chybová odpověď místo dat (RPRT -n) ukončí čtení
+                    // an error response instead of data (RPRT -n) ends the reading
                     if l.hasPrefix("RPRT ") { break }
                     continue
                 }
@@ -83,7 +83,7 @@ public actor LineConnection {
             }
             return lines
         } catch let e as RigError {
-            close()              // po chybě i timeoutu je stav proudu neznámý → nové spojení
+            close()              // after an error or a timeout the stream state is unknown → new connection
             throw e
         }
     }
@@ -117,7 +117,7 @@ final class OnceFlag: @unchecked Sendable {
     func first() -> Bool { lock.lock(); defer { lock.unlock() }; if done { return false }; done = true; return true }
 }
 
-/// Spustí operaci s timeoutem; po vypršení zavolá `onTimeout` (který má operaci probudit) a hodí `.timeout`.
+/// Runs an operation with a timeout; on expiry calls `onTimeout` (which should wake the operation) and throws `.timeout`.
 func withTimeout<T: Sendable>(_ d: Duration, _ op: @escaping @Sendable () async throws -> T,
                               onTimeout: @escaping @Sendable () -> Void) async throws -> T {
     let timedOut = OnceFlag()

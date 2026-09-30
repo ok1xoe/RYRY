@@ -4,7 +4,7 @@ import Localization
 import QSOLog
 import Security
 
-// MARK: Chyby a výsledek
+// MARK: Errors and result
 
 public enum UploadError: Error, Equatable, Sendable, LocalizedError {
     case notConfigured(String)
@@ -31,11 +31,11 @@ public enum UploadError: Error, Equatable, Sendable, LocalizedError {
     }
 }
 
-/// Výsledek nahrání: která spojení se mají označit jako nahraná + zpráva pro uživatele.
+/// The upload result: which QSOs should be marked as uploaded + a message for the user.
 public struct UploadOutcome: Sendable, Equatable {
     public var target: UploadTarget
     public var uploadedIDs: [UUID]
-    /// Spojení, která nešla odeslat (např. chybí frekvence/pásmo).
+    /// QSOs that could not be sent (e.g. a missing frequency/band).
     public var skipped: Int
     public var message: String
     public init(target: UploadTarget, uploadedIDs: [UUID], skipped: Int = 0, message: String) {
@@ -49,17 +49,17 @@ public extension UploadTarget {
     }
 }
 
-// MARK: Výběr nenahraných
+// MARK: Selecting the not yet uploaded
 
 public enum UploadSelection {
-    /// Dosud nenahraná spojení na službu; spojení bez pásma (frekvence) služby odmítají → `missingBand`.
+    /// QSOs not yet uploaded to the service; the services reject QSOs without a band (frequency) → `missingBand`.
     public static func pending(_ records: [QSORecord], target: UploadTarget) -> (eligible: [QSORecord], missingBand: Int) {
         let open = records.filter { !$0.isUploaded(target) }.sorted { $0.timeOn < $1.timeOn }
         let ok = open.filter { $0.band != nil }
         return (ok, open.count - ok.count)
     }
 
-    /// ADIF s hlavičkou (volitelná extra pole hlavičky, např. EQSL_USER) a záznamy bez příznaků nahrání.
+    /// ADIF with a header (optional extra header fields, e.g. EQSL_USER) and records without the upload flags.
     public static func adif(_ records: [QSORecord], headerFields: String = "") -> String {
         "mmtty4mac upload\n" + ADIF.field("ADIF_VER", ADIF.version) + ADIF.field("PROGRAMID", "mmtty4mac")
             + headerFields + "<EOH>\n" + records.map(ADIF.uploadRecord).joined()
@@ -134,7 +134,7 @@ public enum FormBody {
     }
 }
 
-// MARK: Klíčenka
+// MARK: Keychain
 
 public protocol UploadSecretStore: Sendable {
     func get(service: String, account: String) -> String?

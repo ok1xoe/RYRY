@@ -1,54 +1,54 @@
-/// Obecné rozhraní modemu (RTTY teď, později PSK z MMVARI, SSTV z MMSSTV).
+/// Generic modem interface (RTTY now, later PSK from MMVARI, SSTV from MMSSTV).
 ///
-/// Vlákna: všechny metody volá jeden sériový kontext (Engine). `events` je AsyncStream
-/// s jediným odběratelem (Engine), který události dále rozesílá.
+/// Threading: all methods are called from one serial context (Engine). `events` is an AsyncStream
+/// with a single subscriber (Engine), which forwards the events onward.
 public protocol Modem: AnyObject {
     static var id: String { get }
-    /// Módy, které modem umí.
+    /// The modes the modem supports.
     var modes: [ModeDescriptor] { get }
     var currentMode: ModeDescriptor { get }
-    /// Pracovní vzorkovací frekvence modemu (AudioIO převádí ze/do frekvence zařízení).
+    /// The modem's working sample rate (AudioIO converts from/to the device rate).
     var sampleRate: Double { get }
     var capabilities: ModemCapabilities { get }
-    /// Popis všech parametrů (pro GUI a API).
+    /// A description of all parameters (for the GUI and the API).
     var parameters: [ParameterDescriptor] { get }
-    /// Proud událostí (přijatý text, úroveň signálu, doladění…).
+    /// The stream of events (received text, signal level, tuning…).
     var events: AsyncStream<ModemEvent> { get }
 
     func select(mode: ModeDescriptor) throws
     func set(parameter id: String, value: ParameterValue) throws
     func get(parameter id: String) -> ParameterValue?
 
-    /// Zpracuje blok přijatých vzorků (±1.0) na `sampleRate`.
+    /// Processes a block of received samples (±1.0) at `sampleRate`.
     func processRx(_ samples: UnsafeBufferPointer<Float>)
-    /// Zahájí vysílání; `tune` = jen nosná.
+    /// Starts transmitting; `tune` = carrier only.
     func beginTx(tune: Bool)
-    /// Přidá text do vysílací fronty.
+    /// Appends text to the transmit queue.
     func queueTx(text: String)
-    /// Přidá surové kódy modemu (RTTY: Baudot v pořadí MMTTY a řídicí 0xFC–0xFF) – ve stejném pořadí s textem.
+    /// Appends raw modem codes (RTTY: Baudot in MMTTY order and control 0xFC–0xFF) – in the same order as the text.
     func queueTxRaw(_ codes: [UInt8])
-    /// Vygeneruje vysílané vzorky; `.finished`, když vysílání skončilo (zbytek bufferu je ticho).
+    /// Generates the transmit samples; `.finished` once the transmission ended (the rest of the buffer is silence).
     func generateTx(into buffer: UnsafeMutableBufferPointer<Float>) -> TxStatus
-    /// Dovysílá rozpracovaný znak, zbytek fronty zahodí; pak `generateTx` vrátí `.finished`.
+    /// Finishes the character in progress and discards the rest of the queue; then `generateTx` returns `.finished`.
     func stopTx()
-    /// Okamžitě ukončí vysílání.
+    /// Ends the transmission immediately.
     func abortTx()
-    /// Množství dat čekajících na odvysílání (RTTY: bajty textu ve frontě modemu + Baudot kódy v jádře).
-    /// Jednotky nejsou jednotné – spolehlivé je jen porovnání s nulou (vše odvysíláno).
+    /// The amount of data waiting to be transmitted (RTTY: text bytes in the modem queue + Baudot codes in the core).
+    /// The units are not uniform – only a comparison with zero is reliable (everything transmitted).
     var txPending: Int { get }
-    /// Poslední spektrum pro vodopád a AFC.
+    /// The latest spectrum for the waterfall and AFC.
     func spectrum() -> SpectrumFrame?
-    /// Kódy, které modulátor začal vysílat (pro FSK klíčovač); modemy bez FSK vrací [].
+    /// The codes the modulator has started transmitting (for the FSK keyer); modems without FSK return [].
     func takeFskCodes() -> [UInt8]
-    /// Ukončí proud `events` (po doručení čekajících událostí). Modem pak už nic nehlásí.
+    /// Finishes the `events` stream (after pending events are delivered). The modem then reports nothing more.
     func finishEvents()
-    /// XY scope: zapnout sběr a číst dávky bodů (modemy bez XY vrací nil).
+    /// XY scope: enable collection and read batches of points (modems without XY return nil).
     func setXYScope(_ on: Bool)
     func xyScope() -> [XYPoint]?
-    /// Scope demodulátoru (ladění): zapnout sběr a číst hotové dávky (všechny zdroje).
+    /// Demodulator scope (tuning): enable collection and read completed batches (all sources).
     func setDemodScope(_ on: Bool)
     func demodScope() -> DemodScope?
-    /// Zářez na kmitočtu (pravé tlačítko ve spektru, jako MMTTY); modemy bez notch nic nedělají.
+    /// Notch at a frequency (right button in the spectrum, as in MMTTY); modems without a notch do nothing.
     func notchClick(hz: Double)
 }
 

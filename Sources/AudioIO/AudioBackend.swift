@@ -11,16 +11,16 @@ public struct AudioConfig: Sendable, Equatable, Codable {
     public init() {}
 }
 
-/// Zvukový backend: RX i TX vzorky na frekvenci modemu (převod řeší backend).
-/// `readRx`/`writeTx`/`clearTx` volá jedno (DSP) vlákno.
+/// Audio backend: both RX and TX samples at the modem rate (the backend handles the conversion).
+/// `readRx`/`writeTx`/`clearTx` are called from a single (DSP) thread.
 public protocol AudioBackend: AnyObject, Sendable {
     func start(modemRate: Double, config: AudioConfig) throws
     func stop()
     func readRx(into: inout [Float]) -> Int
     func writeTx(_ samples: [Float]) -> Int
     func clearTx()
-    var txQueued: Int { get }          // vzorky (na frekvenci modemu) čekající na výstup
+    var txQueued: Int { get }          // samples (at the modem rate) waiting for output
     var isRunning: Bool { get }
-    /// Nenulové, když zařízení selhalo (odpojeno, změna konfigurace) – Engine přeruší TX.
+    /// Non-nil when the device has failed (disconnected, configuration change) – the Engine aborts TX.
     var failure: String? { get }
 }

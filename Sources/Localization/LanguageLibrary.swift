@@ -2,8 +2,8 @@
 import CryptoKit
 import Foundation
 
-/// Dostupné jazyky: přibalené v aplikaci a nahrané uživatelem (Application Support/mmtty4mac/Languages).
-/// Nahraný soubor se stejným kódem má přednost před přibaleným.
+/// Available languages: bundled with the app and added by the user (Application Support/mmtty4mac/Languages).
+/// A user file with the same code takes precedence over the bundled one.
 public struct LanguageLibrary: Sendable {
     public let bundled: [URL]
     public let userDirectory: URL
@@ -12,7 +12,7 @@ public struct LanguageLibrary: Sendable {
         self.bundled = bundled; self.userDirectory = userDirectory
     }
 
-    /// Výchozí umístění: Languages v balíčku aplikace, při vývoji Resources/Languages v repozitáři.
+    /// Default locations: Languages inside the app bundle, during development Resources/Languages in the repository.
     public static func standard() -> LanguageLibrary {
         var dirs: [URL] = []
         if let r = Bundle.main.resourceURL { dirs.append(r.appendingPathComponent("Languages")) }
@@ -30,7 +30,7 @@ public struct LanguageLibrary: Sendable {
             .compactMap { try? LanguagePack.decode(Data(contentsOf: $0)) }
     }
 
-    /// Přibalené jazyky podle kódu (dřívější složka v `bundled` má přednost).
+    /// Bundled languages by code (an earlier folder in `bundled` wins).
     func bundledPacks() -> [String: (pack: LanguagePack, file: URL)] {
         var byCode: [String: (LanguagePack, URL)] = [:]
         for d in bundled.reversed() {
@@ -42,8 +42,8 @@ public struct LanguageLibrary: Sendable {
         return byCode
     }
 
-    /// Všechny jazyky seřazené podle kódu. Soubor ve složce uživatele má přednost; texty, které v něm chybějí
-    /// (nebo jsou prázdné), doplní přibalená verze – nové texty z dalších verzí aplikace tak nechybí.
+    /// All languages sorted by code. A file in the user folder takes precedence; texts that are missing there
+    /// (or empty) are filled in from the bundled version – so new texts from later app versions are not missing.
     public func available() -> [LanguagePack] {
         var byCode = bundledPacks().mapValues(\.pack)
         for u in packs(in: userDirectory) {
@@ -58,8 +58,8 @@ public struct LanguageLibrary: Sendable {
         return byCode.values.sorted { $0.code < $1.code }
     }
 
-    /// Zkopíruje přibalené jazyky do složky uživatele (kde je lze upravit). Kopie, kterou uživatel neupravil,
-    /// se při nové verzi aplikace obnoví; upravenou nepřepíše (pozná se podle otisku v `.<soubor>.seeded`).
+    /// Copies the bundled languages into the user folder (where they can be edited). A copy the user has not edited
+    /// is refreshed on a new app version; an edited one is not overwritten (recognized by the digest in `.<file>.seeded`).
     public func seedUserDirectory() {
         let fm = FileManager.default
         try? fm.createDirectory(at: userDirectory, withIntermediateDirectories: true)
@@ -69,7 +69,7 @@ public struct LanguageLibrary: Sendable {
             let mark = userDirectory.appendingPathComponent(".\(code).json.seeded")
             if let cur = try? Data(contentsOf: dst) {
                 guard cur != src, let seeded = try? String(contentsOf: mark, encoding: .utf8),
-                      seeded == Self.digest(cur) else { continue }      // upravená (nebo cizí) kopie – nechat
+                      seeded == Self.digest(cur) else { continue }      // an edited (or foreign) copy – leave it
             }
             do {
                 try src.write(to: dst, options: .atomic)
@@ -82,7 +82,7 @@ public struct LanguageLibrary: Sendable {
 
     public func pack(code: String) -> LanguagePack? { available().first { $0.code == code } }
 
-    /// Ověří soubor a zkopíruje ho do složky jazyků jako `<kód>.json`.
+    /// Validates the file and copies it into the languages folder as `<code>.json`.
     @discardableResult
     public func importPack(from url: URL) throws -> LanguagePack {
         let data: Data
@@ -95,23 +95,23 @@ public struct LanguageLibrary: Sendable {
         return p
     }
 
-    /// Referenční jazyk pro šablonu (angličtina, jinak první dostupný).
+    /// The reference language for the template (English, otherwise the first available one).
     public func reference() -> LanguagePack? { pack(code: "en") ?? available().first }
 
-    /// Zvolený jazyk se pamatuje v UserDefaults (volba rozhraní, platí hned – nečeká na „Použít“).
+    /// The chosen language is remembered in UserDefaults (a UI choice, effective at once – no waiting for "Apply").
     public static let defaultsKey = "language"
 
-    /// Přepne jazyk (nil/„cs“ = čeština) a zapamatuje volbu.
+    /// Switches the language (nil/"cs" = Czech) and remembers the choice.
     public func select(_ code: String?, localizer: Localizer = .shared, defaults: UserDefaults = .standard) {
-        let p = code.flatMap { pack(code: $0) }                     // čeština bez souboru = vestavěná
+        let p = code.flatMap { pack(code: $0) }                     // Czech without a file = the built-in one
         localizer.use(p)
         defaults.set(p?.code ?? Localizer.baseCode, forKey: Self.defaultsKey)
     }
 
-    /// Jazyk bez uložené volby (první spuštění).
+    /// The language used when no choice is stored (first launch).
     public static let defaultCode = "en"
 
-    /// Obnoví jazyk z minulého spuštění; bez volby angličtina, chybějící soubor → čeština.
+    /// Restores the language from the previous launch; English when nothing was chosen, a missing file → Czech.
     public func restore(localizer: Localizer = .shared, defaults: UserDefaults = .standard) {
         let c = defaults.string(forKey: Self.defaultsKey) ?? Self.defaultCode
         localizer.use(pack(code: c))

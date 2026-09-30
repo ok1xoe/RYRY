@@ -1,8 +1,8 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Klient hamlib `rigctld` (výchozí, ne rozšířený protokol).
-/// Při výpadku spojení vrací `.offline`; další volání se pokusí připojit znovu.
+/// hamlib `rigctld` client (the default protocol, not the extended one).
+/// On a connection failure it returns `.offline`; the next call tries to connect again.
 public final class HamlibClient: Rig {
     private let conn: LineConnection
     public let name: String
@@ -36,7 +36,7 @@ public final class HamlibClient: Rig {
     }
 
     public func setMode(_ mode: String) async throws {
-        // jen název módu (USB, PKTUSB, RTTY…) – nic, co by vložilo další příkaz rigctld
+        // the mode name only (USB, PKTUSB, RTTY…) – nothing that could inject another rigctld command
         guard !mode.isEmpty, mode.count <= 16, mode.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }) else {
             throw RigError.protocolError("neplatný mód '\(mode)'")
         }
@@ -47,7 +47,7 @@ public final class HamlibClient: Rig {
         try Self.checkRPRT(try await conn.request("T \(on ? 1 : 0)", responseLines: 1))
     }
 
-    /// `RPRT 0` = OK; `RPRT -n` = chyba. Odpověď s daty RPRT nemá.
+    /// `RPRT 0` = OK; `RPRT -n` = an error. A response carrying data has no RPRT.
     static func checkRPRT(_ lines: [String]) throws {
         guard let last = lines.last, last.hasPrefix("RPRT ") else { return }
         let code = Int(last.dropFirst(5).trimmingCharacters(in: .whitespaces)) ?? -999
