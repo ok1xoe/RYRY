@@ -4,7 +4,7 @@ import Foundation
 import Testing
 @testable import RigControl
 
-/// Simulované rádio: odpověď podle zapsaných bajtů (volitelně s echem jako sběrnice CI-V).
+/// A simulated radio: the response depends on the bytes written (optionally with an echo, like the CI-V bus).
 final class FakeCATTransport: CATTransport, @unchecked Sendable {
     let lock = NSLock()
     var pending: [UInt8] = []
@@ -24,7 +24,7 @@ final class FakeCATTransport: CATTransport, @unchecked Sendable {
     func discardInput() { lock.withLock { pending.removeAll() } }
 }
 
-/// IC-7300 (94h): frekvence 14,085 MHz, mód RTTY; ACK = FB.
+/// IC-7300 (94h): frequency 14.085 MHz, mode RTTY; ACK = FB.
 func fakeIcom(freq: inout Int) -> FakeCATTransport {
     nonisolated(unsafe) var f = freq
     return FakeCATTransport(echo: true) { b in
@@ -51,7 +51,7 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     #expect(try await rig.frequency() == 7_045_000)
     try await rig.setPTT(true)
     #expect(t.written.last == CIV.ptt(true, to: 0x94))
-    try await rig.setMode("PKTUSB")                                  // USB + datový režim
+    try await rig.setMode("PKTUSB")                                  // USB + data mode
     #expect(t.written.suffix(2) == [CIV.frame(to: 0x94, cmd: 0x06, [0x01]), CIV.dataMode(true, to: 0x94)])
     await rig.disconnect()
     #expect(!t.opened)
@@ -75,7 +75,7 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
         if s == "FA;" { return Array(fa.utf8) }
         if s == "MD;" { return Array("MD6;".utf8) }
         if s.hasPrefix("FA") { fa = s }
-        return []                                                     // nastavovací příkazy Kenwood nepotvrzuje
+        return []                                                     // Kenwood does not acknowledge the set commands
     }
     let rig = SerialCATRig(transport: k, protocol: .text(.kenwood), timeout: .milliseconds(200))
     try await rig.connect()
@@ -92,29 +92,29 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     #expect(try await yr.frequency() == 14_085_000)
     try await yr.setFrequency(14_080_000)
     #expect(String(decoding: y.written.last!, as: UTF8.self) == "FA014080000;")
-    // rádio odpoví „?;“ (neznámý příkaz) → chyba protokolu
+    // the radio answers "?;" (unknown command) → a protocol error
     let q = FakeCATTransport { _ in Array("?;".utf8) }
     let qr = SerialCATRig(transport: q, protocol: .text(.kenwood), timeout: .milliseconds(100))
     try await qr.connect()
     await #expect(throws: RigError.self) { try await qr.frequency() }
 }
 
-// Skutečný sériový transport přes pseudoterminál: na druhém konci simulované IC-7300 (bez echa)
+// A real serial transport over a pseudo-terminal: a simulated IC-7300 at the other end (without an echo)
 @Test func serialTransportOverPTY() async throws {
     var master: Int32 = -1, slave: Int32 = -1
     var name = [CChar](repeating: 0, count: 128)
     guard openpty(&master, &slave, &name, nil, nil) == 0 else { return }
     let path = String(cString: name)
-    // slave nechat otevřený do konce (jinak master čte EIO); transport si otevře vlastní deskriptor
+    // keep the slave open to the very end (otherwise the master reads EIO); the transport opens its own descriptor
     nonisolated(unsafe) let m = master
     let radio = Thread {
         var parser = CIV.Parser(), buf = [UInt8](repeating: 0, count: 256)
-        // rádio čte rámce určené jemu (to 94, from E0) – vlastní parser: prohodit role
+        // the radio reads the frames addressed to it (to 94, from E0) – our own parser: swap the roles
         while true {
             let n = read(m, &buf, 256)
             if n <= 0 { break }
             var bytes = Array(buf[0..<n])
-            // převést rámce pro rádio na rámce „pro E0“, aby je CIV.Parser přijal
+            // turn the frames for the radio into frames "for E0" so that CIV.Parser accepts them
             for i in bytes.indices where i + 3 < bytes.count && bytes[i] == 0xFE && bytes[i + 1] == 0xFE && bytes[i + 2] == 0x94 {
                 bytes[i + 2] = 0xE0; bytes[i + 3] = 0x94
             }
@@ -137,7 +137,7 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     close(slave); close(master)
 }
 
-// Review 1: I/O chyba (vytažené USB) zavře port a další dotaz ho otevře znovu
+// Review 1: an I/O error (the USB cable pulled out) closes the port and the next query opens it again
 @Test func catReopensAfterIOError() async throws {
     final class Flaky: CATTransport, @unchecked Sendable {
         var opens = 0, failNext = false
@@ -156,7 +156,7 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     #expect(t.opens == 2)
 }
 
-// Review 2: starší Yaesu (FTDX3000, FT-950) mají FA s 8 číslicemi – délka se převezme z odpovědi rádia
+// Review 2: older Yaesu rigs (FTDX3000, FT-950) have FA with 8 digits – the length is taken from the radio's response
 @Test func yaesuFrequencyDigitsFromRadio() async throws {
     let y = FakeCATTransport { b in String(decoding: b, as: UTF8.self) == "FA;" ? Array("FA14085000;".utf8) : [] }
     let rig = SerialCATRig(transport: y, protocol: .text(.yaesu), timeout: .milliseconds(200))
@@ -165,21 +165,21 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     #expect(String(decoding: y.written.last!, as: UTF8.self) == "FA07045000;")
 }
 
-// Review 13: Kenwood při odchodu z datového režimu vypne DA; Elecraft zná PKTLSB
+// Review 13: when leaving data mode Kenwood turns DA off; Elecraft knows PKTLSB
 @Test func textModesLeaveDataMode() {
     #expect(TextCAT.setMode("RTTY", dialect: .kenwood) == "MD6;DA0;")
     #expect(TextCAT.setMode("USB", dialect: .kenwood) == "MD2;DA0;")
     #expect(TextCAT.setMode("PKTLSB", dialect: .elecraft) == "MD9;DT0;")
 }
 
-// Review (odloženo): zápis na zaseknutý port (plný buffer) skončí po limitu, nezablokuje frontu CAT
+// Review (deferred): a write to a stuck port (a full buffer) ends after the timeout, it does not block the CAT queue
 @Test func serialWriteTimesOut() throws {
     var fds: [Int32] = [0, 0]
     #expect(pipe(&fds) == 0)
     let w = fds[1]
     _ = fcntl(w, F_SETFL, fcntl(w, F_GETFL) | O_NONBLOCK)
     let chunk = [UInt8](repeating: 0x55, count: 4096)
-    while chunk.withUnsafeBufferPointer({ write(w, $0.baseAddress, 4096) }) > 0 {}      // naplnit buffer roury
+    while chunk.withUnsafeBufferPointer({ write(w, $0.baseAddress, 4096) }) > 0 {}      // fill the pipe buffer
     _ = fcntl(w, F_SETFL, fcntl(w, F_GETFL) & ~O_NONBLOCK)
     let t0 = Date()
     let e = chunk.withUnsafeBufferPointer { cserial_write_timeout(w, $0.baseAddress, 16, 200) }
@@ -188,7 +188,7 @@ func fakeIcom(freq: inout Int) -> FakeCATTransport {
     close(fds[0]); close(fds[1])
 }
 
-// Po výslovném odpojení (stop engine) rig port znovu neotevře – pozdě doběhlý příkaz jen hlásí offline
+// After an explicit disconnect (stopping the engine) the rig does not reopen the port – a command that arrives late only reports offline
 @Test func catStaysClosedAfterDisconnect() async throws {
     let t = FakeCATTransport { _ in Array("FA00014085000;".utf8) }
     let rig = SerialCATRig(transport: t, protocol: .text(.kenwood), timeout: .milliseconds(100))

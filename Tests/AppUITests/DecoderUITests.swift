@@ -6,7 +6,7 @@ import RTTYSignalKit
 import Settings
 @testable import AppUI
 
-/// Čeká (s pumpováním), dokud neplatí podmínka.
+/// Waits (pumping the run loop) until the condition holds.
 @MainActor func pumpUntil(_ f: Fixture, max: Int = 400, _ cond: () -> Bool) async {
     for _ in 0..<max {
         if cond() { return }
@@ -21,14 +21,14 @@ import Settings
     await f.model.start()
     await f.model.setSecondDecoder(true)
     #expect(f.model.settings.decoders.secondEnabled)
-    #expect(f.model.secondDemodEffective == "fft")                // hlavní IIR → druhý FFT
+    #expect(f.model.secondDemodEffective == "fft")                // main IIR → the second one FFT
     #expect(SettingsStore(directory: f.dir).load().0.decoders.secondEnabled)
     let text = "CQ CQ DE DL1ABC DL1ABC K"
     f.audio.feedRx(RTTYSignalGenerator().generate(text: text))
     await pumpUntil(f) { f.model.rx2Text.contains(text) }
     #expect(f.model.rx2Text.contains(text))
     #expect(f.model.rxPlainText.contains(text))
-    #expect(f.engines.count == 1)                                  // bez restartu
+    #expect(f.engines.count == 1)                                  // without a restart
     f.model.clearRx2()
     #expect(f.model.rx2Text.isEmpty && f.model.rx2TrimmedTotal == f.model.rx2AppendedTotal)
     await f.model.stop()
@@ -49,7 +49,7 @@ import Settings
     #expect(ch.text.contains("OK2ABC"))
     await f.model.tuneChannel(ch.id)
     #expect(f.model.param("mark") == .double((ch.mark * 10).rounded() / 10))
-    await f.model.insertWord("OK2ABC")                             // klik na slovo v kanálu = jako v hlavním příjmu
+    await f.model.insertWord("OK2ABC")                             // clicking a word in a channel = as in the main receive pane
     #expect(f.model.qso.call == "OK2ABC")
     await f.model.setChannelDecoding(false)
     #expect(f.model.decoderChannels.isEmpty)
@@ -62,7 +62,7 @@ import Settings
     #expect(f.model.decoderChannels.isEmpty)
     f.model.handleAux(.channels([DecoderChannelInfo(id: 1, mark: 1000), DecoderChannelInfo(id: 2, mark: 1500)]))
     for _ in 0..<200 { f.model.handleAux(.channelText(id: 2, "A")) }
-    f.model.handleAux(.channels([DecoderChannelInfo(id: 2, mark: 1502)]))    // kanál 1 zanikl, text 2 zůstává
+    f.model.handleAux(.channels([DecoderChannelInfo(id: 2, mark: 1502)]))    // channel 1 is gone, text 2 stays
     #expect(f.model.decoderChannels.map(\.id) == [2])
     #expect(f.model.decoderChannels[0].text.count == AppModel.channelTextLimit)
     #expect(f.model.decoderChannels[0].mark == 1502)
@@ -74,11 +74,11 @@ import Settings
     let base = f.model.settings
     var s = base
     s.decoders.channelsEnabled = true; s.decoders.maxChannels = 6; s.decoders.secondDemod = "pll"
-    await f.model.setSecondDecoder(true)                           // mezitím změněno v horní liště
+    await f.model.setSecondDecoder(true)                           // changed in the top bar meanwhile
     await f.model.applySettings(s, baseline: base)
     let d = f.model.settings.decoders
     #expect(d.channelsEnabled && d.maxChannels == 6 && d.secondDemod == "pll")
-    #expect(d.secondEnabled)                                       // přepínač z lišty dialog nepřepsal
+    #expect(d.secondEnabled)                                       // the dialog did not overwrite the switch from the bar
     #expect(await f.engine.auxDecoders == d.auxConfig())
     await f.model.stop()
 }

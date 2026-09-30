@@ -36,7 +36,7 @@ private let feedJSON = #"{"latest":{"version":"0.13.0","build":150,"url":"https:
     guard case .available = m.status else { Issue.record("available"); return }
     let (m2, _, _) = makeModel(FakeNet(feedJSON), feed: "")
     m2.showWindow = { shown += 1 }
-    await m2.checkAtLaunch(enabled: true); #expect(shown == 1 && m2.status == .idle)   // nenastaveno: ticho
+    await m2.checkAtLaunch(enabled: true); #expect(shown == 1 && m2.status == .idle)   // not configured: silence
 }
 
 @MainActor @Test func manualCheckShowsResultsAndDownloadOpensDMG() async {

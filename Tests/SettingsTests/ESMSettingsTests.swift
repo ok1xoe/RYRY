@@ -12,7 +12,7 @@ private func decode(_ json: String) throws -> AppSettings {
     #expect(e.runCQ == 0 && e.runExchange == 3 && e.runTU == 4)
     #expect(e.spMyCall == 14 && e.spExchange == 3 && e.agn == 10)
     #expect(AppSettings().esm == e)
-    // výchozí makro „Moje značka“ na ⇧F3
+    // the default "My call" macro on ⇧F3
     #expect(AppSettings.defaultMacros[14].text.contains("%m"))
     #expect(!AppSettings.defaultMacros[14].name.isEmpty)
     #expect(AppSettings.defaultMacros[15].text.isEmpty)
@@ -23,23 +23,23 @@ private func decode(_ json: String) throws -> AppSettings {
     s.esm.enabled = true; s.esm.mode = .sp; s.esm.spMyCall = 7; s.esm.agn = 11
     let back = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s))
     #expect(back.esm == s.esm)
-    // neplatné hodnoty → výchozí, index mimo 0…15 → výchozí
+    // invalid values → the defaults, an index outside 0…15 → the default
     let t = try decode(#"{"esm":{"enabled":"x","mode":"weird","runCQ":99,"runTU":-1,"spExchange":5}}"#)
     #expect(!t.esm.enabled && t.esm.mode == .run && t.esm.runCQ == 0 && t.esm.runTU == 4 && t.esm.spExchange == 5)
 }
 
 @Test func esmMigrationFillsEmptyMyCallSlot() throws {
-    // starší soubor bez sekce esm s prázdným ⇧F3 → doplní se výchozí „Moje značka“
+    // an older file with no esm section and an empty ⇧F3 → the default "My call" is filled in
     var macros = Array(repeating: #"{"name":"","text":""}"#, count: 16)
     macros[0] = #"{"name":"A","text":"x"}"#
     let old = try decode(#"{"macros":[\#(macros.joined(separator: ","))]}"#)
     #expect(old.macros[14] == AppSettings.defaultMacros[14])
     #expect(old.macros[0].name == "A" && old.macros[15].text.isEmpty)
-    // vlastní obsah ⇧F3 se nemění
+    // custom content of ⇧F3 is left alone
     macros[14] = #"{"name":"Mine","text":"abc"}"#
     let own = try decode(#"{"macros":[\#(macros.joined(separator: ","))]}"#)
     #expect(own.macros[14].name == "Mine")
-    // s uloženou sekcí esm se prázdné makro už nedoplňuje (uživatel ho mohl smazat)
+    // with a stored esm section an empty macro is no longer filled in (the user may have deleted it)
     macros[14] = #"{"name":"","text":""}"#
     let cleared = try decode(#"{"esm":{},"macros":[\#(macros.joined(separator: ","))]}"#)
     #expect(cleared.macros[14].text.isEmpty)

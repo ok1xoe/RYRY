@@ -3,19 +3,19 @@ import RTTYSignalKit
 import TestSupport
 @testable import Engine
 
-// Review I-2: WAV nahrazuje vstup zvukovky (MMTTY TSound::Execute), tempo dává vstup; při TX pauza.
+// Review I-2: a WAV replaces the sound card input (MMTTY TSound::Execute), the input sets the pace; paused during TX.
 @Test func playbackReplacesLiveInputInRealTime() async throws {
     let r = try makeEngine(ptt: .none)
     try await r.engine.start()
     let text = "CQ CQ DE DL1ABC DL1ABC K"
     let wav = RTTYSignalGenerator().generate(text: text)
     var noise = [Float](repeating: 0, count: wav.count + 22050)
-    var g = NoiseGenerator(seed: 9); g.addNoise(to: &noise, rms: 0.3)    // živý vstup = silný šum
+    var g = NoiseGenerator(seed: 9); g.addNoise(to: &noise, rms: 0.3)    // the live input = strong noise
     r.audio.feedRx(noise)
     await r.engine.startPlayback(wav, speed: 1)
     #expect(await r.engine.playbackRemaining == wav.count)
     await pump(r) { await r.engine.playbackRemaining == 0 }
-    #expect(r.audio.rxRemaining > 0)                 // tempo podle vstupu: vstup se čte stejně rychle
+    #expect(r.audio.rxRemaining > 0)                 // paced by the input: the input is read at the same rate
     await r.engine.stop()
     #expect(await collectText(r.events).contains(text))
 }
@@ -36,7 +36,7 @@ import TestSupport
     await r.engine.stop()
 }
 
-// Nahrávání: engine sbírá živý vstup, aplikace ho průběžně odebírá (zápis do WAV mimo engine)
+// Recording: the engine collects the live input, the application drains it as it goes (the WAV is written outside the engine)
 @Test func recordingCollectsLiveInput() async throws {
     let r = try makeEngine(ptt: .none)
     try await r.engine.start()
@@ -47,7 +47,7 @@ import TestSupport
     var got = await r.engine.drainRecording()
     #expect(got.count == input.count)
     #expect(got.prefix(1000) == input.prefix(1000))
-    #expect(await r.engine.drainRecording().isEmpty)          // odebráno
+    #expect(await r.engine.drainRecording().isEmpty)          // drained
     await r.engine.setRecording(false)
     r.audio.feedRx([0.5, 0.5])
     await pump(r, steps: 3) { false }
@@ -56,7 +56,7 @@ import TestSupport
     await r.engine.stop()
 }
 
-// Pauza, posun a převinutí přehrávání
+// Pausing, seeking and rewinding the playback
 @Test func playbackPauseSeekRewind() async throws {
     let r = try makeEngine(ptt: .none)
     try await r.engine.start()
@@ -64,13 +64,13 @@ import TestSupport
     await r.engine.startPlayback([Float](repeating: 0.1, count: 100_000), speed: 1)
     await r.engine.setPlaybackPaused(true)
     await pump(r, steps: 5) { false }
-    #expect(await r.engine.playbackPosition == 0)             // pauza: nic se nepřehrává
+    #expect(await r.engine.playbackPosition == 0)             // paused: nothing is played
     await r.engine.seekPlayback(toFraction: 0.5)
     #expect(await r.engine.playbackPosition == 50_000)
     await r.engine.setPlaybackPaused(false)
     await pump(r, steps: 3) { false }
     #expect(await r.engine.playbackPosition > 50_000)
-    await r.engine.seekPlayback(toFraction: 0)                // převinutí na začátek
+    await r.engine.seekPlayback(toFraction: 0)                // rewind to the start
     #expect(await r.engine.playbackPosition == 0)
     #expect(await r.engine.playbackTotal == 100_000)
     await r.engine.stop()

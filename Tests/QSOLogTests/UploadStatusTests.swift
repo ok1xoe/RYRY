@@ -26,7 +26,7 @@ import Testing
     #expect(r.isUploaded(.eqsl) && !r.isUploaded(.lotw))
     #expect(abs(r.uploads![UploadTarget.eqsl.rawValue]!.timeIntervalSince(when)) < 0.01)
     #expect(recs.first { $0.id == b.id }!.uploads == nil)
-    // neznámé id se ignoruje
+    // an unknown id is ignored
     #expect(try await store.markUploaded(ids: [UUID()], target: .lotw) == 0)
 }
 
@@ -49,17 +49,17 @@ import Testing
     #expect(imp.isUploaded(.clublog) && !imp.isUploaded(.eqsl))
 }
 
-// Review Critical 1: dvě instance logu nad stejnými soubory (nahrávání přes Použít) – přepis nesmí smazat
-// spojení zapsané druhou instancí
+// Review Critical 1: two log instances over the same files (an upload across Apply) – the rewrite must not delete
+// a QSO written by the second instance
 @Test func rewriteReloadsWhenFileChangedElsewhere() async throws {
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("stale-\(UUID())")
     let old = try QSOLogStore(directory: dir)
     let a = QSORecord(call: "OK1AAA", timeOn: Date())
     try await old.append(a)
-    let fresh = try QSOLogStore(directory: dir)                   // restart po Použít
-    try await Task.sleep(for: .milliseconds(20))                  // jiný čas změny souboru
+    let fresh = try QSOLogStore(directory: dir)                   // a restart after Apply
+    try await Task.sleep(for: .milliseconds(20))                  // a different file modification time
     try await fresh.append(QSORecord(call: "OK2BBB", timeOn: Date()))
-    try await old.markUploaded(ids: [a.id], target: .lotw)        // doběhlé nahrávání ve staré instanci
+    try await old.markUploaded(ids: [a.id], target: .lotw)        // an upload that finished in the old instance
     let check = try QSOLogStore(directory: dir)
     let calls = await check.records.map(\.call)
     #expect(calls.sorted() == ["OK1AAA", "OK2BBB"])

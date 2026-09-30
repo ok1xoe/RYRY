@@ -42,7 +42,7 @@ func text(_ r: MacroResult) -> String {
     #expect(text(MacroEngine.expand("%g/%f", context: utc)) == "GOOD AFTERNOON/GA")
 }
 
-// MMTTY SetGreetingString: podle místního času protistanice (země z DXCC); neznámá země → HELLO / nic
+// MMTTY SetGreetingString: based on the other station's local time (the entity from DXCC); an unknown entity → HELLO / nothing
 @Test func greetingUsesHisLocalTime() {
     var c = ctx()                                     // 14:13 UTC
     c.hisUTCOffsetHours = 9                            // JA: 23:13
@@ -51,7 +51,7 @@ func text(_ r: MacroResult) -> String {
     #expect(text(MacroEngine.expand("%g/%f", context: c)) == "GOOD MORNING/GM")
     c.hisUTCOffsetHours = 5.5                          // VU: 19:43
     #expect(text(MacroEngine.expand("%g", context: c)) == "GOOD EVENING")
-    c.hisUTCOffsetHours = -14.5                        // přes půlnoc zpět: 23:43 předchozího dne
+    c.hisUTCOffsetHours = -14.5                        // back across midnight: 23:43 of the previous day
     #expect(text(MacroEngine.expand("%f", context: c)) == "GE")
     c.hisUTCOffsetHours = nil
     #expect(text(MacroEngine.expand("[%g][%f]", context: c)) == "[HELLO][]")
@@ -75,7 +75,7 @@ func text(_ r: MacroResult) -> String {
     #expect(codes.count > 30)
     let sp = MacroEngine.expand("%{E E}", context: ctx())
     guard case .raw(let c2)? = sp.outputs.first else { Issue.record("čekám raw"); return }
-    // E = tečka, mezera = 5× nosná vyp. + mezera za znakem
+    // E = a dot, a space = 5× carrier off + the space after the character
     #expect(c2 == [0xFD, 0xFE, 0xFF, 0xFE, 0xFE, 0xFE] + [UInt8](repeating: 0xFE, count: 5) + [0xFE, 0xFE] + [0xFF, 0xFE, 0xFE, 0xFE])
 }
 

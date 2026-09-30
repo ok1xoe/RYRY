@@ -19,7 +19,7 @@ private func bmRecord(_ call: String, mode: String = "RTTY", at: Date = Date()) 
 
 @Test func bandMapFiltersToDisplayedRange() {
     let spots = [bmSpot("DL1ABC", 14080.5), bmSpot("OK2XYZ", 14082.0), bmSpot("F5AAA", 14090.0), bmSpot("G3BBB", 14079.0)]
-    // LSB, dial 14082.5 kHz: audio = dial − spot → 2000, 500, (−7500 mimo), 3500
+    // LSB, dial 14082.5 kHz: audio = dial − spot → 2000, 500, (−7500 outside), 3500
     let all = AppModel.bandMapMarkers(spots: spots, dialHz: 14_082_500, mode: "LSB", offsetHz: 0,
                                       fromHz: 0, toHz: 4000, records: [], contestSince: nil)
     #expect(Set(all.map(\.spot.call)) == ["DL1ABC", "OK2XYZ", "G3BBB"])
@@ -49,28 +49,28 @@ private func bmRecord(_ call: String, mode: String = "RTTY", at: Date = Date()) 
     #expect(status("F5AAA", nil) == .new)
     #expect(status("DL1ABC", nil) == .worked)
     #expect(status("OK2XYZ", nil) == .worked)
-    #expect(status("DL1ABC", since) == .dupe)          // v závodě je spojení od začátku závodu
-    #expect(status("OK2XYZ", since) == .worked)        // starší než začátek závodu → jen „v logu“
+    #expect(status("DL1ABC", since) == .dupe)          // in a contest only QSOs since the contest start count
+    #expect(status("OK2XYZ", since) == .worked)        // older than the contest start → only "in the log"
     #expect(status("F5AAA", since) == .new)
 }
 
 @Test @MainActor func bandMapHiddenWithoutRigOrWhenDisabled() async throws {
     let m = spotModel(rig: NoRig())
     #expect(m.rig == nil)
-    #expect(m.bandMapMarkers.isEmpty)                      // bez rigu žádné štítky
+    #expect(m.bandMapMarkers.isEmpty)                      // no labels without a rig
     m.rig = RigStatus(online: true, frequency: nil, mode: "LSB")
-    #expect(m.bandMapMarkers.isEmpty)                      // neznámá frekvence
+    #expect(m.bandMapMarkers.isEmpty)                      // an unknown frequency
     m.setSpots { $0.showInWaterfall = false }
     #expect(!m.settings.spots.showInWaterfall)
     m.rig = RigStatus(online: true, frequency: 14_082_500, mode: "LSB")
-    #expect(m.bandMapMarkers.isEmpty)                      // vypnuto v nastavení
+    #expect(m.bandMapMarkers.isEmpty)                      // turned off in the settings
 }
 
 @Test @MainActor func showInWaterfallDefaultsToTrueAndDoesNotStartNetwork() async throws {
     let m = spotModel(rig: NoRig())
     #expect(m.settings.spots.showInWaterfall)
     m.setSpots { $0.showInWaterfall = false }
-    #expect(!m.spotFeed.isRunning)                         // přepnutí štítků nespouští síť
+    #expect(!m.spotFeed.isRunning)                         // toggling the labels does not start any networking
 }
 
 @Test @MainActor func clickOnMarkerTunesMarkAndFillsCall() async throws {
@@ -80,7 +80,7 @@ private func bmRecord(_ call: String, mode: String = "RTTY", at: Date = Date()) 
     await m.bandMapClick(BandMapMarker(spot: spot, audioHz: 1850.4, status: .new))
     #expect(m.mark == 1850.4)
     #expect(m.qso.call == "DL1ABC")
-    #expect(rig.freqs.isEmpty)                             // rig se nepřelaďuje
+    #expect(rig.freqs.isEmpty)                             // the rig is not retuned
     await m.stop()
 }
 

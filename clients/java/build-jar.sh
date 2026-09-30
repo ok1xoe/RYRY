@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Sestaví clients/java/mmtty4mac-client.jar (JDK 21, bez závislostí).
+# Builds clients/java/mmtty4mac-client.jar (JDK 21, no dependencies).
 set -euo pipefail
 cd "$(dirname "$0")"
 rm -rf out && mkdir out

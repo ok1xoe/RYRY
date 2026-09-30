@@ -7,7 +7,7 @@ import RTTYModem
 import TestSupport
 @testable import Engine
 
-/// Rig, jehož PTT příkaz trvá 100 ms (odhalí souběh příkazů během await).
+/// A rig whose PTT command takes 100 ms (reveals commands racing during an await).
 final class SlowRig: Rig, @unchecked Sendable {
     private let lock = NSLock()
     private var _ptt: [Bool] = []
@@ -75,7 +75,7 @@ func slowEngine() throws -> (Engine, SlowRig) {
     await #expect(throws: EngineError.notRunning) { try await e.start() }
 }
 
-/// Start selže (zvuk) → stop() musí ukončit proud událostí (odběratelé nesmí viset).
+/// The start fails (audio) → stop() must end the event stream (the subscribers must not hang).
 @Test func stopAfterFailedStartFinishesEvents() async throws {
     let audio = FakeAudioBackend(); audio.failStart = true
     let e = Engine(modem: try RTTYModem(), audio: audio, config: EngineConfig(),

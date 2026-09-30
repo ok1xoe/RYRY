@@ -42,7 +42,7 @@ func macroContext() -> MacroContext { var c = MacroContext(); c.myCall = "OK1XOE
     try await r.engine.start()
     try await r.engine.sendMacro(MacroEngine.expand("%{%m}\\", context: macroContext()))
     await pump(r) { await r.engine.state == .rx && r.audio.writeCalls > 0 }
-    // najít úseky ticha ≥ 30 ms uprostřed signálu (nosná vypnutá mezi CW prvky)
+    // find stretches of silence ≥ 30 ms in the middle of the signal (the carrier is off between the CW elements)
     let s = r.audio.tx
     let first = try #require(s.firstIndex { $0 != 0 })
     var gaps = 0, run = 0
@@ -79,7 +79,7 @@ func macroContext() -> MacroContext { var c = MacroContext(); c.myCall = "OK1XOE
     await r.engine.stop()
 }
 
-// Review I3: makro během doběhu (pttOff) se odvysílá hned v novém TX, ne až příště
+// Review I3: a macro queued during the tail (pttOff) is transmitted right away in the new TX, not only next time
 @Test func macroDuringPttOffIsSentInNewTransmission() async throws {
     let r = try makeEngine()
     try await r.engine.start()
@@ -88,7 +88,7 @@ func macroContext() -> MacroContext { var c = MacroContext(); c.myCall = "OK1XOE
     try await r.engine.sendMacro(MacroEngine.expand("BBBBB\\", context: macroContext()))
     await pump(r) { await r.engine.state == .rx && r.audio.writeCalls > 0 }
     #expect(try await decodeTx(r.audio.tx).contains("BBBBB"))
-    // další TX už BBBBB nesmí obsahovat
+    // the next TX must no longer contain BBBBB
     let before = r.audio.tx.count
     try await r.engine.sendMacro(MacroEngine.expand("CCCCC\\", context: macroContext()))
     await pump(r) { await r.engine.state == .rx && r.audio.tx.count > before }
@@ -96,7 +96,7 @@ func macroContext() -> MacroContext { var c = MacroContext(); c.myCall = "OK1XOE
     await r.engine.stop()
 }
 
-// Review I4: makro bez '\' během drain zruší návrat na RX (jako MMTTY ToTX)
+// Review I4: a macro without '\' during the drain cancels the return to RX (like MMTTY ToTX)
 @Test func macroWithoutRxMarkerCancelsPendingDrain() async throws {
     let r = try makeEngine()
     try await r.engine.start()

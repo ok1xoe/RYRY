@@ -26,7 +26,7 @@ M1="73 %c\r\n%l\\"
 M1=1073
 """#
 
-// Import z MMTTY: náhled ze souboru a uložení přes saveMacros / saveMessages / setParam / applySettings
+// Import from MMTTY: a preview from a file and saving via saveMacros / saveMessages / setParam / applySettings
 @Test @MainActor func importFromMMTTYFile() async throws {
     let f = Fixture()
     await f.model.start()
@@ -44,12 +44,12 @@ M1=1073
     #expect(s.rtty["baud"] == .double(50) && s.rtty["afc"] == .bool(false))
     #expect(await f.engine.modemParam("demodType") == .string("pll"))
     #expect(await f.engine.modemParam("shift") == .double(170))
-    // uloženo i na disk
+    // stored on disk as well
     #expect(SettingsStore(directory: f.dir).load().0.messages.first?.name == "FINAL")
     await f.model.stop()
 }
 
-// Přepínače: nevybrané části se nepřepíšou
+// Switches: the parts that are not selected are not overwritten
 @Test @MainActor func importRespectsOptions() async throws {
     let f = Fixture()
     await f.model.start()
@@ -63,7 +63,7 @@ M1=1073
     await f.model.stop()
 }
 
-// Poškozený soubor: náhled nespadne, nic k importu
+// A corrupted file: the preview does not crash, there is nothing to import
 @Test @MainActor func importDamagedFilePreview() throws {
     let f = Fixture()
     let url = f.dir.appendingPathComponent("bad.ini")

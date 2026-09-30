@@ -3,7 +3,7 @@ import Testing
 import Settings
 @testable import AppCore
 
-// Ukázkové odpovědi podle dokumentace formátů QRZ.com XML a HamQTH XML.
+// Sample responses following the documentation of the QRZ.com XML and HamQTH XML formats.
 enum CallbookSamples {
     static let qrzLogin = """
     <?xml version="1.0" encoding="utf-8" ?>
@@ -99,7 +99,7 @@ final class Counter: @unchecked Sendable {
     let qrz = QRZCallbook(username: "a", password: "b", fetcher: m.fetcher)
     let e = try await qrz.lookup("OK1XOE")
     #expect(e?.name == "Tomas Kaplan")
-    #expect(m.urls.filter { $0.absoluteString.contains("username=") }.count == 2)   // přihlášení, znovu přihlášení
+    #expect(m.urls.filter { $0.absoluteString.contains("username=") }.count == 2)   // log in, log in again
     #expect(m.urls.count == 4)
 }
 
@@ -154,7 +154,7 @@ private actor CountingService: CallbookService {
     #expect(try await c.lookup("NONE") == nil); #expect(try await c.lookup("none") == nil)
     #expect(await svc.calls == ["AA1A", "NONE"])
     await #expect(throws: CallbookError.network("x")) { _ = try await c.lookup("ERR") }
-    _ = try await c.lookup("ERR")                        // chyba se neukládá
+    _ = try await c.lookup("ERR")                        // an error is not cached
     #expect(await svc.calls.count == 4)
 }
 

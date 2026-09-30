@@ -25,9 +25,9 @@ private let listing = """
     #expect(ManagedHamlibRig.arguments(model: 1, serialPort: "", baud: 0, tcpPort: 4533) == ["-m", "1", "-T", "127.0.0.1", "-t", "4533"])
 }
 
-// Skutečný rigctld (model Dummy): aplikace ho spustí, ovládá a při odpojení ukončí
+// A real rigctld (the Dummy model): the application starts it, controls it and terminates it on disconnect
 @Test func managedRigctldDummy() async throws {
-    guard let bin = ManagedHamlibRig.findRigctld() else { return }          // bez hamlib test přeskočit
+    guard let bin = ManagedHamlibRig.findRigctld() else { return }          // skip the test without hamlib
     let port = UInt16(46_000 + Int.random(in: 0..<1000))
     let rig = ManagedHamlibRig(binary: bin, model: 1, serialPort: "", baud: 0, tcpPort: port)
     try await rig.connect()
@@ -46,7 +46,7 @@ private let listing = """
     #expect(!rig.isRunning)
 }
 
-// Engine volá rovnou frequency() bez connect(): rigctld se spustí sám; po chybě se hned znovu nespouští
+// The engine calls frequency() directly without connect(): rigctld starts on its own; after an error it is not started again straight away
 @Test func managedRigctldStartsLazily() async throws {
     guard let bin = ManagedHamlibRig.findRigctld() else { return }
     let rig = ManagedHamlibRig(binary: bin, model: 1, serialPort: "", baud: 0, tcpPort: UInt16(48_000 + Int.random(in: 0..<1000)))
@@ -56,11 +56,11 @@ private let listing = """
                                tcpPort: UInt16(49_000 + Int.random(in: 0..<1000)), startTimeout: .seconds(3))
     await #expect(throws: RigError.self) { try await bad.frequency() }
     let t0 = ContinuousClock.now
-    await #expect(throws: RigError.offline) { try await bad.frequency() }   // v době odkladu hned offline
+    await #expect(throws: RigError.offline) { try await bad.frequency() }   // offline right away during the back-off period
     #expect(ContinuousClock.now - t0 < .milliseconds(200))
 }
 
-// Review 5: souběžné dotazy spustí jediný rigctld; obsazený TCP port = srozumitelná chyba
+// Review 5: concurrent queries start a single rigctld; a busy TCP port = a comprehensible error
 @Test func managedRigctldSingleStartAndBusyPort() async throws {
     guard let bin = ManagedHamlibRig.findRigctld() else { return }
     let port = UInt16(45_000 + Int.random(in: 0..<900))
@@ -70,7 +70,7 @@ private let listing = """
     async let f3 = a.frequency()
     _ = try await (f1, f2, f3)
     #expect(a.startCount == 1)
-    let b = ManagedHamlibRig(binary: bin, model: 1, serialPort: "", baud: 0, tcpPort: port)   // port drží `a`
+    let b = ManagedHamlibRig(binary: bin, model: 1, serialPort: "", baud: 0, tcpPort: port)   // the port is held by `a`
     await #expect(throws: RigError.self) { try await b.connect() }
     #expect(!b.isRunning)
     await a.disconnect()

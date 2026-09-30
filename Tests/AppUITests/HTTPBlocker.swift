@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-/// Obsadí port (pro test obsazeného portu API).
+/// Occupies a port (for the test of a busy API port).
 final class HTTPBlocker: @unchecked Sendable {
     private var l: NWListener?
     func start() async throws -> UInt16 {

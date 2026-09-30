@@ -5,12 +5,12 @@ import java.net.URI;
 import java.util.Map;
 
 /**
- * Ukázka napojení loggeru na mmtty4mac.
+ * Example of connecting a logger to mmtty4mac.
  *
  * <ul>
- *   <li>Vypisuje přijatý text (rx.char).</li>
- *   <li>Reaguje na zalogované spojení (qso.logged).</li>
- *   <li>Přenese značku do QSO okna a zobrazí zemi DXCC.</li>
+ *   <li>Prints the received text (rx.char).</li>
+ *   <li>Reacts to a logged QSO (qso.logged).</li>
+ *   <li>Passes the callsign to the QSO window and shows the DXCC entity.</li>
  * </ul>
  *
  * <pre>

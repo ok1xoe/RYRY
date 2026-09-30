@@ -1,10 +1,10 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
-// Kontrola plánu 16: import z MMTTY – neplatná čísla, kolize zkratek, značka, velikost souboru; Macro.repeatSeconds.
+// Plan 16 check: import from MMTTY – invalid numbers, shortcut clashes, the call, the file size; Macro.repeatSeconds.
 import Foundation
 import Testing
 @testable import Settings
 
-// 4: obří / záporná / nečíselná čísla nesmí shodit import (Int(1e20) = fatal error)
+// 4: huge / negative / non-numeric numbers must not crash the import (Int(1e20) = fatal error)
 @Test func mmttyImportSurvivesHugeNumbers() {
     let ini = """
     [Define]
@@ -43,7 +43,7 @@ import Testing
     #expect(r.shortcuts.isEmpty)
 }
 
-// 4: Macro – repeatSeconds jen 0,1–3600 s (dekódování i init)
+// 4: Macro – repeatSeconds only 0.1–3600 s (both decoding and init)
 @Test func macroRepeatSecondsValidated() throws {
     func dec(_ v: String) throws -> Double? {
         try JSONDecoder().decode(Macro.self, from: Data(#"{"name":"a","text":"b","repeatSeconds":\#(v)}"#.utf8)).repeatSeconds
@@ -59,25 +59,25 @@ import Testing
     #expect(Macro.validRepeat(-1) == nil && Macro.validRepeat(0.1) == 0.1)
 }
 
-// 5: kolize se počítají proti cílovému nastavení; kolidující zkratka se nepřevezme
+// 5: clashes are counted against the target settings; a clashing shortcut is not taken over
 @Test func mmttyShortcutConflictsCheckedOnApply() {
     let r = MMTTYImport.parse(text: "[MacroKey]\nM1=305\nM2=113\n[SysKey]\nS4=332\n")   // ⌘1, F2, openLog ⌘L
     #expect(r.shortcuts["openLog"] == KeyBinding(key: "l", modifiers: [.command]))
-    #expect(!r.warnings.contains { $0.contains("kryje") })          // parse nesrovnává s výchozím nastavením
+    #expect(!r.warnings.contains { $0.contains("kryje") })          // the parse does not compare against the default settings
     var s = AppSettings()
     s.shortcuts["toggleTx"] = KeyBinding(key: "1", modifiers: [.command])
     let w = r.apply(to: &s, options: [.shortcuts])
-    #expect(s.binding(for: .macro(0)) == KeyBinding(key: "f1"))      // ⌘1 má TX → nepřevzato
+    #expect(s.binding(for: .macro(0)) == KeyBinding(key: "f1"))      // ⌘1 is taken by TX → not adopted
     #expect(s.binding(for: .toggleTx) == KeyBinding(key: "1", modifiers: [.command]))
     #expect(s.binding(for: .openLog) == ShortcutCommand.openLog.defaultBinding)   // ⌘L = Log QSO
     #expect(s.conflictingShortcuts().isEmpty)
     #expect(w.count == 1 && w[0].contains("⌘1") && w[0].contains("⌘L"))
     var t = AppSettings()
-    #expect(r.apply(to: &t, options: [.shortcuts]).count == 1)     // jen openLog
+    #expect(r.apply(to: &t, options: [.shortcuts]).count == 1)     // openLog only
     #expect(t.binding(for: .macro(0)) == KeyBinding(key: "1", modifiers: [.command]))
 }
 
-// 10: značka jen A–Z 0–9 /, max. 15 znaků
+// 10: the call may only contain A–Z 0–9 /, 15 characters at most
 @Test func mmttyImportValidatesCall() {
     #expect(MMTTYImport.parse(text: "[Define]\nCall=ok1xoe/p\n").station?.call == "OK1XOE/P")
     for bad in ["OK1 XOE", "OK1-XOE", "ABCDEFGHIJKLMNOP", "OK1XÖE", "<b>"] {
@@ -87,7 +87,7 @@ import Testing
     }
 }
 
-// 10: soubor nad 1 MB se nezpracuje
+// 10: a file over 1 MB is not processed
 @Test func mmttyImportRejectsHugeData() {
     let r = MMTTYImport.parse(data: Data(("[Define]\nCall=OK1XOE\n" + String(repeating: ";", count: 1_100_000)).utf8))
     #expect(r.isEmpty && !r.warnings.isEmpty)

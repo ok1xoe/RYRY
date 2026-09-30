@@ -78,10 +78,10 @@ func collectText(_ m: RTTYModem, _ samples: [Float]) async -> String {
     }
 }
 
-// Review Focus 4: text delší než TX buffer jádra se odvysílá celý
+// Review Focus 4: text longer than the core's TX buffer is transmitted in full
 @Test func longTextIsFullyTransmitted() async throws {
     let tx = try RTTYModem()
-    let long = String(repeating: "RYRYRY CQ TEST ", count: 200)      // 3000 znaků
+    let long = String(repeating: "RYRYRY CQ TEST ", count: 200)      // 3000 characters
     tx.beginTx(tune: false)
     tx.queueTx(text: long)
     var out: [Float] = []
@@ -125,7 +125,7 @@ func collectText(_ m: RTTYModem, _ samples: [Float]) async -> String {
     }
 }
 
-// Review #3: NUL v textu nesmí zablokovat frontu.
+// Review #3: a NUL in the text must not block the queue.
 @Test func nulInTextDoesNotStallQueue() throws {
     let m = try RTTYModem()
     m.beginTx(tune: false)
@@ -135,7 +135,7 @@ func collectText(_ m: RTTYModem, _ samples: [Float]) async -> String {
     #expect(m.txPending == 0)
 }
 
-// Review #4: text zadaný před beginTx se neztratí.
+// Review #4: text entered before beginTx is not lost.
 @Test func textQueuedBeforeBeginTxIsKept() throws {
     let m = try RTTYModem()
     m.queueTx(text: "CQ CQ")
@@ -144,15 +144,15 @@ func collectText(_ m: RTTYModem, _ samples: [Float]) async -> String {
     #expect(m.txPending > 0)
 }
 
-// Review #6: pomalý odběratel nesmí přijít o přijatý text.
+// Review #6: a slow subscriber must not miss any received text.
 @Test func slowConsumerDoesNotLoseText() async throws {
     let m = try RTTYModem()
     try m.set(parameter: "baud", value: .double(110))
     let line = "0123456789 ABCDEFGHIJ KLMNOPQRST UVWXYZ\r\n"
-    let text = String(repeating: line, count: 250)        // 10 000 znaků
+    let text = String(repeating: line, count: 250)        // 10,000 characters
     let s = RTTYSignalGenerator(baud: 110).generate(text: text)
     let stream = m.events
-    s.withUnsafeBufferPointer { m.processRx($0) }           // nikdo zatím nečte
+    s.withUnsafeBufferPointer { m.processRx($0) }           // nobody is reading yet
     m.finishEvents()
     var got = ""
     for await e in stream { if case .rxText(let c, false) = e { got.append(c) } }
@@ -205,7 +205,7 @@ func largeMarkJumpsKeepShift(from: Double, to: Double) throws {
     #expect(m.get(parameter: "shift") == .double(170))
 }
 
-// Plán 7 / T1
+// Plan 7 / T1
 @Test func plan7FilterParametersExposed() throws {
     let m = try RTTYModem()
     let ids = Set(m.parameters.map(\.id))
@@ -226,14 +226,14 @@ func largeMarkJumpsKeepShift(from: Double, to: Double) throws {
     #expect(m.get(parameter: "notchFreq") == .int(1700))
 }
 
-// Plán 7 / T2: kalibrace hodin
+// Plan 7 / T2: clock calibration
 @Test(arguments: [(15_000.0, 2125.0), (0.0, 2125 / 1.015)])
 func rxClockCorrectionKeepsAFCOnTrueFrequency(ppm: Double, expectedMark: Double) async throws {
-    // Zvukovka ve skutečnosti běží o 1,5 % rychleji: tón 2125 Hz se v datech „11025 Hz“ jeví jako 2093,6 Hz.
+    // The sound card actually runs 1.5 % faster: a 2125 Hz tone appears as 2093.6 Hz in the "11025 Hz" data.
     var cfg = RTTYModem.Config()
     cfg.rxClockPPM = ppm
     let m = try RTTYModem(config: cfg)
-    #expect(m.sampleRate == 11025)                         // audio převodník zůstává nominální
+    #expect(m.sampleRate == 11025)                         // the audio converter stays nominal
     let s = RTTYSignalGenerator(sampleRate: 11025 * 1.015).generate(text: String(repeating: "RYRYRYRY ", count: 10))
     let stream = m.events
     s.withUnsafeBufferPointer { m.processRx($0) }
@@ -245,7 +245,7 @@ func rxClockCorrectionKeepsAFCOnTrueFrequency(ppm: Double, expectedMark: Double)
 
 @Test func txClockCorrectionShiftsGeneratedTone() throws {
     var cfg = RTTYModem.Config()
-    cfg.txClockPPM = 10_000                                  // výstup hraje o 1 % rychleji
+    cfg.txClockPPM = 10_000                                  // the output plays 1 % faster
     let m = try RTTYModem(config: cfg)
     try m.set(parameter: "diddle", value: .string("off"))
     m.beginTx(tune: true)
@@ -254,10 +254,10 @@ func rxClockCorrectionKeepsAFCOnTrueFrequency(ppm: Double, expectedMark: Double)
     var crossings = 0
     for i in 1..<buf.count where (buf[i - 1] < 0) != (buf[i] < 0) { crossings += 1 }
     let f = Double(crossings) / 2
-    #expect(abs(f - 2125 / 1.01) < 4, "\(f)")                // v datech nižší, zařízení ho zrychlí na 2125
+    #expect(abs(f - 2125 / 1.01) < 4, "\(f)")                // lower in the data, the device speeds it up to 2125
 }
 
-// Shift po naladění kliknutím (mark s desetinami) nesmí vyjít 169.99999… (picker v GUI ho pak nenajde)
+// The shift after tuning by a click (a mark with decimals) must not come out as 169.99999… (the GUI picker would then not find it)
 @Test func shiftReadBackIsExactAfterFractionalMark() throws {
     let m = try RTTYModem()
     for i in 0..<150 {                                   // mark 1500…2600 Hz
@@ -267,7 +267,7 @@ func rxClockCorrectionKeepsAFCOnTrueFrequency(ppm: Double, expectedMark: Double)
     }
 }
 
-// Plán 8 / T3
+// Plan 8 / T3
 @Test func demodScopeThroughModem() throws {
     let m = try RTTYModem()
     #expect(m.demodScope() == nil)
@@ -277,7 +277,7 @@ func rxClockCorrectionKeepsAFCOnTrueFrequency(ppm: Double, expectedMark: Double)
     let d = try #require(m.demodScope())
     #expect(d.bit.count == 8192 && d.sync.count == 8192)
     #expect(d.marks.count == 4 && d.marks[2].count == 8192 && d.spaces[0].count == 8192)
-    #expect(d.marks[3].isEmpty)                                 // ATC vypnuté
-    #expect(m.demodScope() == nil)                              // další dávka se teprve sbírá
+    #expect(d.marks[3].isEmpty)                                 // ATC off
+    #expect(m.demodScope() == nil)                              // the next batch is still being collected
     #expect(RTTYModem.scopeSources == ["Filtr", "Det.", "LPF", "ATC"])
 }

@@ -16,7 +16,7 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
     #expect(s.snr == 25)
     #expect(s.source == .rbn)
     #expect(s.band == "20m")
-    #expect(s.time == refNow.addingTimeInterval(-7 * 60))            // 12:03 UTC, datum dnešní
+    #expect(s.time == refNow.addingTimeInterval(-7 * 60))            // 12:03 UTC, today's date
 }
 
 @Test func parsesClassicClusterLineWithLocator() throws {
@@ -40,7 +40,7 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
     #expect(inSeg.mode == "RTTY")
     let outSeg = try #require(SpotParser.parse("DX de OK1ABC: 14195.0 K1ABC CQ DX 1200Z", now: refNow))
     #expect(outSeg.mode == nil)
-    // explicitní jiný mód má přednost před segmentem
+    // an explicit different mode takes precedence over the segment
     let ft8 = try #require(SpotParser.parse("DX de OK1ABC: 14074.0 K1ABC FT8 -10 dB 1200Z", now: refNow))
     #expect(ft8.mode == "FT8")
     #expect(ft8.snr == -10)
@@ -52,7 +52,7 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
 }
 
 @Test func timeAfterMidnightBelongsToYesterday() throws {
-    // 00:05 UTC, spot z 23:58 předchozího dne
+    // 00:05 UTC, a spot from 23:58 the previous day
     let now = Date(timeIntervalSince1970: 1_773_446_700)          // 2026-03-14 00:05 UTC
     let s = try #require(SpotParser.parse("DX de OK1ABC: 14080.0 K1ABC RTTY 2358Z", now: now))
     #expect(s.time == now.addingTimeInterval(-7 * 60))
@@ -62,15 +62,15 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
     let bad = [
         "",
         "Hello OK1XOE, welcome to the cluster",
-        "DX de OK1ABC: 14080.0 DL1ABC RTTY",                          // bez času
-        "DX de OK1ABC: 14080.0 DL1ABC RTTY 2561Z",                    // neplatný čas
+        "DX de OK1ABC: 14080.0 DL1ABC RTTY",                          // no time
+        "DX de OK1ABC: 14080.0 DL1ABC RTTY 2561Z",                    // an invalid time
         "DX de OK1ABC: 14080.0 DL1ABC RTTY 2460Z",
-        "DX de OK1ABC: abc DL1ABC RTTY 1200Z",                        // frekvence není číslo
+        "DX de OK1ABC: abc DL1ABC RTTY 1200Z",                        // the frequency is not a number
         "DX de OK1ABC: 0.0 DL1ABC RTTY 1200Z",
-        "DX de OK1ABC 14080.0 DL1ABC RTTY 1200Z",                     // bez dvojtečky
-        "DX de : 14080.0 DL1ABC RTTY 1200Z",                          // bez spotra
-        "DX de OK1ABC: 14080.0 !!!! RTTY 1200Z",                      // vadná značka
-        "DX de OK1ABC: 14080.0 12345 RTTY 1200Z",                     // značka bez písmen
+        "DX de OK1ABC 14080.0 DL1ABC RTTY 1200Z",                     // no colon
+        "DX de : 14080.0 DL1ABC RTTY 1200Z",                          // without a spotter
+        "DX de OK1ABC: 14080.0 !!!! RTTY 1200Z",                      // a malformed call
+        "DX de OK1ABC: 14080.0 12345 RTTY 1200Z",                     // a call with no letters
         "DX de OK1ABC: 14080.0",
         "To ALL de OK1ABC: 14080.0 DL1ABC RTTY 1200Z",
     ]
@@ -83,12 +83,12 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
         Spot(frequencyKHz: khz, call: call, spotter: "X1X", comment: "", time: refNow.addingTimeInterval(-minutesAgo * 60), mode: mode)
     }
     do { let r = b.add(spot("DL1ABC", 14080, minutesAgo: 10), now: refNow, maxAge: 1800); #expect(r) }
-    do { let r = b.add(spot("DL1ABC", 14081, minutesAgo: 2), now: refNow, maxAge: 1800); #expect(r) } // nahradí
-    do { let r = b.add(spot("DL1ABC", 14082, minutesAgo: 20), now: refNow, maxAge: 1800); #expect(!r) } // starší – zahodí
-    do { let r = b.add(spot("DL1ABC", 7040, minutesAgo: 5), now: refNow, maxAge: 1800); #expect(r) } // jiné pásmo
+    do { let r = b.add(spot("DL1ABC", 14081, minutesAgo: 2), now: refNow, maxAge: 1800); #expect(r) } // replaces it
+    do { let r = b.add(spot("DL1ABC", 14082, minutesAgo: 20), now: refNow, maxAge: 1800); #expect(!r) } // older – discarded
+    do { let r = b.add(spot("DL1ABC", 7040, minutesAgo: 5), now: refNow, maxAge: 1800); #expect(r) } // a different band
     #expect(b.count == 2)
     let v = b.visible(SpotFilter())
-    #expect(v.map(\.frequencyKHz) == [14081, 7040])                                      // nejnovější první
+    #expect(v.map(\.frequencyKHz) == [14081, 7040])                                      // the newest first
     #expect(b.visible(SpotFilter(bands: ["40m"])).map(\.call) == ["DL1ABC"])
     #expect(b.visible(SpotFilter(bands: ["15m"])).isEmpty)
 }
@@ -118,7 +118,7 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
     var b = SpotBook()
     b.add(Spot(frequencyKHz: 14033, call: "UA3XYZ", spotter: "X", comment: "", time: refNow, mode: "CW"), now: refNow, maxAge: 1800)
     b.add(Spot(frequencyKHz: 14080, call: "DL1ABC", spotter: "X", comment: "", time: refNow, mode: "RTTY"), now: refNow, maxAge: 1800)
-    #expect(b.visible(SpotFilter()).map(\.call) == ["DL1ABC"])              // výchozí filtr = jen RTTY
+    #expect(b.visible(SpotFilter()).map(\.call) == ["DL1ABC"])              // the default filter = RTTY only
     #expect(b.visible(.all).count == 2)
 }
 
@@ -137,7 +137,7 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
     let (t, r) = f.process(Data([255, 253, 1, 255, 251, 3, 72, 105, 255, 255, 33, 255, 250, 24, 1, 255, 240, 10]))
     #expect(Array(t) == [72, 105, 255, 33, 10])
     #expect(Array(r) == [255, 252, 1, 255, 254, 3])
-    // sekvence rozdělená mezi bloky
+    // a sequence split across blocks
     var g = TelnetFilter()
     let a = g.process(Data([65, 255])), b = g.process(Data([253])), c = g.process(Data([1, 66]))
     #expect(Array(a.text) == [65] && b.text.isEmpty && Array(c.text) == [66])

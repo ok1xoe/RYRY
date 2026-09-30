@@ -13,7 +13,7 @@ private func rec(_ call: String, band: String? = "20m", mode: String = "RTTY", a
     var r = QSORecord(call: call, timeOn: t, mode: mode)
     r.frequency = ["20m": 14_085_000.0, "40m": 7_045_000.0][band ?? ""]; return r
 }
-/// Země podle prvních dvou písmen značky (jen pro test): DL → Germany, OK → Czech Republic, W1 → USA.
+/// The entity from the first two letters of the call (for the test only): DL → Germany, OK → Czech Republic, W1 → USA.
 private func country(_ call: String) -> CountryRef? {
     if call.hasPrefix("DL") { return CountryRef(key: "DL", name: "Germany") }
     if call.hasPrefix("OK") { return CountryRef(key: "OK", name: "Czech Republic") }
@@ -33,15 +33,15 @@ private func country(_ call: String) -> CountryRef? {
     }
     @Test func newWorkedDupe() {
         let i = index([rec("DL1ABC", at: now)], since: now.addingTimeInterval(-60))
-        // nová
+        // new
         #expect(CallHighlight.style(word: "OK2XYZ", myBase: "OK1XOE", band: "20m", mode: "RTTY", contest: true, index: i) == .new)
-        // v logu, bez závodu → modře
+        // in the log, outside a contest → blue
         #expect(CallHighlight.style(word: "DL1ABC", myBase: "OK1XOE", band: "20m", mode: "RTTY", contest: false, index: LogIndex(records: [rec("DL1ABC")], contestSince: nil, country: country)) == .worked)
-        // v závodě stejné pásmo a mód → dupe
+        // in a contest, the same band and mode → a dupe
         #expect(CallHighlight.style(word: "DL1ABC", myBase: "OK1XOE", band: "20m", mode: "RTTY", contest: true, index: i) == .dupe)
-        // jiné pásmo → není dupe, ale v logu
+        // a different band → not a dupe, but in the log
         #expect(CallHighlight.style(word: "DL1ABC", myBase: "OK1XOE", band: "40m", mode: "RTTY", contest: true, index: i) == .worked)
-        // neznámé pásmo → jen značka a mód
+        // an unknown band → the call and the mode only
         #expect(CallHighlight.style(word: "DL1ABC/P", myBase: "OK1XOE", band: nil, mode: "RTTY", contest: true, index: i) == .dupe)
     }
     @Test func dupeMatchesDupeCheck() {
@@ -73,9 +73,9 @@ private func country(_ call: String) -> CountryRef? {
         let t = "CQ CQ DE OK1X" as NSString
         let r = CallHighlight.wordRanges(in: t, range: NSRange(location: 0, length: t.length)).map { t.substring(with: $0) }
         #expect(r == ["CQ", "CQ", "DE", "OK1X"])
-        // nové písmeno se přidalo za neúplné slovo → přestylovat od jeho začátku
+        // a new letter was appended to an incomplete word → restyle from the word's start
         #expect(CallHighlight.restyleStart(in: t, appendedAt: 12) == 9)
-        // přidání začalo za mezerou → od místa přidání
+        // the addition started after a space → from the point of the addition
         #expect(CallHighlight.restyleStart(in: "CQ CQ " as NSString, appendedAt: 6) == 6)
         #expect(CallHighlight.restyleStart(in: "" as NSString, appendedAt: 0) == 0)
     }
@@ -90,12 +90,12 @@ private func country(_ call: String) -> CountryRef? {
 
     @Test func newCountryOnBandVsAny() {
         let i = index([rec("DL1ABC", band: "20m")])
-        // Německo na 20m už je; na 40m ne
+        // Germany on 20m is already there; on 40m it is not
         #expect(NeededCheck.check(call: "DL2XYZ", band: "20m", country: de, settings: settings(band: true, any: true), index: i).isEmpty)
         #expect(NeededCheck.check(call: "DL2XYZ", band: "40m", country: de, settings: settings(band: true, any: true), index: i)
             == [.newCountryBand(country: "Germany", band: "40m")])
         #expect(NeededCheck.check(call: "DL2XYZ", band: "40m", country: de, settings: settings(band: false, any: true), index: i).isEmpty)
-        // země vůbec nová
+        // a completely new entity
         let us = CountryRef(key: "K", name: "USA")
         #expect(NeededCheck.check(call: "W1AW", band: "20m", country: us, settings: settings(band: true, any: true), index: i)
             == [.newCountry(country: "USA")])
@@ -148,7 +148,7 @@ private func country(_ call: String) -> CountryRef? {
         var sc = RxWordScanner()
         let a = sc.feed("OK1X", echo: false), b = sc.feed("OE", echo: false), c = sc.feed(" ", echo: false)
         #expect(a.isEmpty && b.isEmpty && c == ["OK1XOE"])
-        // echo vlastního vysílání se nesnímá a ukončuje slovo
+        // the echo of our own transmission is not picked up and it ends the word
         let d = sc.feed("DL1", echo: false), e = sc.feed("OK1XOE OK1XOE ", echo: true), f = sc.feed(" ", echo: false)
         #expect(d.isEmpty && e.isEmpty && f.isEmpty)
     }
@@ -159,7 +159,7 @@ private func country(_ call: String) -> CountryRef? {
     }
 }
 
-/// Zvuk a oznámení zaznamenané místo skutečných.
+/// Sound and notifications recorded instead of the real ones.
 @MainActor final class RecordingSink: AlertSink {
     var sounds = 0
     var notes: [(String, String)] = []
@@ -183,11 +183,11 @@ private func country(_ call: String) -> CountryRef? {
         let (m, sink) = model()
         for ch in "OK1XOE DE DL1ABC " { m.appendRx(String(ch), echo: false) }
         #expect(sink.sounds == 1)
-        m.appendRx("OK1XOE ", echo: false)          // stejný okamžik hodin → omezeno
+        m.appendRx("OK1XOE ", echo: false)          // the same instant of the clock → rate limited
         #expect(sink.sounds == 1)
-        m.appendRx("OK1XOE OK1XOE ", echo: true)    // echo vůbec ne
+        m.appendRx("OK1XOE OK1XOE ", echo: true)    // echo not at all
         #expect(sink.sounds == 1)
-        #expect(sink.notes.isEmpty)                 // oznámení je ve výchozím stavu vypnuté
+        #expect(sink.notes.isEmpty)                 // notifications are off by default
     }
     @Test func ownCallSoundCanBeDisabledAndNotificationEnabled() {
         let (m, sink) = model { $0.alerts.myCallSound = false; $0.alerts.myCallNotification = true }

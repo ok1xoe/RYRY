@@ -9,7 +9,7 @@ private func tmp() -> URL {
     return u
 }
 
-// Záloha logu: kopie JSONL/ADIF/QTC do backup/<název>-<čas>, drží se jen posledních N
+// Log backup: a copy of the JSONL/ADIF/QTC files into backup/<name>-<time>, only the last N are kept
 @Test func logBackupRotates() async throws {
     let dir = tmp()
     let loc = LogLocation(directory: dir, name: "zavod")
@@ -26,14 +26,14 @@ private func tmp() -> URL {
     for f in ["zavod.jsonl", "zavod.adi", "zavod-qtc.jsonl"] {
         #expect(FileManager.default.fileExists(atPath: last.appendingPathComponent(f).path), "\(f)")
     }
-    // denní záloha: po méně než 24 h se nedělá
+    // the daily backup: it is not made until 24 h have passed
     #expect(!LogBackup.isDue(loc, now: t0.addingTimeInterval(4 * 3600 + 600)))
     #expect(LogBackup.isDue(loc, now: t0.addingTimeInterval(4 * 3600 + 25 * 3600)))
-    // prázdný log (bez souborů) se nezálohuje
+    // an empty log (with no files) is not backed up
     #expect(throws: LogBackup.BackupError.self) { try LogBackup.backup(LogLocation(directory: tmp(), name: "x"), at: t0, keep: 3) }
 }
 
-// Statistika: rychlost za 10 a 60 min (spojení/h), počty podle pásem
+// Statistics: the rate over 10 and 60 min (QSOs/h), the counts per band
 @Test func logStats() {
     let now = ISO8601DateFormatter().date(from: "2026-09-29T12:00:00Z")!
     func r(_ c: String, _ minAgo: Double, _ f: Double?) -> QSORecord {
@@ -42,7 +42,7 @@ private func tmp() -> URL {
     let recs = [r("A", 2, 14_080_000), r("B", 5, 14_081_000), r("C", 30, 7_040_000), r("D", 90, 7_040_000), r("E", 5, nil)]
     let s = LogStats(records: recs, now: now)
     #expect(s.total == 5)
-    #expect(s.last10 == 3 && s.rate10 == 18)          // 3 QSO za 10 min = 18/h
+    #expect(s.last10 == 3 && s.rate10 == 18)          // 3 QSOs in 10 min = 18/h
     #expect(s.last60 == 4 && s.rate60 == 4)
     #expect(s.byBand == [LogStats.BandCount(band: "40m", count: 2), LogStats.BandCount(band: "20m", count: 2),
                          LogStats.BandCount(band: "?", count: 1)])

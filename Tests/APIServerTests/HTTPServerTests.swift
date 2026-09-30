@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import APIServer
 
-/// Surové TCP spojení přes POSIX sokety (test keep-alive a chybných požadavků).
+/// A raw TCP connection over POSIX sockets (tests keep-alive and malformed requests).
 func rawExchange(port: UInt16, host: String = "127.0.0.1", send: [String], readFor: Double = 0.5) -> String? {
     let fd = socket(AF_INET, SOCK_STREAM, 0)
     guard fd >= 0 else { return nil }
@@ -58,7 +58,7 @@ func echoServer(maxBody: Int = 1 << 20) -> HTTPServer {
     #expect(rawExchange(port: port, send: ["POST / HTTP/1.1\r\nContent-Length: 100000000\r\n\r\n"])?.contains("413") == true)
     #expect(rawExchange(port: port, send: ["POST / HTTP/1.1\r\n\r\n"])?.contains("411") == true)
     #expect(rawExchange(port: port, send: ["GARBAGE\r\n\r\n"])?.contains("400") == true)
-    // server žije dál
+    // the server stays alive
     #expect(rawExchange(port: port, send: ["POST / HTTP/1.1\r\nContent-Length: 2\r\n\r\nok"])?.contains("echo:POST / ok") == true)
 }
 
@@ -71,12 +71,12 @@ func echoServer(maxBody: Int = 1 << 20) -> HTTPServer {
     await #expect(throws: (any Error).self) { _ = try await b.start() }
 }
 
-// Review Focus 5: naslouchá jen na loopbacku
+// Review Focus 5: listens on the loopback only
 @Test func bindsLoopbackOnly() async throws {
     let s = echoServer()
     let port = try await s.start()
     defer { s.stop() }
-    // najít nelokální IPv4 adresu stroje
+    // find a non-local IPv4 address of the machine
     var ifaddr: UnsafeMutablePointer<ifaddrs>?
     guard getifaddrs(&ifaddr) == 0 else { return }
     defer { freeifaddrs(ifaddr) }
@@ -91,6 +91,6 @@ func echoServer(maxBody: Int = 1 << 20) -> HTTPServer {
         }
         p = a.pointee.ifa_next
     }
-    guard let ip else { return }                           // stroj bez sítě
+    guard let ip else { return }                           // a machine with no network
     #expect(rawExchange(port: port, host: ip, send: ["POST / HTTP/1.1\r\nContent-Length: 1\r\n\r\nx"]) == nil)
 }

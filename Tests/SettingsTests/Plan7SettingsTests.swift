@@ -23,7 +23,7 @@ import Testing
     s.display.timestamps = true; s.display.fontSize = 18
     try store.save(s)
     #expect(store.load().0 == s)
-    // starý soubor bez nových sekcí a s 12 makry → výchozí hodnoty, makra doplněná na 16
+    // an old file with none of the new sections and with 12 macros → the default values, the macros padded to 16
     let dir = tmp()
     let old = #"{"schemaVersion":1,"macros":[{"name":"A","text":"x"},{"name":"B","text":"y"}],"clock":{"rxPPM":"bad"}}"#
     try old.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
@@ -42,18 +42,18 @@ import Testing
     #expect(c.clampedTx == -20_000)
 }
 
-// Review I-4: staré výchozí závodní makro s %M (přijaté číslo) → %N (odesílané, jako MMTTY)
+// Review I-4: the old default contest macro with %M (the received number) → %N (the sent one, as in MMTTY)
 @Test func oldDefaultContestMacroMigrated() throws {
     let dir = tmp()
     let old = #"{"macros":[{"name":"Contest","text":"\r\n%c 599 %M %M %c\r\n\\"},{"name":"Mine","text":"%M"}]}"#
     try old.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     let s = SettingsStore(directory: dir).load().0
     #expect(s.macros[0].text == "\r\n%c 599 %N %N %c\r\n\\")
-    #expect(s.macros[1].text == "%M")                         // vlastní makra se nemění
+    #expect(s.macros[1].text == "%M")                         // the user's own macros are left alone
     #expect(AppSettings.defaultMacros.allSatisfy { !$0.text.contains("%M") })
 }
 
-// Plán 8 / T1, T2
+// Plan 8 / T1, T2
 @Test func messagesAndMacroColors() throws {
     let s0 = AppSettings()
     #expect(s0.messages.count >= 3 && s0.messages.allSatisfy { !$0.name.isEmpty && !$0.text.isEmpty })
@@ -65,7 +65,7 @@ import Testing
     let l = store.load().0
     #expect(l.messages.count == 1 && l.messages[0].name == "Rig")
     #expect(l.macros[0].color == "#FF8800" && l.macros[1].color == nil)
-    // neplatná barva → bez barvy, starý soubor bez messages → výchozí
+    // an invalid colour → no colour, an old file with no messages → the defaults
     let dir = tmp()
     try ##"{"macros":[{"name":"A","text":"x","color":"orange"},{"name":"B","text":"y","color":"#12345G"}]}"##
         .write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
@@ -74,7 +74,7 @@ import Testing
     #expect(o.messages == AppSettings.defaultMessages)
 }
 
-// OK DX RTTY Contest: sobota 3. celého víkendu v prosinci, 00–24 UTC; výměna RST + CQ zóna
+// OK DX RTTY Contest: the Saturday of the 3rd full weekend in December, 00–24 UTC; the exchange is RST + CQ zone
 @Test func contestPresets() {
     let ok = ContestSettings.preset(.okDXRTTY, year: 2026)
     #expect(ok.enabled && ok.format == .zone && ok.name == "OK-DX-RTTY")
@@ -84,7 +84,7 @@ import Testing
     #expect(wae.format == .wae && wae.name == "WAEDC" && wae.start == ISO8601DateFormatter().date(from: "2026-11-14T00:00:00Z"))
 }
 
-// Paleta předvoleb: začátky podle obvyklých pravidel (celý víkend = sobota i neděle v měsíci)
+// The preset palette: the start dates follow the usual rules (a full weekend = both the Saturday and the Sunday within the month)
 @Test func contestPresetCalendar() {
     let iso = ISO8601DateFormatter()
     let cases: [(ContestPreset, Int, String, ContestFormat, String)] = [
@@ -105,7 +105,7 @@ import Testing
     #expect(ContestPreset.allCases.count == 9)
 }
 
-// Vybraná předvolba se pozná z názvu a formátu; ruční úprava = vlastní nastavení
+// The selected preset is recognised from the name and the format; a manual edit = custom settings
 @Test func contestPresetMatching() {
     var c = ContestSettings.preset(.waeRTTY, year: 2026)
     #expect(ContestPreset.matching(c) == .waeRTTY)
@@ -114,24 +114,24 @@ import Testing
     #expect(ContestPreset.matching(ContestSettings()) == nil)
 }
 
-// Nejbližší termín: letošní, pokud ještě neskončil, jinak příští rok
+// The nearest date: this year's if it has not ended yet, otherwise next year's
 @Test func contestPresetUpcoming() {
     let iso = ISO8601DateFormatter()
     let now = iso.date(from: "2026-09-29T12:00:00Z")!
     #expect(ContestSettings.upcoming(.cqwwRTTY, now: now).start == iso.date(from: "2027-09-25T00:00:00Z"))
     #expect(ContestSettings.upcoming(.makrothen, now: now).start == iso.date(from: "2026-10-10T00:00:00Z"))
-    // závod právě běží → letošní
+    // the contest is running right now → this year's
     #expect(ContestSettings.upcoming(.cqwwRTTY, now: iso.date(from: "2026-09-27T10:00:00Z")!).start
             == iso.date(from: "2026-09-26T00:00:00Z"))
 }
 
-// Makrothen: výměna = 4místný lokátor
+// Makrothen: the exchange = a 4-character locator
 @Test func makrothenUsesLocator() {
     #expect(ContestSettings.preset(.makrothen, year: 2026, locator: "jo70fb").exchange == "JO70")
     #expect(ContestSettings.preset(.makrothen, year: 2026).exchange == "")
 }
 
-// „Vlastní nastavení“ se uloží a vydrží i s názvem a formátem shodným s předvolbou
+// "Custom settings" are stored and survive even with a name and a format identical to a preset
 @Test func contestPresetChoicePersists() throws {
     let dir = tmp()
     var s = AppSettings()
@@ -141,13 +141,13 @@ import Testing
     try SettingsStore(directory: dir).save(s)
     let loaded = SettingsStore(directory: dir).load().0
     #expect(loaded.contest.preset == nil && loaded.contest.name == "WAEDC")
-    // změna formátu mimo předvolbu → vlastní
+    // a format change outside a preset → custom
     var c = ContestSettings.preset(.cqwpxRTTY, year: 2027); c.format = .bartg
     #expect(c.selectedPreset == nil)
     #expect(ContestSettings.preset(.cqwpxRTTY, year: 2027).selectedPreset == .cqwpxRTTY)
 }
 
-// Starší settings.json bez pole preset: předvolba se odvodí z názvu a formátu
+// An older settings.json with no preset field: the preset is derived from the name and the format
 @Test func contestPresetLegacyDecode() throws {
     let dir = tmp()
     try #"{"contest":{"enabled":true,"format":"wae","name":"WAEDC"}}"#

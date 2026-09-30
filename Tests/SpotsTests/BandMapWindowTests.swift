@@ -14,7 +14,7 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(RTTYBandPlan.segment(for: "40m")?.highKHz == 7060)
     #expect(RTTYBandPlan.segment(for: "6m") == nil)
     #expect(RTTYBandPlan.segment(for: nil) == nil)
-    // shodné se segmenty parseru spotů
+    // identical to the segments of the spot parser
     for s in RTTYBandPlan.segments { #expect(SpotParser.rttySegments.contains(s.lowKHz...s.highKHz), "\(s.band)") }
     #expect(RTTYBandPlan.bands.first == "80m")
     for s in RTTYBandPlan.segments { #expect(s.lowKHz < s.highKHz) }
@@ -25,21 +25,21 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: 14_080_000, manualHz: 21_080_000) == "20m")
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: 21_080_000) == "15m")
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil) == nil)
-    // rig na pásmu bez RTTY tabulky (6 m) → přeskočí na ruční frekvenci
+    // the rig is on a band with no RTTY table (6 m) → it falls back to the manual frequency
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: 50_100_000, manualHz: 7_040_000) == "40m")
-    // neznámá volba se ignoruje
+    // an unknown choice is ignored
     #expect(RTTYBandPlan.selectBand(choice: "6m", rigHz: 14_080_000, manualHz: nil) == "20m")
 }
 
 @Test func bandSelectionFallsBackToSpotsThenDefault() {
-    // bez rigu a bez ruční frekvence: pásmo s nejvíce spoty, aby mapa nezůstala prázdná
+    // with no rig and no manual frequency: the band with the most spots, so that the map is not left empty
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: ["15m", "40m"]) == "15m")
-    // pásmo bez RTTY segmentu se přeskočí
+    // a band with no RTTY segment is skipped
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: ["6m", "40m"]) == "40m")
-    // žádné spoty → výchozí pásmo
+    // no spots → the default band
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: []) == RTTYBandPlan.defaultBand)
     #expect(RTTYBandPlan.segment(for: RTTYBandPlan.defaultBand) != nil)
-    // rig a ruční frekvence mají přednost před spoty
+    // the rig and the manual frequency take precedence over the spots
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: 7_040_000, manualHz: nil, spotBands: ["15m"]) == "40m")
     #expect(RTTYBandPlan.selectBand(choice: "10m", rigHz: nil, manualHz: nil, spotBands: ["15m"]) == "10m")
 }
@@ -54,11 +54,11 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
 
 @Test func scalePansAndClampsToSegment() {
     var s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
-    s.zoom(by: 0.5, around: 14_085)                       // rozsah 15 kHz kolem středu
+    s.zoom(by: 0.5, around: 14_085)                       // a 15 kHz range around the centre
     let span = s.span
     s.pan(by: 3)
     #expect(abs(s.span - span) < 1e-9 && s.visibleLow > 14_070)
-    s.pan(by: 1_000)                                      // nad horní okraj → ořízne se
+    s.pan(by: 1_000)                                      // above the upper edge → clamped
     #expect(s.visibleHigh == 14_100 && abs(s.span - span) < 1e-9)
     s.pan(by: -1_000)
     #expect(s.visibleLow == 14_070 && abs(s.span - span) < 1e-9)
@@ -70,16 +70,16 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     let span = s.span
     s.moveLow(to: 14_080)
     #expect(s.visibleLow == 14_080 && abs(s.span - span) < 1e-9)
-    s.moveLow(to: 14_099)                                  // za horní okraj → ořízne
+    s.moveLow(to: 14_099)                                  // past the upper edge → clamped
     #expect(s.visibleHigh == 14_100 && abs(s.span - span) < 1e-9)
-    s.moveLow(to: .nan)                                    // nesmysl se ignoruje
+    s.moveLow(to: .nan)                                    // nonsense is ignored
     #expect(s.visibleHigh == 14_100)
 }
 
 @Test func scaleConvertsFrequencyAndY() {
     let s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
     #expect(s.visibleLow == 14070 && s.visibleHigh == 14100)
-    #expect(s.y(forKHz: 14100, height: 300) == 0)          // vysoká frekvence nahoře
+    #expect(s.y(forKHz: 14100, height: 300) == 0)          // a high frequency at the top
     #expect(s.y(forKHz: 14070, height: 300) == 300)
     #expect(abs(s.y(forKHz: 14085, height: 300) - 150) < 1e-9)
     #expect(abs(s.kHz(forY: 75, height: 300) - 14092.5) < 1e-9)
@@ -93,7 +93,7 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     s.zoom(by: 0.5, around: 14080)
     #expect(abs((s.visibleHigh - s.visibleLow) - 15) < 1e-9)
     #expect(s.visibleLow <= 14080 && s.visibleHigh >= 14080)
-    s.zoom(by: 0.5, around: 14071)                          // u okraje: nevyjede z pásma
+    s.zoom(by: 0.5, around: 14071)                          // at the edge: it does not run out of the band
     #expect(s.visibleLow >= 14070)
     s.center(on: 14099)
     #expect(s.visibleHigh <= 14100 && s.visibleLow >= 14070)
@@ -110,8 +110,8 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(out.count == 4)
     for i in 1..<3 { #expect(out[i] - out[i - 1] >= 14 - 1e-9) }
     #expect(out[3] == 300)
-    #expect(out[0] <= 100 + 1e-9)                            // skupina se rozjede kolem původní polohy
-    // pořadí vstupu se zachová (výstup po indexech)
+    #expect(out[0] <= 100 + 1e-9)                            // the group spreads out around the original position
+    // the input order is preserved (the output is indexed the same way)
     let o2 = BandMapLayout.spread([200, 50], minGap: 14, height: 400)
     #expect(o2 == [200, 50])
     #expect(BandMapLayout.spread([], minGap: 14, height: 100).isEmpty)
@@ -122,7 +122,7 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(out.min()! >= 0 && out.max()! <= 400)
     let sorted = out.sorted()
     for i in 1..<sorted.count { #expect(sorted[i] - sorted[i - 1] >= 14 - 1e-9) }
-    // příliš mnoho položek: mezera se zmenší, ale zůstane v rozsahu
+    // too many items: the spacing shrinks but stays within the range
     let many = BandMapLayout.spread(Array(repeating: 50, count: 40), minGap: 14, height: 100)
     #expect(many.min()! >= 0 && many.max()! <= 100)
     let sm = many.sorted(); for i in 1..<sm.count { #expect(sm[i] >= sm[i - 1]) }
@@ -138,7 +138,7 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(Set(r2.map(\.call)) == ["A1", "B2", "D4"])
     #expect(BandMapFilter.spots(spots, band: "40m", filter: SpotFilter(), maxAgeMinutes: 30, now: now).map(\.call) == ["C3"])
     #expect(BandMapFilter.ageMinutes(of: spots[0], now: now) == 1)
-    #expect(BandMapFilter.ageMinutes(of: sp("Z", 1, age: -30, now: now), now: now) == 0)   // hodiny do budoucnosti
+    #expect(BandMapFilter.ageMinutes(of: sp("Z", 1, age: -30, now: now), now: now) == 0)   // a clock set into the future
 }
 
 @Test func loggedFilterByBandAndAge() {

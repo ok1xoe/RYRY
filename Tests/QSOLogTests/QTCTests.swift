@@ -11,12 +11,12 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
 
 @Test func plannerRespectsLimitsOnceAndNotOwn() {
     let log = [q("DL1ABC", "10:00", rcvd: 5), q("K1XX", "10:05", rcvd: 17), q("JA1YY", "10:10", rcvd: 3),
-               q("OK2PBR", "10:12", rcvd: nil)]                            // bez přijatého čísla → nelze
+               q("OK2PBR", "10:12", rcvd: nil)]                            // without a received number → not possible
     var p = QTCPlanner(records: log, series: [])
-    // stanici K1XX nelze poslat QTC o ní samé
+    // station K1XX cannot be sent a QTC about itself
     #expect(p.available(for: "K1XX").map(\.call) == ["DL1ABC", "JA1YY"])
     #expect(p.available(for: "K1XX").first == QTCLine(time: "1000", call: "DL1ABC", serial: 5))
-    // odesláno → podruhé už ne; počitadlo s K1XX
+    // sent → not a second time; the counter with K1XX
     let s = QTCSeries(direction: .sent, number: 1, counterpart: "K1XX", time: Date(), lines: p.available(for: "K1XX"))
     p = QTCPlanner(records: log, series: [s])
     #expect(p.exchanged(with: "K1XX") == 2 && p.exchanged(with: "K1XX/P") == 2)
@@ -31,7 +31,7 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     let p = QTCPlanner(records: log, series: [recv])
     #expect(p.exchanged(with: "K1XX") == 7)
     #expect(p.available(for: "K1XX").count == 3)
-    #expect(p.available(for: "W2ZZ").count == 10)                      // série max. 10
+    #expect(p.available(for: "W2ZZ").count == 10)                      // a series of 10 at most
 }
 
 @Test func qtcTextFormatAndParse() {
@@ -45,7 +45,7 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     #expect(QTCText.parseHeader("QTC") == nil)
     #expect(QTCText.parseLine("1307 DA1AA 431") == QTCLine(time: "1307", call: "DA1AA", serial: 431))
     #expect(QTCText.parseLine("1307 DA1AA 431 1307 DA1AA 431") == QTCLine(time: "1307", call: "DA1AA", serial: 431))
-    #expect(QTCText.parseLine("2599 DA1AA 431") == nil)                 // neplatný čas
+    #expect(QTCText.parseLine("2599 DA1AA 431") == nil)                 // an invalid time
     #expect(QTCText.parseLine("CQ TEST") == nil)
 }
 
@@ -70,7 +70,7 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     #expect(text.contains("QTC: 14085 RY 2026-11-14 1028 DL1XYZ        2/1   JA1YY         0915 UA0AA         007"))
 }
 
-// Review plán 12
+// Review plan 12
 @Test func plannerScopedToContestWindowAndRTTYSerials() {
     var old = q("DL1OLD", "08:00", rcvd: 3); old.timeOn = isoDate("2025-11-15T08:00:00Z")
     var ssb = q("DL2SSB", "10:30", rcvd: 4); ssb.mode = "SSB"
@@ -87,7 +87,7 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     #expect(QTCText.parseIndexedLine("3 1310 OK2PBR 015 1310 OK2PBR 015").map { [String($0.0), QTCText.line($0.1)] } == ["3", "1310 OK2PBR 015"])
     #expect(QTCText.parseIndexedLine("1310 OK2PBR 015").map { $0.0 } == nil as Int?)
     #expect(QTCText.parseHeader("QTC 3/100") == nil)
-    #expect(QTCText.parseLine("1307 DA1AA 481 1307 DA1AA 431") == nil)          // kopie se liší → vyžádat AGN
+    #expect(QTCText.parseLine("1307 DA1AA 481 1307 DA1AA 431") == nil)          // the copy differs → ask for AGN
 }
 
 @Test func storeRecoversFromPartialLastLineAndKeepsDeclaredCount() async throws {
@@ -95,7 +95,7 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     let st = try QTCStore(directory: dir)
     let a = QTCSeries(direction: .sent, number: 1, counterpart: "W1AW", time: Date(), lines: [QTCLine(time: "1307", call: "DA1AA", serial: 431)])
     try await st.append(a)
-    // havárie: neúplný poslední řádek bez \n
+    // a crash: an incomplete last line with no \n
     let h = try FileHandle(forWritingTo: dir.appendingPathComponent("qtc.jsonl")); try h.seekToEnd(); try h.write(contentsOf: Data("{\"id\":\"brok".utf8)); try h.close()
     let st2 = try QTCStore(directory: dir)
     #expect(await st2.warnings.count == 1)
@@ -109,7 +109,7 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     #expect(cab.contains(" 3/10 "))
 }
 
-// Poškozený řádek se zkráceným/porušeným časem musí držet místo (jinak se posunou další řádky a AGN N žádá špatný řádek)
+// A corrupted line with a truncated/broken time must keep its place (otherwise the following lines shift and AGN N asks for the wrong line)
 @Test func garbledLinesKeepTheirPlace() {
     #expect(QTCText.looksLikeLine("083 BY4AOM 176"))
     #expect(QTCText.looksLikeLine("0Q31 VK2XX 015"))
@@ -123,8 +123,8 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
 @Test func gluedAGNRepeatIsIndexed() {
     let r = QTCText.parseIndexedLine("BKKA8 0803 BY4AOM 176 0803 BY4AOM 176 BKNWU")
     #expect(r?.0 == 8 && r?.1 == QTCLine(time: "0803", call: "BY4AOM", serial: 176))
-    #expect(QTCText.parseIndexedLine("BKKA8 0803 BY4AOM 176") == nil)      // bez zopakování ne (mohlo by jít o šum)
-    #expect(QTCText.parseIndexedLine("QRZ12 0803 BY4AOM 176 0803 BY4AOM 176")?.0 == nil)   // 12 není číslo řádku 1–10
+    #expect(QTCText.parseIndexedLine("BKKA8 0803 BY4AOM 176") == nil)      // not without a repeat (it could be noise)
+    #expect(QTCText.parseIndexedLine("QRZ12 0803 BY4AOM 176 0803 BY4AOM 176")?.0 == nil)   // 12 is not a line number in 1–10
 }
 
 @Test func storeUpdateAndDelete() async throws {
@@ -138,5 +138,5 @@ private func q(_ call: String, _ t: String, rcvd: Int?) -> QSORecord {
     try await st.delete(id: b.id)
     let again = try QTCStore(directory: dir)
     #expect(await again.series == [a])
-    await #expect(throws: QTCStore.StoreError.self) { try await st.update(b) }      // smazaná
+    await #expect(throws: QTCStore.StoreError.self) { try await st.update(b) }      // deleted
 }

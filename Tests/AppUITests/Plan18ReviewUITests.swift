@@ -7,20 +7,20 @@ import Settings
 import Spots
 @testable import AppUI
 
-// Review plan18: dialog Nastavení nepřepíše makra clusteru upravená v okně Spoty.
+// Review plan18: the Settings dialog does not overwrite the cluster macros edited in the Spots window.
 @Test @MainActor func applySettingsKeepsClusterMacrosEditedInSpotsWindow() async throws {
     let f = Fixture()
     await f.model.start()
-    let draft = f.model.settings                                  // dialog otevřen
-    f.model.saveClusterMacros([Macro(name: "X", text: "sh/dx 5")]) // okno Spoty
-    var d = draft; d.spots.maxAgeMinutes = 45                     // v dialogu změněna jiná položka spotů
+    let draft = f.model.settings                                  // the dialog is open
+    f.model.saveClusterMacros([Macro(name: "X", text: "sh/dx 5")]) // the Spots window
+    var d = draft; d.spots.maxAgeMinutes = 45                     // another spot item changed in the dialog
     await f.model.applySettings(d, baseline: draft)
     #expect(f.model.settings.spots.maxAgeMinutes == 45)
     #expect(f.model.settings.spots.clusterMacros[0] == Macro(name: "X", text: "sh/dx 5"))
     await f.model.stop()
 }
 
-// Spot (dx %k %c) bez značky se neodešle; hláška říká proč (ne „nepřipojeno“) a nic se nepošle ani částečně.
+// A spot (dx %k %c) without a call is not sent; the message says why (not "not connected") and nothing is sent, not even partially.
 @Test @MainActor func clusterSpotMacroWithoutCallIsRejected() async throws {
     let m = spotModel(rig: NoRig())
     m.saveClusterMacros(SpotSettings.defaultClusterMacros)
@@ -32,7 +32,7 @@ import Spots
     #expect(m.clusterMessage == AppModel.clusterErrorText(ClusterCommandError.incompleteSpot))
 }
 
-// Index logu (zvýraznění, band mapa) používá stejný klíč duplicit jako DupeCheck – u předvolby bez módu.
+// The log index (highlighting, band map) uses the same dupe key as DupeCheck – for a preset without a mode.
 @Test func logIndexDupeFollowsPresetRule() {
     let t0 = Date(timeIntervalSince1970: 1_800_000_000)
     var r = QSORecord(call: "W1AW", timeOn: t0.addingTimeInterval(60), mode: "RTTY"); r.frequency = 14_080_000
@@ -46,7 +46,7 @@ import Spots
     }
 }
 
-// Závod bez začátku: okno skóre se zafixuje při úplném výpočtu, přírůstek dá stejný výsledek.
+// A contest with no start: the score window is fixed during the full computation, the increment gives the same result.
 @Test @MainActor func scoreWithoutStartUsesFrozenWindow() async throws {
     let f = Fixture()
     f.configure = { s in s.contest = ContestSettings.preset(.cqwwRTTY, year: 2026); s.contest.start = nil }

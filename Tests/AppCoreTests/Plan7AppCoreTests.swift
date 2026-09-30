@@ -46,7 +46,7 @@ func makeContestApp(exchange: String = "", next: Int = 7) throws -> Harness {
     #expect(r.serialSent == 7 && r.serialRcvd == 15)
     #expect(await h.app.settings.contest.nextSerial == 8)
     let after = await h.app.qso
-    #expect(after.call == "" && after.serialSent == 8)                       // v závodě se QSO po zalogování vyčistí
+    #expect(after.call == "" && after.serialSent == 8)                       // in a contest the QSO is cleared after logging
     var saw = false
     for await e in events { if case .contestSerial(let n) = e { saw = n == 8; break } }
     #expect(saw)
@@ -60,7 +60,7 @@ func makeContestApp(exchange: String = "", next: Int = 7) throws -> Harness {
     #expect(await h.app.macroContext().hisRST == "59914")
     try await h.app.setQSOField("call", "DL1ABC")
     _ = try await h.app.logQSO()
-    #expect(await h.app.settings.contest.nextSerial == 7)                  // bez čísel se nemění
+    #expect(await h.app.settings.contest.nextSerial == 7)                  // without numbers nothing changes
 }
 
 @Test func nonContestLogKeepsQSOAndSerial() async throws {
@@ -107,7 +107,7 @@ func makeDXCCApp() throws -> Harness {
     await h.app.stop()
 }
 
-// Review I-4: MMTTY HisRST = report, který posílám (%r %R %N), MyRST = přijatý (%s %M)
+// Review I-4: MMTTY HisRST = the report I send (%r %R %N), MyRST = the received one (%s %M)
 @Test func macroRSTVariablesFollowMMTTY() async throws {
     let h = try makeApp()
     try await h.app.setQSOField("call", "DL1ABC")
@@ -120,11 +120,11 @@ func makeDXCCApp() throws -> Harness {
     #expect(t == "579007 579 007|559015 015")
 }
 
-// Review I-6: export jen závodních spojení (s odeslaným číslem nebo výměnou) v rozsahu
+// Review I-6: export only contest QSOs (with a sent number or exchange) within the range
 @Test func cabrilloContestOnlyAndRange() async throws {
     let h = try makeApp()
     try await h.app.setQSOField("call", "OK2AAA")
-    _ = try await h.app.logQSO()                          // běžné spojení bez výměny
+    _ = try await h.app.logQSO()                          // an ordinary QSO with no exchange
     try await h.app.setQSOField("call", "DL1ABC")
     try await h.app.setQSOField("serialSent", "1")
     _ = try await h.app.logQSO()
@@ -136,7 +136,7 @@ func makeDXCCApp() throws -> Harness {
     #expect(!future.contains("DL1ABC"))
 }
 
-// Review minor: MMTTY ignoruje kliky do spektra během TX
+// Review minor: MMTTY ignores clicks in the spectrum during TX
 @Test func notchClickIgnoredDuringTx() async throws {
     let h = try makeApp(ptt: .none)
     try await h.app.start()
@@ -148,7 +148,7 @@ func makeDXCCApp() throws -> Harness {
     await h.app.stop()
 }
 
-// Plán 8 / T1: seznam zpráv se odesílá jako makro
+// Plan 8 / T1: a message from the list is sent as a macro
 @Test func runMessageSendsExpandedText() async throws {
     let h = try makeApp(ptt: .none)
     try await h.app.start()
@@ -173,16 +173,16 @@ func makeFormatApp(_ f: ContestFormat, exchange: String = "") throws -> Harness 
     return Harness(app: app, engine: engine, audio: audio, clock: clock, rig: rig, dir: dir)
 }
 
-// Plán 8 / T5 + review #2: BARTG = číslo + čas; čas je aktuální až do začátku QSO (první vysílání se značkou,
-// MMTTY UpdateBARTG/SetHisUTC), smazáním značky se uvolní. %x číslo, %y čas.
+// Plan 8 / T5 + review #2: BARTG = number + time; the time keeps updating until the QSO starts (the first transmission
+// with the call, MMTTY UpdateBARTG/SetHisUTC), clearing the call releases it. %x the number, %y the time.
 @Test func bartgSendsSerialAndStartTime() async throws {
     let h = try makeFormatApp(.bartg)
     try await h.app.start()
     let now = AppController.hhmm.string(from: Date())
-    #expect(await h.app.macroContext().hisRST == "599015-" + now)          // i bez značky aktuální čas
+    #expect(await h.app.macroContext().hisRST == "599015-" + now)          // the current time even without a call
     try await h.app.setQSOField("call", "DL1ABC")
-    #expect(await h.app.qso.exchangeSent.isEmpty)                            // zatím nezafixováno
-    try await h.app.runMacro(index: 1)                                       // odpověď = začátek QSO
+    #expect(await h.app.qso.exchangeSent.isEmpty)                            // not fixed yet
+    try await h.app.runMacro(index: 1)                                       // a reply = the start of the QSO
     let q = await h.app.qso
     #expect(q.serialSent == 15 && q.exchangeSent == now)
     let c = await h.app.macroContext()
@@ -194,7 +194,7 @@ func makeFormatApp(_ f: ContestFormat, exchange: String = "") throws -> Harness 
     let r = try await h.app.logQSO()
     #expect(r.serialSent == 15 && r.exchangeSent == now)
     #expect(await h.app.settings.contest.nextSerial == 16)
-    // další QSO: nový čas až při začátku; smazání značky čas uvolní
+    // the next QSO: a new time only at its start; clearing the call releases the time
     try await h.app.setQSOField("call", "OK2AAA")
     try await h.app.runMacro(index: 1)
     await h.app.rxNow()
@@ -214,7 +214,7 @@ func makeFormatApp(_ f: ContestFormat, exchange: String = "") throws -> Harness 
     #expect(p.serialSent == nil && p.exchangeSent.isEmpty)
 }
 
-// Plán 9: oprava značky v logu přepočítá zemi DXCC
+// Plan 9: fixing a call in the log recomputes the DXCC entity
 @Test func updateQSORecomputesCountry() async throws {
     let h = try makeDXCCApp()
     try await h.app.setQSOField("call", "JA1XYZ")

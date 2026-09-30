@@ -102,7 +102,7 @@ func qso(_ call: String, _ t: TimeInterval = 1_790_000_000, name: String? = nil)
     try await s.append(qso("OK1ABC")); try await s.append(qso("OK2DEF"))
     let url = await s.adifURL
     var adi = try String(contentsOf: url, encoding: .utf8)
-    adi = String(adi[..<adi.range(of: "<EOR>")!.upperBound])        // useknout druhý záznam
+    adi = String(adi[..<adi.range(of: "<EOR>")!.upperBound])        // truncate the second record
     try adi.write(to: url, atomically: true, encoding: .utf8)
     #expect(await s.isADIFConsistent() == false)
     try await s.rebuildADIF()

@@ -5,7 +5,7 @@ import RTTYSignalKit
 func runWithTicks(_ core: OpaquePointer, _ samples: [Float]) -> String {
     var text = ""
     var buf = [RTTYCoreChar](repeating: RTTYCoreChar(), count: 256)
-    let block = 1103   // ≈ 100 ms při 11025 Hz
+    let block = 1103   // ≈ 100 ms at 11025 Hz
     var i = 0
     while i < samples.count {
         let n = min(block, samples.count - i)
@@ -21,7 +21,7 @@ func runWithTicks(_ core: OpaquePointer, _ samples: [Float]) -> String {
 @Test func spectrumPeaksAtMarkTone() throws {
     let core = try #require(makeCore())
     defer { rttycore_destroy(core) }
-    let s = RTTYSignalGenerator().generate(codes: [], leadIn: 2.0, tail: 0)   // čistý mark 2125 Hz
+    let s = RTTYSignalGenerator().generate(codes: [], leadIn: 2.0, tail: 0)   // a clean 2125 Hz mark
     _ = runWithTicks(core, s)
     var spec = [Float](repeating: 0, count: 2048)
     var binHz = 0.0
@@ -35,7 +35,7 @@ func runWithTicks(_ core: OpaquePointer, _ samples: [Float]) -> String {
     let core = try #require(makeCore())
     defer { rttycore_destroy(core) }
     #expect(rttycore_get_param(core, RC_AFC) == 1)
-    // signál o 60 Hz níž, než je nastaveno (2065/2235 místo 2125/2295)
+    // a signal 60 Hz lower than configured (2065/2235 instead of 2125/2295)
     let text = String(repeating: "RYRYRYRY CQ TEST DE OK1XOE ", count: 6)
     let s = RTTYSignalGenerator(markHz: 2065).generate(text: text, leadIn: 1.0)
     let out = runWithTicks(core, s)
@@ -54,7 +54,7 @@ func runWithTicks(_ core: OpaquePointer, _ samples: [Float]) -> String {
     #expect(rttycore_signal(core).mark == 2125)
 }
 
-/// Průměrný kmitočet TX signálu (tune + diddle) po příjmu signálu posunutého o -60 Hz.
+/// The average frequency of the TX signal (tune + diddle) after receiving a signal shifted by -60 Hz.
 func txAverageFrequency(net: Bool) throws -> Double {
     let core = try #require(makeCore())
     defer { rttycore_destroy(core) }
@@ -72,7 +72,7 @@ func txAverageFrequency(net: Bool) throws -> Double {
 @Test func netMakesTransmitterFollowAFC() throws {
     let on = try txAverageFrequency(net: true)
     let off = try txAverageFrequency(net: false)
-    // AFC posunulo RX o ~60 Hz dolů; s NET musí vysílač jít s ním, bez NET zůstat.
+    // AFC moved RX about 60 Hz down; with NET the transmitter must follow it, without NET it must stay put.
     #expect(abs((off - on) - 60) < 10)
 }
 
@@ -85,18 +85,18 @@ func txAverageFrequency(net: Bool) throws -> Double {
     #expect(runWithTicks(core, s).contains("CQ CQ DE OK1XOE"))
 }
 
-// Plán 9: AFC nesmí odjet dál než RC_AFC_MAX_DEV od ručně nastaveného kmitočtu
+// Plan 9: AFC must not drift further than RC_AFC_MAX_DEV from the manually set frequency
 @Test func afcMaxDeviationLimitsDrift() throws {
     let text = String(repeating: "RYRYRYRY CQ TEST DE OK1XOE ", count: 6)
-    let s = RTTYSignalGenerator(markHz: 2065).generate(text: text, leadIn: 1.0)   // o 60 Hz níž
+    let s = RTTYSignalGenerator(markHz: 2065).generate(text: text, leadIn: 1.0)   // 60 Hz lower
     let free = try #require(makeCore()), limited = try #require(makeCore())
     defer { rttycore_destroy(free); rttycore_destroy(limited) }
-    #expect(rttycore_get_param(limited, RC_AFC_MAX_DEV) == 0)                    // výchozí = bez omezení
+    #expect(rttycore_get_param(limited, RC_AFC_MAX_DEV) == 0)                    // the default = no limit
     #expect(rttycore_set_param(limited, RC_AFC_MAX_DEV, 20) == RC_OK)
     _ = runWithTicks(free, s); _ = runWithTicks(limited, s)
     #expect(abs(rttycore_signal(free).mark - 2065) < 6)
     #expect(abs(rttycore_signal(limited).mark - 2125) <= 20)
-    // ruční přeladění posune kotvu
+    // retuning manually moves the anchor
     #expect(rttycore_set_param(limited, RC_MARK, 2060) == RC_OK)
     #expect(rttycore_set_param(limited, RC_SPACE, 2230) == RC_OK)
     _ = runWithTicks(limited, s)
@@ -104,7 +104,7 @@ func txAverageFrequency(net: Bool) throws -> Double {
     #expect(rttycore_set_param(limited, RC_AFC_MAX_DEV, -1) == RC_ERR_RANGE)
 }
 
-// Plán 9: AFC jen při otevřeném squelchi – slabý signál pod prahem AFC nepřeladí
+// Plan 9: AFC only with the squelch open – a weak signal below the threshold does not retune AFC
 @Test func afcSquelchGate() throws {
     var s = RTTYSignalGenerator(markHz: 2085, amplitude: 0.05).generate(text: String(repeating: "RYRYRYRY ", count: 10), leadIn: 1.0)
     var g = NoiseGenerator(seed: 3); g.addNoise(to: &s, rms: 0.02)
@@ -113,6 +113,6 @@ func txAverageFrequency(net: Bool) throws -> Double {
     for c in [open, gated] { #expect(rttycore_set_param(c, RC_SQUELCH_LEVEL, 30000) == RC_OK) }
     #expect(rttycore_set_param(gated, RC_AFC_GATE, 1) == RC_OK)
     _ = runWithTicks(open, s); _ = runWithTicks(gated, s)
-    #expect(abs(rttycore_signal(open).mark - 2085) < 8)                         // bez vazby doladí
-    #expect(rttycore_signal(gated).mark == 2125)                                // s vazbou zůstane
+    #expect(abs(rttycore_signal(open).mark - 2085) < 8)                         // without the coupling it tunes in
+    #expect(rttycore_signal(gated).mark == 2125)                                // with the coupling it stays put
 }

@@ -5,7 +5,7 @@ import DXCC
 import Settings
 @testable import AppUI
 
-// Skóre závodu v AppModel: zalogování přičte (bez úplného přepočtu), výsledek = úplný výpočet; mimo závod nic.
+// The contest score in AppModel: logging adds to it (no full recomputation), the result = the full computation; nothing outside a contest.
 @Test @MainActor func loggedQSOUpdatesScoreIncrementally() async throws {
     let f = Fixture()
     f.configure = { s in
@@ -30,7 +30,7 @@ import Settings
     let full = calc.tally(records: f.model.logRecords, qtc: [], since: f.model.settings.contest.effectiveStart,
                           until: f.model.settings.contest.end)
     #expect(s == full)
-    #expect(s.score == 5 * 5)                                           // zóny 14, 5 + DL, K + CT
+    #expect(s.score == 5 * 5)                                           // zones 14, 5 + DL, K + CT
     await f.model.stop()
 }
 

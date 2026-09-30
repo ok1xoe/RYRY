@@ -5,7 +5,7 @@ import RTTYSignalKit
 import XMLRPC
 @testable import APIServer
 
-/// Sekvence volání RUMlogNG (metody zjištěné z binárky: main.get_trx_status, main.get_frequency,
+/// The call sequence of RUMlogNG (methods found in the binary: main.get_trx_status, main.get_frequency,
 /// main.set_frequency, rig.get_mode, rig.get_modes, rig.set_mode, rx.get_data, text.add_tx,
 /// text.clear_tx, main.tx, tx.get_data, main.abort).
 @Test func rumlogNGCallSequence() async throws {
@@ -21,7 +21,7 @@ import XMLRPC
     guard case .string = try await t.call("rig.get_mode", []) else { Issue.record("mode"); return }
     guard case .array = try await t.call("rig.get_modes", []) else { Issue.record("modes"); return }
     _ = try await t.call("rig.set_mode", [.string("USB")])
-    // příjem: rx.get_data vrací jen nové znaky
+    // receive: rx.get_data returns only the new characters
     h.audio.feedRx(RTTYSignalGenerator().generate(text: "CQ DE DL1ABC K"))
     await h.run { h.audio.rxRemaining == 0 }
     try await Task.sleep(for: .milliseconds(100))
@@ -29,7 +29,7 @@ import XMLRPC
     #expect(String(decoding: rx1, as: UTF8.self).contains("CQ DE DL1ABC K"))
     guard case .base64(let rx2) = try await t.call("rx.get_data", []) else { Issue.record("rx2"); return }
     #expect(rx2.isEmpty)
-    // vysílání: clear_tx, add_tx, tx, abort
+    // transmit: clear_tx, add_tx, tx, abort
     _ = try await t.call("text.clear_tx", [])
     _ = try await t.call("text.add_tx", [.string("DL1ABC DE OK1XOE 599 599 K")])
     _ = try await t.call("main.tx", [])

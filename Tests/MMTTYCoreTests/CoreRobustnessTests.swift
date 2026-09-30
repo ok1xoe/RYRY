@@ -18,7 +18,7 @@ import RTTYSignalKit
 @Test func overdrivenInputIsFlaggedAndStillDecodes() throws {
     let core = try #require(makeCore())
     defer { rttycore_destroy(core) }
-    let s = RTTYSignalGenerator(amplitude: 3.0).generate(text: sample)   // 3× přes plný rozsah
+    let s = RTTYSignalGenerator(amplitude: 3.0).generate(text: sample)   // 3× across the full range
     let out = runWithTicks(core, s)
     #expect(rttycore_signal(core).overflow == 1)
     #expect(out.contains("CQ CQ DE OK1XOE"))
@@ -40,8 +40,8 @@ import RTTYSignalKit
     #expect(runWithTicks(core, s).contains("CQ CQ DE OK1XOE"))
 }
 
-/// MMTTY spoléhá na vynulovanou paměť (VCL TObject); konstruktory některé členy nenastavují.
-/// Nová instance nesmí zdědit stav z paměti předchozí (zničené) instance.
+/// MMTTY relies on zeroed memory (VCL TObject); the constructors leave some members unset.
+/// A new instance must not inherit state from the memory of the previous (destroyed) instance.
 @Test func freshCoreDoesNotInheritStateFromFreedInstance() throws {
     for _ in 0..<20 {
         let old = try #require(makeCore())

@@ -7,7 +7,7 @@ import Settings
 
 private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) <= tol }
 
-// MARK: Směr a vzdálenost
+// MARK: Bearing and distance
 
 @Test @MainActor func beamUsesLocatorsWhenBothKnown() async throws {
     let f = Fixture()
@@ -30,16 +30,16 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
     await f.model.setQSOField("call", "JA1ABC")
     let b = try #require(f.model.beamToRemote)
     #expect(b.ownSource == .locator && b.remoteSource == .country)
-    #expect(b.shortAzimuth > 0 && b.shortAzimuth < 90)                   // Japonsko: severovýchod
+    #expect(b.shortAzimuth > 0 && b.shortAzimuth < 90)                   // Japan: north-east
     await f.model.stop()
 }
 
 @Test @MainActor func ownPositionFallsBackToOwnCountry() async throws {
-    let f = Fixture()                                                    // OK1XOE, bez lokátoru
+    let f = Fixture()                                                    // OK1XOE, without a locator
     await f.model.start()
     let own = try #require(f.model.ownPosition)
     #expect(own.source == .country)
-    #expect(own.coordinate.lon > 10 && own.coordinate.lon < 20)          // východní délka kladně
+    #expect(own.coordinate.lon > 10 && own.coordinate.lon < 20)          // east longitude positive
     await f.model.setQSOField("call", "W2AB")
     let b = try #require(f.model.beamToRemote)
     #expect(b.ownSource == .country && b.remoteSource == .country)
@@ -58,7 +58,7 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
     let f = Fixture()
     await f.model.start()
     #expect(f.model.beamToRemote == nil)
-    await f.model.setQSOField("locator", "FN30")                         // jen lokátor bez značky stačí
+    await f.model.setQSOField("locator", "FN30")                         // the locator alone, without a call, is enough
     #expect(f.model.beamToRemote?.remoteSource == .locator)
     await f.model.stop()
 }
@@ -67,12 +67,12 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
     let f = Fixture()
     await f.model.start()
     let b = try #require(f.model.beam(call: "W2AB", locator: ""))
-    #expect(b.shortAzimuth > 270 && b.shortAzimuth < 330)                // USA ze střední Evropy
+    #expect(b.shortAzimuth > 270 && b.shortAzimuth < 330)                // the USA from central Europe
     #expect(f.model.beam(call: "", locator: "") == nil)
     await f.model.stop()
 }
 
-// MARK: Frekvence
+// MARK: Frequency
 
 @Test @MainActor func bandButtonTunesRig() async throws {
     let rig = SpotFakeRig()
@@ -133,7 +133,7 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
 }
 
 @Test @MainActor func failingRigReportsFailure() async throws {
-    let m = spotModel(rig: NoRig())                                      // rig nastaven, ale odpojen
+    let m = spotModel(rig: NoRig())                                      // a rig configured but disconnected
     await m.start()
     #expect(await m.setFrequency(kHz: 14080) == .failed)
     #expect(m.messages.contains { $0.contains("14080.0") })

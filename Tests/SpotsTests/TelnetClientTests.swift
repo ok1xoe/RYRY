@@ -3,7 +3,7 @@ import Network
 import Testing
 @testable import Spots
 
-/// Lokální „cluster“: pošle výzvu, po přihlášení uvítání a spoty; zaznamenává, co klient poslal.
+/// A local "cluster": it sends a prompt, then a greeting and spots after the login; it records what the client sent.
 final class FakeCluster: @unchecked Sendable {
     private let listener: NWListener
     private let queue = DispatchQueue(label: "FakeCluster")
@@ -13,7 +13,7 @@ final class FakeCluster: @unchecked Sendable {
     let prompt: String
     let spots: [String]
     let dropAfterSpots: Bool
-    /// Odpovědi na příkazy po přihlášení (klíč = příkaz).
+    /// The replies to commands after the login (the key = the command).
     let responses: [String: [String]]
     private(set) var port: UInt16 = 0
 
@@ -42,7 +42,7 @@ final class FakeCluster: @unchecked Sendable {
     private func handle(_ c: NWConnection) {
         lock.withLock { _connections += 1 }
         c.start(queue: queue)
-        // telnetová vyjednávání + výzva bez konce řádku
+        // the telnet negotiations + a prompt with no line ending
         c.send(content: Data([255, 253, 24]) + Data(prompt.utf8), completion: .idempotent)
         nonisolated(unsafe) var buf = ""
         nonisolated(unsafe) var loggedIn = false
@@ -89,7 +89,7 @@ final class Collector: @unchecked Sendable {
     func add(_ s: TelnetSpotClient.State) { lock.withLock { _states.append(s) } }
 }
 
-/// Čas HHMMZ aktuální minuty (spoty musí být „čerstvé“, aby je seznam přijal).
+/// The time HHMMZ of the current minute (spots have to be "fresh" for the list to accept them).
 func hhmmZ(_ d: Date = Date()) -> String {
     var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!
     let p = c.dateComponents([.hour, .minute], from: d)
@@ -111,7 +111,7 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     var cfg = TelnetSpotClient.Config(host: "127.0.0.1", port: server.port, login: "OK1XOE",
                                       commands: ["set/skimmer", "sh/dx 30"], source: .cluster)
     cfg.initialDelay = 0.05
-    // hodiny nastavené tak, aby HHMM ve spotech bylo „dnes“
+    // the clock set so that the HHMM in the spots falls on "today"
     let now = Date()
     let client = TelnetSpotClient(config: cfg, now: { now }, onSpots: { col.add($0) }, onState: { col.add($0) })
     await client.start()
@@ -122,7 +122,7 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     await client.stop()
 }
 
-// Klient nefiltruje módy: „Jen RTTY“ je jen filtr zobrazení (SpotBook.visible), spoty se při příjmu nezahazují.
+// The client does not filter modes: "RTTY only" is just a display filter (SpotBook.visible), spots are not discarded on reception.
 @Test func clientPassesAllModes() async throws {
     let server = try FakeCluster(prompt: "Please enter your call: ", spots: sampleLines())
     await server.start()
@@ -154,7 +154,7 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
 }
 
 @Test func clientRetriesWhenServerDown() async throws {
-    // port, na kterém nikdo neposlouchá: uvolníme ho po startu listeneru
+    // a port nobody is listening on: we release it once the listener has started
     let server = try FakeCluster(spots: [])
     await server.start()
     let port = server.port
@@ -190,7 +190,7 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     feed.start(cfg)
     #expect(await waitUntil { await MainActor.run { feed.book.count >= 2 && feed.clusterState == .connected && feed.rbnState == .connected } })
     let v = feed.visible
-    #expect(v.map(\.call).sorted() == ["DL1ABC", "UA3XYZ"])              // DL1ABC jen jednou
+    #expect(v.map(\.call).sorted() == ["DL1ABC", "UA3XYZ"])              // DL1ABC only once
     feed.filter.modes = [.rtty]
     #expect(feed.visible.map(\.call) == ["DL1ABC"])
     feed.filter.bands = ["40m"]

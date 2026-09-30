@@ -20,7 +20,7 @@ let goldenCases: [GoldenCase] = [
     .init(name: "noise0db-45-pll",  baud: 45.45, shift: 170, markOffset: 0,   noiseRMS: 0.2,  demod: 2),
     .init(name: "noise3db-75-fir",  baud: 75,    shift: 170, markOffset: 0,   noiseRMS: 0.15, demod: 1),
     .init(name: "offset40-45-afc",  baud: 45.45, shift: 170, markOffset: -40, noiseRMS: 0.1,  demod: 0),
-    // Těžké případy s chybami – citlivé na jakoukoli změnu DSP (bitová shoda výstupu).
+    // Hard cases with errors – sensitive to any change in the DSP (bit-exact output).
     .init(name: "noise-4db-45-iir", baud: 45.45, shift: 170, markOffset: 0,   noiseRMS: 0.35, demod: 0),
     .init(name: "noise-6db-45-iir", baud: 45.45, shift: 170, markOffset: 0,   noiseRMS: 0.45, demod: 0),
     .init(name: "noise-6db-45-fir", baud: 45.45, shift: 170, markOffset: 0,   noiseRMS: 0.45, demod: 1),
@@ -51,7 +51,7 @@ func golden(_ c: GoldenCase) throws {
         var noise = NoiseGenerator(seed: 2026)
         if c.noiseRMS > 0 { noise.addNoise(to: &s, rms: c.noiseRMS) }
         try WaveFile.write(samples: s, sampleRate: 11025, to: wav)
-        let (readBack, _) = try WaveFile.read(from: wav)          // dekódovat až 16bit verzi
+        let (readBack, _) = try WaveFile.read(from: wav)          // decode the 16-bit version as well
         try goldenDecode(c, samples: readBack).write(to: expected, atomically: true, encoding: .utf8)
         return
     }
