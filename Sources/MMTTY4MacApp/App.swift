@@ -116,6 +116,8 @@ struct MMTTY4MacApp: App {
                         openWindow(id: String(id))
                     }
                     if model.state == .stopped { await model.start() }
+                    // -playDemo YES: play the demo signal right after start (App Store screenshots)
+                    if UserDefaults.standard.bool(forKey: "playDemo") { playDemo() }
                 }
         }
         .commands {

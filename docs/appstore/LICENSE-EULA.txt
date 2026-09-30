@@ -1,0 +1,24 @@
+RYRY – License Agreement
+
+RYRY is free software. Copyright © 2026 OK1XOE (Tomáš Kaplan). It is based on MMTTY,
+copyright © 2000–2013 Makoto Mori (JE3HHT) and Nobuyuki Oba.
+
+RYRY is distributed under the terms of the GNU Lesser General Public License, version 3
+(LGPL v3), which incorporates the GNU General Public License, version 3:
+  https://www.gnu.org/licenses/lgpl-3.0.html
+  https://www.gnu.org/licenses/gpl-3.0.html
+
+The complete corresponding source code is available at no charge:
+  https://github.com/ok1xoe/mmtty4mac
+
+You may use, copy, modify and redistribute RYRY under the terms of that license. Nothing in
+the App Store terms limits the rights the LGPL v3 grants you for this software. Where they
+conflict, the LGPL v3 prevails for RYRY and its source code.
+
+RYRY is provided "as is", without warranty of any kind, express or implied, including the
+warranties of merchantability and fitness for a particular purpose. See the LGPL v3 for details.
+
+Operating a radio transmitter requires a valid amateur radio licence. You are responsible for
+complying with the regulations that apply to you.
+
+The DXCC country file (cty.dat) is by Jim Reisert AD1C, country-files.com.
