@@ -25,6 +25,7 @@ struct BandMapOverlay: View {
 
     var body: some View {
         let markers = model.bandMapMarkers
+        let now = Date()                      // only for the spoken age of a spot (the drawing does not depend on it)
         GeometryReader { g in
             let span = model.waterfallToHz - model.waterfallFromHz
             if !markers.isEmpty, span > 0 {
@@ -41,6 +42,7 @@ struct BandMapOverlay: View {
                     }
                 }
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)      // the dotted lines to the labels: decorative drawing
                 ForEach(Array(markers.enumerated()), id: \.element.id) { i, m in
                     if let r = rows[i] {
                         let left = min(max(xs[i] - ws[i] / 2, 0), max(0, g.size.width - ws[i]))
@@ -53,6 +55,11 @@ struct BandMapOverlay: View {
                         .offset(x: left, y: topInset + CGFloat(r) * Self.rowHeight)
                         .hint(String(format: "%@ · %.1f kHz · %@ · %@", m.spot.call, m.spot.frequencyKHz, m.status.legend,
                                      L("klik = naladit mark a vložit značku")))
+                        // the drawn label is only the callsign; a screen reader also gets frequency, age and status
+                        .accessibilityLabel(SpokenSummary.spot(call: m.spot.call, kHz: m.spot.frequencyKHz,
+                                                              ageMinutes: BandMapFilter.ageMinutes(of: m.spot, now: now),
+                                                              status: m.status.legend))
+                        .accessibilityHint(L("Naladí mark na spot a vloží značku do QSO."))
                     }
                 }
             }

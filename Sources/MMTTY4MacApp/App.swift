@@ -66,7 +66,7 @@ struct MMTTY4MacApp: App {
     }
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    @State private var model = AppModel(alertSink: SystemAlertSink())
+    @State private var model = AppModel(alertSink: SystemAlertSink(), announcer: SystemSpeechAnnouncer())
     @State private var updates = UpdateModel()
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
@@ -124,6 +124,20 @@ struct MMTTY4MacApp: App {
                 Divider()
                 Button(L("Zadat frekvenci…")) { model.showFrequencyEntry = true }
                     .shortcut(model.settings.binding(for: .enterFrequency))
+            }
+            // Accessibility: reading the receive window and the tuning aloud on demand (a screen reader cannot see
+            // the waterfall and reading every incoming character would be unusable).
+            CommandMenu(L("Předčítání")) {
+                Button(L("Přečíst poslední řádek příjmu")) { model.speakLastRxLine() }
+                    .shortcut(model.settings.binding(for: .readLastLine))
+                Button(L("Přečíst předchozí řádek příjmu")) { model.speakPreviousRxLine() }
+                    .shortcut(model.settings.binding(for: .readPreviousLine))
+                Button(L("Přečíst naladění a signál")) { model.speakTuning() }
+                    .shortcut(model.settings.binding(for: .speakTuning))
+                Divider()
+                Toggle(L("Předčítat upozornění odečítačem obrazovky (VoiceOver)"),
+                       isOn: Binding(get: { model.settings.alerts.speakAlerts },
+                                     set: { v in model.setSpeakAlerts(v) }))
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }

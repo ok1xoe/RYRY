@@ -14,12 +14,16 @@ public struct AlertSettings: Codable, Sendable, Equatable {
     /// Alerts for needed calls and countries by sound / system notification (the line in the status bar is always there).
     public var neededSound = true
     public var neededNotification = false
+    /// Read the alerts aloud through the screen reader (VoiceOver). Without a screen reader running the system
+    /// drops the announcement, so it changes nothing for a sighted user.
+    public var speakAlerts = true
     public init() {}
 
     public static let maxWatchLength = 20_000
 
     enum CodingKeys: String, CodingKey {
         case myCallSound, myCallNotification, watchCalls, newCountryBand, newCountryAny, neededSound, neededNotification
+        case speakAlerts
     }
 
     /// Watched calls as a set of base calls (upper case; separator: line, comma, space, semicolon).
@@ -49,5 +53,6 @@ public struct AlertSettings: Codable, Sendable, Equatable {
         newCountryAny = c.tolerant(.newCountryAny, x.newCountryAny, w, s)
         neededSound = c.tolerant(.neededSound, x.neededSound, w, s)
         neededNotification = c.tolerant(.neededNotification, x.neededNotification, w, s)
+        speakAlerts = c.tolerant(.speakAlerts, x.speakAlerts, w, s)
     }
 }

@@ -38,6 +38,9 @@ public struct BandMapWindow: View {
         let color: Color
         let spot: Spot?
         let tip: String
+        /// What a screen reader says: call, frequency, age and whether the station is new / worked / a dupe
+        /// (the drawn label itself is only "call + minutes" and the color carries the status).
+        let spoken: String
     }
 
     var rigKHz: Double? {
@@ -92,13 +95,17 @@ public struct BandMapWindow: View {
             let age = BandMapFilter.ageMinutes(of: s, now: now)
             out.append(Entry(id: "s|" + s.id, kHz: s.frequencyKHz, text: "\(s.call)  \(L("%ld min", age))", color: st.color, spot: s,
                              tip: String(format: "%@ · %.1f kHz · %@ · %@", s.call, s.frequencyKHz, st.legend,
-                                         L("klik = naladit rig a vložit značku"))))
+                                         L("klik = naladit rig a vložit značku")),
+                             spoken: SpokenSummary.spot(call: s.call, kHz: s.frequencyKHz, ageMinutes: age,
+                                                        status: st.legend)))
         }
         if showLogged {
             for r in BandMapFilter.logged(model.logRecords, band: band, minutes: loggedMinutes, now: now) {
                 guard let f = r.frequency, scale.contains(kHz: f / 1000) else { continue }
                 out.append(Entry(id: "l|" + r.id.uuidString, kHz: f / 1000, text: r.call + " ✓", color: .gray, spot: nil,
-                                 tip: String(format: "%@ · %.1f kHz · %@", r.call, f / 1000, L("odpracováno"))))
+                                 tip: String(format: "%@ · %.1f kHz · %@", r.call, f / 1000, L("odpracováno")),
+                                 spoken: SpokenSummary.spot(call: r.call, kHz: f / 1000, ageMinutes: nil,
+                                                            status: L("odpracováno"))))
             }
         }
         return out
@@ -207,6 +214,7 @@ public struct BandMapWindow: View {
                     }
                 }
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)      // the ruler and the connecting lines: decorative drawing
                 ForEach(Array(list.enumerated()), id: \.element.id) { i, e in
                     let label = Text(verbatim: e.text).font(.caption2.monospaced().bold()).lineLimit(1)
                         .foregroundStyle(e.spot == nil ? Color.white : Color.black)
@@ -219,6 +227,9 @@ public struct BandMapWindow: View {
                     }
                     .offset(x: labelX, y: adj[i])
                     .hint(e.tip)
+                    // the drawn label is only "call + minutes"; a screen reader also gets the frequency and the status
+                    .accessibilityLabel(e.spoken)
+                    .accessibilityHint(e.spot == nil ? L("Spojení z logu.") : L("Naladí rig a vloží značku do QSO."))
                 }
                 if empty {
                     Text(L("Zapněte DX cluster nebo RBN (Nastavení → Spoty)."))
@@ -231,6 +242,7 @@ public struct BandMapWindow: View {
                     zoom(pow(0.85, Double(steps)), band: band, around: f)
                 }
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
             // mouse drag = pan the scale (only when it is zoomed in); the spot labels stay clickable
             .contentShape(Rectangle())

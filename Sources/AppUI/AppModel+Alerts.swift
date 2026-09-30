@@ -90,8 +90,13 @@ extension AppModel {
         let now = alertClock()
         guard alertThrottle.allow(NeededCheck.dedupeKey(call: call, band: band) + "|" + source, now: now, interval: interval) else { return }
         let text = Self.neededText(reasons)
-        if batch { queueNeededSummary(call: call, text: text, source: source, now: now) }
-        else { note(L("Potřebné (%@): %@ – %@", source, call, text)) }
+        if batch {
+            queueNeededSummary(call: call, band: band, text: text, source: source, now: now)
+        } else {
+            note(L("Potřebné (%@): %@ – %@", source, call, text))
+            // spoken announcement (VoiceOver): rate-limited separately from the sound, see AppModel+A11y.swift
+            announceNeeded(call: call, band: band, text: text)
+        }
         // sound and notification at most once every 3 s (a burst of spots arrives after connecting to the cluster)
         guard alertThrottle.allow("needed-sound", now: now, interval: 3) else { return }
         if settings.alerts.neededSound { alertSink.playSound() }
@@ -102,9 +107,10 @@ extension AppModel {
     static let neededSummaryInterval: TimeInterval = 5
 
     /// Spots: the first needed one goes out immediately as a line, further ones within `neededSummaryInterval` go into a single summary.
-    private func queueNeededSummary(call: String, text: String, source: String, now: Date) {
+    private func queueNeededSummary(call: String, band: String?, text: String, source: String, now: Date) {
         if neededPending.isEmpty, neededLastLine.map({ now.timeIntervalSince($0) >= Self.neededSummaryInterval }) ?? true {
             note(L("Potřebné (%@): %@ – %@", source, call, text))
+            announceNeeded(call: call, band: band, text: text)
             neededLastLine = now
             return
         }
@@ -123,6 +129,8 @@ extension AppModel {
         let n = neededPending.count
         let list = neededPending.prefix(5).joined(separator: "; ") + (n > 5 ? "; …" : "")
         note(L("Potřebné: %ld (%@)", n, list))
+        // a burst of spots is a single spoken announcement (the count), not N of them
+        announce(L("Potřebných stanic: %ld", n), key: "needed-summary")
         neededPending = []
         neededLastLine = alertClock()
     }
@@ -158,6 +166,9 @@ extension AppModel {
 
     private func alertMyCall(_ call: String) {
         let a = settings.alerts
+        // spoken announcement independently of the sound and the notification (a blind operator wants to hear it even
+        // when the sound is off); it has its own rate limit, see AppModel+A11y.swift
+        announce(L("Volá vás %@", SpokenSummary.spokenCall(call)), key: "my-call")
         guard a.myCallSound || a.myCallNotification else { return }
         guard alertThrottle.allow("my-call", now: alertClock(), interval: 20) else { return }
         if a.myCallSound { alertSink.playSound() }

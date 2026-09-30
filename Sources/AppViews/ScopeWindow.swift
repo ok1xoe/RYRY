@@ -34,6 +34,12 @@ public struct ScopeWindow: View {
             }
             Canvas { ctx, size in draw(ctx, size) }
                 .background(Color.black)
+                // the waveforms say nothing spoken: one element whose value describes what the scope shows
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(L("Scope demodulátoru"))
+                .accessibilityValue(model.scopeSummary(source: Self.sourceName(model.scopeSource),
+                                                       width: Int(width), offset: offset))
+                .accessibilityHint(L("Hodnota se čte na vyžádání, nehlásí se sama."))
                 .overlay(alignment: .topLeading) {
                     VStack(alignment: .leading, spacing: 2) {
                         Label("mark", systemImage: "circle.fill").foregroundStyle(.yellow)
@@ -41,6 +47,7 @@ public struct ScopeWindow: View {
                         Label("bit", systemImage: "circle.fill").foregroundStyle(.green)
                         Label("sync (▼ start, ▽ stop)", systemImage: "circle.fill").foregroundStyle(.cyan)
                     }.font(.caption2).padding(6)
+                        .accessibilityHidden(true)      // a color legend of the drawing - it says nothing spoken
                 }
             if model.demodScope == nil {
                 Text(L("Čekám na data… (scope sbírá při příjmu dávky po 8192 vzorcích)")).font(.caption).foregroundStyle(.secondary)

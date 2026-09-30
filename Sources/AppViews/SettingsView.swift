@@ -517,6 +517,7 @@ struct SpotsTab: View {
                 }
                 Toggle(L("Zvuk u potřebných značek a zemí"), isOn: $s.alerts.neededSound)
                 Toggle(L("Systémové oznámení u potřebných značek a zemí"), isOn: $s.alerts.neededNotification)
+                Toggle(L("Předčítat upozornění odečítačem obrazovky (VoiceOver)"), isOn: $s.alerts.speakAlerts)
             } header: { Text(L("Upozornění")) } footer: {
                 Text(L("Hlídané značky: jedna na řádek (porovnává se základní značka bez /P). Země se poznají z cty.dat a porovnají s logem. Kontroluje se ve spotech (označí se ve sloupci Potřeba) i v přijatém textu; každá značka jen jednou. Oprávnění k oznámením se vyžádá až při zapnutí."))
             }
@@ -964,6 +965,9 @@ struct KeysTab: View {
         case .openLog: return L("Otevřít log")
         case .esmMode: return L("ESM: přepnout Run / S&P")
         case .enterFrequency: return L("Zadat frekvenci")
+        case .readLastLine: return L("Přečíst poslední řádek příjmu")
+        case .readPreviousLine: return L("Přečíst předchozí řádek příjmu")
+        case .speakTuning: return L("Přečíst naladění a signál")
         }
     }
 }
