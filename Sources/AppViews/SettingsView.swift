@@ -407,7 +407,11 @@ struct APITab: View {
                         Text(s.log.directory).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
                         Button(L("Vybrat…")) {
                             let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false; p.canCreateDirectories = true
-                            if p.runModal() == .OK, let u = p.url { s.log.directory = u.path }
+                            if p.runModal() == .OK, let u = p.url {
+                                s.log.directory = u.path
+                                // the sandbox allows this folder only now - keep the access for the next launches
+                                if let data = try? SecurityScopedCodec().make(u) { s.log.bookmarks.set(data, for: u.path) }
+                            }
                         }
                     }
                 }

@@ -147,6 +147,8 @@ public final class AppModel {
     public var scopeFrozen = false
     /// Uploading to the online services (replaceable in tests).
     public var uploader = UploadCoordinator()
+    /// Access to the log folder outside the sandbox container (the app installs the real open panel at launch).
+    public var folderAccess = FolderAccess(prompt: NoFolderPrompt())
     public private(set) var uploadsRunning: Set<UploadTarget> = []
     private var sqTarget: Double?
     private var sqChain: Task<Void, Never>?
@@ -253,6 +255,7 @@ public final class AppModel {
     private func startNow() async {
         guard app == nil else { return }                 // already running
         syncRxLog()
+        await ensureLogFolder()
         let rig = Self.makeRig(settings.rig)
         let engine = engineFactory(settings, rig)
         let log: QSOLogStore?
@@ -346,6 +349,7 @@ public final class AppModel {
     }
 
     private func stopNow() async {
+        defer { folderAccess.stopAll() }
         await stopWAV()
         await stopRecordingWAV()
         spectrumTask?.cancel(); spectrumTask = nil
@@ -380,7 +384,7 @@ public final class AppModel {
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
                 take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
-                take(\.log.directory)
+                take(\.log.directory); take(\.log.bookmarks)
                 m.spots.clusterMacros = cur.spots.clusterMacros   // the dialog does not edit the cluster macros (the Spots window does)
                 // the display filter is changed immediately by the "Band filter" / "Mode filter" windows and "RTTY only" - the dialog does not overwrite it
                 m.spots.filterBands = cur.spots.filterBands; m.spots.filterModes = cur.spots.filterModes
@@ -1086,13 +1090,50 @@ public final class AppModel {
     }
 
     public enum LogFileError: Error, LocalizedError {
-        case exists(String), missing(String)
+        case exists(String), missing(String), noAccess(String)
         public var errorDescription: String? {
             switch self {
+            case .noAccess(let n): return L("Bez přístupu ke složce logu „%@“.", n)
             case .exists(let n): return L("Log „%@“ už existuje – otevřete ho přes Otevřít log.", n)
             case .missing(let n): return L("Log „%@“ neexistuje.", n)
             }
         }
+    }
+
+    /// The sandbox lets the app into a folder outside its container only after the user chose it once; the bookmark
+    /// keeps the access. nil = refused. The user may pick a different folder - the returned one counts.
+    private func accessLogFolder(_ path: String, name: String) async -> URL? {
+        var b = settings.log.bookmarks
+        let u = await folderAccess.acquire(path, bookmarks: &b,
+                                           message: L("RYRY potřebuje přístup ke složce s logem „%@“. Vyberte ji prosím.", name))
+        if b != settings.log.bookmarks {
+            settings.log.bookmarks = b
+            do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        }
+        return u
+    }
+
+    /// At start: the configured log folder, or - when the user refuses access - a folder inside the container,
+    /// so logging always works and the user is told where the log is.
+    private func ensureLogFolder() async {
+        let dir: String
+        if let u = await accessLogFolder(settings.log.directory, name: settings.log.name) {
+            dir = u.path
+        } else {
+            dir = folderAccess.containerHome + "/Documents/RYRY"
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            note(L("Bez přístupu ke složce logu. Log se ukládá do %@.", dir))
+        }
+        guard FolderBookmarks.key(dir) != FolderBookmarks.key(settings.log.directory) else { return }
+        settings.log.directory = dir
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+    }
+
+    /// The log for a chosen file, in a folder the app may use (asks for access when needed).
+    private func accessibleLocation(_ file: URL) async throws -> LogLocation {
+        let loc = LogLocation(file: file)
+        guard let dir = await accessLogFolder(loc.directory.path, name: loc.name) else { throw LogFileError.noAccess(loc.name) }
+        return LogLocation(directory: dir, name: loc.name)
     }
 
     /// Switches to a different log (a restart as after Apply - while transmitting it first switches to RX).
@@ -1113,7 +1154,7 @@ public final class AppModel {
 
     /// A new empty log (the contest serial numbers start from 1).
     public func newLog(file: URL) async throws {
-        let loc = LogLocation(file: file)
+        let loc = try await accessibleLocation(file)
         let fm = FileManager.default
         if fm.fileExists(atPath: loc.jsonlURL.path) || fm.fileExists(atPath: loc.adifURL.path) { throw LogFileError.exists(loc.name) }
         try fm.createDirectory(at: loc.directory, withIntermediateDirectories: true)
@@ -1123,7 +1164,7 @@ public final class AppModel {
     /// Opens an existing log; an ADIF file from another program is converted (the original is kept as .orig). Returns a text for the user.
     @discardableResult
     public func openLog(file: URL) async throws -> String {
-        let loc = LogLocation(file: file)
+        let loc = try await accessibleLocation(file)
         let fm = FileManager.default
         guard fm.fileExists(atPath: loc.jsonlURL.path) || fm.fileExists(atPath: loc.adifURL.path)
                 || fm.fileExists(atPath: loc.directory.appendingPathComponent(loc.name + ".adif").path)
@@ -1139,7 +1180,7 @@ public final class AppModel {
 
     /// Saves a copy of the log under a different name and keeps working in that copy.
     public func saveLogAs(file: URL) async throws {
-        let dst = LogLocation(file: file)
+        let dst = try await accessibleLocation(file)
         if let log = app?.log, !(await log.isADIFConsistent()) { try await log.rebuildADIF() }
         try logLocation.copy(to: dst)
         await switchLog(to: dst, resetSerial: false)

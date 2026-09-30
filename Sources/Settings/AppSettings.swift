@@ -190,11 +190,13 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
 }
 
 public struct LogSettings: Codable, Sendable, Equatable {
-    public var directory: String = NSHomeDirectory() + "/Documents/mmtty4mac"
+    public var directory: String = HomeDirectory.real + "/Documents/RYRY"
     /// Log name (the files `<name>.jsonl`, `<name>.adi`).
     public var name = "mmtty4mac"
     /// Most recently opened logs (paths to the ADIF), newest first.
     public var recent: [String] = []
+    /// Access to folders outside the sandbox container (the log folder, folders of recent logs).
+    public var bookmarks = FolderBookmarks()
     /// Manually entered frequency (Hz) for QSOs without a rig – remembered between runs.
     public var manualFrequency: Double?
     /// Super Check Partial (MASTER.SCP + calls from the log) under the Call field.
@@ -218,7 +220,7 @@ public struct LogSettings: Codable, Sendable, Equatable {
     public init() {}
     public var rxDirectory: URL { URL(fileURLWithPath: directory).appendingPathComponent("rx") }
     enum CodingKeys: String, CodingKey { case directory, name, recent, rxText, rxTimestamps, manualFrequency, superCheck, backup,
-                                             backupKeep }
+                                             backupKeep, bookmarks }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), x = LogSettings()
         directory = c.tolerant(.directory, x.directory, d.warningSink, "log")
@@ -231,6 +233,7 @@ public struct LogSettings: Codable, Sendable, Equatable {
         backupKeep = min(100, max(1, c.tolerant(.backupKeep, x.backupKeep, d.warningSink, "log")))
         rxText = c.tolerant(.rxText, x.rxText, d.warningSink, "log")
         rxTimestamps = c.tolerant(.rxTimestamps, x.rxTimestamps, d.warningSink, "log")
+        bookmarks = c.tolerant(.bookmarks, x.bookmarks, d.warningSink, "log")
     }
 }
 

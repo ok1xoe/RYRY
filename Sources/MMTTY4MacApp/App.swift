@@ -88,6 +88,7 @@ struct MMTTY4MacApp: App {
                 .environment(\.showHints, model.settings.display.showHints)
                 .task {
                     delegate.model = model
+                    model.folderAccess = FolderAccess(prompt: FolderAccessPanel())
                     // the -openSettings YES launch argument (+ -settingsTab N): open Settings (screenshots, support)
                     if UserDefaults.standard.bool(forKey: "openSettings") { openSettings() }
                     // -switchLanguage cs: after 4 s switch the language as if chosen in Settings (live switch test)
