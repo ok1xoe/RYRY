@@ -227,11 +227,24 @@ public actor AppController {
         return c
     }
 
-    /// Kontext pro příkazy DX clusteru: jako `macroContext()` + frekvence rigu (nebo ruční frekvence QSO) v kHz pro `%k`.
+    /// Kontext pro příkazy DX clusteru: jako `macroContext()` + kmitočet stanice v kHz pro `%k` (viz `clusterSpotKHz`).
     public func clusterMacroContext() async -> MacroContext {
         var c = macroContext()
-        if let hz = await currentFrequency(manual: qso.frequency), hz > 0 { c.rigKHz = hz / 1000 }
+        var rigHz: Double?
+        if let st = await engine.rigStatus, st.online, let f = st.frequency { rigHz = f }
+        let manual = rigHz == nil ? await currentFrequency(manual: qso.frequency) : nil
+        c.rigKHz = Self.clusterSpotKHz(rigHz: rigHz, manualHz: manual, offsetHz: settings.spots.offsetHz)
         return c
+    }
+
+    /// Kmitočet pro spot (`%k`, kHz): z rigu = rig − posun spotů (opak `AppModel.useSpot`, který ladí na spot + posun;
+    /// posun oříznutý stejně), aby spot nesl RF kmitočet stanice a ne dial; ruční frekvence QSO je už RF (bez rigu
+    /// se do ní zapisuje přímo frekvence spotu) – posun se neodečítá. nil = neznámá nebo ≤ 0.
+    public static func clusterSpotKHz(rigHz: Double?, manualHz: Double?, offsetHz: Double) -> Double? {
+        let off = min(max(offsetHz, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound)
+        let hz: Double? = rigHz.map { $0 - off } ?? manualHz
+        guard let hz, hz.isFinite, hz > 0 else { return nil }
+        return hz / 1000
     }
 
     private var isBARTG: Bool { settings.contest.enabled && settings.contest.format == .bartg }
@@ -412,13 +425,14 @@ public actor AppController {
     /// Ruční frekvence zadaná od startu (ne jen převzatá z uloženého nastavení).
     private var manualFrequencySetThisSession = false
 
-    /// Duplicita v závodě pro značku v QSO okně (stejná stanice, pásmo a mód od začátku závodu).
+    /// Duplicita v závodě pro značku v QSO okně (stejná stanice a pásmo od začátku závodu; mód jen u vlastního závodu).
     public func dupe() async -> Bool {
         guard settings.contest.enabled, !qso.call.isEmpty, let log else { return false }
         let band = Bands.band(forHz: await currentFrequency(manual: qso.frequency))
         let mode = await engine.currentMode().adifMode
         return DupeCheck.isDupe(call: qso.call, band: band, mode: mode, records: await log.previous(call: qso.call),
-                                since: settings.contest.effectiveStart)
+                                since: settings.contest.effectiveStart,
+                                perMode: DupeCheck.perMode(preset: settings.contest.selectedPreset))
     }
 
     func updateSettingsForTesting(_ s: AppSettings) { settings = s }

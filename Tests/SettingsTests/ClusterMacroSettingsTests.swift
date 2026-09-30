@@ -5,7 +5,7 @@ import Testing
 @Test func clusterMacrosDefaultsAreTenDXSpiderCommands() {
     let m = AppSettings().spots.clusterMacros
     #expect(m.count == SpotSettings.clusterMacroCount && m.count == 10)
-    #expect(m.map(\.name) == ["SH/DX", "RTTY", "20 m", "40 m", "WWV", "Slunce", "Skimmer ON", "Skimmer OFF", "Uživatelé", "Spot"])
+    #expect(m.map(\.name) == ["SH/DX", "RTTY", "20 m", "40 m", "WWV", "SUN", "Skimmer ON", "Skimmer OFF", "USERS", "Spot"])
     #expect(m[0].text == "sh/dx 30" && m[4].text == "sh/wwv" && m[9].text == "dx %k %c RTTY")
 }
 
@@ -26,4 +26,12 @@ import Testing
     #expect(bad.count == 10 && bad[0] == Macro(name: "", text: "") && bad[1].name == "B" && bad[1].color == nil && bad[1].repeatSeconds == nil)
     let notArray = try d.decode(SpotSettings.self, from: Data(#"{"clusterMacros":"x"}"#.utf8)).clusterMacros
     #expect(notArray.count == 10)
+}
+
+// Starší výchozí české názvy (Slunce, Uživatelé) se při načtení nahradí jazykově neutrálními; upravené zůstanou.
+@Test func oldCzechDefaultClusterMacroNamesMigrate() throws {
+    let json = #"{"clusterMacros":[{"name":"Slunce","text":"sh/sun"},{"name":"Uživatelé","text":"sh/users"},{"name":"Slunce","text":"sh/sun 5"}]}"#
+    let m = try JSONDecoder().decode(SpotSettings.self, from: Data(json.utf8)).clusterMacros
+    #expect(m[0] == Macro(name: "SUN", text: "sh/sun") && m[1] == Macro(name: "USERS", text: "sh/users"))
+    #expect(m[2].name == "Slunce")                                       // jiný text = uživatelovo makro
 }

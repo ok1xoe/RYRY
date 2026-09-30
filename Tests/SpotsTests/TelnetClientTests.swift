@@ -109,7 +109,7 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     defer { server.stop() }
     let col = Collector()
     var cfg = TelnetSpotClient.Config(host: "127.0.0.1", port: server.port, login: "OK1XOE",
-                                      commands: ["set/skimmer", "sh/dx 30"], source: .cluster, rttyOnly: false)
+                                      commands: ["set/skimmer", "sh/dx 30"], source: .cluster)
     cfg.initialDelay = 0.05
     // hodiny nastavené tak, aby HHMM ve spotech bylo „dnes“
     let now = Date()
@@ -122,18 +122,19 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     await client.stop()
 }
 
-@Test func clientFiltersRTTYOnly() async throws {
+// Klient nefiltruje módy: „Jen RTTY“ je jen filtr zobrazení (SpotBook.visible), spoty se při příjmu nezahazují.
+@Test func clientPassesAllModes() async throws {
     let server = try FakeCluster(prompt: "Please enter your call: ", spots: sampleLines())
     await server.start()
     defer { server.stop() }
     let col = Collector()
-    var cfg = TelnetSpotClient.Config(host: "127.0.0.1", port: server.port, login: "OK1XOE", source: .rbn, rttyOnly: true)
+    var cfg = TelnetSpotClient.Config(host: "127.0.0.1", port: server.port, login: "OK1XOE", source: .rbn)
     cfg.initialDelay = 0.05
     let client = TelnetSpotClient(config: cfg, onSpots: { col.add($0) }, onState: { col.add($0) })
     await client.start()
-    #expect(await waitUntil { col.spots.count >= 2 })
+    #expect(await waitUntil { col.spots.count >= 3 })
     try await Task.sleep(for: .milliseconds(100))
-    #expect(col.spots.map(\.call) == ["DL1ABC", "JA1XYZ"])
+    #expect(col.spots.map(\.call) == ["DL1ABC", "UA3XYZ", "JA1XYZ"])
     #expect(col.spots.allSatisfy { $0.source == .rbn })
     await client.stop()
 }

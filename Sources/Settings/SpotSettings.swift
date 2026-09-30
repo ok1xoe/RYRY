@@ -27,17 +27,17 @@ public struct SpotSettings: Codable, Sendable, Equatable {
     public static let offsetRange = -10_000.0...10_000.0
     public static let maxCommands = 10
     public static let clusterMacroCount = 10
-    /// Výchozí příkazy DXSpider / CC Cluster. „RTTY“ (`sh/dx 30 info rtty`) – kvalifikátor `info` hledá v komentáři.
+    /// Výchozí příkazy DXSpider / CC Cluster (názvy jazykově neutrální, jako příkazy). „RTTY“ (`sh/dx 30 info rtty`) – kvalifikátor `info` hledá v komentáři.
     public static let defaultClusterMacros: [Macro] = [
         Macro(name: "SH/DX", text: "sh/dx 30"),
         Macro(name: "RTTY", text: "sh/dx 30 info rtty"),
         Macro(name: "20 m", text: "sh/dx on 20m"),
         Macro(name: "40 m", text: "sh/dx on 40m"),
         Macro(name: "WWV", text: "sh/wwv"),
-        Macro(name: "Slunce", text: "sh/sun"),
+        Macro(name: "SUN", text: "sh/sun"),
         Macro(name: "Skimmer ON", text: "set/skimmer"),
         Macro(name: "Skimmer OFF", text: "unset/skimmer"),
-        Macro(name: "Uživatelé", text: "sh/users"),
+        Macro(name: "USERS", text: "sh/users"),
         Macro(name: "Spot", text: "dx %k %c RTTY"),
     ]
     public init() {}
@@ -64,6 +64,11 @@ public struct SpotSettings: Codable, Sendable, Equatable {
             ? Array(c.tolerant(.clusterMacros, TolerantArray<Macro>(), w, s).items.prefix(Self.clusterMacroCount))
             : x.clusterMacros
         while cm.count < Self.clusterMacroCount { cm.append(Macro(name: "", text: "")) }
+        // dřívější výchozí české názvy → jazykově neutrální (jen nezměněná výchozí makra)
+        for (i, m) in cm.enumerated() {
+            if m == Macro(name: "Slunce", text: "sh/sun") { cm[i].name = "SUN" }
+            if m == Macro(name: "Uživatelé", text: "sh/users") { cm[i].name = "USERS" }
+        }
         clusterMacros = cm
         rbnEnabled = c.tolerant(.rbnEnabled, x.rbnEnabled, w, s)
         let rh = c.tolerant(.rbnHost, x.rbnHost, w, s).trimmingCharacters(in: .whitespaces)

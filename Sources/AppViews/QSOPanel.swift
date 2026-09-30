@@ -79,7 +79,7 @@ struct QSOPanel: View {
                                             Text("DUPE").font(.caption.bold()).foregroundStyle(.white)
                                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                                 .background(.red, in: RoundedRectangle(cornerRadius: 4))
-                                                .hint(L("Duplicita: se stanicí už je v tomto závodě spojení na stejném pásmu a módu"))
+                                                .hint(L("Duplicita: se stanicí už je v tomto závodě spojení na stejném pásmu (u vlastního závodu i módu)"))
                                         }
                                         if !model.isDupe, !model.newMultiplier.isEmpty {
                                             Text("NEW MULT").font(.caption.bold()).foregroundStyle(.white)

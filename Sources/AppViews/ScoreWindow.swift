@@ -70,7 +70,7 @@ public struct ScoreWindow: View {
                     if isWAE { Text("\(m.count(band: b)) × \(m.rule.bandWeights[b] ?? 1)").monospacedDigit(); num(x.qtc) }
                 }
             }
-            if m.rule.components.contains(where: { !$0.perBand }) {
+            if s.showsOnceMultiplierRow {
                 GridRow {
                     Text(L("Za závod")).gridColumnAlignment(.leading)
                     Text(""); Text(""); Text("")
@@ -84,7 +84,7 @@ public struct ScoreWindow: View {
                 num(s.qsos).bold()
                 num(s.dupes).bold()
                 num(s.points).bold()
-                if hasMultipliers { num(m.total).bold() }
+                if hasMultipliers { num(s.tableMultiplierTotal).bold() }   // BARTG: bez kontinentů (ve vzorci zvlášť)
                 if isWAE { num(m.weightedTotal).bold(); num(s.qtc).bold() }
             }
         }
@@ -94,10 +94,20 @@ public struct ScoreWindow: View {
 
     func footer(_ s: ScoreTally) -> some View {
         VStack(alignment: .leading, spacing: 4) {
+            if s.ownCountryUnknown {
+                Label(L("Vlastní země není známá (chybí značka v Nastavení → Stanice nebo databáze zemí) – body a násobiče nejsou správné."),
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            }
+            if s.ownLocatorMissing {
+                Label(L("Chybí vlastní lokátor (Nastavení → Stanice nebo výměna závodu) – spojení mají 0 bodů."),
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            }
             if s.rule.formula == .pointsTimesMultipliersTimesContinents {
                 Text(L("Kontinenty: %ld (jednou za závod, násobí se zvlášť)", s.continents)).font(.callout)
             }
-            Text(L("Duplicity (stejná stanice, pásmo a mód) mají 0 bodů. Výsledek je odhad – vyhodnocení závodu odečte chybná a nepotvrzená spojení."))
+            Text(L("Duplicity (stejná stanice na stejném pásmu) mají 0 bodů; spojení mimo dobu závodu se nepočítají. Výsledek je odhad – vyhodnocení závodu odečte chybná a nepotvrzená spojení."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if !s.rule.verified || !s.rule.unverifiedNote.isEmpty {
                 Label(s.rule.verified ? L("Neověřeno: %@", s.rule.unverifiedNote) : L("Pravidlo neověřeno v oficiálních pravidlech."),

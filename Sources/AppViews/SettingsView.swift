@@ -793,7 +793,7 @@ struct ContestTab: View {
                 }
                 if let scpStatus { Text(scpStatus).font(.caption).foregroundStyle(.secondary) }
             } header: { Text("Super Check Partial") } footer: {
-                Text(L("Při psaní značky nabízí známé značky z MASTER.SCP (supercheckpartial.com) a z vašeho logu; „≈“ = značky lišící se o jeden znak (oprava chybně přijaté značky). V závodě červené DUPE upozorní na opakované spojení na stejném pásmu a módu."))
+                Text(L("Při psaní značky nabízí známé značky z MASTER.SCP (supercheckpartial.com) a z vašeho logu; „≈“ = značky lišící se o jeden znak (oprava chybně přijaté značky). V závodě červené DUPE upozorní na opakované spojení na stejném pásmu (u vlastního závodu i módu)."))
             }
         }
         .formStyle(.grouped)

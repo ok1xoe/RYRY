@@ -7,7 +7,8 @@ import SwiftUI
 
 /// Příkazy pro DX cluster v okně Spoty: 10 tlačítek (makra `settings.spots.clusterMacros`, úprava jako u maker
 /// pro vysílání), řádek pro ruční příkaz s historií (šipka nahoru/dolů) a rozbalitelná konzole s odpověďmi clusteru.
-/// Neaktivní, dokud DX cluster není připojený. Odesílá se jen do clusteru, nikdy do rádia.
+/// Neaktivní, dokud DX cluster nepřijímá příkazy (přihlášení). Makra lze upravit i bez spojení (nabídka „Upravit“,
+/// kontextová nabídka). Odesílá se jen do clusteru, nikdy do rádia.
 struct ClusterPanel: View {
     @Bindable var model: AppModel
     @State private var editing: Int?
@@ -16,8 +17,9 @@ struct ClusterPanel: View {
     @State private var showConsole = false
     @FocusState private var fieldFocused: Bool
 
+    /// Příkazy lze poslat: cluster zapnutý, připojený a přihlášený (ne jen navázané TCP).
     private var connected: Bool {
-        model.settings.spots.clusterEnabled && model.spotFeed.clusterState == .connected
+        model.settings.spots.clusterEnabled && model.spotFeed.clusterCommandsReady
     }
 
     var body: some View {
@@ -32,7 +34,9 @@ struct ClusterPanel: View {
                 }
             }
             HStack(spacing: 6) {
-                TextField(L("Příkaz pro DX cluster (např. sh/dx 30)"), text: $command)
+                // psaní ukončí procházení historie (šipka pak začne znovu od nejnovějšího)
+                TextField(L("Příkaz pro DX cluster (např. sh/dx 30)"),
+                          text: Binding(get: { command }, set: { command = $0; historyPos = nil }))
                     .textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced))
                     .focused($fieldFocused)
                     .onSubmit { send() }
@@ -41,11 +45,19 @@ struct ClusterPanel: View {
                     .disabled(!connected)
                 Button(L("Odeslat")) { send() }
                     .disabled(!connected || command.trimmingCharacters(in: .whitespaces).isEmpty)
+                Menu(L("Upravit")) {
+                    ForEach(0..<SpotSettings.clusterMacroCount, id: \.self) { i in
+                        let name = i < macros.count ? macros[i].name : ""
+                        Button("\(i + 1). " + (name.isEmpty ? "—" : name)) { editing = i }
+                    }
+                }
+                .fixedSize()
+                .hint(L("Upravit tlačítka příkazů (i bez spojení s clusterem)"))
             }
             if let msg = model.clusterMessage {
                 Text(msg).font(.caption).foregroundStyle(.red)
             } else if !connected {
-                Text(L("Příkazy lze odeslat, až je DX cluster připojený."))
+                Text(L("Příkazy lze odeslat, až je DX cluster připojený a přihlášený."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             DisclosureGroup(L("Konzola clusteru"), isExpanded: $showConsole) { console }
@@ -57,14 +69,18 @@ struct ClusterPanel: View {
 
     private func button(_ i: Int, _ macros: [Macro]) -> some View {
         let m = i < macros.count ? macros[i] : nil
-        return Button { Task { await model.runClusterMacro(i) } } label: {
-            Text(m?.name ?? "").lineLimit(1).frame(maxWidth: .infinity)
-                .foregroundStyle(MacroBar.textColor(m?.color))
+        // kontextová nabídka na obalu, ne na zakázaném tlačítku (to by ji nezobrazilo); úprava jde i bez spojení
+        return HStack(spacing: 0) {
+            Button { Task { await model.runClusterMacro(i) } } label: {
+                Text(m?.name ?? "").lineLimit(1).frame(maxWidth: .infinity)
+                    .foregroundStyle(MacroBar.textColor(m?.color))
+            }
+            .buttonStyle(.borderedProminentIf(m?.color != nil, color: Color(hex: m?.color)))
+            .disabled(!connected || m == nil || m!.isBlank)
         }
-        .buttonStyle(.borderedProminentIf(m?.color != nil, color: Color(hex: m?.color)))
-        .disabled(!connected || m == nil || m!.isBlank)
+        .contentShape(Rectangle())
         .hint(m?.text ?? "")
-        .contextMenu { Button(L("Upravit…")) { editing = i } }    // mimo .disabled: úprava jde i bez spojení
+        .contextMenu { Button(L("Upravit…")) { editing = i } }
     }
 
     private var console: some View {

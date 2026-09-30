@@ -30,11 +30,7 @@ public struct ScoreRule: Sendable, Equatable {
     public var formula: ScoreFormula
     /// Pravidlo ověřené v oficiálních pravidlech závodu (zdroj v `source`).
     public var verified: Bool
-    /// Neověřené nebo nejednoznačné části (prázdné = vše ověřeno).
-    public var unverifiedNote: String = ""
     public var source: String
-    /// Popis bodování pro okno Skóre.
-    public var pointsNote: String
 
     /// Pásma s vyšším bodováním (WPX, OK DX: 80 a 40 m).
     static let lowBands: Set<String> = ["80m", "40m"]
@@ -46,40 +42,44 @@ public struct ScoreRule: Sendable, Equatable {
     }
 
     public static func rule(for p: ContestPreset) -> ScoreRule {
-        let src = MultiplierRule.rule(for: p).source
-        let unknown = L("Spojení se značkou bez známé země/kontinentu dostane nejnižší bodovou hodnotu.")
+        let formula: ScoreFormula
         switch p {
-        case .arrlRoundup:
-            return ScoreRule(preset: p, formula: .pointsTimesMultipliers, verified: true, source: src,
-                             pointsNote: L("1 bod za spojení; stejnou stanici jen jednou na pásmu. Skóre = body × násobiče."))
-        case .cqwpxRTTY:
-            return ScoreRule(preset: p, formula: .pointsTimesMultipliers, verified: true, unverifiedNote: unknown, source: src,
-                             pointsNote: L("Jiný kontinent 3 body (80 a 40 m: 6), stejný kontinent a jiná země 2 (4), stejná země 1 (2). Skóre = body × prefixy."))
-        case .bartgHF:
-            return ScoreRule(preset: p, formula: .pointsTimesMultipliersTimesContinents, verified: true, source: src,
-                             pointsNote: L("1 bod za spojení. Skóre = body × násobiče (země a oblasti po pásmech) × kontinenty."))
-        case .sartgRTTY:
-            return ScoreRule(preset: p, formula: .pointsTimesMultipliers, verified: true, unverifiedNote: unknown, source: src,
-                             pointsNote: L("Vlastní země 5 bodů, jiná země na vlastním kontinentu 10, jiný kontinent 15. Skóre = body × násobiče."))
-        case .cqwwRTTY:
-            return ScoreRule(preset: p, formula: .pointsTimesMultipliers, verified: true, unverifiedNote: unknown, source: src,
-                             pointsNote: L("Jiný kontinent 3 body, stejný kontinent a jiná země 2, stejná země 1. Skóre = body × (zóny + země + W/VE QTH)."))
-        case .makrothen:
-            return ScoreRule(preset: p, formula: .pointsSum, verified: true, source: src,
-                             pointsNote: L("Body = vzdálenost středů čtverců lokátorů v km (zaokrouhleno dolů) × váha pásma (80 m × 2, 40 m × 1,5, ostatní × 1, znovu dolů); stejný čtverec 100 bodů bez váhy. Skóre = součet bodů."))
-        case .jartsRTTY:
-            return ScoreRule(preset: p, formula: .pointsTimesMultipliers, verified: true,
-                             unverifiedNote: L("Pravidla píší „body na každém pásmu × násobiče na každém pásmu“ – počítá se součet bodů × součet násobičů (obvyklý výklad)."),
-                             source: src,
-                             pointsNote: L("Stejný kontinent (i vlastní země) 2 body, jiný kontinent 3. Skóre = body × násobiče."))
-        case .waeRTTY:
-            return ScoreRule(preset: p, formula: .qsoPlusQTCTimesWeightedMultipliers, verified: true, source: src,
-                             pointsNote: L("1 bod za spojení a 1 za každé odeslané i přijaté QTC. Skóre = (QSO + QTC) × násobiče s váhou pásem."))
-        case .okDXRTTY:
-            return ScoreRule(preset: p, formula: .pointsTimesMultipliers, verified: true, unverifiedNote: unknown, source: src,
-                             pointsNote: L("20, 15 a 10 m: vlastní kontinent 1 bod, jiný kontinent 2; 80 a 40 m: 3 a 6. Skóre = body × násobiče."))
+        case .bartgHF: formula = .pointsTimesMultipliersTimesContinents
+        case .makrothen: formula = .pointsSum
+        case .waeRTTY: formula = .qsoPlusQTCTimesWeightedMultipliers
+        case .arrlRoundup, .cqwpxRTTY, .sartgRTTY, .cqwwRTTY, .jartsRTTY, .okDXRTTY: formula = .pointsTimesMultipliers
+        }
+        return ScoreRule(preset: p, formula: formula, verified: true, source: MultiplierRule.rule(for: p).source)
+    }
+
+    /// Popis bodování pro okno Skóre (překládá se při zobrazení – sleduje přepnutí jazyka).
+    public var pointsNote: String {
+        switch preset {
+        case .arrlRoundup: L("1 bod za spojení; stejnou stanici jen jednou na pásmu. Skóre = body × násobiče.")
+        case .cqwpxRTTY: L("Jiný kontinent 3 body (80 a 40 m: 6), stejný kontinent a jiná země 2 (4), stejná země 1 (2). Skóre = body × prefixy.")
+        case .bartgHF: L("1 bod za spojení. Skóre = body × násobiče (země a oblasti po pásmech) × kontinenty.")
+        case .sartgRTTY: L("Vlastní země 5 bodů, jiná země na vlastním kontinentu 10, jiný kontinent 15. Skóre = body × násobiče.")
+        case .cqwwRTTY: L("Jiný kontinent 3 body, stejný kontinent a jiná země 2, stejná země 1. Skóre = body × (zóny + země + W/VE QTH).")
+        case .makrothen: L("Body = vzdálenost středů čtverců lokátorů v km (zaokrouhleno dolů) × váha pásma (80 m × 2, 40 m × 1,5, ostatní × 1, znovu dolů); stejný čtverec 100 bodů bez váhy. Skóre = součet bodů.")
+        case .jartsRTTY: L("Stejný kontinent (i vlastní země) 2 body, jiný kontinent 3. Skóre = body × násobiče.")
+        case .waeRTTY: L("1 bod za spojení a 1 za každé odeslané i přijaté QTC. Skóre = (QSO + QTC) × násobiče s váhou pásem.")
+        case .okDXRTTY: L("20, 15 a 10 m: vlastní kontinent 1 bod, jiný kontinent 2; 80 a 40 m: 3 a 6. Skóre = body × násobiče.")
         }
     }
+
+    /// Neověřené nebo nejednoznačné části (prázdné = vše ověřeno); překládá se při zobrazení.
+    public var unverifiedNote: String {
+        switch preset {
+        case .cqwpxRTTY, .sartgRTTY, .cqwwRTTY, .okDXRTTY:
+            L("Spojení se značkou bez známé země/kontinentu dostane nejnižší bodovou hodnotu.")
+        case .jartsRTTY:
+            L("Pravidla píší „body na každém pásmu × násobiče na každém pásmu“ – počítá se součet bodů × součet násobičů (obvyklý výklad).")
+        case .arrlRoundup, .bartgHF, .makrothen, .waeRTTY: ""
+        }
+    }
+
+    /// Body závisí na vlastní zemi/kontinentu (nebo násobiče na vlastní zemi) – bez ní je výsledek chybný.
+    var needsOwnCountry: Bool { preset != .makrothen }
 
     /// Body za spojení podle vztahu k vlastní stanici a pásma (Makrothen se počítá zvlášť); nil vztah = nejnižší hodnota.
     public func points(relation: ScoreRelation?, band: String?) -> Int {
@@ -130,12 +130,23 @@ public struct ScoreTally: Sendable, Equatable {
     public let rule: ScoreRule
     public private(set) var multipliers: MultiplierTally
     public private(set) var perBand: [String: BandScore] = [:]
-    /// Odpracované stanice (základní značka, pásmo, mód) pro duplicity.
+    /// Okno závodu zafixované při úplném výpočtu: počítají se spojení a QTC v [since, until); until nil = bez konce.
+    /// Přírůstek (`ScoreCalculator.add`) používá totéž okno – výsledek je stejný jako úplný přepočet.
+    public let since: Date
+    public let until: Date?
+    /// Vlastní země neznámá (chybí značka stanice nebo cty.dat) – body podle země/kontinentu nejsou správné.
+    public internal(set) var ownCountryUnknown = false
+    /// Makrothen: chybí vlastní lokátor – všechna spojení mají 0 bodů.
+    public internal(set) var ownLocatorMissing = false
+    /// Odpracované stanice (`DupeCheck.key`) pro duplicity.
     private var worked: Set<String> = []
 
-    public init(rule: ScoreRule, multiplierRule: MultiplierRule) {
-        self.rule = rule; multipliers = MultiplierTally(rule: multiplierRule)
+    public init(rule: ScoreRule, multiplierRule: MultiplierRule, since: Date = .distantPast, until: Date? = nil) {
+        self.rule = rule; multipliers = MultiplierTally(rule: multiplierRule); self.since = since; self.until = until
     }
+
+    /// Spojení/QTC v čase `t` patří do závodu.
+    public func inWindow(_ t: Date) -> Bool { t >= since && (until.map { t < $0 } ?? true) }
 
     public func band(_ b: String) -> BandScore { perBand[b] ?? BandScore() }
     /// Pásma se spojením nebo QTC, od nejdelšího; neznámé pásmo na konci.
@@ -149,6 +160,14 @@ public struct ScoreTally: Sendable, Equatable {
     public var bandMultipliers: Int { multipliers.total - multipliers.onceCount }
     /// Kontinenty (BARTG).
     public var continents: Int { multipliers.worked(.continent, band: nil).count }
+    /// Násobiče v řádku Celkem tabulky okna Skóre: u BARTG jen po pásmech (kontinenty jsou ve vzorci zvlášť).
+    public var tableMultiplierTotal: Int {
+        rule.formula == .pointsTimesMultipliersTimesContinents ? bandMultipliers : multipliers.total
+    }
+    /// Řádek „Za závod“ v tabulce: násobiče jednou za závod, které jsou součástí součtu (u BARTG ne – kontinenty zvlášť).
+    public var showsOnceMultiplierRow: Bool {
+        rule.formula != .pointsTimesMultipliersTimesContinents && multipliers.rule.components.contains { !$0.perBand }
+    }
 
     /// Násobitel ve vzorci skóre.
     public var multiplierFactor: Int {
@@ -196,19 +215,20 @@ public struct ScoreTally: Sendable, Equatable {
 
     mutating func add(record r: QSORecord, points: Int, hits: [MultiplierHit]) {
         let b = r.band ?? Self.unknownBand
-        let key = QSORecord.baseCall(r.call) + "|" + b + "|" + r.mode.uppercased()
+        let key = DupeCheck.key(call: r.call, band: b, mode: r.mode, perMode: DupeCheck.perMode(preset: rule.preset))
         var s = perBand[b] ?? BandScore()
         s.qsos += 1
         if worked.insert(key).inserted { s.points += points } else { s.dupes += 1 }
         perBand[b] = s
-        multipliers.add(hits, band: r.band)
+        // závod bez násobičů (Makrothen): tally násobičů zůstává prázdný jako dřív (okno Násobiče: 0 spojení)
+        if multipliers.rule.hasMultipliers { multipliers.add(hits, band: r.band) }
     }
 
-    /// QTC série od začátku závodu (WAE); ostatní závody QTC nepočítají.
-    public mutating func setQTC(_ series: [QTCSeries], since: Date) {
+    /// QTC série v okně závodu (WAE); ostatní závody QTC nepočítají.
+    public mutating func setQTC(_ series: [QTCSeries]) {
         for k in perBand.keys { perBand[k]?.qtc = 0 }
         guard rule.formula == .qsoPlusQTCTimesWeightedMultipliers else { return }
-        for s in series where s.time >= since && s.count > 0 {
+        for s in series where inWindow(s.time) && s.count > 0 {
             perBand[Bands.band(forHz: s.frequency) ?? Self.unknownBand, default: BandScore()].qtc += s.count
         }
     }
@@ -258,17 +278,19 @@ public struct ScoreCalculator: Sendable {
         return rule.points(relation: relation(r.call), band: r.band)
     }
 
-    /// Úplný výpočet ze spojení od začátku závodu (a QTC série u WAE).
-    public func tally(records: [QSORecord], qtc: [QTCSeries], since: Date) -> ScoreTally {
-        var t = ScoreTally(rule: rule, multiplierRule: multipliers.rule)
-        for r in records.sorted(by: { $0.timeOn < $1.timeOn }) { add(r, to: &t, since: since) }
-        t.setQTC(qtc, since: since)
+    /// Úplný výpočet ze spojení v okně závodu [since, until) (a QTC série u WAE); okno se v tally zafixuje.
+    public func tally(records: [QSORecord], qtc: [QTCSeries], since: Date, until: Date? = nil) -> ScoreTally {
+        var t = ScoreTally(rule: rule, multiplierRule: multipliers.rule, since: since, until: until)
+        t.ownCountryUnknown = rule.needsOwnCountry && own == nil
+        t.ownLocatorMissing = rule.preset == .makrothen && ownSquare == nil
+        for r in records.sorted(by: { $0.timeOn < $1.timeOn }) { add(r, to: &t) }
+        t.setQTC(qtc)
         return t
     }
 
-    /// Přidá jedno zalogované spojení (bez přepočtu celého logu).
-    public func add(_ r: QSORecord, to t: inout ScoreTally, since: Date) {
-        guard r.timeOn >= since else { return }
+    /// Přidá jedno zalogované spojení (bez přepočtu celého logu) – v okně závodu zafixovaném v `t`.
+    public func add(_ r: QSORecord, to t: inout ScoreTally) {
+        guard t.inWindow(r.timeOn) else { return }
         t.add(record: r, points: points(r), hits: multipliers.rule.hasMultipliers ? multipliers.hits(r) : [])
     }
 

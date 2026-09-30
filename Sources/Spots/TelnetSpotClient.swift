@@ -17,16 +17,16 @@ public actor TelnetSpotClient {
         public var login: String
         public var commands: [String]
         public var source: SpotSource
-        public var rttyOnly: Bool
         public var connectTimeout: Duration = .seconds(10)
         public var initialDelay: Double = 2
         public var maxDelay: Double = 120
         /// Spojení, které vydrželo aspoň tak dlouho, vynuluje prodlevu.
         public var stableAfter: Double = 15
-        public init(host: String, port: UInt16, login: String, commands: [String] = [], source: SpotSource = .cluster,
-                    rttyOnly: Bool = false) {
-            self.host = host; self.port = port; self.login = login; self.commands = commands
-            self.source = source; self.rttyOnly = rttyOnly
+        /// Jak dlouho po připojení čekat na výzvu k přihlášení; server bez výzvy (jen uvítání) pak přijímá příkazy
+        /// bez přihlášení – nejdřív po prvních přijatých datech.
+        public var loginWait: Double = 5
+        public init(host: String, port: UInt16, login: String, commands: [String] = [], source: SpotSource = .cluster) {
+            self.host = host; self.port = port; self.login = login; self.commands = commands; self.source = source
         }
     }
 
@@ -34,24 +34,31 @@ public actor TelnetSpotClient {
     private let onSpots: @Sendable ([Spot]) -> Void
     private let onState: @Sendable (State) -> Void
     private let onLines: (@Sendable ([String]) -> Void)?
+    /// Změna připravenosti na příkazy (true = `sendLine` lze volat: po přihlášení, nebo bez výzvy po uvítání).
+    private let onCommandReady: (@Sendable (Bool) -> Void)?
     private let now: @Sendable () -> Date
     private var task: Task<Void, Never>?
     private var connection: NWConnection?
     /// Spojení, do kterého lze posílat příkazy (po přihlášení); jinak nil.
-    private var sendable: NWConnection?
+    private var sendable: NWConnection? {
+        didSet { if (oldValue == nil) != (sendable == nil) { onCommandReady?(sendable != nil) } }
+    }
+    /// Stav aktuálního spojení pro rozhodnutí „server bez výzvy k přihlášení“.
+    private var loginSeen = false, gotText = false, loginWaitOver = false
     private let queue = DispatchQueue(label: "TelnetSpotClient")
 
     public init(config: Config, now: @escaping @Sendable () -> Date = { Date() },
                 onSpots: @escaping @Sendable ([Spot]) -> Void, onState: @escaping @Sendable (State) -> Void,
-                onLines: (@Sendable ([String]) -> Void)? = nil) {
+                onLines: (@Sendable ([String]) -> Void)? = nil, onCommandReady: (@Sendable (Bool) -> Void)? = nil) {
         self.config = config; self.now = now; self.onSpots = onSpots; self.onState = onState; self.onLines = onLines
+        self.onCommandReady = onCommandReady
     }
 
     /// Pošle řádek serveru (`řádek\r\n`) po přihlášení; bez spojení `.notConnected`. Řádek musí být platný (`ClusterCommand`).
     public func sendLine(_ line: String) async throws {
         let clean = try ClusterCommand.validate(line)
         guard let c = sendable, c.state == .ready else { throw ClusterCommandError.notConnected }
-        await Self.send(c, Data((clean + "\r\n").utf8))
+        if let e = await Self.sendChecked(c, Data((clean + "\r\n").utf8)) { throw ClusterCommandError.sendFailed("\(e)") }
     }
 
     public func start() {
@@ -96,6 +103,12 @@ public actor TelnetSpotClient {
         timer.cancel()
         guard ready, !Task.isCancelled else { return false }
         onState(.connected)
+        loginSeen = false; gotText = false; loginWaitOver = false
+        let wait = Task { [weak self, loginWait = config.loginWait] in
+            try? await Task.sleep(for: .seconds(loginWait))
+            if !Task.isCancelled { await self?.loginWaitEnded(c) }
+        }
+        defer { wait.cancel() }
 
         var filter = TelnetFilter(), splitter = LineSplitter()
         var loginSent = false, commandsSent = false
@@ -105,6 +118,7 @@ public actor TelnetSpotClient {
             let (text, reply) = filter.process(chunk)
             if !reply.isEmpty { await Self.send(c, reply) }
             let lines = splitter.feed(text)
+            if !text.isEmpty { gotText = true }
             if loginSent, !commandsSent, !(text.isEmpty) {
                 commandsSent = true
                 try? await Task.sleep(for: .milliseconds(300))
@@ -114,10 +128,11 @@ public actor TelnetSpotClient {
                 }
             }
             if !loginSent, (lines + [splitter.pending]).contains(where: TelnetPrompt.isLogin) {
-                loginSent = true
+                loginSent = true; loginSeen = true
                 await Self.send(c, Data((login + "\r\n").utf8))
                 sendable = c
             }
+            if !loginSeen, loginWaitOver, gotText, sendable == nil { sendable = c }      // server bez výzvy k přihlášení
             let t = now()
             var spots: [Spot] = []
             var other: [String] = []
@@ -126,13 +141,19 @@ public actor TelnetSpotClient {
                     if !l.trimmingCharacters(in: .whitespaces).isEmpty { other.append(l) }
                     continue
                 }
-                if config.rttyOnly, !s.isRTTY { continue }
                 spots.append(s)
             }
             if !spots.isEmpty { onSpots(spots) }
             if !other.isEmpty { onLines?(other) }
         }
         return true
+    }
+
+    /// Uplynulo čekání na výzvu k přihlášení: bez výzvy, ale s uvítáním už lze posílat příkazy.
+    private func loginWaitEnded(_ c: NWConnection) {
+        guard connection === c else { return }
+        loginWaitOver = true
+        if !loginSeen, gotText, sendable == nil { sendable = c }
     }
 
     // MARK: NWConnection pomocníci
@@ -169,8 +190,13 @@ public actor TelnetSpotClient {
     }
 
     private static func send(_ c: NWConnection, _ data: Data) async {
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            c.send(content: data, completion: .contentProcessed { _ in cont.resume() })
+        _ = await sendChecked(c, data)
+    }
+
+    /// Odešle data; vrací chybu spojení, nil = odesláno.
+    private static func sendChecked(_ c: NWConnection, _ data: Data) async -> NWError? {
+        await withCheckedContinuation { (cont: CheckedContinuation<NWError?, Never>) in
+            c.send(content: data, completion: .contentProcessed { e in cont.resume(returning: e) })
         }
     }
 }

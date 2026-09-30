@@ -20,10 +20,12 @@ extension AppModel {
 
     static func clusterErrorText(_ e: Error) -> String {
         switch e as? ClusterCommandError {
-        case .notConnected?: L("DX cluster není připojený – příkaz nebyl odeslán.")
+        case .notConnected?: L("DX cluster není připojený nebo přihlášený – příkaz nebyl odeslán.")
         case .empty?: L("Prázdný příkaz.")
         case .tooLong?: L("Příkaz je příliš dlouhý (nejvýš %ld znaků).", ClusterCommand.maxLength)
         case .controlCharacter?: L("Příkaz obsahuje řídicí znaky.")
+        case .incompleteSpot?: L("Spot (dx) potřebuje kmitočet v kHz i značku – příkaz nebyl odeslán.")
+        case .sendFailed(let why)?: L("Příkaz clusteru se nepodařilo odeslat: %@", why)
         case nil: L("Příkaz clusteru selhal: %@", "\(e)")
         }
     }
@@ -51,6 +53,10 @@ extension AppModel {
         guard settings.spots.clusterMacros.indices.contains(i) else { return false }
         let lines = MacroEngine.expandCluster(settings.spots.clusterMacros[i].text, context: await clusterContext())
         guard !lines.isEmpty else { clusterMessage = L("Prázdný příkaz."); return false }
+        // nejdřív zkontrolovat všechny řádky (např. spot bez značky), ať se neodešle jen část makra
+        for l in lines {
+            do { _ = try ClusterCommand.validate(l) } catch { clusterMessage = Self.clusterErrorText(error); return false }
+        }
         for l in lines {
             do { try await spotFeed.sendClusterCommand(l) } catch { clusterMessage = Self.clusterErrorText(error); return false }
         }

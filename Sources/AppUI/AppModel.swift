@@ -73,8 +73,9 @@ public final class AppModel {
     public private(set) var settings: AppSettings {
         didSet {
             if multiplierKey != multiplierKeyApplied { refreshMultipliers() }
-            if oldValue.contest.enabled != settings.contest.enabled || oldValue.contest.start != settings.contest.start {
-                rebuildLogIndex()                                              // duplicity: závod zapnut/vypnut, jiný začátek
+            if oldValue.contest.enabled != settings.contest.enabled || oldValue.contest.start != settings.contest.start
+                || oldValue.contest.selectedPreset != settings.contest.selectedPreset {
+                rebuildLogIndex()                                              // duplicity: závod zapnut/vypnut, jiný začátek či pravidla
             }
         }
     }
@@ -379,6 +380,7 @@ public final class AppModel {
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
                 take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
                 take(\.log.directory)
+                m.spots.clusterMacros = cur.spots.clusterMacros   // dialog makra clusteru neupravuje (okno Spoty ano)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 take(\.decoders.secondEnabled); take(\.decoders.secondDemod); take(\.decoders.channelsEnabled)
@@ -602,7 +604,7 @@ public final class AppModel {
 
     // MARK: Duplicita a Super Check Partial
 
-    /// Značka v QSO okně je v závodě duplicita (stejné pásmo a mód).
+    /// Značka v QSO okně je v závodě duplicita (stejné pásmo; mód jen u vlastního závodu – `DupeCheck`).
     public private(set) var isDupe = false
     /// Návrhy pod polem Call: značky obsahující zadanou část a značky lišící se o jeden znak.
     public private(set) var scpPartial: [String] = []
@@ -653,7 +655,7 @@ public final class AppModel {
         logRecords.insert(r, at: 0)
         logRecordsIncremental = false
         guard let calc = scoreCalculator, var t = score else { return }
-        calc.add(r, to: &t, since: settings.contest.effectiveStart)
+        calc.add(r, to: &t)                                              // okno závodu zafixované v tally
         score = t
         refreshNewMultiplier()
     }
@@ -671,7 +673,7 @@ public final class AppModel {
             call, wae in db?.lookup(call, wae: wae)
         }
         multiplierRule = rule; scoreCalculator = calc
-        score = calc.tally(records: logRecords, qtc: qtcSeries, since: settings.contest.effectiveStart)
+        score = calc.tally(records: logRecords, qtc: qtcSeries, since: settings.contest.effectiveStart, until: settings.contest.end)
         refreshNewMultiplier()
     }
 
@@ -868,7 +870,7 @@ public final class AppModel {
 
     /// Všechny uložené série (okno Log → QTC), nejnovější první.
     public private(set) var qtcSeries: [QTCSeries] = [] {
-        didSet { if score != nil { score?.setQTC(qtcSeries, since: settings.contest.effectiveStart) } }   // body za QTC (WAE)
+        didSet { if score != nil { score?.setQTC(qtcSeries) } }   // body za QTC (WAE) v okně závodu zafixovaném v tally
     }
     public struct QTCSummary: Equatable, Sendable { public var sent = 0, received = 0, seriesCount = 0; public var points: Int { sent + received } }
     public var qtcSummary: QTCSummary {
@@ -1399,7 +1401,8 @@ public final class AppModel {
         spotFeed.start(c)
     }
 
-    /// Změna nastavení spotů z okna (filtr RTTY) – hned uloží; spojení se přenastaví.
+    /// Změna nastavení spotů z okna – hned uloží. Filtr „Jen RTTY“, štítky ve vodopádu a makra clusteru spojení
+    /// nemění (filtr je jen zobrazení, uložené jsou spoty všech módů); jiné změny (server, zapnutí…) připojí znovu.
     public func setSpots(_ change: (inout SpotSettings) -> Void) {
         var p = settings.spots
         change(&p)
@@ -1407,13 +1410,12 @@ public final class AppModel {
         let old = settings.spots
         settings.spots = p
         do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        spotFeed.rttyOnly = p.rttyOnly                                   // filtr zobrazení platí hned (oba směry)
         guard app != nil else { return }
-        var noReconnect = old; noReconnect.showInWaterfall = p.showInWaterfall; noReconnect.clusterMacros = p.clusterMacros
-        if noReconnect == p { return }                                   // jen zobrazení štítků, spojení se nemění
-        var onlyFilter = old; onlyFilter.rttyOnly = p.rttyOnly; onlyFilter.showInWaterfall = p.showInWaterfall
-        onlyFilter.clusterMacros = p.clusterMacros
-        if onlyFilter == p, p.rttyOnly { spotFeed.rttyOnly = true }      // jen zúžení zobrazení, spojení se nemění
-        else { startSpots() }                                            // rozšíření na všechny módy: nová data ze serveru
+        var noReconnect = old
+        noReconnect.showInWaterfall = p.showInWaterfall; noReconnect.clusterMacros = p.clusterMacros; noReconnect.rttyOnly = p.rttyOnly
+        if noReconnect == p { return }                                   // jen zobrazení, spojení se nemění
+        startSpots()
     }
 
     /// Dvojklik na spot: nastaví rig na frekvenci spotu (+ posun) a vloží značku do QSO okna.

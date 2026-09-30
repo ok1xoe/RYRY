@@ -148,7 +148,7 @@ func incrementalEqualsFull(_ p: ContestPreset) {
     let c = calc(p, locator: "JO70")
     let full = c.tally(records: log, qtc: [], since: t0)
     var inc = c.tally(records: [], qtc: [], since: t0)
-    for r in log { c.add(r, to: &inc, since: t0) }
+    for r in log { c.add(r, to: &inc) }
     #expect(inc == full)
     #expect(full.qsos == 8)                                             // spojení před začátkem závodu se nepočítá
 }

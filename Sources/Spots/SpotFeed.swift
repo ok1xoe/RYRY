@@ -13,14 +13,17 @@ public struct SpotFeedConfig: Sendable, Equatable {
     public var call: String
     public var cluster: SpotEndpoint?
     public var rbn: SpotEndpoint?
+    /// Počáteční stav filtru zobrazení „Jen RTTY“ (příjem nefiltruje; na spojení nemá vliv, proto není v `==`).
     public var rttyOnly = true
     public var maxAgeMinutes = 30
     public var clientTuning: (initialDelay: Double, maxDelay: Double)?
+    /// Čekání na výzvu k přihlášení (s); nil = výchozí klienta (testy zkracují).
+    public var loginWait: Double?
     public init(call: String, cluster: SpotEndpoint? = nil, rbn: SpotEndpoint? = nil, rttyOnly: Bool = true, maxAgeMinutes: Int = 30) {
         self.call = call; self.cluster = cluster; self.rbn = rbn; self.rttyOnly = rttyOnly; self.maxAgeMinutes = maxAgeMinutes
     }
     public static func == (a: Self, b: Self) -> Bool {
-        a.call == b.call && a.cluster == b.cluster && a.rbn == b.rbn && a.rttyOnly == b.rttyOnly && a.maxAgeMinutes == b.maxAgeMinutes
+        a.call == b.call && a.cluster == b.cluster && a.rbn == b.rbn && a.maxAgeMinutes == b.maxAgeMinutes
     }
 }
 
@@ -30,10 +33,14 @@ public final class SpotFeed {
     public private(set) var book = SpotBook()
     public private(set) var clusterState = TelnetSpotClient.State.off
     public private(set) var rbnState = TelnetSpotClient.State.off
+    /// DX cluster přijímá příkazy (přihlášeno, nebo server bez výzvy po uvítání) – tlačítka příkazů jen tehdy.
+    public var clusterCommandsReady: Bool { clusterLoggedIn && clusterState == .connected }
+    /// Klient hlásí připravenost na příkazy (po přihlášení / uvítání bez výzvy).
+    private var clusterLoggedIn = false
     public private(set) var config = SpotFeedConfig(call: "")
     /// Filtr pásma v okně (např. „20m“); nil = všechna.
     public var bandFilter: String?
-    /// Zobrazit jen RTTY (filtr zobrazení; příjem u klienta se řídí `config.rttyOnly`).
+    /// Zobrazit jen RTTY – jen filtr zobrazení (seznam, band mapa, štítky); ukládají se spoty všech módů.
     public var rttyOnly = true
     /// Posledních ~500 ne-spotových řádků z DX clusteru (odpovědi na příkazy, uvítání) a odeslané příkazy (`> příkaz`).
     public private(set) var consoleLines: [String] = []
@@ -41,6 +48,8 @@ public final class SpotFeed {
     /// Volá se pro každý nově přidaný spot (značka + pásmo, které v seznamu ještě nebylo).
     @ObservationIgnored public var onNewSpot: (@MainActor (Spot) -> Void)?
 
+    /// Počet spuštění (`start`) – test, že změna filtru nepřipojuje znovu.
+    @ObservationIgnored public private(set) var starts = 0
     @ObservationIgnored private var clients: [TelnetSpotClient] = []
     @ObservationIgnored private var clusterClient: TelnetSpotClient?
     @ObservationIgnored private var pruneTask: Task<Void, Never>?
@@ -62,22 +71,27 @@ public final class SpotFeed {
     /// Zastaví staré klienty a spustí ty, které konfigurace zapíná. Seznam spotů zůstává.
     public func start(_ cfg: SpotFeedConfig) {
         stop()
+        starts += 1
         config = cfg
         rttyOnly = cfg.rttyOnly
         book = SpotBook(maxCount: SpotBook.absoluteMax)
-        clusterState = .off; rbnState = .off
+        clusterState = .off; rbnState = .off; clusterLoggedIn = false
         consoleLines = []
         let clock = self.clock
         func make(_ e: SpotEndpoint, _ src: SpotSource) -> TelnetSpotClient {
-            var c = TelnetSpotClient.Config(host: e.host, port: e.port, login: cfg.call, commands: e.commands,
-                                            source: src, rttyOnly: cfg.rttyOnly)
+            var c = TelnetSpotClient.Config(host: e.host, port: e.port, login: cfg.call, commands: e.commands, source: src)
             if let t = cfg.clientTuning { c.initialDelay = t.initialDelay; c.maxDelay = t.maxDelay }
+            if let w = cfg.loginWait { c.loginWait = w }
             var lineSink: (@Sendable ([String]) -> Void)?
-            if src == .cluster { lineSink = { [weak self] lines in Task { @MainActor in self?.appendConsole(lines) } } }
+            var readySink: (@Sendable (Bool) -> Void)?
+            if src == .cluster {
+                lineSink = { [weak self] lines in Task { @MainActor in self?.appendConsole(lines) } }
+                readySink = { [weak self] r in Task { @MainActor in self?.setCommandsReady(r) } }
+            }
             return TelnetSpotClient(config: c, now: clock,
                 onSpots: { [weak self] spots in Task { @MainActor in self?.ingest(spots) } },
                 onState: { [weak self] st in Task { @MainActor in self?.setState(src, st) } },
-                onLines: lineSink)
+                onLines: lineSink, onCommandReady: readySink)
         }
         if let e = cfg.cluster { let c = make(e, .cluster); clusterClient = c; clients.append(c) }
         if let e = cfg.rbn { clients.append(make(e, .rbn)) }
@@ -96,13 +110,13 @@ public final class SpotFeed {
         clients = []; clusterClient = nil
         pruneTask?.cancel(); pruneTask = nil
         Task { for c in old { await c.stop() } }
-        clusterState = .off; rbnState = .off
+        clusterState = .off; rbnState = .off; clusterLoggedIn = false
     }
 
     /// Pošle příkaz do DX clusteru (ne do RBN) přes existující spojení: `příkaz\r\n`. Bez spojení vyhodí `ClusterCommandError`.
     public func sendClusterCommand(_ line: String) async throws {
         let clean = try ClusterCommand.validate(line)
-        guard let c = clusterClient, clusterState == .connected else { throw ClusterCommandError.notConnected }
+        guard let c = clusterClient, clusterCommandsReady else { throw ClusterCommandError.notConnected }
         try await c.sendLine(clean)
         appendConsole(["> " + clean])
     }
@@ -127,6 +141,11 @@ public final class SpotFeed {
     private func setState(_ src: SpotSource, _ st: TelnetSpotClient.State) {
         guard isRunning else { return }
         switch src { case .cluster: clusterState = st; case .rbn: rbnState = st }
+    }
+
+    private func setCommandsReady(_ r: Bool) {
+        guard isRunning else { return }
+        clusterLoggedIn = r
     }
 
     public func prune() { book.prune(now: clock(), maxAge: maxAge) }

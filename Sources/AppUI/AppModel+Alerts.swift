@@ -25,7 +25,8 @@ extension AppModel {
     /// Přestaví index logu (start, přepnutí logu, změna záznamů).
     func rebuildLogIndex() {
         logIndexSince = contestSinceForIndex
-        logIndex = LogIndex(records: logRecords, contestSince: logIndexSince, country: { [app] in
+        logIndex = LogIndex(records: logRecords, contestSince: logIndexSince,
+                            dupePerMode: DupeCheck.perMode(preset: settings.contest.selectedPreset), country: { [app] in
             app?.country(for: $0).map { CountryRef(key: $0.primaryPrefix, name: $0.name) }
         })
         spotLogIndex = SpotLogIndex(logRecords)

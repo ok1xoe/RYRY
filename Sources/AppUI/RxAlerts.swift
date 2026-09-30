@@ -18,11 +18,14 @@ public struct LogIndex: Sendable, Equatable {
     public private(set) var countries: Set<String> = []
     public private(set) var countriesByBand: [String: Set<String>] = [:]
     private var dupes: Set<String> = []
+    /// Duplicity rozlišují mód (vlastní závod); předvolby ne – `DupeCheck.perMode`.
+    public private(set) var dupePerMode = true
 
     public init() {}
 
     /// `contestSince` = začátek běžícího závodu (nil = žádný závod, duplicity se neevidují).
-    public init(records: [QSORecord], contestSince: Date?, country: (String) -> CountryRef?) {
+    public init(records: [QSORecord], contestSince: Date?, dupePerMode: Bool = true, country: (String) -> CountryRef?) {
+        self.dupePerMode = dupePerMode
         var cache: [String: CountryRef?] = [:]
         for r in records { add(r, contestSince: contestSince, country: country, cache: &cache) }
     }
@@ -43,9 +46,8 @@ public struct LogIndex: Sendable, Equatable {
             countriesByBand[r.band ?? "", default: []].insert(c.key)
         }
         if let since = contestSince, r.timeOn >= since {
-            let m = r.mode.uppercased()
-            dupes.insert("\(base)|*|\(m)")
-            dupes.insert("\(base)|\(r.band ?? "")|\(m)")
+            dupes.insert(DupeCheck.key(call: r.call, band: nil, mode: r.mode, perMode: dupePerMode))
+            dupes.insert(DupeCheck.key(call: r.call, band: r.band ?? "", mode: r.mode, perMode: dupePerMode))
         }
     }
 
@@ -58,9 +60,9 @@ public struct LogIndex: Sendable, Equatable {
         return countriesByBand[band]?.contains(key) ?? false
     }
 
-    /// Stejné pravidlo jako `DupeCheck.isDupe` (bez známého pásma se porovná jen značka a mód).
+    /// Stejné pravidlo a klíč jako `DupeCheck.isDupe` (bez známého pásma se porovná jen značka, případně mód).
     public func isDupe(call: String, band: String?, mode: String) -> Bool {
-        dupes.contains("\(QSORecord.baseCall(call))|\(band ?? "*")|\(mode.uppercased())")
+        dupes.contains(DupeCheck.key(call: call, band: band, mode: mode, perMode: dupePerMode))
     }
 }
 

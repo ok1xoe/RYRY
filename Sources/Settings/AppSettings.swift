@@ -353,6 +353,15 @@ public enum ContestPreset: String, CaseIterable, Codable, Sendable {
         case .okDXRTTY: return (12, 3, 0)
         }
     }
+    /// Délka závodu v hodinách od začátku podle oficiálních pravidel (docs/rulings.md, „Bodování a skóre“).
+    public var durationHours: Double {
+        switch self {
+        case .arrlRoundup: return 30                       // So 18:00 – Ne 23:59
+        case .sartgRTTY, .makrothen: return 40             // tři etapy: So 00–08, So 16–24, Ne 08–16
+        case .okDXRTTY: return 24                          // So 00:00 – 24:00
+        case .cqwpxRTTY, .bartgHF, .cqwwRTTY, .jartsRTTY, .waeRTTY: return 48   // BARTG So 02:00 – Po 01:59
+        }
+    }
     /// Termín a výměna jedním řádkem (pro nabídku a popisek v Nastavení).
     public var summary: String {
         switch self {
@@ -391,6 +400,11 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     /// ARRL RTTY Roundup s pořadovými čísly: W/VE posílají místo čísla stát/provincii (pole „Stát/prov. r“).
     public var isRoundupStateExchange: Bool { enabled && format == .serial && exchange.isEmpty && selectedPreset == .arrlRoundup }
     public var effectiveStart: Date { start ?? Date().addingTimeInterval(-72 * 3600) }
+    /// Konec závodu (začátek + délka předvolby); nil = začátek nebo předvolba neznámé.
+    public var end: Date? {
+        guard let s = start, let p = selectedPreset else { return nil }
+        return s.addingTimeInterval(p.durationHours * 3600)
+    }
 
     /// Nastavení podle předvolby závodu v daném roce. `locator` = vlastní lokátor (výměna Makrothenu).
     public static func preset(_ p: ContestPreset, year: Int, locator: String = "") -> ContestSettings {

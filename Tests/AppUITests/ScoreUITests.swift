@@ -27,7 +27,8 @@ import Settings
     let s = try #require(f.model.score)
     #expect(s.qsos == 3 && s.dupes == 1 && s.points == 2 + 3)
     let calc = ScoreCalculator(preset: .cqwwRTTY, ownCall: "OK1XOE", ownLocator: "", countries: CountryDB.shared)
-    let full = calc.tally(records: f.model.logRecords, qtc: [], since: f.model.settings.contest.effectiveStart)
+    let full = calc.tally(records: f.model.logRecords, qtc: [], since: f.model.settings.contest.effectiveStart,
+                          until: f.model.settings.contest.end)
     #expect(s == full)
     #expect(s.score == 5 * 5)                                           // zóny 14, 5 + DL, K + CT
     await f.model.stop()

@@ -30,7 +30,8 @@ public struct Spot: Sendable, Equatable, Identifiable {
     public var id: String { call + "|" + (band ?? "?") }
 }
 
-/// Parser řádků „DX de SPOTTER:  14080.0  DL1ABC  komentář  1203Z“ (DX cluster i RBN).
+/// Parser řádků „DX de SPOTTER:  14080.0  DL1ABC  komentář  1203Z“ (DX cluster i RBN) a řádků výpisu `sh/dx`
+/// z DX clusteru „14080.0  JA1ABC  30-Sep-2026 0701Z  komentář  <SPOTTER>“ (DXSpider, AR-Cluster, CC Cluster).
 public enum SpotParser {
     /// Segmenty RTTY v kHz (orientačně, IARU pásmové plány) – pro spoty bez módu v komentáři.
     public static let rttySegments: [ClosedRange<Double>] = [
@@ -45,7 +46,9 @@ public enum SpotParser {
     /// `now` = aktuální čas (čas ve spotu je jen HHMM UTC; datum se dopočítá).
     public static func parse(_ line: String, now: Date = Date(), source: SpotSource = .cluster) -> Spot? {
         let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.lowercased().hasPrefix("dx de ") else { return nil }
+        guard text.lowercased().hasPrefix("dx de ") else {
+            return source == .cluster ? parseListing(text, now: now) : nil
+        }
         let rest = text.dropFirst(6)
         guard let colon = rest.firstIndex(of: ":") else { return nil }
         let spotter = rest[..<colon].trimmingCharacters(in: .whitespaces).uppercased()
@@ -66,13 +69,58 @@ public enum SpotParser {
         comps.hour = hm.0; comps.minute = hm.1; comps.second = 0
         guard var t = cal.date(from: comps) else { return nil }
         if t > now.addingTimeInterval(300) { t = cal.date(byAdding: .day, value: -1, to: t) ?? t }   // spot z minulého dne (půlnoc UTC)
-        let words = comment.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
-        var mode: String?
-        if words.contains("RTTY") { mode = "RTTY" }
-        else if let m = words.first(where: { otherModes.contains($0) }) { mode = m }
-        else if inRTTYSegment(kHz: kHz) { mode = "RTTY" }
         return Spot(frequencyKHz: kHz, call: call, spotter: spotter, comment: comment, time: t,
-                    mode: mode, snr: snr(in: comment), source: source)
+                    mode: mode(comment: comment, kHz: kHz), snr: snr(in: comment), source: source)
+    }
+
+    /// Mód spotu: slovo RTTY v komentáři, jiný známý mód, jinak RTTY podle segmentu pásma; nil = nepoznáno.
+    static func mode(comment: String, kHz: Double) -> String? {
+        let words = comment.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+        if words.contains("RTTY") { return "RTTY" }
+        if let m = words.first(where: { otherModes.contains($0) }) { return m }
+        return inRTTYSegment(kHz: kHz) ? "RTTY" : nil
+    }
+
+    /// Řádek výpisu `sh/dx`: kmitočet, značka, datum, čas HHMMZ, komentář, `<spotter>` (za ním nejvýš 2 slova,
+    /// např. lokátor CC Clusteru). Vyžaduje celý vzor, aby se jako spot nebral libovolný text z konzole.
+    static func parseListing(_ text: String, now: Date) -> Spot? {
+        let tokens = text.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        guard tokens.count >= 5, let kHz = Double(tokens[0]), kHz >= 100, kHz < 1e7 else { return nil }
+        let call = tokens[1].uppercased()
+        guard validCall(call), let hm = parseHHMM(tokens[3]),
+              let si = tokens.indices.last(where: { $0 >= 4 && tokens[$0].hasPrefix("<") && tokens[$0].hasSuffix(">") }),
+              tokens.count - si <= 3 else { return nil }
+        let spotter = tokens[si].dropFirst().dropLast().uppercased()
+        guard !spotter.isEmpty, spotter.count <= 20,
+              spotter.allSatisfy({ ($0.isASCII && ($0.isLetter || $0.isNumber)) || "/-#".contains($0) }),
+              let t = listingDate(tokens[2], hour: hm.0, minute: hm.1, now: now) else { return nil }
+        let comment = tokens[4..<si].joined(separator: " ")
+        return Spot(frequencyKHz: kHz, call: call, spotter: String(spotter), comment: comment, time: t,
+                    mode: mode(comment: comment, kHz: kHz), snr: snr(in: comment), source: .cluster)
+    }
+
+    private static let months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+
+    /// Datum výpisu: „30-Sep-2026“, „30-Sep-26“, „30-Sep“ (rok dopočítán; budoucí = loňský) nebo „2026-09-30“.
+    static func listingDate(_ s: String, hour: Int, minute: Int, now: Date) -> Date? {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+        let p = s.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
+        var y: Int?, m: Int, d: Int
+        if p.count == 3, p[0].count == 4, let yy = Int(p[0]), let mm = Int(p[1]), let dd = Int(p[2]) {
+            y = yy; m = mm; d = dd
+        } else if (2...3).contains(p.count), let dd = Int(p[0]), let mi = months.firstIndex(of: p[1].uppercased()) {
+            d = dd; m = mi + 1
+            if p.count == 3 {
+                guard let yy = Int(p[2]), p[2].count == 4 || p[2].count == 2 else { return nil }
+                y = p[2].count == 2 ? 2000 + yy : yy
+            }
+        } else { return nil }
+        let year = y ?? cal.component(.year, from: now)
+        var comps = DateComponents(year: year, month: m, day: d, hour: hour, minute: minute)
+        guard cal.date(from: comps) != nil, let check = cal.date(from: comps),
+              cal.component(.day, from: check) == d, cal.component(.month, from: check) == m else { return nil }   // 31-Feb
+        if y == nil, check > now.addingTimeInterval(86_400) { comps.year = year - 1; return cal.date(from: comps) }
+        return check
     }
 
     static func parseHHMM(_ s: String) -> (Int, Int)? {
