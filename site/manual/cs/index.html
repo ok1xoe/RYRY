@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mmtty4mac – příručka</title>
-<meta name="description" content="Uživatelská příručka programu mmtty4mac – RTTY pro macOS založené na MMTTY.">
+<title>RYRY – příručka</title>
+<meta name="description" content="Uživatelská příručka programu RYRY – RTTY pro macOS založené na MMTTY.">
 <link rel="stylesheet" href="../style.css">
 <link rel="stylesheet" href="../bridge.css">
 <link rel="icon" href="../img/icon.png">
@@ -12,7 +12,7 @@
 <body>
 <header class="top"><div class="in">
   <img class="icon" src="../img/icon.png" alt="">
-  <span class="brand">mmtty4mac</span><span class="ver">příručka · verze 0.14</span>
+  <span class="brand">RYRY</span><span class="ver">příručka · verze 1.0</span>
   <a class="home" href="../../cs/index.html">← RYRY</a>
   <span class="lang"><span>Čeština</span> <a href="../en/index.html">English</a></span>
 </div></header>
@@ -39,26 +39,28 @@
 <main>
 <div class="hero" id="uvod">
   <h1>RTTY pro macOS</h1>
-  <p class="lead">mmtty4mac je nativní přepis programu MMTTY (JE3HHT) pro Mac. Používá stejný osvědčený demodulátor a přidává log, podporu závodů, ovládání rádia přes USB a API pro loggery.</p>
+  <p class="lead">RYRY (dříve mmtty4mac) je nativní přepis programu MMTTY (JE3HHT) pro Mac. Používá stejný osvědčený demodulátor a přidává log, podporu závodů, ovládání rádia přes USB a API pro loggery.</p>
   <ul class="pills">
     <li>demodulátor MMTTY</li><li>AFSK i FSK</li><li>CAT Icom / Yaesu / Kenwood / Elecraft + hamlib</li>
     <li>log ADIF, Cabrillo</li><li>9 předvoleb závodů, WAE QTC</li><li>API kompatibilní s fldigi</li><li>čeština / English</li>
   </ul>
 </div>
 <figure>
-  <a href="../img/cs-main.png"><img src="../img/cs-main.png" alt="Hlavní okno mmtty4mac při příjmu" loading="lazy"></a>
+  <a href="../img/cs-main.png"><img src="../img/cs-main.png" alt="Hlavní okno RYRY při příjmu" loading="lazy"></a>
   <figcaption>Hlavní okno: nahoře ovládání modemu, pod ním spektrum a vodopád (žlutá = mark, oranžová = space), přijatý text, okno vysílání a makra F1–⇧F4. Vpravo QSO okno se zemí DXCC, místním časem protistanice a předchozími spojeními.</figcaption>
 </figure>
 
 <section id="instalace">
 <h2>1. Instalace</h2>
 <ol>
-  <li>Otevřete <code>mmtty4mac-0.14.0.dmg</code> a přetáhněte aplikaci do složky <b>Aplikace</b>.</li>
-  <li>Při prvním spuštění se macOS zeptá na přístup k <b>mikrofonu</b> – potvrďte ho, jinak příjem nefunguje. Změnit to jde v Nastavení systému → Soukromí a zabezpečení → Mikrofon.</li>
-  <li>Aplikace je podepsaná a notarizovaná Applem, spustí se bez varování.</li>
-  <li>Tuto příručku otevřete kdykoli z aplikace: menu <b>Nápověda → Příručka mmtty4mac</b> (<kbd>⌘</kbd><kbd>?</kbd>).</li>
+  <li>Nainstalujte <b>RYRY</b> z Mac App Store (zdarma). Aktualizace přicházejí přes App Store.</li>
+  <li>Při prvním spuštění se RYRY zeptá na <b>složku pro log</b> (předvybraná je <code>~/Documents/RYRY</code>) – klikněte na <b>Povolit přístup</b>. macOS pustí aplikaci do složky až po tom, co ji vyberete; RYRY si přístup zapamatuje. Když dialog zrušíte, log zůstane v kontejneru aplikace a stavový řádek řekne kde.</li>
+  <li>macOS se zeptá na přístup k <b>mikrofonu</b> – potvrďte ho, jinak příjem nefunguje. Změnit to jde v Nastavení systému → Soukromí a zabezpečení → Mikrofon.</li>
+  <li>Nemáte po ruce rádio? <b>Nápověda → Přehrát ukázkový signál</b> přehraje krátké závodní spojení a uvidíte, jak RYRY dekóduje.</li>
+  <li>Tuto příručku otevřete kdykoli z aplikace: menu <b>Nápověda → Příručka RYRY</b> (<kbd>⌘</kbd><kbd>?</kbd>).</li>
 </ol>
-<p>Volitelně: pro rádia, která vestavěný CAT nezná, nainstalujte hamlib příkazem <code>brew install hamlib</code>.</p>
+<p>Přecházíte z mmtty4mac? Nastavení se při prvním spuštění přenese samo; RYRY se jednou zeptá na složku s logem (obvykle <code>~/Documents/mmtty4mac</code>) a hesla online služeb bude možná potřeba zadat znovu.</p>
+<p>Volitelně: pro rádia, která vestavěný CAT nezná, nainstalujte hamlib příkazem <code>brew install hamlib</code> a <code>rigctld</code> spusťte sami (viz Ovládání rádia).</p>
 </section>
 
 <section id="nastaveni">
@@ -87,8 +89,7 @@
 <p>V záložce <b>Rig</b> vyberte způsob ovládání:</p>
 <ul>
   <li><b>CAT přes USB (vestavěný)</b> – bez dalších programů. Protokoly Icom CI-V (IC-7300, 7610, 705, 9700…; výběr modelu nastaví adresu CI-V), Yaesu (FT-991, FTDX10/101, FT-710), Kenwood (TS-590, TS-890) a Elecraft (K3, K4, KX3). Aplikace čte a nastavuje frekvenci a mód a ovládá PTT.</li>
-  <li><b>hamlib – spustit automaticky</b> – pro ostatní rádia: model vyberete ze seznamu hamlib, aplikace si <code>rigctld</code> spustí a ukončí sama.</li>
-  <li><b>hamlib rigctld (síť)</b> a <b>flrig</b> – připojení k již běžícímu programu.</li>
+  <li><b>hamlib rigctld (síť)</b> a <b>flrig</b> – pro ostatní rádia: připojení k běžícímu programu. rigctld spusťte sami, např. <code>rigctld -m &lt;model&gt; -r /dev/cu.X -s &lt;rychlost&gt;</code> (<code>rigctld -l</code> vypíše modely). Verze z App Store ho neumí spustit sama.</li>
 </ul>
 <figure class="half"><a href="../img/cs-settings-3.png"><img src="../img/cs-settings-3.png" alt="Nastavení – Rig" loading="lazy"></a>
   <figcaption>Vestavěný CAT: protokol, sériový port rádia, rychlost a stop bity (musí odpovídat menu rádia). Tlačítko „Vyzkoušet spojení“ ukáže frekvenci a mód.</figcaption></figure>
@@ -150,13 +151,13 @@
 <figure><a href="../img/cs-log.png"><img src="../img/cs-log.png" alt="Okno Log" loading="lazy"></a>
   <figcaption>Okno Log (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): hledání, oprava dvojklikem, mazání. Dole je cesta k otevřenému logu, menu <b>Log</b> (nový, otevřít, uložit jako, export ADIF), import ADIF a export Cabrillo. Záložka QTC ukazuje série QTC ze závodu WAE.</figcaption></figure>
 <p><b>Zálohy:</b> log se jednou denně zálohuje do složky <code>backup</code> vedle logu (posledních 10 záloh); ručně Soubor → Zálohovat log teď. <b>Import z MMTTY:</b> Soubor → Importovat z MMTTY… načte makra, zprávy, značku, parametry modemu a klávesové zkratky ze souboru <code>Mmtty.ini</code> z Windows; před importem ukáže náhled a co přepíše.</p>
-<p>Log se ukládá do <code>~/Documents/mmtty4mac</code> jako JSONL a zároveň jako ADIF (<code>mmtty4mac.adi</code>), který přečte každý logger. Starý log z MMTTY v MMTTY exportujte do ADIF a v mmtty4mac importujte – duplicity se přeskočí.</p>
+<p>Log se ukládá do složky z Nastavení → API a log (výchozí <code>~/Documents/RYRY</code>; log z mmtty4mac zůstává v <code>~/Documents/mmtty4mac</code>) jako JSONL a zároveň jako ADIF (<code>mmtty4mac.adi</code>), který přečte každý logger. Když otevřete nebo založíte log v jiné složce, RYRY se jednou zeptá na přístup k ní. Starý log z MMTTY v MMTTY exportujte do ADIF a v RYRY importujte – duplicity se přeskočí.</p>
 <h3>Správa logu</h3>
 <p>Každý log je samostatný soubor – třeba jeden pro běžný provoz a jeden pro každý závod. V menu <b>Soubor</b>:</p>
 <table>
   <tr><th>Příkaz</th><th>Co dělá</th></tr>
   <tr><td>Nový log… <kbd>⌘</kbd><kbd>N</kbd></td><td>založí prázdný log se zvoleným názvem a umístěním; pořadová čísla závodu začnou od 1</td></tr>
-  <tr><td>Otevřít log… <kbd>⌘</kbd><kbd>O</kbd></td><td>otevře log mmtty4mac nebo ADIF z jiného programu (ten se převede, originál zůstane jako <code>.adi.orig</code>)</td></tr>
+  <tr><td>Otevřít log… <kbd>⌘</kbd><kbd>O</kbd></td><td>otevře log RYRY nebo ADIF z jiného programu (ten se převede, originál zůstane jako <code>.adi.orig</code>)</td></tr>
   <tr><td>Otevřít nedávný log</td><td>posledních 8 logů</td></tr>
   <tr><td>Uložit log jako… <kbd>⇧</kbd><kbd>⌘</kbd><kbd>S</kbd></td><td>uloží kopii pod jiným názvem a dál se pracuje v ní</td></tr>
   <tr><td>Exportovat ADIF…</td><td>kopie ADIF jinam, log zůstane otevřený</td></tr>
@@ -204,7 +205,7 @@
 
 <section id="api">
 <h2>9. API pro loggery</h2>
-<p>mmtty4mac se loggerům představuje jako <b>fldigi</b> (XML-RPC na portu 7362), takže ho ovládají například RUMlogNG nebo MacLoggerDX – v loggeru zvolte „fldigi“. Druhé API je JSON-RPC přes WebSocket (<code>ws://127.0.0.1:7363/v1</code>) s událostmi o přijatém textu, stavu a zalogovaných spojeních; Java klient je v <code>clients/java</code>.</p>
+<p>RYRY se loggerům představuje jako <b>fldigi</b> (XML-RPC na portu 7362), takže ho ovládají například RUMlogNG nebo MacLoggerDX – v loggeru zvolte „fldigi“. Druhé API je JSON-RPC přes WebSocket (<code>ws://127.0.0.1:7363/v1</code>) s událostmi o přijatém textu, stavu a zalogovaných spojeních; Java klient je v <code>clients/java</code>.</p>
 <figure class="half"><a href="../img/cs-settings-7.png"><img src="../img/cs-settings-7.png" alt="Nastavení – API a log" loading="lazy"></a>
   <figcaption>API a log: porty API, adresář a název otevřeného logu a průběžný záznam příjmu.</figcaption></figure>
 <div class="note warn">API nemá autentizaci a umí zapnout vysílač. Ve výchozím stavu naslouchá jen na tomto Macu; přístup ze sítě zapínejte jen v důvěryhodné síti.</div>
@@ -218,8 +219,7 @@
   <tr><td>Callbook (QRZ.com, HamQTH)</td><td>Nastavení → API a log</td><td>doplní jméno, QTH a lokátor protistanice</td></tr>
   <tr><td>DX cluster a RBN</td><td>Nastavení → Spoty, okno Okno → Spoty</td><td>seznam RTTY spotů; dvojklik naladí rig a vloží značku (posun frekvence pro LSB/AFSK nastavíte); spoty v propustném pásmu se zobrazí jako štítky přímo ve vodopádu (zelená = nová stanice, oranžová = v logu, červená = duplicita), klik naladí mark</td></tr>
   <tr><td>Příkazy pro DX cluster</td><td>okno Okno → Spoty (dole)</td><td>10 tlačítek s příkazy (např. <code>sh/dx 30</code>, <code>sh/wwv</code>, <code>set/skimmer</code>) a řádek pro ruční příkaz s historií (šipky ↑↓); odpovědi clusteru jsou v rozbalovací konzoli. Pravé tlačítko myši upraví příkaz stejným editorem jako makra pro vysílání; <code>%k</code> = frekvence rigu v kHz, <code>%c</code> = protistanice (např. <code>dx %k %c RTTY</code>)</td></tr>
-  <tr><td>LoTW, eQSL, Club Log</td><td>Nastavení → Online, okno Log → Nahrát</td><td>nahraje dosud nenahraná spojení (LoTW přes program TQSL); volitelně automaticky po zalogování</td></tr>
-  <tr><td>Aktualizace</td><td>menu aplikace → Zkontrolovat aktualizace…</td><td>upozorní na novou verzi a stáhne DMG (nic neinstaluje samo)</td></tr>
+  <tr><td>LoTW, eQSL, Club Log</td><td>Nastavení → Online, okno Log → Nahrát</td><td>nahraje dosud nenahraná spojení – eQSL a Club Log přímo (volitelně automaticky po zalogování); pro LoTW RYRY uloží ADIF do Stažených souborů a otevře ho v TrustedQSL, kde ho podepíšete a odešlete, pak odeslání potvrdíte v RYRY</td></tr>
 </table>
 </section>
 
@@ -232,7 +232,7 @@
     <figcaption>Klávesové zkratky: klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).</figcaption></figure>
 </div>
 <p>Ve výchozím stavu je rozhraní anglicky; češtinu zvolíte v Nastavení → Zobrazení → Jazyk rozhraní (volba se pamatuje).</p>
-<p><b>Jazykové soubory</b> <code>cs.json</code> a <code>en.json</code> najdete ve složce <code>~/Library/Application Support/mmtty4mac/Languages</code> (tlačítko se složkou v sekci Jazyk). Můžete je upravit – uložená změna se projeví okamžitě ve všech oknech. Upravený soubor aplikace při aktualizaci nepřepíše a texty, které v něm chybějí, doplní z přibalené verze.</p>
+<p><b>Jazykové soubory</b> <code>cs.json</code> a <code>en.json</code> najdete ve složce <code>~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages</code> – aplikace běží v sandboxu macOS (tlačítko se složkou v sekci Jazyk). Můžete je upravit – uložená změna se projeví okamžitě ve všech oknech. Upravený soubor aplikace při aktualizaci nepřepíše a texty, které v něm chybějí, doplní z přibalené verze.</p>
 <p><b>Vlastní překlad:</b> v sekci Jazyk zvolte <b>Uložit šablonu…</b>, přeložte hodnoty v <code>strings</code>, nastavte <code>code</code> a <code>name</code> a soubor nahrajte tlačítkem <b>Nahrát jazyk…</b>. Jazyk se přepne hned ve všech oknech.</p>
 </section>
 
@@ -249,7 +249,7 @@
 </table>
 </section>
 
-<footer>mmtty4mac © 2026 OK1XOE · licence GNU LGPL v3 · jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
+<footer>RYRY © 2026 OK1XOE · licence GNU LGPL v3 · zdrojový kód: github.com/ok1xoe/mmtty4mac · jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
 </main>
 </div>
 </body>
