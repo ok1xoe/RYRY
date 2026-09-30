@@ -381,6 +381,9 @@ public final class AppModel {
                 take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
                 take(\.log.directory)
                 m.spots.clusterMacros = cur.spots.clusterMacros   // dialog makra clusteru neupravuje (okno Spoty ano)
+                // filtr zobrazení mění okna „Filtr pásem“ / „Filtr módů“ a „Jen RTTY“ hned – dialog ho nepřepisuje
+                m.spots.filterBands = cur.spots.filterBands; m.spots.filterModes = cur.spots.filterModes
+                m.spots.filterOtherBands = cur.spots.filterOtherBands; m.spots.previousFilterModes = cur.spots.previousFilterModes
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 take(\.decoders.secondEnabled); take(\.decoders.secondDemod); take(\.decoders.channelsEnabled)
@@ -1415,6 +1418,7 @@ public final class AppModel {
         var noReconnect = old
         noReconnect.showInWaterfall = p.showInWaterfall; noReconnect.clusterMacros = p.clusterMacros
         noReconnect.filterBands = p.filterBands; noReconnect.filterModes = p.filterModes
+        noReconnect.filterOtherBands = p.filterOtherBands; noReconnect.previousFilterModes = p.previousFilterModes
         if noReconnect == p { return }                                   // jen zobrazení, spojení se nemění
         startSpots()
     }

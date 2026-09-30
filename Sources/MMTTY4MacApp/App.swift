@@ -179,6 +179,8 @@ struct MMTTY4MacApp: App {
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
                 Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
                 Button(L("Spoty")) { openWindow(id: "spots") }
+                Button(L("Filtr pásem")) { openWindow(id: SpotFilterWindowID.bands) }
+                Button(L("Filtr módů")) { openWindow(id: SpotFilterWindowID.modes) }
                 Button(L("Band mapa")) { openWindow(id: "bandmapwindow") }
                 Button(L("Násobiče")) { openWindow(id: "multipliers") }
                 Button(L("Skóre")) { openWindow(id: "score") }
@@ -199,6 +201,15 @@ struct MMTTY4MacApp: App {
         Window(L("Spoty"), id: "spots") {
             SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
+        // filtr zobrazení spotů ve dvou samostatných oknech (zaškrtávátka pásem a skupin módů)
+        Window(L("Filtr pásem"), id: SpotFilterWindowID.bands) {
+            SpotBandFilterWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        .windowResizability(.contentSize)
+        Window(L("Filtr módů"), id: SpotFilterWindowID.modes) {
+            SpotModeFilterWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        .windowResizability(.contentSize)
         Window(L("Band mapa"), id: "bandmapwindow") {
             BandMapWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }

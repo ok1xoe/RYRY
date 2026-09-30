@@ -1,16 +1,19 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import AppUI
 import Localization
 import Spots
 import SwiftUI
 
-/// Zaškrtávátka filtru zobrazení spotů: pevná řada pásem a skupin módů (jako filtry bandmapy N1MM).
-/// Zaškrtnuté = zobrazené. Filtruje se jen zobrazení – přijímají a ukládají se spoty všech pásem a módů.
-struct SpotFilterBar: View {
-    @Binding var bands: Set<String>
-    @Binding var modes: Set<SpotModeGroup>
+/// Ovládání filtru zobrazení spotů v okně Spoty (a v Nastavení → Spoty): tlačítka, která otevřou okna
+/// „Filtr pásem“ a „Filtr módů“, a zaškrtávátko „Jen RTTY“. Filtruje se jen zobrazení – přijímají
+/// a ukládají se spoty všech pásem a módů. Změna platí hned (bez Použít a bez nového připojení).
+public struct SpotFilterBar: View {
+    @Bindable var model: AppModel
+    @Environment(\.openWindow) private var openWindow
+    public init(model: AppModel) { self.model = model }
 
     /// Popisek skupiny módů (názvy módů se nepřekládají, jen „ostatní“).
-    static func modeLabel(_ g: SpotModeGroup) -> String {
+    public static func modeLabel(_ g: SpotModeGroup) -> String {
         switch g {
         case .rtty: "RTTY"
         case .cw: "CW"
@@ -21,55 +24,18 @@ struct SpotFilterBar: View {
         }
     }
 
-    private func bandToggle(_ b: String) -> some View {
-        Toggle(b, isOn: Binding(get: { bands.contains(b) },
-                               set: { on in if on { bands.insert(b) } else { bands.remove(b) } })).toggleStyle(.checkbox)
-    }
-
-    private func modeToggle(_ g: SpotModeGroup) -> some View {
-        Toggle(Self.modeLabel(g), isOn: Binding(get: { modes.contains(g) },
-                                                set: { on in if on { modes.insert(g) } else { modes.remove(g) } }))
-            .toggleStyle(.checkbox)
-    }
-
-    /// „Vše“ / „Nic“ za řadou zaškrtávátek.
-    private func allNone(_ all: @escaping () -> Void, _ none: @escaping () -> Void) -> some View {
+    public var body: some View {
         HStack(spacing: 6) {
-            Button(L("Vše"), action: all)
-            Button(L("Nic"), action: none)
-        }
-        .buttonStyle(.link)
-    }
-
-    private func bandRow(_ list: [String], label: Bool, buttons: Bool) -> some View {
-        HStack(spacing: 6) {
-            if label { Text(L("Pásma:")).foregroundStyle(.secondary) }
-            ForEach(list, id: \.self) { bandToggle($0) }
-            if buttons { allNone({ bands = SpotFilter.allBandsSet }, { bands = [] }) }
-        }
-    }
-
-    private var modeRow: some View {
-        HStack(spacing: 6) {
-            Text(L("Módy:")).foregroundStyle(.secondary)
-            ForEach(SpotModeGroup.allCases, id: \.self) { modeToggle($0) }
-            allNone({ modes = SpotFilter.allModes }, { modes = [] })
-        }
-        .hint(L("Skupiny módů spotů; „ostatní“ = i spoty, u kterých mód nejde poznat"))
-    }
-
-    private var allBandRow: some View { bandRow(SpotFilter.allBands, label: true, buttons: true) }
-
-    /// Podle šířky okna: vše na jednom řádku → pásma a módy po řádcích → pásma zalomená na dva řádky.
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 16) { allBandRow; modeRow; Spacer(minLength: 0) }
-            VStack(alignment: .leading, spacing: 3) { allBandRow; modeRow }
-            VStack(alignment: .leading, spacing: 3) {
-                bandRow(Array(SpotFilter.allBands.prefix(6)), label: true, buttons: false)
-                bandRow(Array(SpotFilter.allBands.dropFirst(6)), label: false, buttons: true)
-                modeRow
-            }
+            Text(L("Filtry:")).foregroundStyle(.secondary)
+            Button(L("Pásma")) { openWindow(id: SpotFilterWindowID.bands) }
+                .hint(L("Otevře okno se zaškrtávátky pásem"))
+            Button(L("Módy")) { openWindow(id: SpotFilterWindowID.modes) }
+                .hint(L("Otevře okno se zaškrtávátky skupin módů"))
+            Toggle(L("Jen RTTY"), isOn: Binding(get: { model.settings.spots.rttyOnly },
+                                                set: { v in model.setSpots { $0.setRTTYOnly(v) } }))
+                .toggleStyle(.checkbox)
+                .hint(L("Zobrazí jen RTTY spoty; odškrtnutí vrátí předchozí volbu módů"))
+            Spacer(minLength: 0)
         }
         .font(.caption)
         .controlSize(.small)

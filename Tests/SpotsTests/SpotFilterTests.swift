@@ -16,6 +16,18 @@ private func s(_ call: String, _ kHz: Double, _ mode: String?, min: Double = 0) 
     #expect(SpotFilter.allBands == Bands.hfAnd6m)
 }
 
+// Řádky zaškrtávátek v okně „Filtr pásem“: celý pevný seznam, v pořadí, nic nevypadne ani se neopakuje.
+@Test func bandRowsCoverWholeBandList() {
+    for perRow in 1...12 {
+        let rows = SpotFilter.bandRows(perRow: perRow)
+        #expect(rows.flatMap(\.self) == SpotFilter.allBands)
+        #expect(rows.allSatisfy { !$0.isEmpty && $0.count <= perRow })
+        #expect(rows.count == (SpotFilter.allBands.count + perRow - 1) / perRow)
+    }
+    #expect(SpotFilter.bandRows(perRow: 4) == [["160m", "80m", "60m", "40m"], ["30m", "20m", "17m", "15m"], ["12m", "10m", "6m"]])
+    #expect(SpotFilter.bandRows(perRow: 0) == [SpotFilter.allBands])     // nesmyslná šířka = jeden řádek
+}
+
 private func g(_ m: String?) -> SpotModeGroup { SpotModeGroup.group(for: m) }
 
 // Každý mód, který `SpotParser` umí vyrobit (včetně nil), patří do přesně jedné skupiny.
@@ -75,14 +87,41 @@ private func g(_ m: String?) -> SpotModeGroup { SpotModeGroup.group(for: m) }
     #expect(SpotFilter(bands: SpotFilter.allBandsSet, modes: []).apply(to: list).isEmpty)
 }
 
-// Spot mimo seznam pásem (VHF, neznámé pásmo) nemá zaškrtávátko, proto ho filtr pásem nikdy neschová.
-@Test func filterKeepsSpotsOutsideBandList() {
-    let vhf = s("OK1VHF", 144_300, "SSB")                            // 2m – bez zaškrtávátka
+// Spot mimo pevný seznam pásem (630 m, VHF a výš, neznámé pásmo) patří pod zaškrtávátko „ostatní“:
+// zaškrtnuté ho zobrazí (výchozí stav), odškrtnuté schová – „Nic“ tedy vyprázdní tabulku úplně.
+@Test func otherBandsCheckboxCoversSpotsOutsideBandList() {
+    let vhf = s("OK1VHF", 144_300, "SSB")                            // 2m – mimo pevný seznam
+    let lf = s("OK1LF", 475, "RTTY")                                 // 630m – pod krátkými vlnami
     let unknown = s("OK1UNK", 5000, "RTTY")                          // mimo všechna pásma → band == nil
-    #expect(vhf.band == "2m" && unknown.band == nil)
-    let f = SpotFilter(bands: [], modes: SpotFilter.allModes)
-    #expect(Set(f.apply(to: [vhf, unknown]).map(\.call)) == ["OK1VHF", "OK1UNK"])
-    #expect(SpotFilter(bands: [], modes: [.rtty]).apply(to: [vhf, unknown]).map(\.call) == ["OK1UNK"])  // mód platí
+    #expect(vhf.band == "2m" && lf.band == "630m" && unknown.band == nil)
+    let list = [vhf, lf, unknown, s("A20", 14080, "RTTY")]
+    #expect(SpotFilter().otherBands)                                                     // výchozí: zaškrtnuto
+    #expect(SpotFilter.all.apply(to: list).count == 4)                                   // „Vše“ pustí i „ostatní“
+    #expect(SpotFilter(bands: [], modes: SpotFilter.allModes, otherBands: false).apply(to: list).isEmpty)  // „Nic“
+    let onlyOther = SpotFilter(bands: [], modes: SpotFilter.allModes, otherBands: true)
+    #expect(Set(onlyOther.apply(to: list).map(\.call)) == ["OK1VHF", "OK1LF", "OK1UNK"])
+    #expect(SpotFilter(bands: [], modes: [.rtty], otherBands: true).apply(to: list).map(\.call) == ["OK1LF", "OK1UNK"])  // mód platí
+    #expect(SpotFilter(bands: SpotFilter.allBandsSet, modes: SpotFilter.allModes, otherBands: false)
+        .apply(to: list).map(\.call) == ["A20"])                                          // odškrtnuté „ostatní“ schová
+}
+
+// Každý spot padne právě pod jedno zaškrtávátko pásem (jako skupiny módů): pásmo z pevného seznamu, jinak „ostatní“.
+@Test func bandCheckboxesCoverEverySpot() {
+    // kmitočty (kHz) všech pásem tabulky `Bands` + kmitočty mimo všechna pásma
+    let kHz: [Double] = [137.5, 475, 1840, 3580, 5357, 7040, 10140, 14080, 18100, 21080, 24920, 28080,
+                         50300, 70200, 144_300, 223_500, 432_100, 5000, 1000, 500_000]
+    var outside: Set<String?> = []
+    for f in kHz {
+        let x = s("TEST", f, "RTTY")
+        let inList = x.band.map(SpotFilter.allBandsSet.contains) ?? false
+        if !inList { outside.insert(x.band) }
+        #expect(SpotFilter.all.matchesBand(x))                                           // „Vše“ pustí každý spot
+        #expect(!SpotFilter(bands: [], modes: SpotFilter.allModes, otherBands: false).matchesBand(x))  // „Nic“ žádný
+        // právě jedno zaškrtávátko: vlastní pásmo, nebo „ostatní“ – a to druhé spot nepustí
+        #expect(SpotFilter(bands: inList ? [x.band!] : [], modes: SpotFilter.allModes, otherBands: !inList).matchesBand(x))
+        #expect(!SpotFilter(bands: inList ? [] : SpotFilter.allBandsSet, modes: SpotFilter.allModes, otherBands: inList).matchesBand(x))
+    }
+    #expect(outside == ["2190m", "630m", "4m", "2m", "1.25m", "70cm", nil])               // co pokrývá „ostatní“
 }
 
 // Řazení: nejnovější první, při stejném čase nižší kmitočet dřív.
