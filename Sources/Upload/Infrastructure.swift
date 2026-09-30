@@ -8,8 +8,6 @@ import Security
 
 public enum UploadError: Error, Equatable, Sendable, LocalizedError {
     case notConfigured(String)
-    case tqslNotFound
-    case tqsl(code: Int, message: String)
     case network(String)
     case authFailed(String)
     case rejected(String)
@@ -19,9 +17,6 @@ public enum UploadError: Error, Equatable, Sendable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .notConfigured(let s): return L("Nenastaveno: %@", s)
-        case .tqslNotFound:
-            return L("TQSL nenalezen. Nainstalujte TrustedQSL (tqsl.app) nebo zadejte cestu k programu tqsl v Nastavení → Online.")
-        case .tqsl(let code, let m): return L("TQSL selhal (kód %ld): %@", code, m)
         case .network(let m): return L("Síťová chyba: %@", m)
         case .authFailed(let m): return L("Přihlášení odmítnuto: %@", m)
         case .rejected(let m): return L("Služba záznamy odmítla: %@", m)

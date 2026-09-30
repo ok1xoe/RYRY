@@ -150,6 +150,13 @@ public struct LogWindow: View {
         .alert(L("Nahrávání"), isPresented: Binding(get: { uploadResult != nil }, set: { if !$0 { uploadResult = nil } })) {
             Button("OK") { uploadResult = nil }
         } message: { Text(uploadResult ?? "") }
+        // after the message about the file handed to TQSL: did TQSL send it? (only then are the QSOs marked)
+        .background(EmptyView().alert(L("Odeslali jste spojení v TQSL do LoTW?"),
+                                      isPresented: Binding(get: { model.pendingLoTW != nil && uploadResult == nil },
+                                                           set: { if !$0 && model.pendingLoTW != nil { Task { await model.confirmLoTW(false) } } })) {
+            Button(L("Ano, označit jako nahraná")) { Task { await model.confirmLoTW(true) } }
+            Button(L("Zatím ne"), role: .cancel) { Task { await model.confirmLoTW(false) } }
+        } message: { Text(model.pendingLoTW?.file.lastPathComponent ?? "") })
         .frame(minWidth: 700, minHeight: 300)
     }
 

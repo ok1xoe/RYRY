@@ -1013,21 +1013,12 @@ struct SecretField: View {
 struct UploadTab: View {
     @Binding var s: AppSettings
     let secrets: any UploadSecretStore
-    var tqslFound: String? { TQSLLocator.find(custom: s.upload.lotwTqslPath) }
     var body: some View {
         Form {
             Section {
                 Toggle(L("Nahrávat na LoTW"), isOn: $s.upload.lotwEnabled)
-                TextField(L("Station Location"), text: $s.upload.lotwLocation).disabled(!s.upload.lotwEnabled)
-                TextField(L("Cesta k tqsl"), text: $s.upload.lotwTqslPath, prompt: Text(L("prázdné = automaticky")))
-                    .disabled(!s.upload.lotwEnabled)
-                Toggle(L("Nahrát automaticky po zalogování"), isOn: $s.upload.lotwAuto).disabled(!s.upload.lotwEnabled)
-                LabeledContent("TQSL") {
-                    Text(tqslFound ?? L("nenalezen – nainstalujte TrustedQSL")).foregroundStyle(tqslFound == nil ? .orange : .secondary)
-                        .lineLimit(1).truncationMode(.middle)
-                }
             } header: { Text("LoTW") } footer: {
-                Text(L("Spojení se podepíšou a odešlou programem TQSL (certifikát a Station Location musí být v TQSL nastaveny)."))
+                Text(L("LoTW: RYRY připraví ADIF a otevře ho v TrustedQSL, kde ho podepíšete a odešlete (certifikát a Station Location nastavíte v TQSL)."))
             }
             Section {
                 Toggle(L("Nahrávat na eQSL"), isOn: $s.upload.eqslEnabled)

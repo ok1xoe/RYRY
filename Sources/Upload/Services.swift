@@ -117,107 +117,36 @@ public struct ClubLogUploader: Sendable {
     }
 }
 
-// MARK: LoTW (TQSL)
+// MARK: LoTW (hand-off to TrustedQSL)
 
-public struct ProcessResult: Sendable, Equatable {
-    public var status: Int32
-    public var output: String
-    public init(status: Int32, output: String) { self.status = status; self.output = output }
-}
+/// LoTW needs the QSOs signed with the user's certificate, which only TrustedQSL can do. The App Store sandbox
+/// cannot run the tqsl program, so RYRY writes the QSOs not uploaded yet into an ADIF file and hands it to TQSL;
+/// the user signs and sends it there and confirms in RYRY.
+public struct LoTWExport: Sendable {
+    let directory: URL
+    let now: @Sendable () -> Date
+    public init(directory: URL, now: @escaping @Sendable () -> Date = Date.init) {
+        self.directory = directory; self.now = now
+    }
 
-public protocol ProcessRunner: Sendable {
-    func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> ProcessResult
-}
-
-/// The real runner (Foundation.Process); it terminates the process when the limit expires.
-public struct SystemProcessRunner: ProcessRunner {
-    public init() {}
-    public func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> ProcessResult {
-        try await withCheckedThrowingContinuation { cont in
-            DispatchQueue.global().async {
-                let p = Process(), pipe = Pipe()
-                p.executableURL = URL(fileURLWithPath: executable); p.arguments = arguments
-                p.standardOutput = pipe; p.standardError = pipe; p.standardInput = FileHandle.nullDevice
-                do { try p.run() } catch { cont.resume(throwing: UploadError.tqslNotFound); return }
-                let killer = DispatchWorkItem { if p.isRunning { p.terminate() } }
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                p.waitUntilExit(); killer.cancel()
-                cont.resume(returning: ProcessResult(status: p.terminationStatus, output: String(decoding: data, as: UTF8.self)))
-            }
+    /// Writes the QSOs with a band into `<directory>/<logName>-lotw-<yyyyMMdd-HHmmss>.adi` (UTC); an existing file is
+    /// never overwritten (`-2`, `-3`… is appended). Returns the file, the IDs written and how many were skipped (no band).
+    public func write(_ records: [QSORecord], logName: String) throws -> (file: URL, ids: [UUID], skipped: Int) {
+        let eligible = records.filter { $0.band != nil }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyyMMdd-HHmmss"
+        let base = "\(logName)-lotw-\(f.string(from: now()))"
+        var file = directory.appendingPathComponent(base + ".adi"), n = 2
+        while FileManager.default.fileExists(atPath: file.path) {
+            file = directory.appendingPathComponent("\(base)-\(n).adi"); n += 1
         }
+        try Data(UploadSelection.adif(eligible).utf8).write(to: file, options: .withoutOverwriting)
+        return (file, eligible.map(\.id), records.count - eligible.count)
     }
 }
 
-public enum TQSLLocator {
-    public static let standardPaths = ["/Applications/TrustedQSL/tqsl.app/Contents/MacOS/tqsl",
-                                       "/Applications/tqsl.app/Contents/MacOS/tqsl",
-                                       "/opt/homebrew/bin/tqsl", "/usr/local/bin/tqsl"]
-    /// The configured path → the standard locations → PATH.
-    public static func find(custom: String?, path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
-                            isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }) -> String? {
-        var c: [String] = []
-        if let custom, !custom.trimmingCharacters(in: .whitespaces).isEmpty {
-            let t = (custom as NSString).expandingTildeInPath
-            c.append(t)
-            // the tqsl.app bundle was given
-            if t.hasSuffix(".app") { c.append(t + "/Contents/MacOS/tqsl") }
-        }
-        c += standardPaths + path.split(separator: ":").map { String($0) + "/tqsl" }
-        return c.first(where: isExecutable)
-    }
-}
-
-/// LoTW via TQSL: `tqsl -d -q -u -a compliant -l "<location>" -x <file.adi>` (-d no date-range dialog,
-/// -q/-x batch mode, -u upload after signing, -a compliant = skip already uploaded and out of range, -l Station Location).
-/// Return codes: 0 = OK; 8 = everything was already uploaded / out of range; 9 and 14 = part already uploaded (rest sent).
-public struct LoTWUploader: Sendable {
-    let runner: ProcessRunner
-    let tqslPath: String?, location: String
-    let tempDirectory: URL, isExecutable: @Sendable (String) -> Bool
-    let timeout: TimeInterval
-    public init(runner: ProcessRunner, tqslPath: String?, location: String,
-                tempDirectory: URL = FileManager.default.temporaryDirectory, timeout: TimeInterval = 180,
-                isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }) {
-        self.runner = runner; self.tqslPath = tqslPath; self.location = location
-        self.tempDirectory = tempDirectory; self.timeout = timeout; self.isExecutable = isExecutable
-    }
-
-    static let okCodes: Set<Int> = [0, 8, 9, 14]
-
-    static func arguments(location: String, file: String) -> [String] {
-        ["-d", "-q", "-u", "-a", "compliant", "-l", location, "-x", file]
-    }
-
-    /// The last "Final Status: description (code)" line from the TQSL output.
-    static func finalStatus(_ out: String) -> String? {
-        out.split(whereSeparator: \.isNewline).last { $0.contains("Final Status:") }
-            .map { String($0).components(separatedBy: "Final Status:").last!.trimmingCharacters(in: .whitespaces) }
-    }
-
-    public func upload(_ records: [QSORecord]) async throws -> UploadOutcome {
-        let eligible = records.filter { $0.band != nil }, missing = records.count - eligible.count
-        guard !eligible.isEmpty else {
-            return UploadOutcome(target: .lotw, uploadedIDs: [], skipped: missing, message: L("LoTW: není co nahrát."))
-        }
-        guard !location.trimmingCharacters(in: .whitespaces).isEmpty else {
-            throw UploadError.notConfigured(L("název Station Location pro LoTW"))
-        }
-        guard let exe = TQSLLocator.find(custom: tqslPath, isExecutable: isExecutable) else { throw UploadError.tqslNotFound }
-        let file = tempDirectory.appendingPathComponent("mmtty4mac-lotw-\(UUID().uuidString).adi")
-        try Data(UploadSelection.adif(eligible).utf8).write(to: file)
-        defer { try? FileManager.default.removeItem(at: file) }
-        let res = try await runner.run(executable: exe, arguments: Self.arguments(location: location, file: file.path), timeout: timeout)
-        let status = Self.finalStatus(res.output)
-        guard Self.okCodes.contains(Int(res.status)) else {
-            throw UploadError.tqsl(code: Int(res.status), message: status ?? String(res.output.suffix(200)))
-        }
-        let msg: String
-        switch res.status {
-        case 0: msg = L("LoTW: odesláno %ld spojení (TQSL).", eligible.count)
-        case 8: msg = L("LoTW: spojení už byla nahrána nebo jsou mimo rozsah dat.")
-        default: msg = L("LoTW: část spojení už byla nahrána, zbytek odeslán.")
-        }
-        return UploadOutcome(target: .lotw, uploadedIDs: eligible.map(\.id), skipped: missing, message: msg)
-    }
+/// Opens an ADIF file in TrustedQSL (the real one uses NSWorkspace in AppUI).
+public protocol TQSLOpener: Sendable {
+    /// false = TrustedQSL is not installed.
+    func open(_ file: URL) async -> Bool
 }

@@ -1176,6 +1176,19 @@ public final class AppModel {
         guard !uploadsRunning.contains(t) else { return automatic ? nil : L("%@: nahrávání už běží.", t.title) }
         uploadsRunning.insert(t); defer { uploadsRunning.remove(t) }
         let coordinator = uploader, cfg = settings
+        if t == .lotw {
+            do {
+                guard let h = try await coordinator.prepareLoTW(settings: cfg, log: log, logName: cfg.log.name) else {
+                    return automatic ? nil : L("%@: žádná nenahraná spojení.", t.title)
+                }
+                pendingLoTW = h
+                return h.openedInTQSL
+                    ? L("ADIF pro LoTW je otevřený v TQSL (%@). Podepište a odešlete ho, pak potvrďte v RYRY.", h.file.lastPathComponent)
+                    : L("TQSL nenalezen. ADIF pro LoTW je uložený ve Stažených souborech: %@. Nainstalujte TrustedQSL a otevřete ho v něm.", h.file.lastPathComponent)
+            } catch {
+                return "\(t.title): \((error as? LocalizedError)?.errorDescription ?? "\(error)")"
+            }
+        }
         do {
             let msg = try await coordinator.uploadPending(t, settings: cfg, log: log)
             await refreshLog()
@@ -1186,6 +1199,19 @@ public final class AppModel {
             if automatic { note(text); return nil }
             return text
         }
+    }
+
+    /// The LoTW file handed to TrustedQSL and waiting for the user's word that TQSL sent it (drives the Log window alert).
+    public var pendingLoTW: LoTWHandoff?
+
+    /// true = TQSL sent the QSOs: mark them as uploaded to LoTW; false = leave them for the next time.
+    public func confirmLoTW(_ uploaded: Bool) async {
+        guard let h = pendingLoTW else { return }
+        pendingLoTW = nil
+        guard uploaded, let log = app?.log else { return }
+        do { try await log.markUploaded(ids: h.ids, target: .lotw) }
+        catch { note(L("Nahráno, ale stav se nepodařilo zapsat do logu: %@", "\(error)")) }
+        await refreshLog()
     }
 
     private func refreshLog() async {

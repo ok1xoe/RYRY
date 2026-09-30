@@ -17,3 +17,8 @@ func loadSettingsJSON(_ json: String) throws -> (AppSettings, [String]) {
     #expect(s.rig.type == .hamlib && s.rig.effectivePort == 4532 && s.rig.host == "127.0.0.1")
     #expect(w.contains { $0.contains("rigctld") })
 }
+
+@Test func oldLoTWKeysAreIgnored() throws {
+    let (s, w) = try loadSettingsJSON(#"{"upload":{"lotwEnabled":true,"lotwTqslPath":"/x/tqsl","lotwAuto":true,"lotwLocation":"Home"}}"#)
+    #expect(s.upload.lotwEnabled && w.isEmpty)
+}
