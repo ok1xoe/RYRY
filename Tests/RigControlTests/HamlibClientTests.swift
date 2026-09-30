@@ -93,3 +93,22 @@ func withFake(_ body: (FakeRigctld, HamlibClient) async throws -> Void) async th
         #expect(errors == 0 && wrong == 0, "errors \(errors) wrong \(wrong)")
     }
 }
+
+// RTTY is sent as audio over USB/ACC: the PTT must select the DATA input (hamlib RIG_PTT_ON_DATA = T 3, Kenwood TX1;).
+// Plain T 1 is the microphone PTT - a Kenwood then keys up but transmits the (silent) microphone.
+@Test func pttSelectsTheDataInput() async throws {
+    try await withFake { fake, rig in
+        try await rig.setPTT(true)
+        #expect(fake.ptt && fake.commands.last == "T 3")
+        try await rig.setPTT(false)
+        #expect(!fake.ptt && fake.commands.last == "T 0")
+    }
+}
+
+@Test func pttFallsBackToPlainPTTWhenTheRigHasNoDataPTT() async throws {
+    try await withFake { fake, rig in
+        fake.dataPTTUnsupported = true
+        try await rig.setPTT(true)
+        #expect(fake.ptt && fake.commands.suffix(2) == ["T 3", "T 1"])
+    }
+}

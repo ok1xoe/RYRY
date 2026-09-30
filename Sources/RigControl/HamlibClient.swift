@@ -43,8 +43,13 @@ public final class HamlibClient: Rig {
         try Self.checkRPRT(try await conn.request("M \(mode) 0", responseLines: 1))
     }
 
+    /// RTTY goes to the radio as audio over USB/ACC, so the PTT selects the DATA input (RIG_PTT_ON_DATA, `T 3`; e.g. Kenwood
+    /// `TX1;`). Plain `T 1` keys the microphone input - the radio transmits but sends nothing. A rig without a separate DATA
+    /// PTT rejects `T 3`; then plain PTT.
     public func setPTT(_ on: Bool) async throws {
-        try Self.checkRPRT(try await conn.request("T \(on ? 1 : 0)", responseLines: 1))
+        guard on else { try Self.checkRPRT(try await conn.request("T 0", responseLines: 1)); return }
+        do { try Self.checkRPRT(try await conn.request("T 3", responseLines: 1)) }
+        catch RigError.rejected { try Self.checkRPRT(try await conn.request("T 1", responseLines: 1)) }
     }
 
     /// `RPRT 0` = OK; `RPRT -n` = an error. A response carrying data has no RPRT.
