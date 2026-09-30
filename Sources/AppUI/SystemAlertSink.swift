@@ -3,8 +3,8 @@ import AppKit
 import Foundation
 import UserNotifications
 
-/// Skutečný zvuk (NSSound „Glass“) a systémová oznámení. Oznámení se posílá jen když aplikace není aktivní
-/// a jen z balíčku .app (mimo něj UserNotifications nefunguje). Oprávnění se vyžádá až na požádání.
+/// Real sound (NSSound "Glass") and system notifications. A notification is only posted when the app is not active
+/// and only from an .app bundle (outside one UserNotifications does not work). Permission is requested on demand.
 @MainActor public final class SystemAlertSink: AlertSink {
     public init() {}
 
@@ -25,7 +25,7 @@ import UserNotifications
             guard st.authorizationStatus == .authorized || st.authorizationStatus == .provisional else { return }
             let c = UNMutableNotificationContent()
             c.title = title; c.body = body
-            // centrum se nezachytává (není Sendable) – získá se znovu v obsluze
+            // the center is not captured (it is not Sendable) - it is fetched again in the handler
             UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
         }
     }

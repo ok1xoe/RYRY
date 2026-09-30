@@ -6,14 +6,14 @@ import Settings
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Akce menu Soubor, které otevírají systémové dialogy.
+/// File menu actions that open system dialogs.
 @MainActor public enum FileActions {
     static let stamp: DateFormatter = {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyyMMdd-HHmm"; return f
     }()
 
-    /// Uloží obsah okna příjmu do textového souboru (MMTTY „RxWindow to file“).
+    /// Saves the contents of the receive window into a text file (MMTTY "RxWindow to file").
     public static func saveRxWindow(_ model: AppModel) {
         let p = NSSavePanel()
         p.allowedContentTypes = [.plainText]
@@ -22,7 +22,7 @@ import UniformTypeIdentifiers
         do { try model.saveRxText(to: url) } catch { NSAlert(error: error).runModal() }
     }
 
-    /// Spustí nahrávání příjmu do WAV (MMTTY „Record WAVE“).
+    /// Starts recording the receive audio into a WAV file (MMTTY "Record WAVE").
     public static func recordWAV(_ model: AppModel) {
         let p = NSSavePanel()
         p.allowedContentTypes = [.wav]
@@ -33,7 +33,7 @@ import UniformTypeIdentifiers
         }
     }
 
-    /// Vyšle textový soubor (MMTTY „Send Text…“).
+    /// Transmits a text file (MMTTY "Send Text…").
     public static func sendTextFile(_ model: AppModel) {
         let p = NSOpenPanel()
         p.allowedContentTypes = [.plainText, .text]
@@ -41,7 +41,7 @@ import UniformTypeIdentifiers
         Task { @MainActor in await model.sendTextFile(url) }
     }
 
-    /// Import spojení z ADIF (MMTTY umí svůj log exportovat do ADIF).
+    /// Imports QSOs from ADIF (MMTTY can export its own log to ADIF).
     public static func importADIF(_ model: AppModel) {
         let p = NSOpenPanel()
         p.allowedContentTypes = [UTType(filenameExtension: "adi"), UTType(filenameExtension: "adif"), .plainText].compactMap { $0 }
@@ -54,11 +54,11 @@ import UniformTypeIdentifiers
         }
     }
 
-    // MARK: Import z MMTTY
+    // MARK: Import from MMTTY
 
     private static var importWindow: NSWindow?
 
-    /// Menu Soubor → Importovat z MMTTY…: výběr Mmtty.ini, náhled a volba, co přepsat.
+    /// File → Import from MMTTY…: pick Mmtty.ini, preview and choose what to overwrite.
     public static func importMMTTY(_ model: AppModel) {
         let p = NSOpenPanel()
         p.allowedContentTypes = [UTType(filenameExtension: "ini"), .plainText].compactMap { $0 }
@@ -75,7 +75,7 @@ import UniformTypeIdentifiers
         importWindow = w
     }
 
-    // MARK: Správa logu
+    // MARK: Log management
 
     static var adifTypes: [UTType] { [UTType(filenameExtension: "adi"), UTType(filenameExtension: "adif")].compactMap { $0 } }
 
@@ -89,7 +89,7 @@ import UniformTypeIdentifiers
         }
     }
 
-    /// Nový log: název a umístění (vytvoří se `<název>.adi` a `.jsonl`).
+    /// A new log: name and location (`<name>.adi` and `.jsonl` are created).
     public static func newLog(_ model: AppModel) {
         let p = NSSavePanel()
         p.allowedContentTypes = adifTypes; p.nameFieldStringValue = "log.adi"; p.title = L("Nový log")
@@ -98,7 +98,7 @@ import UniformTypeIdentifiers
         run { try await model.newLog(file: url); return nil }
     }
 
-    /// Otevře log mmtty4mac nebo ADIF z jiného programu.
+    /// Opens an mmtty4mac log or an ADIF file from another program.
     public static func openLog(_ model: AppModel) {
         let p = NSOpenPanel()
         p.allowedContentTypes = adifTypes + [UTType(filenameExtension: "jsonl")].compactMap { $0 }
@@ -111,7 +111,7 @@ import UniformTypeIdentifiers
         run { try await model.openLog(file: url) }
     }
 
-    /// Uloží kopii logu pod jiným názvem a dál pracuje v ní.
+    /// Saves a copy of the log under a different name and keeps working in that copy.
     public static func saveLogAs(_ model: AppModel) {
         let p = NSSavePanel()
         p.allowedContentTypes = adifTypes; p.nameFieldStringValue = model.logLocation.name + "-" + L("kopie") + ".adi"
@@ -120,7 +120,7 @@ import UniformTypeIdentifiers
         run { try await model.saveLogAs(file: url); return nil }
     }
 
-    /// Kopie ADIF jinam (log zůstává otevřený).
+    /// An ADIF copy elsewhere (the log stays open).
     public static func exportADIF(_ model: AppModel) {
         let p = NSSavePanel()
         p.allowedContentTypes = adifTypes; p.nameFieldStringValue = model.logLocation.name + ".adi"
@@ -129,7 +129,7 @@ import UniformTypeIdentifiers
         run { try await model.exportADIF(to: url); return nil }
     }
 
-    /// Záloha logu teď (menu Soubor).
+    /// Back the log up now (File menu).
     public static func backupLog(_ model: AppModel) {
         Task { @MainActor in
             do {
@@ -145,12 +145,12 @@ import UniformTypeIdentifiers
         NSWorkspace.shared.open(model.backupDirectory)
     }
 
-    /// Otevře nastavení zvuku systému (úroveň vstupu a výstupu zvukovky).
+    /// Opens the system sound settings (the sound card's input and output level).
     public static func openSoundSettings() {
         if let u = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") { NSWorkspace.shared.open(u) }
     }
 
-    /// Otevře Audio MIDI Setup (formát a úroveň kanálů zařízení).
+    /// Opens Audio MIDI Setup (the device's channel format and level).
     public static func openAudioMIDISetup() {
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Audio MIDI Setup.app"))
     }

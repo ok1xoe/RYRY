@@ -1,12 +1,12 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Zalamování psaného textu (MMTTY „Word wrap on keyboard“): řádek delší než `column` se zlomí
-/// na poslední mezeře, bez mezery natvrdo.
+/// Wrapping of typed text (MMTTY "Word wrap on keyboard"): a line longer than `column` is broken
+/// at the last space, or hard-broken when there is no space.
 public enum TxWrap {
     public static func wrap(_ text: String, column: Int) -> String { wrap(text, column: column, startColumn: 0) }
 
-    /// `startColumn` = kolik znaků aktuálního řádku už bylo odvysíláno (během TX se odvysílaný text z okna maže).
+    /// `startColumn` = how many characters of the current line have already been transmitted (during TX the transmitted text is removed from the window).
     public static func wrap(_ text: String, column: Int, startColumn: Int) -> String {
         guard column > 0 else { return text }
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
@@ -14,13 +14,13 @@ public enum TxWrap {
             .joined(separator: "\n")
     }
 
-    /// Sloupec po odvysílání textu (od posledního CR/LF), počítáno od `from`.
+    /// Column after the text has been transmitted (since the last CR/LF), counted from `from`.
     public static func column(afterSending s: String, from: Int = 0) -> Int {
         if let i = s.lastIndex(where: { $0 == "\n" || $0 == "\r" || $0 == "\r\n" }) { return s.distance(from: s.index(after: i), to: s.endIndex) }
         return from + s.count
     }
 
-    /// `used` = znaky prvního řádku obsazené už dříve (odvysílaný text).
+    /// `used` = characters of the first line already taken up earlier (transmitted text).
     static func wrapLine(_ line: String, _ column: Int, used: Int = 0) -> String {
         var rest = Substring(line), out: [Substring] = [], room = column - used
         while rest.count > room {
@@ -28,7 +28,7 @@ public enum TxWrap {
             if let sp = rest[..<rest.index(limit, offsetBy: 1, limitedBy: rest.endIndex)!].lastIndex(of: " "), sp > rest.startIndex {
                 out.append(rest[..<sp]); rest = rest[rest.index(after: sp)...]
             } else if room < column {
-                out.append("")                                   // za odvysílaným textem: celé slovo na nový řádek
+                out.append("")                                   // after the transmitted text: the whole word goes on a new line
             } else {
                 out.append(rest[..<limit]); rest = rest[limit...]
             }

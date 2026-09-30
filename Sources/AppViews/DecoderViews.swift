@@ -6,9 +6,9 @@ import Localization
 import Settings
 import SwiftUI
 
-// MARK: Druhý dekodér
+// MARK: Second decoder
 
-/// Panel druhého dekodéru pod oknem příjmu (menší písmo, klik na slovo → QSO jako v hlavním příjmu).
+/// The second decoder's panel below the receive window (smaller font, clicking a word → QSO as in the main receive window).
 struct SecondDecoderPanel: View {
     @Bindable var model: AppModel
 
@@ -41,7 +41,7 @@ struct SecondDecoderPanel: View {
     }
 }
 
-/// Text druhého dekodéru: NSTextView s inkrementálním přidáváním a klikáním na slova (jako RxTextView).
+/// The second decoder's text: an NSTextView with incremental appending and clickable words (like RxTextView).
 struct AuxTextView: NSViewRepresentable {
     @Bindable var model: AppModel
 
@@ -50,7 +50,7 @@ struct AuxTextView: NSViewRepresentable {
 
     func style() -> RxTextView.Style {
         var s = RxTextView.Style(model.settings.display)
-        s.size = max(8, s.size - 2)                   // menší písmo než hlavní příjem
+        s.size = max(8, s.size - 2)                   // smaller font than the main receive window
         return s
     }
 
@@ -91,9 +91,9 @@ struct AuxTextView: NSViewRepresentable {
     }
 }
 
-// MARK: Kanály
+// MARK: Channels
 
-/// Okno „Kanály“: nezávislé dekodéry na signálech nalezených ve vodopádu.
+/// The "Channels" window: independent decoders on the signals found in the waterfall.
 public struct ChannelsWindow: View {
     @Bindable var model: AppModel
     public init(model: AppModel) { self.model = model }
@@ -160,7 +160,7 @@ struct ChannelRow: View {
 
     static let scheme = "mmtty4mac-word"
 
-    /// Text, kde je každé slovo odkazem (klik → vložení slova do QSO).
+    /// Text in which every word is a link (click → the word is put into the QSO panel).
     static func clickable(_ text: String) -> AttributedString {
         var out = AttributedString()
         let flat = text.replacingOccurrences(of: "\r", with: "").replacingOccurrences(of: "\n", with: " ")
@@ -185,7 +185,7 @@ struct ChannelRow: View {
     }
 }
 
-/// Značky kanálů ve vodopádu: krátké zelené čárky u mark a space a číslo kanálu.
+/// Channel markers in the waterfall: short green ticks at mark and space plus the channel number.
 @MainActor func drawChannelMarks(_ ctx: GraphicsContext, _ size: CGSize, _ model: AppModel) {
     let d = model.settings.decoders
     guard d.channelsEnabled, d.showChannelMarks, !model.decoderChannels.isEmpty else { return }
@@ -204,7 +204,7 @@ struct ChannelRow: View {
     }
 }
 
-// MARK: Nastavení
+// MARK: Settings
 
 struct DecodersTab: View {
     @Binding var s: AppSettings

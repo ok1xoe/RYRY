@@ -5,7 +5,7 @@ import Localization
 import Settings
 import SwiftUI
 
-/// Okno „Skóre“: po pásmech QSO, body, násobiče (u WAE s váhou a QTC), řádek Celkem a výsledné skóre se vzorcem.
+/// The "Score" window: QSOs, points and multipliers per band (with weight and QTC for WAE), a Total row and the resulting score with its formula.
 public struct ScoreWindow: View {
     @Bindable var model: AppModel
     public init(model: AppModel) { self.model = model }
@@ -84,7 +84,7 @@ public struct ScoreWindow: View {
                 num(s.qsos).bold()
                 num(s.dupes).bold()
                 num(s.points).bold()
-                if hasMultipliers { num(s.tableMultiplierTotal).bold() }   // BARTG: bez kontinentů (ve vzorci zvlášť)
+                if hasMultipliers { num(s.tableMultiplierTotal).bold() }   // BARTG: no continents (handled separately in the formula)
                 if isWAE { num(m.weightedTotal).bold(); num(s.qtc).bold() }
             }
         }

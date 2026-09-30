@@ -39,8 +39,8 @@ struct MacroBar: View {
 }
 
 extension MacroBar {
-    /// Makra 1–12 = F1–F12, 13–16 = ⇧F1–⇧F4 (MMTTY má 16 tlačítek).
-    /// Text tlačítka: na světlé barvě černý, na tmavé bílý, bez barvy výchozí.
+    /// Macros 1–12 = F1–F12, 13–16 = ⇧F1–⇧F4 (MMTTY has 16 buttons).
+    /// Button text: black on a light color, white on a dark one, default when there is no color.
     static func textColor(_ hex: String?) -> Color {
         guard let c = Color(hex: hex) else { return .primary }
         return c.isLight ? .black : .white
@@ -50,7 +50,7 @@ extension MacroBar {
 
 struct EditIndex: Identifiable { let id: Int }
 
-/// Editor maker: makra pro vysílání (`settings.macros`) nebo příkazů DX clusteru (`settings.spots.clusterMacros`).
+/// Macro editor: transmit macros (`settings.macros`) or DX cluster command macros (`settings.spots.clusterMacros`).
 struct MacroEditor: View {
     enum Target { case transmit, cluster }
     @Bindable var model: AppModel
@@ -115,7 +115,7 @@ struct MacroEditor: View {
     }
 }
 
-/// Obarvené makro = tlačítko vyplněné vlastní barvou (drží se i v neaktivním okně), ostatní běžná.
+/// A colored macro = a button filled with its own color (kept even in an inactive window), the rest are ordinary.
 struct BorderedProminentIf: PrimitiveButtonStyle {
     let on: Bool
     var color: Color? = nil

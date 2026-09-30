@@ -90,7 +90,7 @@ struct TopBar: View {
         .padding(8)
     }
 
-    /// Krátký štítek stavu (dlouhé názvy by v úzkém okně vytlačily lištu).
+    /// Short status label (long names would push the bar out in a narrow window).
     static func stateLabel(_ s: EngineState) -> String {
         switch s {
         case .stopped: return "STOP"
@@ -109,7 +109,7 @@ struct TopBar: View {
     }
 }
 
-/// Filtry příjmu a UOS v jedné nabídce (šetří místo); popisek ukazuje zapnuté.
+/// Receive filters and UOS in a single menu (saves space); the label shows which ones are on.
 struct FilterMenu: View {
     @Bindable var model: AppModel
     var active: String {
@@ -154,7 +154,7 @@ struct SignalMeter: View {
     }
 }
 
-/// Nabídka 16 profilů parametrů modemu (načíst / uložit aktuální).
+/// Menu of 16 modem parameter profiles (load / save the current one).
 struct ProfileMenu: View {
     @Bindable var model: AppModel
     @State private var saveSlot: Int?
@@ -184,7 +184,7 @@ struct ProfileMenu: View {
     }
 }
 
-/// Ovládání přehrávaného WAV: převinutí, pauza, posun, zastavení (MMTTY Play/Pause/Rewind/Seek).
+/// Controls for WAV playback: rewind, pause, seek, stop (MMTTY Play/Pause/Rewind/Seek).
 struct WAVControls: View {
     @Bindable var model: AppModel
     @State private var dragging: Double?
@@ -215,7 +215,7 @@ struct WAVControls: View {
     }
 }
 
-/// Frekvence rigu v horní liště: kliknutí (nebo zkratka) otevře zadání kHz, vedle je nabídka pásem.
+/// The rig frequency in the top bar: clicking it (or the shortcut) opens a kHz entry, with the band menu next to it.
 struct FrequencyControl: View {
     @Bindable var model: AppModel
     @State private var shown = false

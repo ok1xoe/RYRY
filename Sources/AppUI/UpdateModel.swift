@@ -5,7 +5,7 @@ import Localization
 import Observation
 import Updates
 
-/// Stav a akce okna aktualizací. Instalaci nedělá: stáhne DMG a otevře ho, aplikaci přetáhne uživatel.
+/// State and actions of the updates window. It does not install anything: it downloads the DMG and opens it, the user drags the app over.
 @MainActor @Observable
 public final class UpdateModel {
     public enum Status: Equatable {
@@ -22,7 +22,7 @@ public final class UpdateModel {
     }
 
     public private(set) var status: Status = .idle
-    /// Nastaví aplikace: otevře okno aktualizací.
+    /// Set by the app: opens the updates window.
     @ObservationIgnored public var showWindow: () -> Void = {}
 
     @ObservationIgnored private let checker: UpdateChecker
@@ -41,13 +41,13 @@ public final class UpdateModel {
         self.opener = opener
     }
 
-    /// Verze právě běžící aplikace (pro text okna).
+    /// Version of the currently running app (for the window's text).
     public var currentVersionText: String {
         let v = UpdateChecker.currentVersion()
         return v.description + (v.build.map { " (\($0))" } ?? "")
     }
 
-    /// Kontrola při startu: jen když je zapnutá a nastavená; okno se otevře jen při nové verzi.
+    /// Check at startup: only when it is enabled and configured; the window opens only when there is a new version.
     public func checkAtLaunch(enabled: Bool) async {
         guard enabled, checker.isConfigured, !busy else { return }
         busy = true; defer { busy = false }
@@ -57,7 +57,7 @@ public final class UpdateModel {
         }
     }
 
-    /// Ruční příkaz z menu: okno se otevře vždy a ukáže výsledek.
+    /// Manual command from the menu: the window always opens and shows the result.
     public func checkManually() async {
         showWindow()
         guard !busy else { return }

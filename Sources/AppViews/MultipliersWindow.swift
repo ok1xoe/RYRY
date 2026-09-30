@@ -5,10 +5,10 @@ import Localization
 import Settings
 import SwiftUI
 
-/// Okno „Násobiče“: mřížka pásmo × druh násobiče, souhrn a odpracované / chybějící násobiče.
+/// The "Multipliers" window: a band × multiplier-kind grid, a summary and the worked / missing multipliers.
 public struct MultipliersWindow: View {
     @Bindable var model: AppModel
-    /// Vybrané pásmo pro detail; nil = násobiče „jednou za závod“.
+    /// The band selected for the detail view; nil = "once per contest" multipliers.
     @State private var detailBand: String?
     public init(model: AppModel) { self.model = model }
 
@@ -131,7 +131,7 @@ public struct MultipliersWindow: View {
         }
     }
 
-    /// Čísla (zóny) číselně, ostatní abecedně.
+    /// Numbers (zones) numerically, everything else alphabetically.
     static func sorted(_ s: Set<String>) -> [String] {
         s.sorted { a, b in
             if let x = Int(a), let y = Int(b) { return x < y }

@@ -5,21 +5,21 @@ import Settings
 import Spots
 import SwiftUI
 
-/// Identifikátory oken filtru spotů (`Window(id:)`, `openWindow(id:)`, spouštěcí parametr `-openWindow`).
+/// Identifiers of the spot filter windows (`Window(id:)`, `openWindow(id:)`, the `-openWindow` launch argument).
 public enum SpotFilterWindowID {
     public static let bands = "spotbands"
     public static let modes = "spotmodes"
 }
 
-/// Okno „Filtr pásem“: zaškrtávátka celého pevného seznamu pásem (`SpotFilter.allBands`) a tlačítka Vše / Nic.
-/// Zaškrtnuté = zobrazené v tabulce Spoty; filtruje se jen zobrazení a změna platí hned (uloží se do nastavení).
+/// The "Band filter" window: checkboxes for the whole fixed list of bands (`SpotFilter.allBands`) and All / None buttons.
+/// Checked = shown in the Spots table; only the display is filtered and a change takes effect immediately (it is saved to the settings).
 public struct SpotBandFilterWindow: View {
     @Bindable var model: AppModel
     public init(model: AppModel) { self.model = model }
 
-    /// Řádky zaškrtávátek – dohromady vždy celý seznam pásem.
+    /// The checkbox rows - together always the whole list of bands.
     public static let rows = SpotFilter.bandRows(perRow: 4)
-    /// Popisek zaškrtávátka za pevným seznamem (spoty bez vlastního pásma) – stejné slovo jako u skupin módů.
+    /// Label of the checkbox after the fixed list (spots without a band of their own) - the same word as for the mode groups.
     public static var otherLabel: String { L("ostatní") }
 
     private var otherToggle: some View {
@@ -64,13 +64,13 @@ public struct SpotBandFilterWindow: View {
     }
 }
 
-/// Okno „Filtr módů“: zaškrtávátka všech skupin módů (`SpotModeGroup`) a tlačítka Vše / Nic. Zaškrtnuté =
-/// zobrazené v tabulce Spoty, band mapě i ve vodopádu; právě RTTY = zaškrtávátko „Jen RTTY“ v okně Spoty.
+/// The "Mode filter" window: checkboxes for all the mode groups (`SpotModeGroup`) and All / None buttons. Checked =
+/// shown in the Spots table, the band map and the waterfall; RTTY alone = the "RTTY only" checkbox in the Spots window.
 public struct SpotModeFilterWindow: View {
     @Bindable var model: AppModel
     public init(model: AppModel) { self.model = model }
 
-    /// Řádky zaškrtávátek – dohromady vždy všechny skupiny módů.
+    /// The checkbox rows - together always all the mode groups.
     public static let rows: [[SpotModeGroup]] = {
         let all = SpotModeGroup.allCases, perRow = 3
         return stride(from: 0, to: all.count, by: perRow).map { Array(all[$0..<min($0 + perRow, all.count)]) }

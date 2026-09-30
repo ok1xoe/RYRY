@@ -9,7 +9,7 @@ import Localization
 
 struct QSOPanel: View {
     @Bindable var model: AppModel
-    /// Místní čas protistanice (hh:mm).
+    /// The other station's local time (hh:mm).
     static let hm: DateFormatter = {
         let f = DateFormatter(); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm"; return f
     }()
@@ -29,13 +29,13 @@ struct QSOPanel: View {
 
     static func azimuthInt(_ az: Double) -> Int { Int(az.rounded()) % 360 }
 
-    /// „az 312° · 1 234 km · z lokátoru“ (krátká cesta).
+    /// "az 312° · 1 234 km · from the locator" (short path).
     static func beamShort(_ b: Geo.Beam) -> String {
         let src = b.ownSource == .locator && b.remoteSource == .locator ? L("z lokátoru") : L("podle země")
         return L("az %ld° · %@ km · %@", azimuthInt(b.shortAzimuth), Geo.formatKm(b.shortKm), src)
     }
 
-    /// Dlouhá cesta (opačný směr, zbytek obvodu Země).
+    /// Long path (the opposite direction, the rest of the Earth's circumference).
     static func beamLong(_ b: Geo.Beam) -> String {
         L("dlouhá cesta %ld° · %@ km", azimuthInt(b.longAzimuth), Geo.formatKm(b.longKm))
     }
@@ -46,14 +46,14 @@ struct QSOPanel: View {
         return L("Vlastní poloha %@, protistanice %@", own, remote)
     }
 
-    /// Popisek v levém sloupci mřížky.
+    /// The label in the grid's left column.
     func label(_ t: String) -> some View {
         Text(t).font(.callout).foregroundStyle(.secondary).gridColumnAlignment(.trailing).lineLimit(1).fixedSize()
     }
 
     var body: some View {
-        // Posuvný sloupec: obsah (příjem QTC s 10 řádky, předchozí spojení) se nesmí vytlačit mimo okno,
-        // a do šířky se přizpůsobuje – dlouhé texty se zalamují místo ořezu.
+        // A scrolling column: the content (QTC reception with 10 rows, previous QSOs) must not be pushed out of the window,
+        // and it adapts to the width - long texts wrap instead of being clipped.
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -64,7 +64,7 @@ struct QSOPanel: View {
                 }
                 if model.esmActive { ESMBar(model: model) }
                 Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
-                    // pole podle závodu (bez závodu běžné QSO, v závodě jen výměna daného formátu)
+                    // fields according to the contest (an ordinary QSO outside a contest, in a contest only the given format's exchange)
                     ForEach(Array(QSOLayout.rows(for: model.settings.contest).enumerated()), id: \.offset) { _, row in
                         switch row {
                         case .single(let field, let title):
@@ -154,12 +154,12 @@ struct QSOPanel: View {
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        // ESM spouští jen Enter v polích Call a výměny (onSubmit v QSOField). Panelový `.onKeyPress(.return)` by
-        // zachytil i Enter v jiných polích (Notes, jméno, kHz) a poslal makro nechtěně – proto tu žádný není.
+        // ESM is only triggered by Enter in the Call and exchange fields (onSubmit in QSOField). A panel-level `.onKeyPress(.return)` would
+        // also catch Enter in other fields (Notes, name, kHz) and send a macro unintentionally - which is why there is none here.
     }
 }
 
-/// ESM: přepínač Run / S&P a nápověda, co pošle Enter.
+/// ESM: the Run / S&P switch and a hint about what Enter will send.
 struct ESMBar: View {
     @Bindable var model: AppModel
     var body: some View {
@@ -195,19 +195,19 @@ struct ESMBar: View {
     }
 }
 
-/// Pole QSO s lokální editací: potvrdí se Enterem nebo opuštěním pole (ne po každém znaku),
-/// a převezme hodnotu z modelu, když se změní zvenku (klik na slovo, API, Clear).
+/// A QSO field with local editing: it is committed with Enter or by leaving the field (not after every character),
+/// and it picks up the value from the model when that changes from the outside (clicking a word, the API, Clear).
 struct QSOField: View {
     @Bindable var model: AppModel
     let label: String
     let field: String
-    /// Enter spouští ESM (pole Call a výměny).
+    /// Enter triggers ESM (the Call and exchange fields).
     var esm = false
-    /// Volá se při každé změně textu (Super Check Partial u značky).
+    /// Called on every text change (Super Check Partial for the callsign).
     var onTyping: ((String) -> Void)? = nil
     @State private var text = ""
-    /// Běží ESM akce spuštěná z tohoto pole – do jejího konce se text do modelu nezapisuje (po zalogování
-    /// by stará hodnota přešla do nového QSO).
+    /// An ESM action started from this field is running - until it finishes the text is not written into the model (after logging
+    /// the old value would carry over into the new QSO).
     @State private var esmPending = false
     @FocusState private var focused: Bool
 
@@ -216,7 +216,7 @@ struct QSOField: View {
             .textFieldStyle(.roundedBorder)
             .focused($focused)
             .overlay(alignment: .trailing) {
-                // nenápadný štítek u hodnoty doplněné z historie značek (zmizí po ruční úpravě pole)
+                // a discreet label next to a value filled in from the call history (it disappears once the field is edited by hand)
                 if let v = model.qso.historyFilled[field], !v.isEmpty, model.qso.value(field) == v {
                     Text(L("z historie")).font(.caption2).foregroundStyle(.secondary).padding(.trailing, 6)
                         .allowsHitTesting(false)
@@ -232,16 +232,16 @@ struct QSOField: View {
             }
     }
 
-    /// Enter: potvrdit pole, pak (ESM) poslat makro a přesunout fokus na další prázdné pole.
+    /// Enter: commit the field, then (with ESM) send the macro and move the focus to the next empty field.
     private func submit() {
         guard esm, model.esmActive else { commit(); return }
-        guard !esmPending, !model.esmBusy else { return }          // podržený Enter
+        guard !esmPending, !model.esmBusy else { return }          // Enter held down
         let changed = text != (model.qso.value(field) ?? ""), v = text
         esmPending = true
         Task {
             if changed { await model.setQSOField(field, v) }
-            let next = await model.esmEnter()                     // logující krok vrací až po zalogování
-            text = model.qso.value(field) ?? ""          // po zalogování prázdné – odchod z pole nesmí vrátit starou hodnotu
+            let next = await model.esmEnter()                     // a logging step only returns once the QSO has been logged
+            text = model.qso.value(field) ?? ""          // empty after logging - leaving the field must not restore the old value
             esmPending = false
             if let next { model.esmFocusField = next }
         }
@@ -254,7 +254,7 @@ struct QSOField: View {
     }
 }
 
-/// Návrhy značek (Super Check Partial): klik vloží značku do QSO okna.
+/// Callsign suggestions (Super Check Partial): a click puts the call into the QSO window.
 struct SuperCheckList: View {
     @Bindable var model: AppModel
     var body: some View {
@@ -270,7 +270,7 @@ struct SuperCheckList: View {
     }
 
     func chips(_ calls: [String], color: Color) -> some View {
-        // jednoduchý zalamovaný seznam (ViewThatFits by nestačil) – po řádcích max. 4 značky
+        // a simple wrapping list (ViewThatFits would not be enough) - at most 4 calls per row
         VStack(alignment: .leading, spacing: 2) {
             ForEach(Array(stride(from: 0, to: min(calls.count, 12), by: 4)), id: \.self) { i in
                 HStack(spacing: 4) {
@@ -284,7 +284,7 @@ struct SuperCheckList: View {
     }
 }
 
-/// Pásmo a frekvence: z rigu, nebo ručně (bez CAT) – zapíše se do logu.
+/// Band and frequency: from the rig, or manually (without CAT) - it is written into the log.
 struct FrequencyRow: View {
     @Bindable var model: AppModel
     var body: some View {

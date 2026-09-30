@@ -2,12 +2,12 @@
 import Localization
 import Settings
 
-/// Která pole QSO okna se nabízejí – podle toho, zda je zapnutý závod a jakého formátu.
+/// Which QSO window fields are offered - depending on whether a contest is on and which format it uses.
 public enum QSOLayout {
     public enum Row: Equatable, Sendable {
-        case single(String, String)                    // pole, popisek
-        case pair(String, String, String, String)      // odeslané pole+popisek, přijaté pole+popisek
-        case country                                   // řádek se zemí DXCC
+        case single(String, String)                    // field, label
+        case pair(String, String, String, String)      // sent field+label, received field+label
+        case country                                   // row with the DXCC entity
     }
 
     public static func rows(for c: ContestSettings) -> [Row] {
@@ -20,7 +20,7 @@ public enum QSOLayout {
         let base = [call, .country, rst]
         switch c.format {
         case .serial:
-            // ARRL RTTY Roundup: W/VE posílají stát/provincii místo čísla (násobič) – přijatá výměna zvlášť
+            // ARRL RTTY Roundup: W/VE send a state/province instead of a number (multiplier) - received exchange handled separately
             if c.isRoundupStateExchange {
                 return base + [serial, .single("exchangeRcvd", L("Stát/prov. r")), notes]
             }
@@ -33,6 +33,6 @@ public enum QSOLayout {
         }
     }
 
-    /// Panel QTC jen v závodě WAE.
+    /// The QTC panel only in the WAE contest.
     public static func showsQTC(_ c: ContestSettings) -> Bool { c.enabled && c.format == .wae }
 }

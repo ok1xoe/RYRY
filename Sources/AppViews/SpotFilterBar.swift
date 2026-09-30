@@ -4,15 +4,15 @@ import Localization
 import Spots
 import SwiftUI
 
-/// Ovládání filtru zobrazení spotů v okně Spoty (a v Nastavení → Spoty): tlačítka, která otevřou okna
-/// „Filtr pásem“ a „Filtr módů“, a zaškrtávátko „Jen RTTY“. Filtruje se jen zobrazení – přijímají
-/// a ukládají se spoty všech pásem a módů. Změna platí hned (bez Použít a bez nového připojení).
+/// Controls for the spot display filter in the Spots window (and in Settings → Spots): buttons that open the
+/// "Band filter" and "Mode filter" windows, and the "RTTY only" checkbox. Only the display is filtered - spots of
+/// all bands and modes are received and stored. A change takes effect immediately (no Apply and no reconnect).
 public struct SpotFilterBar: View {
     @Bindable var model: AppModel
     @Environment(\.openWindow) private var openWindow
     public init(model: AppModel) { self.model = model }
 
-    /// Popisek skupiny módů (názvy módů se nepřekládají, jen „ostatní“).
+    /// Label of a mode group (mode names are not translated, only "other" is).
     public static func modeLabel(_ g: SpotModeGroup) -> String {
         switch g {
         case .rtty: "RTTY"

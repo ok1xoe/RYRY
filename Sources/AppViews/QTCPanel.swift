@@ -6,8 +6,8 @@ import QSOLog
 import SwiftUI
 import Localization
 
-/// QTC pro WAE DX Contest (jen ve formátu závodu WAE): stav, odeslání a příjem série přímo v QSO panelu,
-/// aby šlo během příjmu klikat na slova v okně příjmu.
+/// QTC for the WAE DX Contest (only in the WAE contest format): status, sending and receiving a series right in the QSO panel,
+/// so that words in the receive window can be clicked while receiving.
 struct QTCPanel: View {
     @Bindable var model: AppModel
     @State private var sending: [QTCLine]?
@@ -23,7 +23,7 @@ struct QTCPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: { Text("QTC (WAE)").font(.subheadline.bold()) }
         .task(id: model.qso.call) {
-            if model.qtcPending == nil { sending = nil }           // seznam patří stanici, pro kterou byl připraven
+            if model.qtcPending == nil { sending = nil }           // the list belongs to the station it was prepared for
             await model.refreshQTC()
         }
     }
@@ -115,7 +115,7 @@ struct QTCPanel: View {
                     TextField("HHMM ZNAČKA NNN", text: Binding(get: { d.lines[i].map(QTCText.line) ?? "" },
                                                               set: { model.qtcSetLine(i, $0) }))
                         .font(.caption.monospaced())
-                        // nové pole při změně obsahu z příjmu – rozepsané (prázdné) pole nesmí načtený řádek přepsat
+                        // a new field when the content changes from the receive side - a half-typed (empty) field must not overwrite the loaded row
                         .id("\(i)-\(d.lines[i].map(QTCText.line) ?? "")")
                     Button("AGN") { Task { await model.qtcPhrase(.agn(i + 1)) } }.controlSize(.mini)
                 }
@@ -125,7 +125,7 @@ struct QTCPanel: View {
             HStack(spacing: 4) {
                 Button("QRV") { Task { await model.qtcPhrase(.qrv) } }
                 Button(L("Uložit – R R ALL OK")) {
-                    // nejdřív uložit; potvrzení odeslat jen když se série opravdu zapsala
+                    // save first; only send the confirmation when the series was actually written
                     NSApp.keyWindow?.makeFirstResponder(nil)
                     Task { if await model.qtcSaveReceived() { await model.qtcPhrase(.allOK) } }
                 }

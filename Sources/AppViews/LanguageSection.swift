@@ -4,7 +4,7 @@ import Localization
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Volba jazyka rozhraní – platí hned ve všech oknech (nečeká na „Použít“).
+/// Interface language choice - takes effect immediately in all windows (does not wait for "Apply").
 struct LanguageSection: View {
     let library: LanguageLibrary
     @State private var packs: [LanguagePack] = []

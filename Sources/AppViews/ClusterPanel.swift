@@ -5,10 +5,10 @@ import Settings
 import Spots
 import SwiftUI
 
-/// Příkazy pro DX cluster v okně Spoty: 10 tlačítek (makra `settings.spots.clusterMacros`, úprava jako u maker
-/// pro vysílání), řádek pro ruční příkaz s historií (šipka nahoru/dolů) a rozbalitelná konzole s odpověďmi clusteru.
-/// Neaktivní, dokud DX cluster nepřijímá příkazy (přihlášení). Makra lze upravit i bez spojení (nabídka „Upravit“,
-/// kontextová nabídka). Odesílá se jen do clusteru, nikdy do rádia.
+/// DX cluster commands in the Spots window: 10 buttons (the `settings.spots.clusterMacros` macros, edited like the transmit
+/// macros), a manual command line with history (up/down arrow) and an expandable console with the cluster's replies.
+/// Disabled until the DX cluster accepts commands (logged in). The macros can be edited without a connection too ("Edit" menu,
+/// context menu). Sent to the cluster only, never to the radio.
 struct ClusterPanel: View {
     @Bindable var model: AppModel
     @State private var editing: Int?
@@ -17,7 +17,7 @@ struct ClusterPanel: View {
     @State private var showConsole = false
     @FocusState private var fieldFocused: Bool
 
-    /// Příkazy lze poslat: cluster zapnutý, připojený a přihlášený (ne jen navázané TCP).
+    /// Commands can be sent: the cluster is enabled, connected and logged in (not just a TCP connection established).
     private var connected: Bool {
         model.settings.spots.clusterEnabled && model.spotFeed.clusterCommandsReady
     }
@@ -34,7 +34,7 @@ struct ClusterPanel: View {
                 }
             }
             HStack(spacing: 6) {
-                // psaní ukončí procházení historie (šipka pak začne znovu od nejnovějšího)
+                // typing ends the history walk (the arrow then starts again from the newest entry)
                 TextField(L("Příkaz pro DX cluster (např. sh/dx 30)"),
                           text: Binding(get: { command }, set: { command = $0; historyPos = nil }))
                     .textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced))
@@ -69,7 +69,7 @@ struct ClusterPanel: View {
 
     private func button(_ i: Int, _ macros: [Macro]) -> some View {
         let m = i < macros.count ? macros[i] : nil
-        // kontextová nabídka na obalu, ne na zakázaném tlačítku (to by ji nezobrazilo); úprava jde i bez spojení
+        // the context menu goes on the wrapper, not on the disabled button (which would not show it); editing works without a connection
         return HStack(spacing: 0) {
             Button { Task { await model.runClusterMacro(i) } } label: {
                 Text(m?.name ?? "").lineLimit(1).frame(maxWidth: .infinity)
@@ -114,7 +114,7 @@ struct ClusterPanel: View {
         }
     }
 
-    /// Šipka nahoru = starší příkaz, dolů = novější (za nejnovějším prázdný řádek).
+    /// Up arrow = older command, down = newer (an empty line past the newest one).
     private func history(_ step: Int) {
         let h = model.clusterHistory
         guard !h.isEmpty else { return }

@@ -5,11 +5,11 @@ import RTTYModem
 import SwiftUI
 import Localization
 
-/// Scope demodulátoru (MMTTY „Digital Scope“): průběhy mark/space ze zvoleného místa demodulátoru,
-/// rozhodnutý bit a synchronizace (start/stop bity). Slouží k ladění parametrů demodulátoru.
+/// Demodulator scope (MMTTY "Digital Scope"): mark/space waveforms from the chosen point in the demodulator,
+/// the decided bit and the synchronization (start/stop bits). Used for tuning the demodulator parameters.
 public struct ScopeWindow: View {
     @Bindable var model: AppModel
-    @State private var width = 2048.0          // zobrazených vzorků
+    @State private var width = 2048.0          // samples shown
     @State private var offset = 0.0
     public init(model: AppModel) { self.model = model }
 
@@ -69,13 +69,13 @@ public struct ScopeWindow: View {
             }
             return p
         }
-        // mark/space – společná automatická stupnice, horní dvě pásma
+        // mark/space - a shared automatic scale, the top two lanes
         let peak = max(1e-6, (mk[start..<(start + w)] + sp[start..<(start + w)]).map { abs($0) }.max() ?? 1)
         ctx.stroke(path(mk.map { abs($0) }, top: 4, height: lane * 2 - 8, scale: peak), with: .color(.yellow), lineWidth: 1)
         ctx.stroke(path(sp.map { abs($0) }, top: 4, height: lane * 2 - 8, scale: peak), with: .color(.orange), lineWidth: 1)
         // bit
         ctx.stroke(path(d.bit, top: lane * 2 + 6, height: lane - 12, scale: 1), with: .color(.green), lineWidth: 1.2)
-        // sync: značky
+        // sync: markers
         let top = lane * 3 + 4
         for i in 0..<w {
             let v = d.sync[start + i]
@@ -95,7 +95,7 @@ public struct ScopeWindow: View {
 }
 
 extension ScopeWindow {
-    /// Názvy zdrojů scope (pořadí jako RTTYModem.scopeSources).
+    /// Names of the scope sources (same order as RTTYModem.scopeSources).
     static func sourceName(_ i: Int) -> String {
         switch i {
         case 0: return L("Filtr")

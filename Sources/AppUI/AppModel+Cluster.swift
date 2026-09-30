@@ -6,10 +6,10 @@ import MacroEngine
 import Settings
 import Spots
 
-/// Příkazy pro DX cluster: makra na tlačítkách (`settings.spots.clusterMacros`) a ruční řádek v okně Spoty.
-/// Odesílá se jen do clusteru (nikdy do rádia); RBN příkazy nepřijímá.
+/// DX cluster commands: the button macros (`settings.spots.clusterMacros`) and the manual line in the Spots window.
+/// Sent to the cluster only (never to the radio); RBN does not accept commands.
 extension AppModel {
-    /// Kontext proměnných: s enginem jako vysílací makra + frekvence rigu; bez něj jen značky a čas.
+    /// Variable context: with the engine, the same as transmit macros plus the rig frequency; without it, only calls and time.
     func clusterContext() async -> MacroContext {
         if let app { return await app.clusterMacroContext() }
         var c = MacroContext()
@@ -30,7 +30,7 @@ extension AppModel {
         }
     }
 
-    /// Pošle jeden ručně zadaný řádek; true = odesláno. Chyba se uloží do `clusterMessage`.
+    /// Sends a single manually entered line; true = sent. An error is stored in `clusterMessage`.
     @discardableResult
     public func sendClusterLine(_ text: String) async -> Bool {
         do {
@@ -47,13 +47,13 @@ extension AppModel {
         }
     }
 
-    /// Spustí makro clusteru: expanduje proměnné (bez řídicích znaků maker), každý řádek = jeden příkaz. True = vše odesláno.
+    /// Runs a cluster macro: expands the variables (without the macro control characters), each line = one command. True = everything sent.
     @discardableResult
     public func runClusterMacro(_ i: Int) async -> Bool {
         guard settings.spots.clusterMacros.indices.contains(i) else { return false }
         let lines = MacroEngine.expandCluster(settings.spots.clusterMacros[i].text, context: await clusterContext())
         guard !lines.isEmpty else { clusterMessage = L("Prázdný příkaz."); return false }
-        // nejdřív zkontrolovat všechny řádky (např. spot bez značky), ať se neodešle jen část makra
+        // check all the lines first (e.g. a spot without a call) so that only part of the macro is not sent
         for l in lines {
             do { _ = try ClusterCommand.validate(l) } catch { clusterMessage = Self.clusterErrorText(error); return false }
         }

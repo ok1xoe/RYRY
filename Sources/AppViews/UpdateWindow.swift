@@ -5,7 +5,7 @@ import Localization
 import SwiftUI
 import Updates
 
-/// Okno aktualizací: výsledek ruční kontroly, poznámky k nové verzi a tlačítka Stáhnout / Později / Přeskočit.
+/// Updates window: the result of a manual check, release notes for the new version and the Download / Later / Skip buttons.
 public struct UpdateWindow: View {
     @Bindable var model: UpdateModel
     @Environment(\.dismiss) private var dismiss

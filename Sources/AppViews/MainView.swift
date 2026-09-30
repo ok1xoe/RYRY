@@ -43,7 +43,7 @@ struct StatusBar: View {
             }
             Spacer()
             if model.settings.contest.enabled {
-                // přepočet každých 30 s – rychlost klesá i bez nových spojení
+                // recompute every 30 s - the rate drops even without new QSOs
                 TimelineView(.periodic(from: .now, by: 30)) { tl in
                     let st = model.logStats(now: tl.date)
                     Text(L("QSO %ld · 10 min: %ld/h · 60 min: %ld/h", st.total, st.rate10, st.rate60))

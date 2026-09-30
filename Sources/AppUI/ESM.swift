@@ -3,20 +3,20 @@ import AppCore
 import Localization
 import Settings
 
-/// „Enter Sends Message“ (N1MM Logger+): co pošle Enter v QSO okně podle režimu Run / S&P a stavu spojení.
-/// Čistá logika bez vedlejších účinků; provedení je v `AppModel.esmEnter()`.
+/// "Enter Sends Message" (N1MM Logger+): what Enter sends in the QSO window, depending on the Run / S&P mode and the state of the QSO.
+/// Pure logic with no side effects; the execution lives in `AppModel.esmEnter()`.
 public enum ESM {
     public enum Step: Equatable, Sendable {
-        case none            // nic (mimo závod, během TX, S&P bez značky)
-        case cq              // Run: prázdná značka
-        case exchange        // Run: značka + výměna
-        case tu              // Run: poděkování a zalogování
-        case myCall          // S&P: moje značka
-        case exchangeAndLog  // S&P: výměna a zalogování
-        case agn             // jen část výměny přijata → AGN?
+        case none            // nothing (outside a contest, during TX, S&P without a call)
+        case cq              // Run: empty call
+        case exchange        // Run: call + exchange
+        case tu              // Run: thanks and log the QSO
+        case myCall          // S&P: my own call
+        case exchangeAndLog  // S&P: exchange and log the QSO
+        case agn             // only part of the exchange received → AGN?
     }
 
-    /// Co už v tomto spojení odešlo (platí jen pro značku `call`; jiná značka = nové spojení).
+    /// What has already been sent in this QSO (valid only for the call `call`; a different call = a new QSO).
     public struct Progress: Equatable, Sendable {
         public var call = ""
         public var exchangeSent = false
@@ -24,14 +24,14 @@ public enum ESM {
         public init(call: String = "", exchangeSent: Bool = false, myCallSent: Bool = false) {
             self.call = call; self.exchangeSent = exchangeSent; self.myCallSent = myCallSent
         }
-        /// Průběh pro danou značku (jiná značka → od začátku).
+        /// The progress for the given call (a different call → start over).
         public func forCall(_ call: String) -> Progress { self.call == call ? self : Progress(call: call) }
     }
 
     public enum Received: Equatable, Sendable { case none, partial, complete }
 
-    /// Pole přijaté výměny podle rozložení QSO okna (bez RST, které je předvyplněné 599): přijatá pole dvojic
-    /// i samostatné řádky přijaté výměny (ARRL RU „Stát/prov. r“).
+    /// The received exchange fields, following the QSO window layout (without RST, which is pre-filled with 599): the received fields of the pairs
+    /// as well as the standalone received exchange rows (ARRL RU "State/prov. r").
     public static func receivedFields(_ c: ContestSettings) -> [String] {
         QSOLayout.rows(for: c).compactMap { row in
             switch row {
@@ -42,8 +42,8 @@ public enum ESM {
         }
     }
 
-    /// Skupiny přijatých polí: skupina je kompletní, když je vyplněné aspoň jedno její pole.
-    /// ARRL RTTY Roundup: W/VE posílají stát/provincii, ostatní číslo → číslo NEBO stát.
+    /// Groups of received fields: a group is complete once at least one of its fields is filled in.
+    /// ARRL RTTY Roundup: W/VE send a state/province, everyone else a number → number OR state.
     public static func receivedGroups(_ c: ContestSettings) -> [[String]] {
         let f = receivedFields(c)
         if c.isRoundupStateExchange, Set(f) == ["serialRcvd", "exchangeRcvd"] { return [f] }
@@ -54,11 +54,11 @@ public enum ESM {
         let groups = receivedGroups(c)
         func has(_ f: String) -> Bool { !(q.value(f) ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
         let filled = groups.filter { $0.contains(where: has) }.count
-        if filled == groups.count { return .complete }        // i formát bez výměny (PED)
+        if filled == groups.count { return .complete }        // also a format without an exchange (PED)
         return filled == 0 ? .none : .partial
     }
 
-    /// Krok pro Enter. Mimo závod a během vysílání nic.
+    /// The step for Enter. Nothing outside a contest and during transmit.
     public static func step(mode: ESMMode, contest: ContestSettings, qso: QSOFields, progress: Progress, transmitting: Bool) -> Step {
         guard contest.enabled, !transmitting else { return .none }
         let call = qso.call.trimmingCharacters(in: .whitespaces)
@@ -76,7 +76,7 @@ public enum ESM {
         }
     }
 
-    /// Makro (index 0…15) pro krok podle nastavení.
+    /// The macro (index 0…15) for the step, according to the settings.
     public static func macro(for step: Step, _ e: ESMSettings) -> Int? {
         switch step {
         case .none: nil
@@ -89,7 +89,7 @@ public enum ESM {
         }
     }
 
-    /// Makro obsahuje %l (zaloguje samo) – stejná pravidla jako MacroEngine: %% není proměnná, %E ukončí text.
+    /// The macro contains %l (it logs the QSO itself) - the same rules as MacroEngine: %% is not a variable, %E ends the text.
     public static func macroLogs(_ text: String) -> Bool {
         var it = text.makeIterator()
         while let ch = it.next() {
@@ -100,12 +100,12 @@ public enum ESM {
         return false
     }
 
-    /// Krok, který má spojení zalogovat, a makro to neudělá samo.
+    /// A step that should log the QSO where the macro does not do it itself.
     public static func needsExplicitLog(_ step: Step, macroText: String) -> Bool {
         (step == .tu || step == .exchangeAndLog) && !macroLogs(macroText)
     }
 
-    /// Pole, kam se po kroku přesune fokus: po výměně/značce první prázdné pole přijaté výměny, jinak Call.
+    /// The field the focus moves to after the step: after the exchange/call the first empty received exchange field, otherwise Call.
     public static func nextFocus(after step: Step, qso: QSOFields, contest: ContestSettings) -> String {
         switch step {
         case .exchange, .myCall, .agn:
@@ -116,7 +116,7 @@ public enum ESM {
         }
     }
 
-    /// Popis kroku pro nápovědu v QSO panelu („→ Výměna“).
+    /// Description of the step for the hint in the QSO panel ("→ Exchange").
     public static func title(_ step: Step) -> String {
         switch step {
         case .none: "—"

@@ -4,7 +4,7 @@ import Settings
 import SwiftUI
 
 extension KeyBinding {
-    /// Klávesa pro SwiftUI (nil = bez zkratky).
+    /// The key for SwiftUI (nil = no shortcut).
     var keyEquivalent: KeyEquivalent? {
         if isNone { return nil }
         if key.hasPrefix("f"), let n = Int(key.dropFirst()), (1...20).contains(n) {
@@ -37,7 +37,7 @@ extension KeyBinding {
         return m
     }
 
-    /// Zkratka z události klávesnice (záznam v Nastavení); nil = nepoužitelná klávesa.
+    /// A shortcut from a keyboard event (recorded in Settings); nil = unusable key.
     static func from(_ e: NSEvent) -> KeyBinding? {
         var mods: [Modifier] = []
         let f = e.modifierFlags
@@ -70,12 +70,12 @@ extension KeyBinding {
 }
 
 extension View {
-    /// Klávesová zkratka z nastavení (žádná = bez zkratky).
+    /// Keyboard shortcut from the settings (none = no shortcut).
     @ViewBuilder public func shortcut(_ b: KeyBinding) -> some View {
         if let k = b.keyEquivalent { keyboardShortcut(k, modifiers: b.eventModifiers) } else { self }
     }
 
-    /// Bublinová nápověda, kterou lze v Nastavení vypnout (MMTTY „Show Button Hint“).
+    /// A tooltip that can be turned off in Settings (MMTTY "Show Button Hint").
     public func hint(_ text: String) -> some View { modifier(HintModifier(text: text)) }
 }
 

@@ -6,7 +6,7 @@ import Settings
 import Spots
 import SwiftUI
 
-/// Okno „Spoty“: DX cluster a RBN. Dvojklik na spot nastaví rig a vloží značku do QSO okna.
+/// The "Spots" window: DX cluster and RBN. Double-clicking a spot tunes the rig and puts the call into the QSO window.
 public struct SpotsWindow: View {
     @Bindable var model: AppModel
     @State private var selection: Set<Spot.ID> = []
