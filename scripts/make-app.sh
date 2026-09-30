@@ -33,7 +33,12 @@ cp Resources/container-migration.plist "$APP/Contents/Resources/"   # přechod n
 cp Resources/demo-rtty.wav "$APP/Contents/Resources/"   # ukázkový signál (Nápověda → Přehrát ukázkový signál)
 cp -R Resources/Languages "$APP/Contents/Resources/"   # jazyky rozhraní (JSON)
 rm -rf "$APP/Contents/Resources/Help"; cp -R docs/html "$APP/Contents/Resources/Help"   # příručka (Nápověda)
-cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+# ikona: formát macOS 26 (Resources/AppIcon.icon → Assets.car + záložní AppIcon.icns přes actool), jinak jen .icns
+if ! xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --platform macosx --minimum-deployment-target 14.0 \
+        --app-icon AppIcon --output-partial-info-plist build/icon-partial.plist >/dev/null 2>&1; then
+    echo "actool neumí .icon – použita jen Resources/AppIcon.icns"
+    cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+fi
 # číslo sestavení = počet commitů
 BUILD_NO=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NO" "$APP/Contents/Info.plist"

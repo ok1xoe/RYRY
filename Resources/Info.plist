@@ -8,6 +8,8 @@
 	<string>MMTTY4MacApp</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>cz.ok1xoe.mmtty4mac</string>
 	<key>CFBundleName</key>
