@@ -181,6 +181,7 @@ struct MMTTY4MacApp: App {
                 Button(L("Spoty")) { openWindow(id: "spots") }
                 Button(L("Band mapa")) { openWindow(id: "bandmapwindow") }
                 Button(L("Násobiče")) { openWindow(id: "multipliers") }
+                Button(L("Skóre")) { openWindow(id: "score") }
                 Divider()
                 Toggle(L("2. dekodér"), isOn: Binding(get: { model.settings.decoders.secondEnabled },
                                                       set: { v in Task { await model.setSecondDecoder(v) } }))
@@ -203,6 +204,9 @@ struct MMTTY4MacApp: App {
         }
         Window(L("Násobiče"), id: "multipliers") {
             MultipliersWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        Window(L("Skóre"), id: "score") {
+            ScoreWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
         Window(L("Kanály"), id: "channels") {
             ChannelsWindow(model: model).environment(\.showHints, model.settings.display.showHints)

@@ -1,4 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+import AppCore
 import AppUI
 import Localization
 import SwiftUI
@@ -48,6 +49,11 @@ struct StatusBar: View {
                     Text(L("QSO %ld · 10 min: %ld/h · 60 min: %ld/h", st.total, st.rate10, st.rate60))
                         .monospacedDigit().foregroundStyle(.secondary)
                         .hint(L("Rychlost závodu: počet spojení za posledních 10 a 60 minut přepočtený na hodinu"))
+                }
+                if let s = model.score {
+                    Divider().frame(height: 12)
+                    Text(L("Skóre %@", ScoreTally.format(s.score))).monospacedDigit().foregroundStyle(.secondary)
+                        .hint(L("Odhad skóre závodu podle pravidel předvolby (okno Okno → Skóre)"))
                 }
                 Divider().frame(height: 12)
             }
