@@ -18,7 +18,14 @@ public struct QSOFields: Codable, Sendable, Equatable {
     public var timeOn: Date?
     /// Ručně zadaná frekvence v Hz (bez rigu); zůstává i pro další spojení.
     public var frequency: Double?
+    /// Pole doplněná z historie značek (název pole → doplněná hodnota); jen pro GUI („z historie“), do JSON se nezapisuje.
+    /// Pole se počítá jako doplněné jen dokud má stále tuto hodnotu.
+    public var historyFilled: [String: String] = [:]
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case call, name, qth, locator, rstSent, rstRcvd, serialSent, serialRcvd, exchangeSent, exchangeRcvd, notes, timeOn, frequency
+    }
 
     public static let fieldNames = ["call", "name", "qth", "locator", "rstSent", "rstRcvd",
                                     "serialSent", "serialRcvd", "exchangeSent", "exchangeRcvd", "notes", "freq"]
@@ -49,6 +56,10 @@ public struct QSOFields: Codable, Sendable, Equatable {
 
 public enum AppError: Error, Equatable, Sendable {
     case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String), qtc(String), badValue(String)
+    /// Během vysílání se rig nepřelaďuje.
+    case transmitting
+    /// Engine neběží (zvuk nespuštěn / zastaveno) – rig není připojený.
+    case engineStopped
 }
 
 public enum AppEvent: Sendable {
@@ -105,6 +116,10 @@ public actor AppController {
     public nonisolated let qtcStore: QTCStore?
     /// Odeslaná série čekající na potvrzení příjemce (R R ALL OK).
     private var pendingQTC: QTCSeries?
+    /// Historie značek (N1MM Call History); nil = nenačtena. Používá se jen při `settings.callHistory.enabled`.
+    private var callHistory: CallHistory?
+    /// Zóna protistanice předvyplněná z DXCC (počítá se jako prázdná: historie ji přepíše, změna značky ji přepočítá).
+    private var dxccFilledZone: String?
 
     public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil,
                 countries: CountryDB? = CountryDB.shared, qtc: QTCStore? = nil) {
@@ -284,12 +299,17 @@ public actor AppController {
         let v = value.trimmingCharacters(in: .whitespaces)
         switch name {
         case "call":
+            let changed = v.uppercased() != qso.call
             qso.call = v.uppercased()
             if !v.isEmpty, qso.timeOn == nil { qso.timeOn = Date() }
+            if changed { releaseAutoFilled() }
+            // Priorita: ruční zadání > historie značek > (callbook, v GUI) > odhad zóny z DXCC
+            applyCallHistory(v)
             // RST + CQ zóna: zóna protistanice podle DXCC (klik na číslo v příjmu ji přepíše)
             if !v.isEmpty, settings.contest.enabled, settings.contest.prefillsZone, qso.exchangeRcvd.isEmpty,
                let z = country(for: v)?.cqZone {
                 qso.exchangeRcvd = String(z)
+                dxccFilledZone = String(z)
             }
             // BARTG: smazaná značka = QSO nezačalo, čas se znovu bere aktuální (MMTTY UpdateBARTG)
             if v.isEmpty, isBARTG { qso.exchangeSent = ""; qso.timeOn = nil }
@@ -311,12 +331,54 @@ public actor AppController {
             manualFrequencySetThisSession = true
         default: throw AppError.unknownField(name)
         }
+        if name != "call" {                                // ruční zadání pole (i shodné hodnoty) zruší označení „z historie“; změna zruší „z DXCC“
+            qso.historyFilled[name] = nil
+            if name == "exchangeRcvd", qso.exchangeRcvd != dxccFilledZone { dxccFilledZone = nil }
+        }
         broadcaster.send(.qsoChanged(qso))
+    }
+
+    // MARK: Historie značek
+
+    /// Nastaví (nebo zruší) načtenou historii značek. Změna se projeví při další změně značky.
+    public func setCallHistory(_ h: CallHistory?) { callHistory = h }
+
+    private func setAutoField(_ f: String, _ v: String) {
+        switch f {
+        case "name": qso.name = v
+        case "locator": qso.locator = v
+        case "exchangeRcvd": qso.exchangeRcvd = v
+        default: break
+        }
+    }
+
+    /// Změna značky: hodnoty doplněné automaticky (a od té doby neupravené) patřily staré značce – vymažou se.
+    private func releaseAutoFilled() {
+        for (f, val) in qso.historyFilled where qso.value(f) == val { setAutoField(f, "") }
+        qso.historyFilled = [:]
+        if let z = dxccFilledZone, qso.exchangeRcvd == z { qso.exchangeRcvd = "" }
+        dxccFilledZone = nil
+    }
+
+    private func applyCallHistory(_ call: String) {
+        let cfg = settings.callHistory
+        guard cfg.enabled, !call.isEmpty, let hist = callHistory, let e = hist.lookup(call) else { return }
+        let country = country(for: call)
+        let na = country.map { ["K", "VE"].contains($0.primaryPrefix) }
+        for (f, val) in hist.fields(for: e, contest: settings.contest, isNorthAmerica: na) {
+            let cur = qso.value(f) ?? ""
+            let isDXCC = f == "exchangeRcvd" && !cur.isEmpty && cur == dxccFilledZone
+            guard cur.isEmpty || isDXCC || !cfg.fillEmptyOnly else { continue }
+            setAutoField(f, val)
+            qso.historyFilled[f] = val
+            if f == "exchangeRcvd" { dxccFilledZone = nil }
+        }
     }
 
     public func clearQSO() {
         let f = qso.frequency
         qso = QSOFields()
+        dxccFilledZone = nil
         qso.frequency = f                                // pásmo zůstává pro další spojení
         applyContestDefaults()
         broadcaster.send(.qsoChanged(qso))
@@ -574,7 +636,16 @@ public actor AppController {
 
     // MARK: Rig a modem
 
-    public func setFrequency(_ hz: Double) async throws { try await engine.setRigFrequency(hz) }
+    /// Přeladí rig. Během vysílání (zaklíčovaný vysílač) a se zastaveným enginem odmítne – stav se bere z enginu,
+    /// takže platí pro GUI i API (vzor `notchClick`).
+    public func setFrequency(_ hz: Double) async throws {
+        let st = await engine.state
+        if Self.transmittingStates.contains(st) { throw AppError.transmitting }
+        if st == .stopped { throw AppError.engineStopped }
+        try await engine.setRigFrequency(hz)
+    }
+    /// Stavy enginu, kdy je vysílač zaklíčovaný nebo se klíčuje.
+    public static let transmittingStates: Set<EngineState> = [.keying, .pttOn, .tx, .drain, .pttOff]
     public func setRigMode(_ m: String) async throws { try await engine.setRigMode(m) }
     public func modemParam(_ id: String) async -> ParameterValue? { await engine.modemParam(id) }
     public func setModemParam(_ id: String, _ v: ParameterValue) async throws {
@@ -585,7 +656,7 @@ public actor AppController {
     /// Zářez na kmitočtu (pravé tlačítko ve spektru jako MMTTY).
     public func notchClick(hz: Double) async {
         // MMTTY: během vysílání se kliky do spektra ignorují
-        guard ![.keying, .pttOn, .tx, .drain, .pttOff].contains(await engine.state) else { return }
+        guard !Self.transmittingStates.contains(await engine.state) else { return }
         await engine.withModem { $0.notchClick(hz: hz) }
         broadcaster.send(.paramsChanged(await engine.modemParams()))
     }

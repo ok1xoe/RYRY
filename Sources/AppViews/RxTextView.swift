@@ -32,13 +32,29 @@ struct RxTextView: NSViewRepresentable {
         var appended = 0
         var trimmed = 0
         var style: Style?
+        var highlightVersion = -1
     }
+
+    /// Značka v textu vysílání (echo) – zvýraznění ji přeskakuje.
+    nonisolated static let echoKey = NSAttributedString.Key("cz.ok1xoe.mmtty4mac.echo")
+    /// Kolik posledních znaků se přestyluje při změně stavu (zalogování, změna pásma).
+    static let restyleTail = 5000
 
     /// Vzhled okna příjmu (písmo, barvy) – změna vede k přestylování celého obsahu.
     struct Style: Equatable {
-        var size: Double, font: String, text: String?, echo: String?, background: String?
+        var size: Double, font: String, text: String?, echo: String?, background: String?, highlight: Bool
         init(_ d: DisplaySettings) {
             size = d.fontSize; font = d.rxFont; text = d.rxTextColor; echo = d.rxEchoColor; background = d.rxBackground
+            highlight = d.highlightCalls
+        }
+        /// Atributy zvýrazněné značky: vlastní červeně tučně, duplicita šedě přeškrtnutě, v logu modře, nová tučně.
+        func decorate(_ a: inout [NSAttributedString.Key: Any], _ s: CallStyle, bold: NSFont) {
+            switch s {
+            case .own: a[.foregroundColor] = NSColor.systemRed; a[.font] = bold
+            case .dupe: a[.foregroundColor] = NSColor.systemGray; a[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+            case .worked: a[.foregroundColor] = NSColor.systemBlue
+            case .new: a[.font] = bold
+            }
         }
         var nsFont: NSFont {
             if !font.isEmpty, let f = NSFont(name: font, size: size) { return f }
@@ -46,7 +62,9 @@ struct RxTextView: NSViewRepresentable {
         }
         func attrs(echo isEcho: Bool) -> [NSAttributedString.Key: Any] {
             let c = isEcho ? (Color(hex: echo).map(NSColor.init) ?? .systemRed) : (Color(hex: text).map(NSColor.init) ?? .textColor)
-            return [.font: nsFont, .foregroundColor: c]
+            var a: [NSAttributedString.Key: Any] = [.font: nsFont, .foregroundColor: c]
+            if isEcho { a[RxTextView.echoKey] = true }
+            return a
         }
         var backgroundColor: NSColor { Color(hex: background).map(NSColor.init) ?? .textBackgroundColor }
     }
@@ -69,6 +87,20 @@ struct RxTextView: NSViewRepresentable {
         return scroll
     }
 
+    /// Obarví značky ve slovech od pozice `from` (mimo echo). Ostatní slova dostanou základní styl,
+    /// takže se dřívější zvýraznění při změně stavu správně vrátí.
+    func applyHighlight(_ storage: NSTextStorage, from: Int, style: Style) {
+        let ns = storage.mutableString
+        guard from < ns.length else { return }
+        let bold = NSFontManager.shared.convert(style.nsFont, toHaveTrait: .boldFontMask)
+        for r in CallHighlight.wordRanges(in: ns, range: NSRange(location: from, length: ns.length - from)) {
+            if storage.attribute(Self.echoKey, at: r.location, effectiveRange: nil) != nil { continue }
+            var a = style.attrs(echo: false)
+            if let cs = model.callStyle(for: ns.substring(with: r)) { style.decorate(&a, cs, bold: bold) }
+            storage.setAttributes(a, range: r)
+        }
+    }
+
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let tv = scroll.documentView as? NSTextView, let storage = tv.textStorage else { return }
         let c = context.coordinator
@@ -77,6 +109,8 @@ struct RxTextView: NSViewRepresentable {
         let cut = model.rxTrimmedTotal - c.trimmed
         let style = Style(model.settings.display)
         if style != c.style { tv.backgroundColor = style.backgroundColor; tv.insertionPointColor = style.attrs(echo: false)[.foregroundColor] as? NSColor ?? .textColor }
+        let hv = model.highlightVersion
+        var restyleFrom: Int?
         storage.beginEditing()
         if newChars >= model.rxCharCount || newChars < 0 || cut < 0 || style != c.style {
             c.style = style
@@ -84,16 +118,25 @@ struct RxTextView: NSViewRepresentable {
             let s = NSMutableAttributedString()
             for r in model.rxRuns { s.append(NSAttributedString(string: r.text, attributes: style.attrs(echo: r.echo))) }
             storage.setAttributedString(s)
+            restyleFrom = max(0, storage.length - Self.restyleTail)
         } else {
             if cut > 0 {       // ořez zepředu (limit 200 000 znaků)
                 let n = (storage.string.utf16.count > 0) ? NSRange(storage.string.startIndex..<storage.string.index(storage.string.startIndex, offsetBy: min(cut, storage.string.count)), in: storage.string) : NSRange(location: 0, length: 0)
                 storage.deleteCharacters(in: n)
             }
+            let oldLength = storage.length
             for r in model.rxTail(newChars) {
                 storage.append(NSAttributedString(string: r.text, attributes: style.attrs(echo: r.echo)))
             }
+            // navazuje-li přidaný text na neúplné slovo, přestylovat i to (slovo rozdělené mezi dvě přidání)
+            if newChars > 0 { restyleFrom = CallHighlight.restyleStart(in: storage.mutableString, appendedAt: oldLength) }
+            if hv != c.highlightVersion {         // změna stavu (log, pásmo) → přestylovat konec textu
+                restyleFrom = min(restyleFrom ?? Int.max, max(0, storage.length - Self.restyleTail))
+            }
         }
+        if style.highlight, let from = restyleFrom { applyHighlight(storage, from: from, style: style) }
         storage.endEditing()
+        c.highlightVersion = hv
         c.appended = model.rxAppendedTotal
         c.trimmed = model.rxTrimmedTotal
         if atBottom { tv.scrollToEndOfDocument(nil) }

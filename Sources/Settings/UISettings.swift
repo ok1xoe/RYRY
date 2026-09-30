@@ -77,9 +77,9 @@ public struct KeyBinding: Codable, Sendable, Hashable {
 
 /// Příkazy, kterým lze přiřadit zkratku (MMTTY „Assign ShortCut Keys“).
 public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
-    case macro(Int), toggleTx, rxNow, tune, logQSO, clearQSO, clearRx, stopMacro, openLog, esmMode
+    case macro(Int), toggleTx, rxNow, tune, logQSO, clearQSO, clearRx, stopMacro, openLog, esmMode, enterFrequency
     public static var allCases: [ShortcutCommand] {
-        (0..<AppSettings.macroCount).map { .macro($0) } + [.toggleTx, .rxNow, .tune, .logQSO, .clearQSO, .clearRx, .stopMacro, .openLog, .esmMode]
+        (0..<AppSettings.macroCount).map { .macro($0) } + [.toggleTx, .rxNow, .tune, .logQSO, .clearQSO, .clearRx, .stopMacro, .openLog, .esmMode, .enterFrequency]
     }
     public var id: String {
         switch self {
@@ -87,9 +87,10 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
         case .toggleTx: "toggleTx"; case .rxNow: "rxNow"; case .tune: "tune"; case .logQSO: "logQSO"
         case .clearQSO: "clearQSO"; case .clearRx: "clearRx"; case .stopMacro: "stopMacro"; case .openLog: "openLog"
         case .esmMode: "esmMode"
+        case .enterFrequency: "enterFrequency"
         }
     }
-    /// Výchozí zkratky (dosavadní pevné): F1–F12, ⇧F1–⇧F4, ⌘T, ⌘., ⌘L, ⌘K, ⇧⌘L; ⌃R přepíná Run / S&P.
+    /// Výchozí zkratky (dosavadní pevné): F1–F12, ⇧F1–⇧F4, ⌘T, ⌘., ⌘L, ⌘K, ⇧⌘L; ⌃R přepíná Run / S&P, ⌥⌘F zadání frekvence.
     public var defaultBinding: KeyBinding {
         switch self {
         case .macro(let i): i < 12 ? KeyBinding(key: "f\(i + 1)") : KeyBinding(key: "f\(i - 11)", modifiers: [.shift])
@@ -99,6 +100,7 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
         case .clearRx: KeyBinding(key: "k", modifiers: [.command])
         case .openLog: KeyBinding(key: "l", modifiers: [.command, .shift])
         case .esmMode: KeyBinding(key: "r", modifiers: [.control])
+        case .enterFrequency: KeyBinding(key: "f", modifiers: [.option, .command])
         case .tune, .clearQSO, .stopMacro: .none
         }
     }

@@ -9,6 +9,7 @@ import Settings
 import RigControl
 import AppCore
 import SwiftUI
+import UniformTypeIdentifiers
 import Upload
 import QSOLog
 
@@ -503,6 +504,20 @@ struct SpotsTab: View {
             } header: { Text(L("Spoty")) } footer: {
                 Text(L("Rig se nastaví na frekvenci spotu (u RTTY je to mark) + posun. Rádio v režimu LSB/AFSK s mark 2125 Hz potřebuje posun +2125 Hz. Síť se používá jen u zapnutých služeb; změny po Použít."))
             }
+            Section {
+                Toggle(L("Zvuk, když se v příjmu objeví moje značka"), isOn: $s.alerts.myCallSound)
+                Toggle(L("Systémové oznámení, když mě někdo volá (jen když aplikace není aktivní)"), isOn: $s.alerts.myCallNotification)
+                Toggle(L("Hlídat novou zemi na aktuálním pásmu"), isOn: $s.alerts.newCountryBand)
+                Toggle(L("Hlídat novou zemi vůbec"), isOn: $s.alerts.newCountryAny)
+                LabeledContent(L("Hlídané značky")) {
+                    TextEditor(text: $s.alerts.watchCalls).font(.system(.body, design: .monospaced)).frame(width: 260, height: 70)
+                        .border(Color.secondary.opacity(0.3))
+                }
+                Toggle(L("Zvuk u potřebných značek a zemí"), isOn: $s.alerts.neededSound)
+                Toggle(L("Systémové oznámení u potřebných značek a zemí"), isOn: $s.alerts.neededNotification)
+            } header: { Text(L("Upozornění")) } footer: {
+                Text(L("Hlídané značky: jedna na řádek (porovnává se základní značka bez /P). Země se poznají z cty.dat a porovnají s logem. Kontroluje se ve spotech (označí se ve sloupci Potřeba) i v přijatém textu; každá značka jen jednou. Oprávnění k oznámením se vyžádá až při zapnutí."))
+            }
         }
         .formStyle(.grouped)
     }
@@ -760,6 +775,7 @@ struct ContestTab: View {
                 Text(L("%N odesílané číslo nebo výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST")).font(.callout)
             } header: { Text(L("Makra")) }
             ESMSection(s: $s)
+            CallHistorySection(s: $s, model: model)
             Section {
                 Toggle(L("Návrhy značek pod polem Call"), isOn: $s.log.superCheck)
                 LabeledContent(L("Databáze značek")) {
@@ -851,9 +867,12 @@ struct DisplayTab: View {
                     NumberRow(title: L("Délka řádku"), value: $s.txWindow.wrapColumn, range: TxWindowSettings.wrapRange, unit: L("znaků"))
                 }
             } header: { Text(L("Okno vysílání")) }
-            Section(L("Ostatní")) {
+            Section {
                 Toggle(L("Časové značky UTC při přepnutí TX/RX"), isOn: $s.display.timestamps)
                 Toggle(L("Bublinová nápověda tlačítek"), isOn: $s.display.showHints)
+                Toggle(L("Zvýrazňovat značky v příjmu"), isOn: $s.display.highlightCalls)
+            } header: { Text(L("Ostatní")) } footer: {
+                Text(L("Vaše značka červeně tučně, duplicita v závodě šedě přeškrtnutě, značka už v logu modře, nová značka tučně. Echo vlastního vysílání se nezvýrazňuje."))
             }
             Section {
                 Toggle(L("Automaticky kontrolovat aktualizace"), isOn: $s.updates.autoCheck)
@@ -942,6 +961,7 @@ struct KeysTab: View {
         case .stopMacro: return L("Zastavit opakování makra")
         case .openLog: return L("Otevřít log")
         case .esmMode: return L("ESM: přepnout Run / S&P")
+        case .enterFrequency: return L("Zadat frekvenci")
         }
     }
 }
@@ -1099,5 +1119,45 @@ struct ESMSection: View {
             Text(L("V závodě Enter v poli Call nebo výměny pošle makro podle stavu: Run – CQ, výměna, TU a zalogování; S&P – moje značka, výměna a zalogování. Nemá-li makro TU nebo výměny S&P %l, spojení se zaloguje automaticky. Během vysílání Enter nic neposílá. Run / S&P přepíná i QSO panel a %@.", s.binding(for: .esmMode).display))
         }
         .disabled(!s.contest.enabled)
+    }
+}
+
+/// Nastavení → Závod → Historie značek (soubor ve formátu N1MM Call History).
+struct CallHistorySection: View {
+    @Binding var s: AppSettings
+    @Bindable var model: AppModel
+
+    private func choose() {
+        let p = NSOpenPanel()
+        p.canChooseFiles = true; p.canChooseDirectories = false; p.allowsMultipleSelection = false
+        p.allowedContentTypes = [.plainText, .commaSeparatedText, .text]
+        p.message = L("Vyberte soubor historie značek (N1MM Call History, .txt nebo .csv)")
+        if p.runModal() == .OK, let u = p.url { s.callHistory.path = u.path; s.callHistory.enabled = true }
+    }
+
+    var body: some View {
+        Section {
+            Toggle(L("Doplňovat z historie značek"), isOn: $s.callHistory.enabled)
+            LabeledContent(L("Soubor")) {
+                HStack {
+                    Text(s.callHistory.path.isEmpty ? L("nevybrán") : (s.callHistory.path as NSString).lastPathComponent)
+                        .foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        .hint(s.callHistory.path)
+                    Button(L("Vybrat…")) { choose() }
+                    if !s.callHistory.path.isEmpty {
+                        Button(L("Znovu načíst")) { model.reloadCallHistory() }
+                            .disabled(s.callHistory.path != model.settings.callHistory.path)
+                    }
+                }
+            }
+            if !model.callHistoryStatus.isEmpty {
+                Text(model.callHistoryStatus).font(.caption).foregroundStyle(.secondary)
+            } else if model.settings.callHistory.enabled, !model.settings.callHistory.path.isEmpty {
+                Text(L("%ld značek", model.callHistoryCount)).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
+            Toggle(L("Doplnit jen prázdná pole"), isOn: $s.callHistory.fillEmptyOnly)
+        } header: { Text(L("Historie značek")) } footer: {
+            Text(L("Po zadání značky doplní jméno, lokátor a výměnu protistanice ze souboru (N1MM Call History: hlavička !!Order!!, nebo jednoduché CSV Call,Name,Exch1). Historie má přednost před zónou z DXCC a před callbookem; ručně zadané hodnoty se nepřepisují. Počet značek se aktualizuje po uložení nastavení."))
+        }
     }
 }

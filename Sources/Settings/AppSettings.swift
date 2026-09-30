@@ -138,6 +138,20 @@ public struct CallbookSettings: Codable, Sendable, Equatable {
     }
 }
 
+/// Soubor historie značek (N1MM Call History): předvyplnění jména, lokátoru a výměny protistanice.
+public struct CallHistorySettings: Codable, Sendable, Equatable {
+    public var enabled = false
+    public var path = ""
+    public var fillEmptyOnly = true
+    public init() {}
+    enum CodingKeys: String, CodingKey { case enabled, path, fillEmptyOnly }
+    public init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "callHistory", x = CallHistorySettings()
+        enabled = c.tolerant(.enabled, x.enabled, w, s); path = c.tolerant(.path, x.path, w, s)
+        fillEmptyOnly = c.tolerant(.fillEmptyOnly, x.fillEmptyOnly, w, s)
+    }
+}
+
 public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public var name: String
     public var text: String
@@ -374,6 +388,8 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     public init() {}
     /// Předvolba platná pro UI: jen dokud formát odpovídá předvolbě.
     public var selectedPreset: ContestPreset? { preset.flatMap { $0.format == format ? $0 : nil } }
+    /// ARRL RTTY Roundup s pořadovými čísly: W/VE posílají místo čísla stát/provincii (pole „Stát/prov. r“).
+    public var isRoundupStateExchange: Bool { enabled && format == .serial && exchange.isEmpty && selectedPreset == .arrlRoundup }
     public var effectiveStart: Date { start ?? Date().addingTimeInterval(-72 * 3600) }
 
     /// Nastavení podle předvolby závodu v daném roce. `locator` = vlastní lokátor (výměna Makrothenu).
@@ -455,12 +471,14 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     public var xyQuality = XYScopeQuality.high
     /// Bublinová nápověda tlačítek (MMTTY „Show Button Hint“).
     public var showHints = true
+    /// Zvýrazňovat značky v přijatém textu (vlastní, duplicita, v logu, nová).
+    public var highlightCalls = true
     public init() {}
     /// FFT jádra pokrývá 0–4000 Hz (TSound m_FFTWINDOW).
     public static let maxHz = 4000.0
     enum CodingKeys: String, CodingKey { case fromHz, toHz, gainDB, autoGain, timestamps, fontSize, rxFont, rxBackground,
                                              rxTextColor, rxEchoColor, txBackground, txTextColor, palette, fftResponse,
-                                             xySize, xyQuality, showHints }
+                                             xySize, xyQuality, showHints, highlightCalls }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "display", x = DisplaySettings()
         fromHz = c.tolerant(.fromHz, x.fromHz, w, s); toHz = c.tolerant(.toHz, x.toHz, w, s)
@@ -477,6 +495,7 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
         palette = c.tolerant(.palette, x.palette, w, s); fftResponse = c.tolerant(.fftResponse, x.fftResponse, w, s)
         xySize = c.tolerant(.xySize, x.xySize, w, s); xyQuality = c.tolerant(.xyQuality, x.xyQuality, w, s)
         showHints = c.tolerant(.showHints, x.showHints, w, s)
+        highlightCalls = c.tolerant(.highlightCalls, x.highlightCalls, w, s)
     }
 }
 
@@ -501,6 +520,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var rig = RigSettings()
     public var api = APISettings()
     public var callbook = CallbookSettings()
+    public var callHistory = CallHistorySettings()
     public var rtty: [String: ParameterValue] = [:]
     public var macros: [Macro] = AppSettings.defaultMacros
     public var log = LogSettings()
@@ -521,6 +541,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var decoders = DecoderSettings()
     /// Enter Sends Message (Run / S&P) v závodě.
     public var esm = ESMSettings()
+    /// Upozornění (moje značka, hlídané značky, potřebné země).
+    public var alerts = AlertSettings()
     public init() {}
     public static let macroCount = 16
 
@@ -543,9 +565,9 @@ public struct AppSettings: Codable, Sendable, Equatable {
         Macro(name: "", text: ""),
     ]
 
-    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, rtty,
+    enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, callHistory, rtty,
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
-                                             shortcuts, updates, upload, spots, decoders, esm }
+                                             shortcuts, updates, upload, spots, decoders, esm, alerts }
 
     /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
     public static let defaultMessages: [Macro] = [
@@ -560,6 +582,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         ptt = c.tolerant(.ptt, x.ptt, w, s); fsk = c.tolerant(.fsk, x.fsk, w, s)
         rig = c.tolerant(.rig, x.rig, w, s); api = c.tolerant(.api, x.api, w, s)
         callbook = c.tolerant(.callbook, x.callbook, w, s)
+        callHistory = c.tolerant(.callHistory, x.callHistory, w, s)
         rtty = c.tolerant(.rtty, TolerantDict<ParameterValue>(), w, s).items
         macros = c.contains(.macros) ? c.tolerant(.macros, TolerantArray<Macro>(), w, s).items : x.macros
         // dřívější výchozí závodní makro mělo %M (v MMTTY přijaté číslo) místo %N (odesílané)
@@ -583,6 +606,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
             macros[14] = Self.defaultMacros[14]
         }
         esm = c.tolerant(.esm, x.esm, w, s)
+        alerts = c.tolerant(.alerts, x.alerts, w, s)
     }
 
     /// Konfigurace Engine z nastavení.

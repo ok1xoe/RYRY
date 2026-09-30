@@ -47,8 +47,11 @@ public struct SpotLogIndex: Sendable {
     private var bands: [String: Set<String>] = [:]      // základní značka → pásma ("" = neznámé)
 
     public init(_ records: [QSORecord] = []) {
-        for r in records { bands[QSORecord.baseCall(r.call), default: []].insert(r.band ?? "") }
+        for r in records { add(r) }
     }
+
+    /// Doplní jedno spojení (po zalogování, bez přestavby).
+    public mutating func add(_ r: QSORecord) { bands[QSORecord.baseCall(r.call), default: []].insert(r.band ?? "") }
 
     public func status(of s: Spot) -> Status {
         guard let b = bands[QSORecord.baseCall(s.call)] else { return .none }

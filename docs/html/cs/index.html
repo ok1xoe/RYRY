@@ -100,6 +100,8 @@
   <li><b>Kolečko myši</b> nad vodopádem mění úroveň squelche, <b>pravé tlačítko</b> vloží zářez (notch) proti rušení.</li>
   <li><b>AFC</b> doladí signál (pravé tlačítko: jen při otevřeném squelchi, omezení rozsahu), <b>NET</b> vysílá na kmitočtu příjmu, <b>REV</b> prohodí mark a space, <b>ATC</b> a <b>SQ</b> jako v MMTTY.</li>
   <li><b>Filtry</b> (menu vedle Shift): BPF, AA6YQ, notch/LMS, UOS. <b>XY</b> zapne křížový indikátor ladění.</li>
+  <li><b>Zvýraznění značek:</b> v přijatém textu je vaše značka červeně, stanice už v logu modře, nová tučně a duplicita přeškrtnutě. Když vás někdo volá, ozve se zvuk (volitelně i oznámení).</li>
+  <li><b>Hlídání:</b> v Nastavení → Spoty lze hlídat vybrané značky a nové země (na pásmu nebo vůbec) ve spotech i v příjmu.</li>
   <li><b>Klik na slovo</b> v přijatém textu ho vloží do QSO okna – značku, RST, číslo, jméno podle typu slova.</li>
 </ul>
 <h3>Druhý dekodér a vícekanálové dekódování</h3>
@@ -139,6 +141,8 @@
 <ul>
   <li><b>Pásmo:</b> bez připojeného rigu vyberte pod poli QSO pásmo nebo zadejte frekvenci v kHz – zapíše se do logu a zůstane i pro další spojení. S rigem se frekvence bere z rádia.</li>
   <li><b>Super Check Partial:</b> při psaní značky se pod polem Call nabízejí známé značky (z MASTER.SCP a z vašeho logu); „≈“ označuje značky lišící se o jeden znak – pomohou opravit chybně přijatou značku. MASTER.SCP stáhnete v Nastavení → Závod.</li>
+  <li><b>Směr antény:</b> pod zemí je azimut a vzdálenost k protistanici (z lokátoru, jinak podle země) i dlouhou cestou.</li>
+  <li><b>Frekvence:</b> kliknutím na frekvenci v horní liště (nebo <kbd>⌥</kbd><kbd>⌘</kbd><kbd>F</kbd>) zadáte kmitočet nebo zvolíte pásmo – rig se přeladí (během vysílání ne).</li>
   <li><b>Callbook:</b> po zadání značky se z QRZ.com nebo HamQTH doplní jméno, QTH a lokátor (Nastavení → API a log → Callbook; heslo je v Klíčence).</li>
 </ul>
 <figure><a href="../img/cs-log.png"><img src="../img/cs-log.png" alt="Okno Log" loading="lazy"></a>
@@ -171,6 +175,9 @@
 <h3>ESM – Enter posílá zprávy (Run / S&amp;P)</h3>
 <p>Po zapnutí v Nastavení → Závod → ESM pošle Enter v poli Call nebo výměny makro podle stavu spojení, podobně jako v N1MM: <b>Run</b> (voláte CQ) – CQ → výměna → TU a zalogování; <b>S&amp;P</b> (odpovídáte) – moje značka → výměna a zalogování. Režim přepnete v hlavičce QSO panelu nebo <kbd>⌃</kbd><kbd>R</kbd>; panel ukazuje, co Enter pošle. Během vysílání Enter nic neposílá a prázdné makro se nikdy neodešle.</p>
 <p><b>Rychlost:</b> ve stavovém řádku je v závodě počet spojení a rychlost za posledních 10 a 60 minut (spojení za hodinu); v okně Log jsou počty podle pásem.</p>
+<h3>Násobiče a band mapa</h3>
+<p>Okno <b>Okno → Násobiče</b> ukazuje u zvolené předvolby odpracované násobiče po pásmech (země DXCC, CQ zóny, prefixy WPX, státy a provincie, oblasti…) a u konečných množin i chybějící. U zadané značky se v QSO okně objeví zelené <b>NEW MULT</b>. Pravidla, která nešlo ověřit v oficiálních pravidlech závodu, jsou v okně označena. <b>Okno → Band mapa</b> ukazuje RTTY část pásma se spoty podle frekvence a naladěním rigu; klik naladí rig a vloží značku.</p>
+<p><b>Historie značek:</b> soubor ve formátu N1MM Call History (Nastavení → Závod) předvyplní jméno, lokátor a výměnu protistanice (např. zónu).</p>
 <h3>WAE a QTC</h3>
 <p>Ve formátu WAE je v QSO okně panel QTC: <b>QTC?</b> se zeptá protistanice, <b>QRV – přijmout</b> otevře příjem série, <b>Poslat…</b> připraví a odvysílá sérii z vašeho logu. Aplikace hlídá pravidla – nejvýše 10 QTC na dvojici stanic, jen mezi kontinenty, každé spojení jen jednou. Přijaté řádky se plní klikem na slova nebo tlačítkem <b>Načíst z příjmu</b>.</p>
 </section>

@@ -54,12 +54,15 @@ public enum WordClassifier {
 
     /// Klik na slovo v závodě podle formátu (MMTTY TMmttyWd::PBoxRxMouseDown, StoreZone/StoreQTH/StoreNR/StoreUTC).
     /// Vrací pole QSO okna k nastavení. PED řeší volající (každé slovo = značka).
-    public static func contestUpdate(_ word: String, format: ContestFormat, serialMode: Bool,
+    /// `roundup` = ARRL RTTY Roundup: stát/provincie (W/VE) jde do přijaté výměny, číslo do čísla.
+    public static func contestUpdate(_ word: String, format: ContestFormat, serialMode: Bool, roundup: Bool = false,
                                      current q: QSOFields) -> [(String, String)] {
         let w = word.uppercased().trimmingCharacters(in: .punctuationCharacters.subtracting(CharacterSet(charactersIn: ":"))
             .union(.whitespaces))
         // státy/provincie, které jsou zároveň běžné zkratky (CQ WW RTTY: OK = Oklahoma, AR = Arkansas)
         let qthAbbrev: Set<String> = ["OK", "AR", "OR", "ME", "HI", "IN", "MA", "ON", "AB"]
+        // ARRL RU: stát/provincie má přednost i před běžnými zkratkami (OK, DE, ON …) – klik je výslovná volba
+        if roundup, let sp = Multipliers.stateOrProvince(w) { return [("exchangeRcvd", sp)] }
         guard !w.isEmpty, !stopWords.contains(w) || (format == .cqrj && qthAbbrev.contains(w)) else { return [] }
         if w == "599" { return [("rstRcvd", w)] }
         var rest = Substring(w)

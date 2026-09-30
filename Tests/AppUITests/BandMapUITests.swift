@@ -83,3 +83,12 @@ private func bmRecord(_ call: String, mode: String = "RTTY", at: Date = Date()) 
     #expect(rig.freqs.isEmpty)                             // rig se nepřelaďuje
     await m.stop()
 }
+
+@Test func spotStatusNewWorkedDupe() {
+    let spot = bmSpot("DL1ABC", 14080.5)
+    let recs = [bmRecord("DL1ABC")]
+    func idx(_ since: Date?) -> LogIndex { LogIndex(records: recs, contestSince: since, country: { _ in nil }) }
+    #expect(AppModel.spotStatus(bmSpot("F5NEW", 14081), index: idx(nil), contest: false) == .new)
+    #expect(AppModel.spotStatus(spot, index: idx(nil), contest: false) == .worked)
+    #expect(AppModel.spotStatus(spot, index: idx(Date().addingTimeInterval(-3600)), contest: true) == .dupe)
+}

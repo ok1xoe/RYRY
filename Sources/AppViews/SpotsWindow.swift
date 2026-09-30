@@ -45,7 +45,7 @@ public struct SpotsWindow: View {
 
     public var body: some View {
         let feed = model.spotFeed
-        let index = SpotLogIndex(model.logRecords)
+        let index = model.spotLogIndex
         let rows = feed.visible
         VStack(spacing: 6) {
             HStack(spacing: 14) {
@@ -73,10 +73,22 @@ public struct SpotsWindow: View {
                 TableColumn("kHz") { s in Text(String(format: "%.1f", s.frequencyKHz)).monospacedDigit() }.width(70)
                 TableColumn("Call") { s in Text(s.call).fontWeight(.semibold) }.width(90)
                 TableColumn(L("Země")) { s in Text(model.app?.country(for: s.call)?.name ?? "") }.width(min: 90, ideal: 130)
+                TableColumn("Az") { s in
+                    Text(model.beam(call: s.call, locator: "").map { String(QSOPanel.azimuthInt($0.shortAzimuth)) + "°" } ?? "")
+                        .monospacedDigit().foregroundStyle(.secondary)
+                        .hint(L("Azimut krátkou cestou podle země spotu"))
+                }.width(38)
                 TableColumn("Log") { s in
                     let st = index.status(of: s)
                     Text(Self.logLabel(st)).foregroundStyle(st == .workedOnBand ? Color.orange : Color.secondary)
                 }.width(56)
+                TableColumn(L("Potřeba")) { s in
+                    let needed = model.neededReasons(for: s)
+                    if !needed.isEmpty {
+                        Label(L("potřebné"), systemImage: "star.fill").labelStyle(.titleAndIcon).font(.caption)
+                            .foregroundStyle(.pink).help(AppModel.neededText(needed))
+                    }
+                }.width(74)
                 TableColumn(L("Komentář")) { s in Text(s.comment).lineLimit(1) }
                 TableColumn("Spotter") { s in Text(s.spotter).foregroundStyle(.secondary) }.width(90)
             }

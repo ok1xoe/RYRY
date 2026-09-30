@@ -70,7 +70,14 @@ public final class AppModel {
     private let engineFactory: EngineFactory
     private let spectrumFPS: Double
 
-    public private(set) var settings: AppSettings
+    public private(set) var settings: AppSettings {
+        didSet {
+            if multiplierKey != multiplierKeyApplied { refreshMultipliers() }
+            if oldValue.contest.enabled != settings.contest.enabled || oldValue.contest.start != settings.contest.start {
+                rebuildLogIndex()                                              // duplicity: závod zapnut/vypnut, jiný začátek
+            }
+        }
+    }
     public private(set) var state: EngineState = .stopped
     public private(set) var rxRuns: [RxRun] = []
     public private(set) var rxCharCount = 0
@@ -85,14 +92,42 @@ public final class AppModel {
     public private(set) var mark = 2125.0
     public private(set) var space = 2295.0
     public private(set) var fig = false
-    public internal(set) var rig: RigStatus?
-    public private(set) var qso = QSOFields()
+    public internal(set) var rig: RigStatus? { didSet { if currentBand != Self.band(oldValue, qso) { refreshNewMultiplier() } } }
+    public private(set) var qso = QSOFields() { didSet { refreshNewMultiplier() } }
     public private(set) var previousQSOs: [QSORecord] = []
-    public private(set) var logRecords: [QSORecord] = []
+    /// Změna logu přepočte násobiče celé; zalogování jednoho spojení je jen přičte (`addLoggedRecord`).
+    public private(set) var logRecords: [QSORecord] = [] { didSet { if !logRecordsIncremental { refreshMultipliers() } } }
+    private var logRecordsIncremental = false
+    /// Index logu pro zvýrazňování značek, hlídání a band mapu (viz RxAlerts.swift, AppModel+Alerts.swift).
+    public internal(set) var logIndex = LogIndex()
+    /// Začátek závodu, se kterým je `logIndex` sestavený (duplicity).
+    var logIndexSince: Date?
+    /// Index „v logu / na pásmu“ pro okno Spoty (udržovaný spolu s `logIndex`, ne při každém překreslení).
+    public internal(set) var spotLogIndex = SpotLogIndex()
+    /// Výskyty značek v příjmu (potvrzení „potřebné“ ze šumu) a předchozí slovo příjmu (DE/CQ před značkou).
+    var rxCallSightings = RxCallSightings()
+    var rxPrevWord = ""
+    /// Souhrn upozornění ze spotů (dávka po připojení ke clusteru = jeden řádek).
+    var neededPending: [String] = []
+    var neededLastLine: Date?
+    var neededFlushTask: Task<Void, Never>?
+    /// Zvýšení znamená změnu stavu ovlivňující styl značek (log, pásmo, nastavení) – okno příjmu přestyluje konec textu.
+    public internal(set) var highlightVersion = 0
+    var highlightBand: String?
+    public var alertSink: AlertSink
+    let alertClock: () -> Date
+    var alertThrottle = AlertThrottle()
+    var rxScanner = RxWordScanner()
     public private(set) var messages: [String] = []
     public private(set) var apiStatus = ""
     /// Nenápadná informace pro QSO panel: „callbook: QRZ.com“ nebo chyba (prázdné = nic).
     public private(set) var callbookStatus = ""
+    /// Historie značek: počet načtených značek a stav načítání (prázdné = nic k hlášení).
+    public private(set) var callHistoryCount = 0
+    public private(set) var callHistoryStatus = ""
+    private var callHistory: CallHistory?
+    private var callHistoryPath = ""
+    private var callHistoryTask: Task<Void, Never>?
     private let secrets: SecretStore
     private let callbookFetcher: HTTPFetcher
     private let callbookDelay: Duration
@@ -160,7 +195,9 @@ public final class AppModel {
     public init(settingsStore: SettingsStore = SettingsStore(), profileStore: ProfileStore = ProfileStore(),
                 engineFactory: EngineFactory? = nil, spectrumFPS: Double = 15,
                 secrets: SecretStore = KeychainSecretStore(), callbookFetcher: @escaping HTTPFetcher = CallbookFactory.liveFetcher,
-                callbookDelay: Duration = .milliseconds(800)) {
+                callbookDelay: Duration = .milliseconds(800),
+                alertSink: AlertSink = NullAlertSink(), alertClock: @escaping () -> Date = { Date() }) {
+        self.alertSink = alertSink; self.alertClock = alertClock
         self.secrets = secrets; self.callbookFetcher = callbookFetcher; self.callbookDelay = callbookDelay
         self.settingsStore = settingsStore; self.profileStore = profileStore
         self.engineFactory = engineFactory ?? AppModel.realEngine
@@ -169,6 +206,7 @@ public final class AppModel {
         settings = s
         messages = w
         syncDisplay()
+        spotFeed.onNewSpot = { [weak self] spot in self?.checkSpotNeeded(spot) }
     }
 
     /// Stav oprávnění k mikrofonu; při prvním spuštění se zeptá (asynchronně).
@@ -196,7 +234,7 @@ public final class AppModel {
 
     func noteForTesting(_ m: String) { note(m) }
 
-    private func note(_ m: String) {
+    func note(_ m: String) {
         logger.notice("\(m, privacy: .public)")
         messages.append(m)
         if messages.count > 50 { messages.removeFirst(messages.count - 50) }
@@ -219,6 +257,7 @@ public final class AppModel {
         let qtc = try? QTCStore(directory: loc.directory, fileName: loc.qtcFileName)
         let app = AppController(settings: settings, engine: engine, log: log, profiles: profileStore, qtc: qtc)
         self.app = app
+        syncCallHistory()
         let events = app.events()
         eventTask = Task { [weak self] in
             for await e in events { self?.handle(e) }
@@ -242,6 +281,7 @@ public final class AppModel {
         state = await engine.state
         await refreshParams()
         if let log { logRecords = await log.query() }
+        rebuildLogIndex()
         backupLogIfDue()
         await loadSuperCheck()
         await refreshDupe()
@@ -333,7 +373,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.callbook); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots)
+                take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
                 take(\.log.directory)
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
@@ -349,7 +389,10 @@ public final class AppModel {
             // znovu sloučit: během zastavování mohl přijít .contestSerial (makro s %l)
             let merged = merge(self.settings)
             do { try self.settingsStore.save(merged) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
+            let wasNotifying = self.settings.alerts.wantsNotifications
             self.settings = merged
+            if merged.alerts.wantsNotifications, !wasNotifying { self.alertSink.requestNotificationAuthorization() }
+            self.highlightVersion &+= 1
             self.syncDisplay()
             if !self.qtcEnabled { self.qtcReceive = nil; self.qtcPendingCache = nil }
             await self.startNow()
@@ -378,6 +421,7 @@ public final class AppModel {
         case .engine(.rig(let r)):
             let bandChanged = Bands.band(forHz: r.frequency) != Bands.band(forHz: rig?.frequency)
             rig = r
+            updateHighlightBand()
             if bandChanged, !qso.call.isEmpty { Task { await self.refreshDupe() } }   // QSY na jiné pásmo
         case .engine(.error(let err)): note("\(err)")
         case .engine(.pttTimeout): note(L("PTT časovač vypnul vysílání"))
@@ -385,6 +429,7 @@ public final class AppModel {
         case .qsoChanged(let q):
             let callChanged = q.call != qso.call, freqChanged = q.frequency != qso.frequency
             qso = q
+            if freqChanged { updateHighlightBand() }
             if q.call.isEmpty { esmProgress = ESM.Progress() }     // nové spojení (Clear, zalogováno)
             if callChanged { updateSuperCheck(); Task { await self.refreshPrevious(); await self.refreshQTC() }; scheduleCallbook() }
             if callChanged || freqChanged { Task { await self.refreshDupe() } }
@@ -393,7 +438,8 @@ public final class AppModel {
                 try? settingsStore.save(settings)
             }
         case .qsoLogged(let r):
-            logRecords.insert(r, at: 0)
+            addLoggedRecord(r)
+            addToLogIndex(r)
             backupLogIfDue()
             if historyCalls.insert(r.call).inserted { rebuildSuperCheck() }
             Task { await self.refreshPrevious(); await self.refreshQTC(); await self.refreshDupe() }
@@ -433,6 +479,7 @@ public final class AppModel {
         }
         rxCharCount += s.count
         rxAppendedTotal += s.count
+        scanRxForAlerts(s, echo: echo)
         while rxCharCount > Self.rxLimit, !rxRuns.isEmpty {
             let over = rxCharCount - Self.rxLimit
             if rxRuns[0].text.count <= over {
@@ -559,19 +606,76 @@ public final class AppModel {
     public private(set) var scpCount = 0
     private var scpMaster: [String] = []
     private var historyCalls: Set<String> = []
-    private var superCheck = SuperCheck(calls: [])
+    private(set) var superCheck = SuperCheck(calls: [])
 
     func refreshDupe() async { isDupe = await app?.dupe() ?? false }
 
-    /// Soubor MASTER.SCP (Application Support/mmtty4mac).
-    public static var scpURL: URL {
-        (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory).appendingPathComponent("mmtty4mac/MASTER.SCP")
+    // MARK: Násobiče
+
+    /// Odpracované násobiče závodu (přepočet jen při změně logu nebo závodu); nil = mimo závod / vlastní závod.
+    public private(set) var multipliers: MultiplierTally?
+    /// Pravidla násobičů zvoleného závodu (i Makrothen bez násobičů); nil = mimo závod.
+    public private(set) var multiplierRule: MultiplierRule?
+    /// Násobiče, které by přineslo spojení se značkou v QSO okně (štítek NEW MULT).
+    public private(set) var newMultiplier = NewMultiplier(hits: [], band: nil)
+    private var multiplierCalculator: MultiplierCalculator?
+    private var multiplierKeyApplied: MultiplierKey?
+
+    private struct MultiplierKey: Equatable { var contest: ContestSettings; var call: String }
+    private var multiplierKey: MultiplierKey {
+        var c = settings.contest; c.nextSerial = 0                     // číslo spojení násobiče nemění
+        return MultiplierKey(contest: c, call: settings.station.call.uppercased())
     }
+    private var countryDB: CountryDB? { app?.countries ?? CountryDB.shared }
+
+    /// Pásmo aktuálního spojení: rig online, jinak ručně zadaná frekvence.
+    public var currentBand: String? { Self.band(rig, qso) }
+    private static func band(_ rig: RigStatus?, _ qso: QSOFields) -> String? {
+        Bands.band(forHz: rig?.online == true ? rig?.frequency : qso.frequency)
+    }
+
+    /// Počet úplných přepočtů násobičů (test: zalogování nepřepočítává celý log).
+    private(set) var multiplierFullRecomputes = 0
+
+    /// Zalogované spojení: do logu a průběžně do násobičů (bez přepočtu celého logu).
+    private func addLoggedRecord(_ r: QSORecord) {
+        logRecordsIncremental = true
+        logRecords.insert(r, at: 0)
+        logRecordsIncremental = false
+        guard let calc = multiplierCalculator, var t = multipliers else { return }
+        calc.add(r, to: &t, since: settings.contest.effectiveStart)
+        multipliers = t
+        refreshNewMultiplier()
+    }
+
+    func refreshMultipliers() {
+        multiplierFullRecomputes += 1
+        multiplierKeyApplied = multiplierKey
+        let db = countryDB
+        let own = db?.lookup(settings.station.call)?.primaryPrefix
+        guard let rule = MultiplierRule.rule(for: settings.contest, ownCountry: own) else {
+            multiplierRule = nil; multipliers = nil; multiplierCalculator = nil; refreshNewMultiplier(); return
+        }
+        let calc = MultiplierCalculator(rule: rule, countries: db)
+        multiplierRule = rule; multiplierCalculator = calc
+        multipliers = calc.tally(records: logRecords, since: settings.contest.effectiveStart)
+        refreshNewMultiplier()
+    }
+
+    private func refreshNewMultiplier() {
+        var n = NewMultiplier(hits: [], band: nil)
+        if let calc = multiplierCalculator, let t = multipliers, !qso.call.isEmpty {
+            n = t.newHits(calc.hits(call: qso.call, exchange: qso.exchangeRcvd), band: currentBand)
+        }
+        if n != newMultiplier { newMultiplier = n }
+    }
+
+    /// Soubor MASTER.SCP – ve složce nastavení (v aplikaci Application Support/mmtty4mac; testy mají vlastní složku).
+    public var scpURL: URL { settingsStore.url.deletingLastPathComponent().appendingPathComponent("MASTER.SCP") }
 
     /// Načte MASTER.SCP a značky z logu (po startu a po přepnutí logu).
     func loadSuperCheck() async {
-        let url = Self.scpURL
+        let url = scpURL
         scpMaster = await Task.detached { (try? String(contentsOf: url, encoding: .utf8)).map(SuperCheck.parse) ?? [] }.value
         historyCalls = Set(logRecords.map(\.call))
         rebuildSuperCheck()
@@ -605,8 +709,8 @@ public final class AppModel {
         else { throw QSOLogError.io(L("MASTER.SCP se nepodařilo stáhnout.")) }
         let calls = SuperCheck.parse(text)
         guard calls.count > 1000 else { throw QSOLogError.io(L("MASTER.SCP se nepodařilo stáhnout.")) }
-        try FileManager.default.createDirectory(at: Self.scpURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: Self.scpURL, options: .atomic)
+        try FileManager.default.createDirectory(at: scpURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: scpURL, options: .atomic)
         scpMaster = calls
         rebuildSuperCheck()
         return calls.count
@@ -1066,6 +1170,7 @@ public final class AppModel {
     private func refreshLog() async {
         guard let log = app?.log else { return }
         logRecords = await log.query()
+        rebuildLogIndex()
     }
 
     private func refreshParams() async {
@@ -1301,18 +1406,84 @@ public final class AppModel {
         let off = min(max(settings.spots.offsetHz, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound)
         let hz = spot.frequencyHz + off
         if let app, settings.rig.type != .none {
-            if state != .rx {
-                // nikdy nepřelaďovat zaklíčovaný vysílač (jiné pásmo pod zátěží, cizí kmitočet)
-                note(L("Během vysílání se rig nepřelaďuje – spot použijte po přechodu na RX."))
-            } else {
-                do { try await app.setFrequency(hz) }
-                catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
-            }
+            // nikdy nepřelaďovat zaklíčovaný vysílač (jiné pásmo pod zátěží, cizí kmitočet) – hlídá AppController
+            do { try await app.setFrequency(hz) }
+            catch AppError.transmitting { note(L("Během vysílání se rig nepřelaďuje – spot použijte po přechodu na RX.")) }
+            catch AppError.engineStopped { note(Self.engineStoppedMessage) }
+            catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
         } else {
             await setQSOField("freq", String(format: "%.1f", spot.frequencyHz / 1000))   // bez rigu: frekvence spotu do logu
         }
         await setQSOField("call", spot.call)
     }
+
+    // MARK: Frekvence a pásma (horní lišta)
+
+    /// Výsledek zadání frekvence.
+    public enum TuneOutcome: Equatable, Sendable {
+        case rig            // rig přeladěn
+        case manual         // bez rigu: ruční frekvence QSO
+        case rejectedTX     // během vysílání se rig nepřelaďuje
+        case notRunning     // engine neběží (zvuk nespuštěn) – rig není připojený
+        case invalid        // neplatný vstup
+        case failed         // rig frekvenci nepřijal
+    }
+
+    static var engineStoppedMessage: String { L("Engine neběží (zvuk nespuštěn?) – rig nelze přeladit.") }
+
+    /// Požadavek na otevření zadání frekvence (zkratka / menu); horní lišta ho zobrazí a shodí.
+    public var showFrequencyEntry = false
+
+    /// Nastaví frekvenci v kHz: s rigem přeladí rig (jen v RX, stejně jako `useSpot`), bez rigu zapíše ruční frekvenci QSO.
+    @discardableResult
+    public func setFrequency(kHz: Double) async -> TuneOutcome {
+        guard FrequencyInput.rangeKHz.contains(kHz) else {
+            note(L("Neplatná frekvence – zadejte kHz v rozsahu 100 až 500 000."))
+            return .invalid
+        }
+        if let app, settings.rig.type != .none {
+            do { try await app.setFrequency(kHz * 1000); return .rig }
+            catch AppError.transmitting {
+                note(L("Během vysílání se rig nepřelaďuje – frekvenci zadejte po přechodu na RX."))
+                return .rejectedTX
+            } catch AppError.engineStopped {
+                note(Self.engineStoppedMessage)
+                return .notRunning
+            } catch {
+                note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", kHz), "\(error)"))
+                return .failed
+            }
+        }
+        await setQSOField("freq", kHz == kHz.rounded() ? String(Int(kHz)) : String(kHz))
+        return .manual
+    }
+
+    /// Zadání z textového pole (kHz, čárka i tečka, volitelně „kHz“ / „MHz“).
+    @discardableResult
+    public func setFrequency(text: String) async -> TuneOutcome {
+        guard let k = FrequencyInput.parseKHz(text) else {
+            note(L("Neplatná frekvence „%@“ – zadejte kHz v rozsahu 100 až 500 000.", text))
+            return .invalid
+        }
+        return await setFrequency(kHz: k)
+    }
+
+    // MARK: Směr a vzdálenost
+
+    /// Vlastní poloha: lokátor ze Stanice, jinak střed země DXCC vlastní značky.
+    public var ownPosition: Geo.Position? {
+        Geo.position(locator: settings.station.locator, country: app?.country(for: settings.station.call))
+    }
+
+    /// Směr a vzdálenost k protistanici: lokátor z QSO okna, jinak střed země její značky.
+    public func beam(call: String, locator: String) -> Geo.Beam? {
+        guard let own = ownPosition else { return nil }
+        let c = call.trimmingCharacters(in: .whitespaces)
+        guard let remote = Geo.position(locator: locator, country: c.isEmpty ? nil : app?.country(for: c)) else { return nil }
+        return Geo.beam(own: own, remote: remote)
+    }
+
+    public var beamToRemote: Geo.Beam? { beam(call: qso.call, locator: qso.locator) }
 
     /// Klik na štítek band map: mark na audio pozici spotu a značka do QSO okna (rig se nepřelaďuje).
     public func bandMapClick(_ marker: BandMapMarker) async {
@@ -1329,6 +1500,42 @@ public final class AppModel {
         await run("QSO") { try await app.setQSOField(name, value) }
         qso = await app.qso
         if name == "call" { await refreshPrevious(); scheduleCallbook() }
+    }
+
+    // MARK: Historie značek
+
+    /// Znovu načte soubor historie značek (po úpravě souboru na disku).
+    public func reloadCallHistory() { callHistoryPath = ""; callHistory = nil; syncCallHistory() }
+
+    /// Předá řadiči načtenou historii; při novém souboru ho načte na pozadí (desítky tisíc řádků neblokují GUI).
+    private func syncCallHistory() {
+        callHistoryTask?.cancel(); callHistoryTask = nil
+        let cfg = settings.callHistory
+        guard cfg.enabled, !cfg.path.isEmpty else {
+            callHistory = nil; callHistoryPath = ""; callHistoryCount = 0; callHistoryStatus = ""
+            if let app { Task { await app.setCallHistory(nil) } }
+            return
+        }
+        if callHistoryPath == cfg.path, let h = callHistory {
+            if let app { Task { await app.setCallHistory(h) } }
+            return
+        }
+        let path = cfg.path
+        callHistoryStatus = L("Načítám historii značek…")
+        callHistoryTask = Task { [weak self] in
+            do {
+                let h = try await CallHistory.load(url: URL(fileURLWithPath: path))
+                guard !Task.isCancelled, let self else { return }
+                self.callHistory = h; self.callHistoryPath = path
+                self.callHistoryCount = h.count; self.callHistoryStatus = ""
+                await self.app?.setCallHistory(h)
+            } catch is CancellationError {
+            } catch {
+                guard !Task.isCancelled, let self else { return }
+                self.callHistory = nil; self.callHistoryPath = ""; self.callHistoryCount = 0
+                self.callHistoryStatus = L("Historii značek nelze načíst: %@", error.localizedDescription)
+            }
+        }
     }
 
     // MARK: Callbook
@@ -1415,7 +1622,8 @@ public final class AppModel {
         }
         if settings.contest.enabled, !qso.call.isEmpty, kind != .call {
             for (field, v) in WordClassifier.contestUpdate(word, format: settings.contest.format,
-                                                           serialMode: settings.contest.exchange.isEmpty, current: qso) {
+                                                           serialMode: settings.contest.exchange.isEmpty,
+                                                           roundup: settings.contest.isRoundupStateExchange, current: qso) {
                 await setQSOField(field, v)
             }
             return

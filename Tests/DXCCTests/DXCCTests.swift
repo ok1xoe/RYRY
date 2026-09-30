@@ -88,3 +88,20 @@ func portableCalls(call: String, country: String) throws {
     #expect(db.lookup("IT9ABC")?.name == "Italy")
     #expect(db.lookup("OK1XOE/P")?.name == "Czech Republic")
 }
+
+// Násobiče: CQ WW a WAE počítají i země ze seznamu WAE (*IT9, *GM/s, *TA1, *4U1V, *JW/b, *IG9).
+@Test func waeListLookup() throws {
+    let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("Resources/cty.dat")
+    let db = try CountryDB(contentsOf: url)
+    #expect(db.lookup("IT9ABC", wae: true)?.name == "Sicily")
+    #expect(db.lookup("IT9ABC", wae: true)?.primaryPrefix == "IT9")
+    #expect(db.lookup("IT9ABC", wae: false)?.name == "Italy")
+    #expect(db.lookup("TA1ABC", wae: true)?.name == "European Turkey")
+    #expect(db.lookup("IG9ABC", wae: true)?.name == "African Italy")
+    #expect(db.lookup("4U1VIC", wae: true)?.name == "Vienna Intl Ctr")
+    #expect(db.lookup("I1ABC", wae: true)?.name == "Italy")                 // mimo seznam WAE = DXCC
+    #expect(db.lookup("OK1XOE", wae: true)?.name == "Czech Republic")
+    #expect(db.lookup("IT9ABC/P", wae: true)?.name == "Sicily")
+    #expect(db.count > 300 && db.count < 400)                               // count = jen země DXCC
+}

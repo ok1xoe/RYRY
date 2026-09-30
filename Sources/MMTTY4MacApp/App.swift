@@ -66,7 +66,7 @@ struct MMTTY4MacApp: App {
     }
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    @State private var model = AppModel()
+    @State private var model = AppModel(alertSink: SystemAlertSink())
     @State private var updates = UpdateModel()
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
@@ -121,6 +121,9 @@ struct MMTTY4MacApp: App {
                 Button(model.settings.esm.mode == .run ? L("ESM: přepnout na S&P") : L("ESM: přepnout na Run")) {
                     model.toggleESMMode()
                 }.shortcut(model.settings.binding(for: .esmMode))
+                Divider()
+                Button(L("Zadat frekvenci…")) { model.showFrequencyEntry = true }
+                    .shortcut(model.settings.binding(for: .enterFrequency))
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }
@@ -176,6 +179,8 @@ struct MMTTY4MacApp: App {
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
                 Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
                 Button(L("Spoty")) { openWindow(id: "spots") }
+                Button(L("Band mapa")) { openWindow(id: "bandmapwindow") }
+                Button(L("Násobiče")) { openWindow(id: "multipliers") }
                 Divider()
                 Toggle(L("2. dekodér"), isOn: Binding(get: { model.settings.decoders.secondEnabled },
                                                       set: { v in Task { await model.setSecondDecoder(v) } }))
@@ -192,6 +197,12 @@ struct MMTTY4MacApp: App {
             .windowResizability(.contentSize)
         Window(L("Spoty"), id: "spots") {
             SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        Window(L("Band mapa"), id: "bandmapwindow") {
+            BandMapWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        Window(L("Násobiče"), id: "multipliers") {
+            MultipliersWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
         Window(L("Kanály"), id: "channels") {
             ChannelsWindow(model: model).environment(\.showHints, model.settings.display.showHints)

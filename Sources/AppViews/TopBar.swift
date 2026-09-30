@@ -1,6 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import AppUI
 import Engine
+import QSOLog
 import SwiftUI
 import Localization
 
@@ -45,11 +46,7 @@ struct TopBar: View {
                 Button("HAM") { Task { await model.hamShift() } }.fixedSize().hint("Shift 170 Hz")
                 ProfileMenu(model: model)
                 Spacer()
-                Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")
-                    .font(.system(.title3, design: .monospaced))
-                    .lineLimit(1).fixedSize()
-                    .foregroundStyle(model.rig?.online == true ? .primary : .secondary)
-                    .hint(model.rig?.online == true ? L("Rig online") : L("Rig offline"))
+                FrequencyControl(model: model)
                 SignalMeter(level: model.signalLevel, open: model.squelchOpen).frame(width: 56, height: 12)
             }
             HStack(spacing: 6) {
@@ -215,5 +212,76 @@ struct WAVControls: View {
         .padding(.horizontal, 6).padding(.vertical, 2)
         .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
         .fixedSize()
+    }
+}
+
+/// Frekvence rigu v horní liště: kliknutí (nebo zkratka) otevře zadání kHz, vedle je nabídka pásem.
+struct FrequencyControl: View {
+    @Bindable var model: AppModel
+    @State private var shown = false
+    @State private var text = ""
+    @State private var error: String?
+    @FocusState private var focused: Bool
+
+    var online: Bool { model.rig?.online == true }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Menu {
+                ForEach(AppModel.bandPresets, id: \.0) { b in
+                    Button("\(b.0) (\(Int(b.1)) kHz)") { Task { await model.setFrequency(kHz: b.1) } }
+                }
+            } label: {
+                Text(Bands.band(forHz: model.rig?.frequency ?? model.qso.frequency) ?? L("Pásmo")).lineLimit(1)
+            }
+            .fixedSize().controlSize(.small)
+            .hint(model.settings.rig.type == .none ? L("Pásmo do logu (bez rigu)") : L("Přeladit rig na RTTY kmitočet pásma"))
+            Button { open() } label: {
+                Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")
+                    .font(.system(.title3, design: .monospaced))
+                    .lineLimit(1).fixedSize()
+                    .foregroundStyle(online ? .primary : .secondary)
+            }
+            .buttonStyle(.plain)
+            .hint((online ? L("Rig online") : L("Rig offline")) + " – " + L("kliknutím zadáte frekvenci (%@)", model.settings.binding(for: .enterFrequency).display))
+            .popover(isPresented: $shown, arrowEdge: .bottom) { entry }
+        }
+        .onChange(of: model.showFrequencyEntry) { _, v in if v { model.showFrequencyEntry = false; open() } }
+    }
+
+    func open() {
+        if let f = model.rig?.frequency, online { text = String(format: "%.3f", f / 1000) } else { text = "" }
+        error = nil; shown = true
+    }
+
+    var entry: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(model.settings.rig.type == .none ? L("Frekvence do logu (kHz)") : L("Přeladit rig (kHz)")).font(.caption).foregroundStyle(.secondary)
+            HStack {
+                TextField("kHz", text: $text)
+                    .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 130)
+                    .focused($focused)
+                    .onSubmit { submit() }
+                    .onChange(of: text) { error = nil }
+                Text("kHz").foregroundStyle(.secondary)
+            }
+            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+        }
+        .padding(10)
+        .onAppear { focused = true }
+    }
+
+    func submit() {
+        let t = text
+        Task {
+            let r = await model.setFrequency(text: t)
+            switch r {
+            case .invalid: error = L("Zadejte kHz, 100 až 500 000")
+            case .rejectedTX: error = L("Během vysílání se rig nepřelaďuje")
+            case .notRunning: error = L("Engine neběží – rig nelze přeladit")
+            case .failed: error = L("Rig frekvenci nepřijal")
+            case .rig, .manual: shown = false
+            }
+        }
     }
 }
