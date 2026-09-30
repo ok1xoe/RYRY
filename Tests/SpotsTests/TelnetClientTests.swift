@@ -185,17 +185,16 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     let now = Date()
     let feed = SpotFeed(clock: { now })
     var cfg = SpotFeedConfig(call: "OK1XOE", cluster: SpotEndpoint(host: "127.0.0.1", port: cluster.port),
-                             rbn: SpotEndpoint(host: "127.0.0.1", port: rbn.port), rttyOnly: false)
+                             rbn: SpotEndpoint(host: "127.0.0.1", port: rbn.port), filter: .all)
     cfg.clientTuning = (0.05, 0.1)
     feed.start(cfg)
     #expect(await waitUntil { await MainActor.run { feed.book.count >= 2 && feed.clusterState == .connected && feed.rbnState == .connected } })
     let v = feed.visible
     #expect(v.map(\.call).sorted() == ["DL1ABC", "UA3XYZ"])              // DL1ABC jen jednou
-    feed.rttyOnly = true
+    feed.filter.modes = [.rtty]
     #expect(feed.visible.map(\.call) == ["DL1ABC"])
-    feed.bandFilter = "40m"
+    feed.filter.bands = ["40m"]
     #expect(feed.visible.isEmpty)
-    #expect(feed.bands == ["20m"])
     feed.stop()
     #expect(feed.clusterState == .off && !feed.isRunning)
 }

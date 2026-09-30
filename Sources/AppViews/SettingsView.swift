@@ -489,10 +489,10 @@ struct SpotsTab: View {
                     TextField("", value: $s.spots.rbnPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
                 }.disabled(!s.spots.rbnEnabled)
             } header: { Text("RBN") } footer: {
-                Text(L("Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat „Jen RTTY“."))
+                Text(L("Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat ve filtru módů jen RTTY."))
             }
             Section {
-                Toggle(L("Jen RTTY"), isOn: $s.spots.rttyOnly)
+                SpotFilterBar(bands: $s.spots.filterBands, modes: $s.spots.filterModes)
                 Toggle(L("Spoty ve vodopádu"), isOn: $s.spots.showInWaterfall)
                 NumberRow(title: L("Stáří spotů"), value: $s.spots.maxAgeMinutes, range: SpotSettings.ageRange, unit: "min")
                 LabeledContent(L("Posun frekvence rigu")) {

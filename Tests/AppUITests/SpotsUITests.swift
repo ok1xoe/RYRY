@@ -95,7 +95,7 @@ let spot = Spot(frequencyKHz: 14080.0, call: "DL1ABC", spotter: "W3LPL-#", comme
         $0.spots.clusterCommands = ["sh/dx 30"]; $0.spots.rbnEnabled = true; $0.spots.maxAgeMinutes = 45
     }
     let c = try #require(m2.spotFeedConfig())
-    #expect(c.call == "OK1XOE" && c.maxAgeMinutes == 45 && c.rttyOnly)
+    #expect(c.call == "OK1XOE" && c.maxAgeMinutes == 45 && c.filter == SpotFilter())
     #expect(c.cluster == SpotEndpoint(host: "dxfun.com", port: 8000, commands: ["sh/dx 30"]))
     #expect(c.rbn == SpotEndpoint(host: "telnet.reversebeacon.net", port: 7000))
 }
@@ -107,12 +107,14 @@ let spot = Spot(frequencyKHz: 14080.0, call: "DL1ABC", spotter: "W3LPL-#", comme
     await m.stop()
 }
 
-@Test @MainActor func settingRTTYOnlyPersists() async throws {
+@Test @MainActor func settingModeFilterPersists() async throws {
     let m = spotModel(rig: NoRig())
     await m.start()
-    m.setSpots { $0.rttyOnly = false }
-    #expect(!m.settings.spots.rttyOnly)
-    m.setSpots { $0.rttyOnly = true }
-    #expect(m.settings.spots.rttyOnly)
+    m.setSpots { $0.filterModes = SpotFilter.allModes }
+    #expect(m.settings.spots.filterModes == SpotFilter.allModes && m.spotFeed.filter.modes == SpotFilter.allModes)
+    m.setSpots { $0.filterBands = ["20m"] }
+    #expect(m.settings.spots.filterBands == ["20m"] && m.spotFeed.filter.bands == ["20m"])
+    m.setSpots { $0.filterModes = [.rtty] }
+    #expect(m.settings.spots.filterModes == [.rtty])
     await m.stop()
 }

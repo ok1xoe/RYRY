@@ -1,5 +1,6 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
+import Spots
 
 /// Spoty z DX clusteru a Reverse Beacon Network (telnet). Přihlašovací značka = značka ze Stanice.
 /// Výchozí stav je vypnuto – síť se použije jen na výslovné zapnutí.
@@ -14,14 +15,19 @@ public struct SpotSettings: Codable, Sendable, Equatable {
     public var rbnEnabled = false
     public var rbnHost = "telnet.reversebeacon.net"
     public var rbnPort = 7000
-    /// Jen spoty RTTY.
-    public var rttyOnly = true
+    /// Filtr zobrazení – zaškrtnutá pásma (pevný seznam `SpotFilter.allBands`). Výchozí: všechna.
+    public var filterBands = SpotFilter.allBandsSet
+    /// Filtr zobrazení – zaškrtnuté skupiny módů. Výchozí jen RTTY (jako dřívější „Jen RTTY“).
+    public var filterModes: Set<SpotModeGroup> = [.rtty]
     /// Stáří spotů v minutách (1…240).
     public var maxAgeMinutes = 30
     /// Posun frekvence rigu proti frekvenci spotu (Hz): rádio v LSB/AFSK s mark 2125 Hz potřebuje +2125.
     public var offsetHz = 0.0
     /// Štítky spotů (band map) ve vodopádu a spektru.
     public var showInWaterfall = true
+
+    /// Filtr zobrazení pro seznam spotů, band mapu a štítky ve vodopádu.
+    public var filter: SpotFilter { SpotFilter(bands: filterBands, modes: filterModes) }
 
     public static let ageRange = 1...240
     public static let offsetRange = -10_000.0...10_000.0
@@ -43,8 +49,12 @@ public struct SpotSettings: Codable, Sendable, Equatable {
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case clusterEnabled, clusterHost, clusterPort, clusterCommands, clusterMacros, rbnEnabled, rbnHost, rbnPort, rttyOnly, maxAgeMinutes, offsetHz, showInWaterfall
+        case clusterEnabled, clusterHost, clusterPort, clusterCommands, clusterMacros, rbnEnabled, rbnHost, rbnPort
+        case filterBands, filterModes, maxAgeMinutes, offsetHz, showInWaterfall
     }
+
+    /// Zrušené nastavení „Jen RTTY“ – čte se jen kvůli migraci na `filterModes` (už se neukládá).
+    enum LegacyKeys: String, CodingKey { case rttyOnly }
 
     static func validHost(_ h: String) -> Bool {
         !h.isEmpty && h.count <= 253 && !h.contains(where: { $0.isWhitespace || $0 == "/" })
@@ -74,7 +84,16 @@ public struct SpotSettings: Codable, Sendable, Equatable {
         let rh = c.tolerant(.rbnHost, x.rbnHost, w, s).trimmingCharacters(in: .whitespaces)
         rbnHost = Self.validHost(rh) ? rh : x.rbnHost
         let rp = c.tolerant(.rbnPort, x.rbnPort, w, s); rbnPort = (1...65535).contains(rp) ? rp : x.rbnPort
-        rttyOnly = c.tolerant(.rttyOnly, x.rttyOnly, w, s)
+        // pásma: neznámé názvy se vynechají, prázdný seznam je platný („Nic“), neplatná hodnota = výchozí
+        let fb: TolerantArray<String>? = c.tolerant(.filterBands, nil, w, s)
+        filterBands = fb.map { Set($0.items.filter(SpotFilter.allBandsSet.contains)) } ?? x.filterBands
+        // migrace: starší settings.json má jen „rttyOnly“ (true = jen RTTY, false = všechny módy)
+        let fm: TolerantArray<SpotModeGroup>? = c.tolerant(.filterModes, nil, w, s)
+        let legacy = try? d.container(keyedBy: LegacyKeys.self)
+        if let fm { filterModes = Set(fm.items) }
+        else if let legacy, legacy.contains(.rttyOnly) {
+            filterModes = legacy.tolerant(.rttyOnly, true, w, s) ? [.rtty] : SpotFilter.allModes
+        } else { filterModes = x.filterModes }
         let a = c.tolerant(.maxAgeMinutes, x.maxAgeMinutes, w, s); maxAgeMinutes = Self.ageRange.contains(a) ? a : x.maxAgeMinutes
         let o = c.tolerant(.offsetHz, x.offsetHz, w, s); offsetHz = Self.offsetRange.contains(o) ? o : x.offsetHz
         showInWaterfall = c.tolerant(.showInWaterfall, x.showInWaterfall, w, s)

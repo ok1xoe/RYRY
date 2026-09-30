@@ -33,12 +33,11 @@ public struct SpotBook: Sendable, Equatable {
 
     public mutating func removeAll() { byID.removeAll() }
 
-    /// Spoty od nejnovějšího; filtr jen RTTY a pásmo (např. „20m“, nil = všechna).
-    public func visible(rttyOnly: Bool, band: String? = nil) -> [Spot] {
-        byID.values
-            .filter { (!rttyOnly || $0.isRTTY) && (band == nil || $0.band == band) }
-            .sorted { $0.time != $1.time ? $0.time > $1.time : $0.frequencyKHz < $1.frequencyKHz }
-    }
+    /// Spoty od nejnovějšího podle filtru zobrazení (zaškrtnutá pásma a skupiny módů).
+    public func visible(_ filter: SpotFilter) -> [Spot] { filter.apply(to: byID.values) }
+
+    /// Totéž, ale jen podle filtru módů – pásmo určuje okno band mapy nebo frekvence rigu.
+    public func visibleModes(_ filter: SpotFilter) -> [Spot] { filter.applyModes(to: byID.values) }
 }
 
 /// Zda je značka ze spotu už v logu (a na stejném pásmu). Duplicity v závodě nejsou k dispozici, jen „v logu“.

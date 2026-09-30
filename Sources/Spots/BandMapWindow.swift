@@ -116,11 +116,12 @@ public enum BandMapLayout {
 
 /// Výběr dat pro okno „Band mapa“.
 public enum BandMapFilter {
-    /// Spoty pásma `band` mladší než `maxAgeMinutes`; nejnovější první. `rttyOnly` = jen RTTY spoty.
-    public static func spots(_ spots: [Spot], band: String, rttyOnly: Bool, maxAgeMinutes: Int, now: Date) -> [Spot] {
+    /// Spoty pásma `band` mladší než `maxAgeMinutes`; nejnovější první. Z filtru zobrazení se uplatní jen skupiny
+    /// módů – pásmo si okno band mapy vybírá samo, zaškrtávátka pásem by mapu zvoleného pásma jen vyprázdnila.
+    public static func spots(_ spots: [Spot], band: String, filter: SpotFilter, maxAgeMinutes: Int, now: Date) -> [Spot] {
         let cutoff = now.addingTimeInterval(-Double(maxAgeMinutes) * 60)
-        return spots.filter { $0.band == band && (!rttyOnly || $0.isRTTY) && $0.time >= cutoff }
-            .sorted { $0.time != $1.time ? $0.time > $1.time : $0.frequencyKHz < $1.frequencyKHz }
+        return spots.filter { $0.band == band && filter.matchesMode($0) && $0.time >= cutoff }
+            .sorted(by: SpotFilter.newestFirst)
     }
 
     /// Stáří spotu v celých minutách (nikdy záporné).

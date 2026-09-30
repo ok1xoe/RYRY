@@ -23,18 +23,22 @@ import Spots
     #expect(!m.spotFeed.isRunning)                         // změna maker nespouští síť
 }
 
-// „Jen RTTY“ v okně Spoty v obou směrech jen přepne filtr zobrazení – spojení se nerestartuje.
-@Test @MainActor func togglingRTTYOnlyDoesNotRestartFeed() async throws {
+// Zaškrtávátka pásem a módů v okně Spoty jen přepínají filtr zobrazení – spojení se nerestartuje.
+@Test @MainActor func togglingSpotFiltersDoesNotRestartFeed() async throws {
     let m = spotModel(rig: NoRig()) {
         $0.spots.clusterEnabled = true; $0.spots.clusterHost = "127.0.0.1"; $0.spots.clusterPort = 1
     }
     await m.start()
-    #expect(m.spotFeed.isRunning && m.spotFeed.rttyOnly)
+    #expect(m.spotFeed.isRunning && m.spotFeed.filter == SpotFilter())
     let starts = m.spotFeed.starts
-    m.setSpots { $0.rttyOnly = false }
-    #expect(!m.spotFeed.rttyOnly && m.spotFeed.starts == starts)
-    m.setSpots { $0.rttyOnly = true }
-    #expect(m.spotFeed.rttyOnly && m.spotFeed.starts == starts)
+    m.setSpots { $0.filterModes = SpotFilter.allModes }
+    #expect(m.spotFeed.filter.modes == SpotFilter.allModes && m.spotFeed.starts == starts)
+    m.setSpots { $0.filterModes = [.rtty] }
+    #expect(m.spotFeed.filter.modes == [.rtty] && m.spotFeed.starts == starts)
+    m.setSpots { $0.filterBands = [] }                                     // „Nic“ u pásem
+    #expect(m.spotFeed.filter.bands.isEmpty && m.spotFeed.starts == starts)
+    m.setSpots { $0.filterBands = SpotFilter.allBandsSet }                 // „Vše“ u pásem
+    #expect(m.spotFeed.filter.bands == SpotFilter.allBandsSet && m.spotFeed.starts == starts)
     m.setSpots { $0.clusterPort = 2 }                                      // změna serveru = nové spojení
     #expect(m.spotFeed.starts == starts + 1)
     await m.stop()

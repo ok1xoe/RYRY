@@ -87,10 +87,10 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
     do { let r = b.add(spot("DL1ABC", 14082, minutesAgo: 20), now: refNow, maxAge: 1800); #expect(!r) } // starší – zahodí
     do { let r = b.add(spot("DL1ABC", 7040, minutesAgo: 5), now: refNow, maxAge: 1800); #expect(r) } // jiné pásmo
     #expect(b.count == 2)
-    let v = b.visible(rttyOnly: true)
+    let v = b.visible(SpotFilter())
     #expect(v.map(\.frequencyKHz) == [14081, 7040])                                      // nejnovější první
-    #expect(b.visible(rttyOnly: true, band: "40m").map(\.call) == ["DL1ABC"])
-    #expect(b.visible(rttyOnly: true, band: "15m").isEmpty)
+    #expect(b.visible(SpotFilter(bands: ["40m"])).map(\.call) == ["DL1ABC"])
+    #expect(b.visible(SpotFilter(bands: ["15m"])).isEmpty)
 }
 
 @Test func bookAgeLimitAndPrune() {
@@ -110,16 +110,16 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
               now: refNow, maxAge: 1800)
     }
     #expect(b.count == 5)
-    #expect(Set(b.visible(rttyOnly: false).map(\.call)) == ["K3ABC", "K4ABC", "K5ABC", "K6ABC", "K7ABC"])
+    #expect(Set(b.visible(.all).map(\.call)) == ["K3ABC", "K4ABC", "K5ABC", "K6ABC", "K7ABC"])
     #expect(SpotBook(maxCount: 10_000).maxCount == 500)
 }
 
-@Test func rttyOnlyFilterHidesOthers() {
+@Test func modeFilterHidesOtherModes() {
     var b = SpotBook()
     b.add(Spot(frequencyKHz: 14033, call: "UA3XYZ", spotter: "X", comment: "", time: refNow, mode: "CW"), now: refNow, maxAge: 1800)
     b.add(Spot(frequencyKHz: 14080, call: "DL1ABC", spotter: "X", comment: "", time: refNow, mode: "RTTY"), now: refNow, maxAge: 1800)
-    #expect(b.visible(rttyOnly: true).map(\.call) == ["DL1ABC"])
-    #expect(b.visible(rttyOnly: false).count == 2)
+    #expect(b.visible(SpotFilter()).map(\.call) == ["DL1ABC"])              // výchozí filtr = jen RTTY
+    #expect(b.visible(.all).count == 2)
 }
 
 @Test func logIndexStatus() {

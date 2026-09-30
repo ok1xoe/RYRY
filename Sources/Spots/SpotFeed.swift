@@ -13,14 +13,15 @@ public struct SpotFeedConfig: Sendable, Equatable {
     public var call: String
     public var cluster: SpotEndpoint?
     public var rbn: SpotEndpoint?
-    /// Počáteční stav filtru zobrazení „Jen RTTY“ (příjem nefiltruje; na spojení nemá vliv, proto není v `==`).
-    public var rttyOnly = true
+    /// Počáteční stav filtru zobrazení (pásma + módy; příjem nefiltruje, na spojení nemá vliv, proto není v `==`).
+    public var filter = SpotFilter()
     public var maxAgeMinutes = 30
     public var clientTuning: (initialDelay: Double, maxDelay: Double)?
     /// Čekání na výzvu k přihlášení (s); nil = výchozí klienta (testy zkracují).
     public var loginWait: Double?
-    public init(call: String, cluster: SpotEndpoint? = nil, rbn: SpotEndpoint? = nil, rttyOnly: Bool = true, maxAgeMinutes: Int = 30) {
-        self.call = call; self.cluster = cluster; self.rbn = rbn; self.rttyOnly = rttyOnly; self.maxAgeMinutes = maxAgeMinutes
+    public init(call: String, cluster: SpotEndpoint? = nil, rbn: SpotEndpoint? = nil,
+                filter: SpotFilter = SpotFilter(), maxAgeMinutes: Int = 30) {
+        self.call = call; self.cluster = cluster; self.rbn = rbn; self.filter = filter; self.maxAgeMinutes = maxAgeMinutes
     }
     public static func == (a: Self, b: Self) -> Bool {
         a.call == b.call && a.cluster == b.cluster && a.rbn == b.rbn && a.maxAgeMinutes == b.maxAgeMinutes
@@ -38,10 +39,9 @@ public final class SpotFeed {
     /// Klient hlásí připravenost na příkazy (po přihlášení / uvítání bez výzvy).
     private var clusterLoggedIn = false
     public private(set) var config = SpotFeedConfig(call: "")
-    /// Filtr pásma v okně (např. „20m“); nil = všechna.
-    public var bandFilter: String?
-    /// Zobrazit jen RTTY – jen filtr zobrazení (seznam, band mapa, štítky); ukládají se spoty všech módů.
-    public var rttyOnly = true
+    /// Filtr zobrazení (zaškrtnutá pásma a skupiny módů) – jen zobrazení (seznam, band mapa, štítky);
+    /// ukládají se spoty všech pásem a módů.
+    public var filter = SpotFilter()
     /// Posledních ~500 ne-spotových řádků z DX clusteru (odpovědi na příkazy, uvítání) a odeslané příkazy (`> příkaz`).
     public private(set) var consoleLines: [String] = []
     public static let consoleMax = 500
@@ -58,22 +58,15 @@ public final class SpotFeed {
     public init(clock: @escaping @Sendable () -> Date = { Date() }) { self.clock = clock }
 
     public var maxAge: TimeInterval { TimeInterval(config.maxAgeMinutes) * 60 }
-    public var visible: [Spot] { book.visible(rttyOnly: rttyOnly, band: bandFilter) }
+    public var visible: [Spot] { book.visible(filter) }
     public var isRunning: Bool { !clients.isEmpty }
-
-    /// Pásma, která se ve spotech vyskytují (pro výběr filtru).
-    public var bands: [String] {
-        let order = ["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m"]
-        let present = Set(book.byID.values.compactMap(\.band))
-        return order.filter(present.contains) + present.subtracting(order).sorted()
-    }
 
     /// Zastaví staré klienty a spustí ty, které konfigurace zapíná. Seznam spotů zůstává.
     public func start(_ cfg: SpotFeedConfig) {
         stop()
         starts += 1
         config = cfg
-        rttyOnly = cfg.rttyOnly
+        filter = cfg.filter
         book = SpotBook(maxCount: SpotBook.absoluteMax)
         clusterState = .off; rbnState = .off; clusterLoggedIn = false
         consoleLines = []

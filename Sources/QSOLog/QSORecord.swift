@@ -61,6 +61,8 @@ public enum Bands {
         ("17m", 18.068, 18.168), ("15m", 21.0, 21.45), ("12m", 24.89, 24.99), ("10m", 28.0, 29.7),
         ("6m", 50, 54), ("4m", 70, 71), ("2m", 144, 148), ("1.25m", 222, 225), ("70cm", 420, 450),
     ]
+    /// Krátkovlnná pásma + 6 m od nejnižšího – jediný zdroj seznamu pro zaškrtávátka filtru spotů.
+    public static let hfAnd6m: [String] = table.filter { $0.1 >= 1.8 && $0.2 <= 54 }.map(\.0)
     public static func band(forHz hz: Double?) -> String? {
         guard let hz, hz.isFinite else { return nil }
         let mhz = hz / 1e6

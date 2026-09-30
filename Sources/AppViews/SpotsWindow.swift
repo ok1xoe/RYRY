@@ -52,18 +52,17 @@ public struct SpotsWindow: View {
                 status("DX cluster", feed.clusterState, enabled: model.settings.spots.clusterEnabled)
                 status("RBN", feed.rbnState, enabled: model.settings.spots.rbnEnabled)
                 Spacer()
-                Toggle(L("Jen RTTY"), isOn: Binding(get: { model.settings.spots.rttyOnly },
-                                                    set: { v in model.setSpots { $0.rttyOnly = v } }))
-                Picker(L("Pásmo"), selection: Bindable(feed).bandFilter) {
-                    Text(L("všechna")).tag(String?.none)
-                    ForEach(feed.bands, id: \.self) { Text($0).tag(String?.some($0)) }
-                }.fixedSize()
+                Text(L("%ld z %ld spotů", rows.count, feed.book.count)).font(.caption).foregroundStyle(.secondary)
                 LabeledContent(L("Posun (Hz)")) {
                     TextField("", value: Binding(get: { model.settings.spots.offsetHz },
                                                  set: { v in model.setSpots { $0.offsetHz = min(max(v, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound) } }),
                               format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 64)
                 }.fixedSize()
             }
+            SpotFilterBar(bands: Binding(get: { model.settings.spots.filterBands },
+                                        set: { v in model.setSpots { $0.filterBands = v } }),
+                          modes: Binding(get: { model.settings.spots.filterModes },
+                                         set: { v in model.setSpots { $0.filterModes = v } }))
             if !model.settings.spots.clusterEnabled && !model.settings.spots.rbnEnabled {
                 Text(L("Spoty jsou vypnuté – zapněte DX cluster nebo RBN v Nastavení → Spoty."))
                     .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)

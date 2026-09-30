@@ -1389,7 +1389,7 @@ public final class AppModel {
     func spotFeedConfig() -> SpotFeedConfig? {
         let p = settings.spots
         guard p.clusterEnabled || p.rbnEnabled else { return nil }
-        var c = SpotFeedConfig(call: settings.station.call, rttyOnly: p.rttyOnly, maxAgeMinutes: p.maxAgeMinutes)
+        var c = SpotFeedConfig(call: settings.station.call, filter: p.filter, maxAgeMinutes: p.maxAgeMinutes)
         if p.clusterEnabled { c.cluster = SpotEndpoint(host: p.clusterHost, port: UInt16(clamping: p.clusterPort), commands: p.clusterCommands) }
         if p.rbnEnabled { c.rbn = SpotEndpoint(host: p.rbnHost, port: UInt16(clamping: p.rbnPort)) }
         return c
@@ -1401,8 +1401,8 @@ public final class AppModel {
         spotFeed.start(c)
     }
 
-    /// Změna nastavení spotů z okna – hned uloží. Filtr „Jen RTTY“, štítky ve vodopádu a makra clusteru spojení
-    /// nemění (filtr je jen zobrazení, uložené jsou spoty všech módů); jiné změny (server, zapnutí…) připojí znovu.
+    /// Změna nastavení spotů z okna – hned uloží. Filtr pásem a módů, štítky ve vodopádu a makra clusteru spojení
+    /// nemění (filtr je jen zobrazení, uložené jsou spoty všech pásem a módů); jiné změny (server, zapnutí…) připojí znovu.
     public func setSpots(_ change: (inout SpotSettings) -> Void) {
         var p = settings.spots
         change(&p)
@@ -1410,10 +1410,11 @@ public final class AppModel {
         let old = settings.spots
         settings.spots = p
         do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
-        spotFeed.rttyOnly = p.rttyOnly                                   // filtr zobrazení platí hned (oba směry)
+        spotFeed.filter = p.filter                                       // filtr zobrazení platí hned (oba směry)
         guard app != nil else { return }
         var noReconnect = old
-        noReconnect.showInWaterfall = p.showInWaterfall; noReconnect.clusterMacros = p.clusterMacros; noReconnect.rttyOnly = p.rttyOnly
+        noReconnect.showInWaterfall = p.showInWaterfall; noReconnect.clusterMacros = p.clusterMacros
+        noReconnect.filterBands = p.filterBands; noReconnect.filterModes = p.filterModes
         if noReconnect == p { return }                                   // jen zobrazení, spojení se nemění
         startSpots()
     }

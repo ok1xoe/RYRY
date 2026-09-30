@@ -69,7 +69,7 @@ private func utc(_ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int) -> Date {
     await cluster.start()
     defer { cluster.stop() }
     let feed = SpotFeed(clock: { now })
-    var cfg = SpotFeedConfig(call: "OK1XOE", cluster: SpotEndpoint(host: "127.0.0.1", port: cluster.port), rttyOnly: false)
+    var cfg = SpotFeedConfig(call: "OK1XOE", cluster: SpotEndpoint(host: "127.0.0.1", port: cluster.port), filter: .all)
     cfg.clientTuning = (0.05, 0.1)
     feed.start(cfg)
     defer { feed.stop() }

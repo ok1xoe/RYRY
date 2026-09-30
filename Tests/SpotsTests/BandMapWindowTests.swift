@@ -120,11 +120,11 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     let now = Date(timeIntervalSince1970: 1_800_000_000)
     let spots = [sp("A1", 14080, age: 60, now: now), sp("B2", 14085, age: 40 * 60, now: now),
                  sp("C3", 7040, now: now), sp("D4", 14090, age: 10 * 60, now: now, mode: "CW")]
-    let r = BandMapFilter.spots(spots, band: "20m", rttyOnly: true, maxAgeMinutes: 30, now: now)
+    let r = BandMapFilter.spots(spots, band: "20m", filter: SpotFilter(), maxAgeMinutes: 30, now: now)
     #expect(r.map(\.call) == ["A1"])
-    let r2 = BandMapFilter.spots(spots, band: "20m", rttyOnly: false, maxAgeMinutes: 60, now: now)
+    let r2 = BandMapFilter.spots(spots, band: "20m", filter: .all, maxAgeMinutes: 60, now: now)
     #expect(Set(r2.map(\.call)) == ["A1", "B2", "D4"])
-    #expect(BandMapFilter.spots(spots, band: "40m", rttyOnly: true, maxAgeMinutes: 30, now: now).map(\.call) == ["C3"])
+    #expect(BandMapFilter.spots(spots, band: "40m", filter: SpotFilter(), maxAgeMinutes: 30, now: now).map(\.call) == ["C3"])
     #expect(BandMapFilter.ageMinutes(of: spots[0], now: now) == 1)
     #expect(BandMapFilter.ageMinutes(of: sp("Z", 1, age: -30, now: now), now: now) == 0)   // hodiny do budoucnosti
 }

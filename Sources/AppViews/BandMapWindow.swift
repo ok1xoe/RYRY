@@ -46,7 +46,7 @@ public struct BandMapWindow: View {
     /// Pásma se spoty od nejvíce obsazeného – náhradní volba, když pásmo neurčí rig ani QSO okno.
     var spotBands: [String] {
         var n: [String: Int] = [:]
-        for s in model.spotFeed.book.byID.values where !model.spotFeed.rttyOnly || s.isRTTY {
+        for s in model.spotFeed.book.byID.values where model.spotFeed.filter.matchesMode(s) {
             if let b = s.band { n[b, default: 0] += 1 }
         }
         return n.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
@@ -70,7 +70,7 @@ public struct BandMapWindow: View {
 
     func entries(band: String, scale: BandScale, now: Date) -> [Entry] {
         let feed = model.spotFeed
-        let spots = BandMapFilter.spots(feed.book.byID.values.map { $0 }, band: band, rttyOnly: feed.rttyOnly,
+        let spots = BandMapFilter.spots(feed.book.byID.values.map { $0 }, band: band, filter: feed.filter,
                                         maxAgeMinutes: max(1, feed.config.maxAgeMinutes), now: now)
         var out: [Entry] = []
         for s in spots where scale.contains(kHz: s.frequencyKHz) {

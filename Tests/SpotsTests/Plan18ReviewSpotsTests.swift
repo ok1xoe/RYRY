@@ -66,14 +66,14 @@ import Testing
     #expect(!feed.clusterCommandsReady)
 }
 
-// „Jen RTTY“ = jen filtr zobrazení: CW spot se uloží i při zapnutém filtru, po vypnutí filtru je hned vidět.
-@Test @MainActor func rttyOnlyIsDisplayFilterOnly() async throws {
+// Filtr módů = jen filtr zobrazení: CW spot se uloží i při zapnutém filtru, po zaškrtnutí CW je hned vidět.
+@Test @MainActor func modeFilterIsDisplayFilterOnly() async throws {
     let cluster = try FakeCluster(spots: sampleLines())
     await cluster.start()
     defer { cluster.stop() }
     let now = Date()
     let feed = SpotFeed(clock: { now })
-    var cfg = SpotFeedConfig(call: "OK1XOE", cluster: SpotEndpoint(host: "127.0.0.1", port: cluster.port), rttyOnly: true)
+    var cfg = SpotFeedConfig(call: "OK1XOE", cluster: SpotEndpoint(host: "127.0.0.1", port: cluster.port), filter: SpotFilter())
     cfg.clientTuning = (0.05, 0.1)
     feed.start(cfg)
     defer { feed.stop() }
@@ -81,7 +81,7 @@ import Testing
     #expect(feed.book.byID.values.contains { $0.call == "UA3XYZ" && $0.mode == "CW" })     // uložen
     #expect(!feed.visible.contains { $0.call == "UA3XYZ" })                                  // skrytý
     let starts = feed.starts
-    feed.rttyOnly = false
+    feed.filter.modes = SpotFilter.allModes
     #expect(feed.visible.contains { $0.call == "UA3XYZ" })
     #expect(feed.starts == starts && cluster.connections == 1)                               // bez nového připojení
 }

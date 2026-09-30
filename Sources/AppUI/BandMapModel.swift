@@ -55,7 +55,8 @@ extension AppModel {
     /// Štítky pro aktuální stav; prázdné, když je funkce vypnutá nebo rig nehlásí frekvenci.
     public var bandMapMarkers: [BandMapMarker] {
         guard settings.spots.showInWaterfall, let r = rig, r.online, let dial = r.frequency, dial > 0 else { return [] }
-        return Self.bandMapMarkers(spots: spotFeed.book.visible(rttyOnly: spotFeed.rttyOnly), dialHz: dial, mode: r.mode,
+        // pásmo dává frekvence rigu, proto z filtru jen skupiny módů (stejně jako v okně Band mapa)
+        return Self.bandMapMarkers(spots: spotFeed.book.visibleModes(spotFeed.filter), dialHz: dial, mode: r.mode,
                                    offsetHz: settings.spots.offsetHz, markHz: mark, fromHz: waterfallFromHz, toHz: waterfallToHz,
                                    index: logIndex, contest: settings.contest.enabled)
     }

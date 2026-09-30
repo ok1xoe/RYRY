@@ -29,7 +29,7 @@ import Testing
     let now = Date()
     let feed = SpotFeed(clock: { now })
     var cfg = SpotFeedConfig(call: "OK1XOE", cluster: SpotEndpoint(host: "127.0.0.1", port: cluster.port),
-                             rbn: SpotEndpoint(host: "127.0.0.1", port: rbn.port), rttyOnly: false)
+                             rbn: SpotEndpoint(host: "127.0.0.1", port: rbn.port), filter: .all)
     cfg.clientTuning = (0.05, 0.1)
     feed.start(cfg)
     defer { feed.stop() }
