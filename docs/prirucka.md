@@ -17,7 +17,7 @@ RYRY (dříve mmtty4mac) je RTTY program pro macOS: nativní přepis MMTTY (JE3H
 ## 1. Instalace
 
 1. Nainstalujte **RYRY** z Mac App Store (zdarma). Aktualizace přicházejí přes App Store.
-2. Při prvním spuštění se RYRY zeptá na **složku pro log** (předvybraná je `~/Documents/RYRY`) – klikněte na **Povolit přístup**. macOS pustí aplikaci do složky až po tom, co ji vyberete; RYRY si přístup zapamatuje. Když dialog zrušíte, log zůstane v kontejneru aplikace a stavový řádek řekne kde.
+2. Při prvním spuštění se RYRY zeptá na **složku pro log** (dialog se otevře ve složce Dokumenty) – klikněte na **Povolit přístup** a RYRY si v ní založí složku `RYRY`. macOS pustí aplikaci do složky až po tom, co ji vyberete; RYRY si přístup zapamatuje. Když dialog zrušíte, log zůstane v kontejneru aplikace a stavový řádek řekne kde.
 3. macOS se zeptá na přístup k **mikrofonu**. Povolte ho, jinak příjem nefunguje. Změnit to jde v Nastavení systému → Soukromí a zabezpečení → Mikrofon.
 4. Nemáte po ruce rádio? **Nápověda → Přehrát ukázkový signál** přehraje krátké závodní spojení a uvidíte, jak RYRY dekóduje.
 

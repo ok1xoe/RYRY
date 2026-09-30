@@ -13,7 +13,7 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 [[ -n "${TEAM_ID:-}" ]] || { echo "TEAM_ID není nastavené (developer.apple.com → Membership)." >&2; exit 1; }
 DEST=upload; [[ "${1:-}" == "--export-only" ]] && DEST=export
 ./scripts/make-app.sh                                  # univerzální (arm64 + x86_64), sandbox, podpis Apple Development
-APP=build/mmtty4mac.app
+APP=build/RYRY.app
 V=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
 B=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")
 A=build/RYRY.xcarchive
@@ -24,7 +24,7 @@ cat > "$A/Info.plist" <<PL
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>ApplicationProperties</key><dict>
-    <key>ApplicationPath</key><string>Applications/mmtty4mac.app</string>
+    <key>ApplicationPath</key><string>Applications/RYRY.app</string>
     <key>Architectures</key><array><string>arm64</string><string>x86_64</string></array>
     <key>CFBundleIdentifier</key><string>cz.ok1xoe.mmtty4mac</string>
     <key>CFBundleShortVersionString</key><string>$V</string>

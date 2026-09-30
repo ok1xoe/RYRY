@@ -146,13 +146,16 @@ public struct CallbookSettings: Codable, Sendable, Equatable {
 public struct CallHistorySettings: Codable, Sendable, Equatable {
     public var enabled = false
     public var path = ""
+    /// Security-scoped bookmark of the file: in the sandbox the only way to read it again after a relaunch.
+    public var bookmark: Data?
     public var fillEmptyOnly = true
     public init() {}
-    enum CodingKeys: String, CodingKey { case enabled, path, fillEmptyOnly }
+    enum CodingKeys: String, CodingKey { case enabled, path, bookmark, fillEmptyOnly }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "callHistory", x = CallHistorySettings()
         enabled = c.tolerant(.enabled, x.enabled, w, s); path = c.tolerant(.path, x.path, w, s)
         fillEmptyOnly = c.tolerant(.fillEmptyOnly, x.fillEmptyOnly, w, s)
+        bookmark = c.tolerant(.bookmark, x.bookmark, w, s)
     }
 }
 

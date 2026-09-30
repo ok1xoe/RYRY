@@ -17,7 +17,7 @@ RYRY (formerly mmtty4mac) is an RTTY program for macOS: a native port of MMTTY (
 ## 1. Installation
 
 1. Install **RYRY** from the Mac App Store (free). Updates come through the App Store.
-2. On first launch RYRY asks for the **folder for the log** (`~/Documents/RYRY` is preselected) – click **Allow Access**. macOS lets the app into a folder only after you choose it; RYRY remembers the access. If you cancel, the log is kept inside the app's container and the status bar says where.
+2. On first launch RYRY asks for the **folder for the log** (the panel opens on your Documents folder) – click **Allow Access** and RYRY creates its `RYRY` folder there. macOS lets the app into a folder only after you choose it; RYRY remembers the access. If you cancel, the log is kept inside the app's container and the status bar says where.
 3. macOS asks for **microphone** access. Allow it, otherwise receiving does not work. You can change this in System Settings → Privacy & Security → Microphone.
 4. No radio at hand? **Help → Play Demo Signal** plays a short contest QSO so you can watch RYRY decode.
 

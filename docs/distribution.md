@@ -6,7 +6,7 @@ důvody jsou v `docs/rulings.md` a `docs/superpowers/specs/2026-09-30-app-store-
 
 ## Vývojové sestavení
 
-    ./scripts/make-app.sh                  # build/mmtty4mac.app, univerzální (arm64 + x86_64)
+    ./scripts/make-app.sh                  # build/RYRY.app, univerzální (arm64 + x86_64)
     MMTTY_ARCHS=arm64 ./scripts/make-app.sh   # rychleji, jen Apple Silicon
 
 Aplikace vždy běží v **App Sandbox** s oprávněními z `Resources/mmtty4mac.entitlements`. Podpis je

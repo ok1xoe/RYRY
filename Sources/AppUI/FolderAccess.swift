@@ -62,9 +62,29 @@ public struct SecurityScopedCodec: BookmarkCodec {
         }
         bookmarks.remove(key)                                    // missing, broken or moved elsewhere
         guard let chosen = await prompt.requestFolder(suggested: URL(fileURLWithPath: key), message: message) else { return nil }
-        if let data = try? codec.make(chosen) { bookmarks.set(data, for: chosen.path) }
-        start(chosen)
-        return chosen
+        var result = chosen
+        // The wanted folder does not exist yet (a new ~/Documents/RYRY), so the panel opened on its parent. Choosing the
+        // parent grants it; create the folder inside instead of scattering the log files over the parent.
+        if !FileManager.default.fileExists(atPath: key),
+           FolderBookmarks.key(chosen.path) == FolderBookmarks.key((key as NSString).deletingLastPathComponent) {
+            start(chosen)
+            if (try? FileManager.default.createDirectory(atPath: key, withIntermediateDirectories: true)) != nil {
+                result = URL(fileURLWithPath: key)
+            }
+        }
+        if let data = try? codec.make(result) { bookmarks.set(data, for: result.path) }
+        start(result)
+        return result
+    }
+
+    /// A single file outside the container (e.g. the call history) - usable after a relaunch only through the bookmark
+    /// made when the user chose it. nil = no valid bookmark: the user has to choose the file again.
+    public func accessFile(_ path: String, bookmark: Data?) -> URL? {
+        let key = FolderBookmarks.key(path)
+        guard sandboxed, !key.hasPrefix(FolderBookmarks.key(containerHome) + "/") else { return URL(fileURLWithPath: key) }
+        guard let bookmark, let r = try? codec.resolve(bookmark), FolderBookmarks.key(r.url.path) == key else { return nil }
+        start(r.url)
+        return r.url
     }
 
     private func start(_ url: URL) {

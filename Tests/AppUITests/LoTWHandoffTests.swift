@@ -42,9 +42,9 @@ private struct Opener: TQSLOpener {
     var r = QSORecord(call: "DL1ABC", timeOn: Date()); r.frequency = 14_080_000
     try await f.model.app!.log!.append(r)
     let msg = try #require(await f.model.uploadPending(.lotw))
-    let h = try #require(f.model.pendingLoTW)
-    #expect(msg.contains(h.file.lastPathComponent) && msg.contains("TrustedQSL"))
-    await f.model.confirmLoTW(false)
+    let files = try FileManager.default.contentsOfDirectory(atPath: dl.path)
+    #expect(files.count == 1 && msg.contains(files[0]) && msg.contains("TrustedQSL"))
+    // review #8: nothing was opened in TQSL, so there is nothing to confirm (one click must not mark unsent QSOs)
     #expect(f.model.pendingLoTW == nil)
     #expect(await f.model.app!.log!.records.allSatisfy { !$0.isUploaded(.lotw) })
     await f.model.stop()

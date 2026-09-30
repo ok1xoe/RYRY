@@ -118,3 +118,50 @@ private let container = "/Users/x/Library/Containers/cz.ok1xoe.mmtty4mac/Data"
     #expect(f.model.settings.log.name == before)
     await f.model.stop()
 }
+
+// Review #1: the default ~/Documents/RYRY does not exist yet, so the panel opens on ~/Documents; choosing that
+// parent must still give the RYRY subfolder, not scatter the log files over Documents.
+@Test @MainActor func choosingTheParentOfAMissingFolderCreatesAndUsesTheFolder() async throws {
+    let docs = FileManager.default.temporaryDirectory.appendingPathComponent("home-\(UUID())/Documents")
+    try FileManager.default.createDirectory(at: docs, withIntermediateDirectories: true)
+    let wanted = docs.appendingPathComponent("RYRY")
+    var b = FolderBookmarks()
+    let fa = FolderAccess(prompt: FakeFolderPrompt(docs), codec: FakeBookmarkCodec(), sandboxed: true, containerHome: container)
+    let u = await fa.acquire(wanted.path, bookmarks: &b, message: "m")
+    #expect(u?.path == wanted.path)
+    #expect(FileManager.default.fileExists(atPath: wanted.path))
+    #expect(b.bookmark(for: wanted.path) != nil && b.bookmark(for: docs.path) == nil)
+}
+
+// Review #3: a file chosen outside the container (the call history) is usable after a relaunch only through its bookmark.
+@Test @MainActor func aFileOutsideTheContainerNeedsItsBookmark() {
+    let fa = FolderAccess(prompt: FakeFolderPrompt(nil), codec: FakeBookmarkCodec(), sandboxed: true, containerHome: container)
+    #expect(fa.accessFile("/Users/x/N1MM/history.txt", bookmark: nil) == nil)
+    #expect(fa.accessFile("/Users/x/N1MM/history.txt", bookmark: Data("/Users/x/N1MM/history.txt".utf8))?.path == "/Users/x/N1MM/history.txt")
+    #expect(fa.accessFile("/Users/x/N1MM/history.txt", bookmark: Data("/Users/x/other.txt".utf8)) == nil)
+    #expect(fa.accessFile(container + "/history.txt", bookmark: nil) != nil)
+    let plain = FolderAccess(prompt: FakeFolderPrompt(nil), codec: FakeBookmarkCodec(), sandboxed: false, containerHome: container)
+    #expect(plain.accessFile("/Users/x/N1MM/history.txt", bookmark: nil) != nil)
+}
+
+@Test @MainActor func callHistoryWithoutABookmarkAsksToChooseTheFileAgain() async throws {
+    let f = Fixture()
+    f.configure = { $0.callHistory.enabled = true; $0.callHistory.path = "/nonexistent/N1MM/history.txt" }
+    f.model.folderAccess = FolderAccess(prompt: FakeFolderPrompt(nil), codec: FakeBookmarkCodec(), sandboxed: true, containerHome: f.dir.path)
+    await f.model.start()
+    #expect(f.model.callHistoryStatus.contains("znovu"))
+    await f.model.stop()
+}
+
+// Review #2: with the receive-text log on, a refused log folder must also move the rx/ folder to the fallback.
+@Test @MainActor func refusedLogFolderAlsoMovesTheReceiveTextLog() async throws {
+    let f = Fixture()
+    f.configure = { $0.log.directory = "/nonexistent/elsewhere"; $0.log.rxText = true }
+    f.model.folderAccess = FolderAccess(prompt: FakeFolderPrompt(nil), codec: FakeBookmarkCodec(), sandboxed: true, containerHome: f.dir.path)
+    await f.model.start()
+    f.model.appendRx("CQ TEST\r\n", echo: false)
+    let rx = f.dir.appendingPathComponent("Documents/RYRY/rx")
+    #expect(f.model.rxLogActive)
+    #expect(((try? FileManager.default.contentsOfDirectory(atPath: rx.path)) ?? []).count == 1)
+    await f.model.stop()
+}

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Sestaví build/mmtty4mac.app (RYRY, release, App Sandbox) a podepíše ho pro vývoj.
+# Sestaví build/RYRY.app (RYRY, release, App Sandbox) a podepíše ho pro vývoj.
 # Pro App Store: scripts/release-appstore.sh (volá tento skript a znovu podepíše certifikátem Apple Distribution).
 #
 # Podpis (SIGN_ID):
@@ -23,7 +23,7 @@ done
 BIN=build/MMTTY4MacApp.universal
 mkdir -p build
 lipo -create "${PARTS[@]}" -output "$BIN"
-APP=build/mmtty4mac.app
+APP=build/RYRY.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/MMTTY4MacApp"

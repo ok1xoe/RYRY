@@ -7,8 +7,8 @@ Paste into App Store Connect → the version → App Review Information → Note
 RYRY is an amateur (ham) radio program for RTTY (radioteletype). Normally the Mac's audio input is connected to a
 radio receiver, and RYRY decodes the tones into text. No radio is needed for the review:
 
-1. On the first launch RYRY asks for access to a folder for its log (~/Documents/RYRY is preselected) - click
-   "Allow Access". If you cancel, the log is kept inside the app's container and a message says where.
+1. On the first launch RYRY asks for access to a folder for its log (the panel opens on Documents) - click
+   "Allow Access"; RYRY creates its RYRY folder there. If you cancel, the log is kept inside the app's container and a message says where.
 2. macOS asks for the microphone - allow it. Nothing is recorded or sent; the audio input is the radio receiver.
 3. Choose Help → Play Demo Signal. The spectrum and waterfall show the two RTTY tones and the decoded contest
    exchange appears in the receive window ("CQ TEST OK1XOE ...").

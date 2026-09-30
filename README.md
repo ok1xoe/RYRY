@@ -66,8 +66,8 @@ app keeps them in `~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Applica
 
 ## The application (GUI)
 
-    ./scripts/make-app.sh          # builds build/mmtty4mac.app (RYRY, App Sandbox, signed with Apple Development, otherwise ad-hoc)
-    open build/mmtty4mac.app
+    ./scripts/make-app.sh          # builds build/RYRY.app (RYRY, App Sandbox, signed with Apple Development, otherwise ad-hoc)
+    open build/RYRY.app
     TEAM_ID=… ./scripts/release-appstore.sh   # App Store build and upload (docs/distribution.md, docs/appstore/README.md)
 
 On first launch macOS asks for microphone access (receiving from the radio) – grant it.

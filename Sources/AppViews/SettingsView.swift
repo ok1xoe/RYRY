@@ -1101,7 +1101,10 @@ struct CallHistorySection: View {
         p.canChooseFiles = true; p.canChooseDirectories = false; p.allowsMultipleSelection = false
         p.allowedContentTypes = [.plainText, .commaSeparatedText, .text]
         p.message = L("Vyberte soubor historie značek (N1MM Call History, .txt nebo .csv)")
-        if p.runModal() == .OK, let u = p.url { s.callHistory.path = u.path; s.callHistory.enabled = true }
+        if p.runModal() == .OK, let u = p.url {
+            s.callHistory.path = u.path; s.callHistory.enabled = true
+            s.callHistory.bookmark = try? SecurityScopedCodec().make(u)   // the sandbox allows the file only now
+        }
     }
 
     var body: some View {

@@ -254,8 +254,8 @@ public final class AppModel {
 
     private func startNow() async {
         guard app == nil else { return }                 // already running
+        await ensureLogFolder()                          // first: it may move the log folder (and with it rx/)
         syncRxLog()
-        await ensureLogFolder()
         let rig = Self.makeRig(settings.rig)
         let engine = engineFactory(settings, rig)
         let log: QSOLogStore?
@@ -1222,7 +1222,8 @@ public final class AppModel {
                 guard let h = try await coordinator.prepareLoTW(settings: cfg, log: log, logName: cfg.log.name) else {
                     return automatic ? nil : L("%@: žádná nenahraná spojení.", t.title)
                 }
-                pendingLoTW = h
+                // only a file opened in TQSL can have been sent - otherwise there is nothing to confirm
+                pendingLoTW = h.openedInTQSL ? h : nil
                 return h.openedInTQSL
                     ? L("ADIF pro LoTW je otevřený v TQSL (%@). Podepište a odešlete ho, pak potvrďte v RYRY.", h.file.lastPathComponent)
                     : L("TQSL nenalezen. ADIF pro LoTW je uložený ve Stažených souborech: %@. Nainstalujte TrustedQSL a otevřete ho v něm.", h.file.lastPathComponent)
@@ -1609,6 +1610,12 @@ public final class AppModel {
         }
         if callHistoryPath == cfg.path, let h = callHistory {
             if let app { Task { await app.setCallHistory(h) } }
+            return
+        }
+        guard folderAccess.accessFile(cfg.path, bookmark: cfg.bookmark) != nil else {
+            callHistory = nil; callHistoryPath = ""; callHistoryCount = 0
+            callHistoryStatus = L("Soubor historie značek vyberte znovu (Nastavení → Závod → Historie značek) – bez toho ho aplikace v sandboxu nesmí číst.")
+            if let app { Task { await app.setCallHistory(nil) } }
             return
         }
         let path = cfg.path

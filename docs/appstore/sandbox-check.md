@@ -47,7 +47,7 @@ Zbytky testů, které můžeš smazat: `~/Library/Containers/cz.ok1xoe.sandboxpr
 
 ## Zbývá ověřit ručně v GUI (Mac byl při přípravě zamčený)
 
-- [ ] Nová instalace: dialog „RYRY potřebuje přístup ke složce s logem“ s předvybranou `~/Documents/RYRY`.
+- [ ] Nová instalace: dialog „RYRY potřebuje přístup ke složce s logem“ otevřený ve složce Dokumenty; po „Povolit přístup“ vznikne `~/Documents/RYRY` a log je v ní (ne volně v Dokumentech).
       Po povolení se API spustí (`lsof -iTCP:7362`). Po restartu už se neptá.
 - [ ] Zrušený dialog: log v kontejneru a zpráva ve stavovém řádku s cestou.
 - [ ] Přesunutá nebo přejmenovaná složka logu: aplikace se znovu zeptá.
@@ -56,6 +56,7 @@ Zbytky testů, které můžeš smazat: `~/Library/Containers/cz.ok1xoe.sandboxpr
 - [ ] DX cluster se připojí (okno Spoty).
 - [ ] LoTW bez TQSL: zpráva s názvem souboru ve Stažených souborech, dotaz na potvrzení, bez potvrzení se nic
       neoznačí.
-- [ ] Ikona v Docku a ve Finderu (macOS 26: skleněný tvar, žádný šedý rámeček).
+- [ ] Ikona v Docku a ve Finderu (macOS 26: skleněný tvar, žádný šedý rámeček); ve Finderu se aplikace jmenuje RYRY.app.
+- [ ] Historie značek (N1MM): po výběru souboru a restartu se načte; bez nového výběru se ukáže výzva vybrat ho znovu.
 - [ ] Snímky: `./scripts/appstore-screenshots.sh` (potřebuje povolení Nahrávání obrazovky pro Terminál).
 - [ ] `TEAM_ID=GN8G426WK4 ./scripts/release-appstore.sh --export-only` po přihlášení účtu v Xcode.

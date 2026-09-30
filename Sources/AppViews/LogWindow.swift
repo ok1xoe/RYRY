@@ -152,8 +152,10 @@ public struct LogWindow: View {
         } message: { Text(uploadResult ?? "") }
         // after the message about the file handed to TQSL: did TQSL send it? (only then are the QSOs marked)
         .background(EmptyView().alert(L("Odeslali jste spojení v TQSL do LoTW?"),
+                                      // set is a no-op: SwiftUI calls it together with a button action, and a
+                                      // "not yet" from here could win the race and swallow a "Yes"
                                       isPresented: Binding(get: { model.pendingLoTW != nil && uploadResult == nil },
-                                                           set: { if !$0 && model.pendingLoTW != nil { Task { await model.confirmLoTW(false) } } })) {
+                                                           set: { _ in })) {
             Button(L("Ano, označit jako nahraná")) { Task { await model.confirmLoTW(true) } }
             Button(L("Zatím ne"), role: .cancel) { Task { await model.confirmLoTW(false) } }
         } message: { Text(model.pendingLoTW?.file.lastPathComponent ?? "") })
