@@ -517,18 +517,6 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Update check (the last check and the skipped version are in UserDefaults, not here).
-public struct UpdateSettings: Codable, Sendable, Equatable {
-    /// At startup (at most once a day) find out whether a newer version exists.
-    public var autoCheck = true
-    public init() {}
-    enum CodingKeys: String, CodingKey { case autoCheck }
-    public init(from d: Decoder) throws {
-        let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "updates", x = UpdateSettings()
-        autoCheck = c.tolerant(.autoCheck, x.autoCheck, w, s)
-    }
-}
-
 public struct AppSettings: Codable, Sendable, Equatable {
     public var schemaVersion = 1
     public var station = Station()
@@ -549,7 +537,6 @@ public struct AppSettings: Codable, Sendable, Equatable {
     /// Message list (MMTTY MsgList): named longer texts with the macro syntax.
     public var messages: [Macro] = AppSettings.defaultMessages
     public var txWindow = TxWindowSettings()
-    public var updates = UpdateSettings()
     /// Custom keyboard shortcuts (command id → shortcut); missing = the default.
     public var shortcuts: [String: KeyBinding] = [:]
     /// Uploading to LoTW / eQSL / Club Log.
@@ -585,7 +572,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, callHistory, rtty,
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
-                                             shortcuts, updates, upload, spots, decoders, esm, alerts }
+                                             shortcuts, upload, spots, decoders, esm, alerts }
 
     /// Default messages per MMTTY (sys.m_MsgList), without the author's details.
     public static let defaultMessages: [Macro] = [
@@ -614,7 +601,6 @@ public struct AppSettings: Codable, Sendable, Equatable {
         contest = c.tolerant(.contest, x.contest, w, s); display = c.tolerant(.display, x.display, w, s)
         messages = c.contains(.messages) ? c.tolerant(.messages, TolerantArray<Macro>(), w, s).items : x.messages
         txWindow = c.tolerant(.txWindow, x.txWindow, w, s)
-        updates = c.tolerant(.updates, x.updates, w, s)
         shortcuts = c.tolerant(.shortcuts, TolerantDict<KeyBinding>(), w, s).items.filter { $0.value.isValid }
         upload = c.tolerant(.upload, x.upload, w, s)
         spots = c.tolerant(.spots, x.spots, w, s)

@@ -853,11 +853,6 @@ struct DisplayTab: View {
             } header: { Text(L("Ostatní")) } footer: {
                 Text(L("Vaše značka červeně tučně, duplicita v závodě šedě přeškrtnutě, značka už v logu modře, nová značka tučně. Echo vlastního vysílání se nezvýrazňuje."))
             }
-            Section {
-                Toggle(L("Automaticky kontrolovat aktualizace"), isOn: $s.updates.autoCheck)
-            } header: { Text(L("Aktualizace")) } footer: {
-                Text(L("Kontrola proběhne při startu nejvýš jednou denně. Nová verze se nikdy neinstaluje sama – stáhne se DMG a aplikaci přetáhnete do Aplikací. Ruční kontrola: menu aplikace → Zkontrolovat aktualizace…"))
-            }
         }
         .formStyle(.grouped)
     }

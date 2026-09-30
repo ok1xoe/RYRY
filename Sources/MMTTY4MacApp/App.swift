@@ -67,7 +67,6 @@ struct MMTTY4MacApp: App {
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var model = AppModel(alertSink: SystemAlertSink())
-    @State private var updates = UpdateModel()
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
@@ -100,9 +99,7 @@ struct MMTTY4MacApp: App {
                     for id in (UserDefaults.standard.string(forKey: "openWindow") ?? "").split(separator: ",") {
                         openWindow(id: String(id))
                     }
-                    updates.showWindow = { openWindow(id: "update") }
                     if model.state == .stopped { await model.start() }
-                    await updates.checkAtLaunch(enabled: model.settings.updates.autoCheck)
                 }
         }
         .commands {
@@ -127,7 +124,6 @@ struct MMTTY4MacApp: App {
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }
-                Button(L("Zkontrolovat aktualizace…")) { Task { await updates.checkManually() } }
             }
             CommandGroup(replacing: .help) {
                 Button(L("Příručka mmtty4mac")) { openManual() }.keyboardShortcut("?", modifiers: .command)
@@ -196,7 +192,6 @@ struct MMTTY4MacApp: App {
         Window(L("Scope demodulátoru"), id: "scope") {
             ScopeWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
-        Window(L("Aktualizace"), id: "update") { UpdateWindow(model: updates) }
             .windowResizability(.contentSize)
         Window(L("Spoty"), id: "spots") {
             SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)

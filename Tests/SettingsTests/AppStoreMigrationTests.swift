@@ -22,3 +22,9 @@ func loadSettingsJSON(_ json: String) throws -> (AppSettings, [String]) {
     let (s, w) = try loadSettingsJSON(#"{"upload":{"lotwEnabled":true,"lotwTqslPath":"/x/tqsl","lotwAuto":true,"lotwLocation":"Home"}}"#)
     #expect(s.upload.lotwEnabled && w.isEmpty)
 }
+
+@Test func oldUpdateSettingsAreIgnored() throws {
+    let (s, w) = try loadSettingsJSON(#"{"updates":{"autoCheck":false},"station":{"call":"OK1XOE"}}"#)
+    #expect(s.station.call == "OK1XOE" && w.isEmpty)
+    #expect(!String(decoding: try JSONEncoder().encode(s), as: UTF8.self).contains("\"updates\""))   // not written back
+}

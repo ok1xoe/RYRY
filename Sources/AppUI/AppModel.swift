@@ -379,7 +379,7 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
+                take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
                 take(\.log.directory)
                 m.spots.clusterMacros = cur.spots.clusterMacros   // the dialog does not edit the cluster macros (the Spots window does)
                 // the display filter is changed immediately by the "Band filter" / "Mode filter" windows and "RTTY only" - the dialog does not overwrite it
