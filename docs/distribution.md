@@ -17,7 +17,7 @@ Verze se bere z `Resources/Info.plist` (`CFBundleShortVersionString`). Číslo s
 
     ./scripts/release.sh
 
-Skript použije účet přihlášený v Xcode, kde je tým GN8G426WK4 s cloudovým certifikátem Developer ID. Hesla ani lokální klíč nepotřebuje. Postup:
+Skript použije účet přihlášený v Xcode, kde je váš tým s cloudovým certifikátem Developer ID (Team ID zadáte proměnnou `TEAM_ID`). Hesla ani lokální klíč nepotřebuje. Postup:
 1. Sestaví a podepíše aplikaci.
 2. Vytvoří `.xcarchive` a `xcodebuild -exportArchive` (method developer-id, destination upload) ji podepíše certifikátem Developer ID a odešle k notarizaci.
 3. Počká na výsledek a `xcodebuild -exportNotarizedApp` vytvoří `build/notarized/mmtty4mac.app` s připojeným lístkem.
@@ -32,11 +32,11 @@ Aplikace podepsaná certifikátem Apple Development běží jen na tvém Macu. A
 potřebuje podpis **Developer ID Application** a notarizaci.
 
 1. **Certifikát Developer ID Application** (jednorázově):
-   Xcode → Settings → Accounts → tým *TOMÁS KAPLAN (GN8G426WK4)* → Manage Certificates… → „+“ → *Developer ID Application*.
+   Xcode → Settings → Accounts → váš tým → Manage Certificates… → „+“ → *Developer ID Application*.
    Založit ho smí jen Account Holder týmu.
 2. **Profil pro notarytool** (jednorázově). Heslo je app-specific password z appleid.apple.com, uloží se do klíčenky:
 
-       xcrun notarytool store-credentials mmtty4mac --apple-id <apple-id> --team-id GN8G426WK4
+       xcrun notarytool store-credentials mmtty4mac --apple-id <apple-id> --team-id <team-id>
 
 3. **Vydání:**
 
