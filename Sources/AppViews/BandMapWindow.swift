@@ -148,8 +148,8 @@ public struct BandMapWindow: View {
             Button { var s = scale(for: band); s.reset(); scales[band] = s } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
             }
-            .hint(L("Celý RTTY úsek pásma"))
-            .accessibilityLabel(L("Celý RTTY úsek pásma"))
+            .hint(L("Zobrazit celé pásmo"))
+            .accessibilityLabel(L("Zobrazit celé pásmo"))
             Button {
                 if let f = rigKHz { var s = scale(for: band); s.center(on: f); scales[band] = s }
             } label: { Image(systemName: "scope") }

@@ -20,7 +20,7 @@ public enum ADIF {
 
     public static func header(now: Date = Date()) -> String {
         "mmtty4mac ADIF export\n" + field("ADIF_VER", version) + field("PROGRAMID", "mmtty4mac")
-            + field("PROGRAMVERSION", "0.15.1") + field("CREATED_TIMESTAMP", dateFmt.string(from: now) + " " + timeFmt.string(from: now))
+            + field("PROGRAMVERSION", "0.16.0") + field("CREATED_TIMESTAMP", dateFmt.string(from: now) + " " + timeFmt.string(from: now))
             + "<EOH>\n"
     }
 

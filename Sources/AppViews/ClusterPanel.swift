@@ -41,6 +41,9 @@ struct ClusterPanel: View {
                 TextField(L("Příkaz pro DX cluster (např. sh/dx 30)"),
                           text: Binding(get: { command }, set: { command = $0; historyPos = nil }))
                     .textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced))
+                    // the placeholder is only read while the field is empty, so name the field too
+                    .accessibilityLabel(L("Příkaz pro DX cluster"))
+                    .accessibilityHint(L("Šipky nahoru a dolů procházejí historii příkazů."))
                     .focused($fieldFocused)
                     .onSubmit { send() }
                     .onKeyPress(.upArrow) { history(-1); return .handled }
