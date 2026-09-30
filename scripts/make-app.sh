@@ -29,6 +29,7 @@ cp "$BIN" "$APP/Contents/MacOS/MMTTY4MacApp"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp COPYING COPYING.LESSER "$APP/Contents/Resources/"
 cp Resources/cty.dat "$APP/Contents/Resources/"      # DXCC (AD1C country file)
+cp Resources/container-migration.plist "$APP/Contents/Resources/"   # přechod nastavení z DMG verze do sandboxu
 cp -R Resources/Languages "$APP/Contents/Resources/"   # jazyky rozhraní (JSON)
 rm -rf "$APP/Contents/Resources/Help"; cp -R docs/html "$APP/Contents/Resources/Help"   # příručka (Nápověda)
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
