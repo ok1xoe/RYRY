@@ -1,0 +1,72 @@
+/* mmtty4mac – dokumentace / documentation */
+:root {
+  --bg: #fbfbfd; --fg: #1d1d1f; --muted: #6e6e73; --line: #e3e3e8; --card: #ffffff;
+  --accent: #0a6cff; --code: #f2f2f5; --warn: #b25e00; --shadow: 0 6px 24px rgba(0,0,0,.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161618; --fg: #ececf0; --muted: #a0a0a8; --line: #2e2e33; --card: #1f1f22;
+    --accent: #4c9dff; --code: #26262a; --warn: #ffb347; --shadow: 0 6px 24px rgba(0,0,0,.5);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+       font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, kbd { font: 0.9em ui-monospace, "SF Mono", Menlo, monospace; background: var(--code);
+            padding: 0.1em 0.35em; border-radius: 4px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; }
+
+header.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent);
+             backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+header.top .in { max-width: 1240px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 14px; }
+header.top img.icon { width: 34px; height: 34px; border-radius: 8px; }
+header.top .brand { font-weight: 700; font-size: 18px; }
+header.top .ver { color: var(--muted); font-size: 14px; }
+header.top .lang { margin-left: auto; font-size: 14px; }
+header.top .lang a, header.top .lang span { padding: 4px 10px; border-radius: 6px; }
+header.top .lang span { background: var(--code); font-weight: 600; }
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 40px; }
+nav.toc { position: sticky; top: 72px; align-self: start; max-height: calc(100vh - 90px); overflow: auto; padding: 24px 0; font-size: 14px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; }
+nav.toc li { margin: 2px 0; }
+nav.toc a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--fg); }
+nav.toc a:hover { background: var(--code); text-decoration: none; }
+main { padding: 24px 0 80px; min-width: 0; }
+
+.hero { padding: 28px 0 8px; }
+.hero h1 { font-size: 40px; line-height: 1.15; margin: 0 0 10px; letter-spacing: -0.02em; }
+.hero p.lead { font-size: 19px; color: var(--muted); margin: 0 0 18px; max-width: 760px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; padding: 0; list-style: none; }
+.pills li { background: var(--code); border-radius: 999px; padding: 4px 12px; font-size: 14px; }
+
+section { padding-top: 28px; }
+h2 { font-size: 28px; margin: 24px 0 10px; letter-spacing: -0.01em; scroll-margin-top: 80px; }
+h3 { font-size: 20px; margin: 22px 0 6px; scroll-margin-top: 80px; }
+p, ul, ol, table { max-width: 820px; }
+
+figure { margin: 18px 0 26px; }
+figure a { display: inline-block; max-width: 100%; }
+figure img { max-width: 100%; height: auto; border-radius: 10px; box-shadow: var(--shadow); border: 1px solid var(--line); display: block; }
+figure.half img { max-width: 520px; width: 100%; }
+figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; max-width: 820px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; margin: 16px 0 26px; }
+.gallery figure { margin: 0; }
+
+table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--code); }
+.note { border-left: 4px solid var(--accent); background: var(--card); padding: 10px 14px; border-radius: 6px; max-width: 820px; box-shadow: var(--shadow); }
+.note.warn { border-color: var(--warn); }
+footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); margin-top: 50px; padding-top: 16px; }
+
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: 1fr; gap: 0; }
+  nav.toc { position: static; max-height: none; padding: 16px 0 0; border-bottom: 1px solid var(--line); }
+  nav.toc ol { columns: 2; }
+  .hero h1 { font-size: 30px; }
+}
+@media (max-width: 520px) { nav.toc ol { columns: 1; } header.top .ver { display: none; } }

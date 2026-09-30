@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RYRY — sound-card RTTY for macOS</title>
+<meta name="description" content="RYRY decodes and sends RTTY with your Mac's sound card: MMTTY's demodulator, contest scoring, band map, DX cluster and an fldigi-compatible API. Free on the Mac App Store.">
+<meta name="theme-color" content="#0A0C0E">
+<link rel="icon" href="img/icon-64.png">
+<link rel="alternate" hreflang="cs" href="https://ryry.ok1xoe.dev/cs/">
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/ryry.css">
+</head>
+<body data-page="index" data-lang="en" data-root=".">
+<div id="site-head"></div>
+
+<section class="hero">
+  <canvas id="scope" aria-hidden="true"></canvas>
+  <div class="shell">
+    <div class="kick"><span class="led" aria-hidden="true"></span><span class="silk">Mac App Store · Free · macOS 14+</span></div>
+    <div class="brand">
+      <img src="img/icon-512.png" alt="RYRY app icon" width="150" height="150">
+      <h1 class="wordmark">RYRY</h1>
+    </div>
+    <p class="claim">Sound-card <b>RTTY for macOS</b> — built on the MMTTY demodulator, made for contests.</p>
+    <div class="ctas">
+      <!-- replace #appstore with https://apps.apple.com/app/id<number> once the app is approved (site/README.md) -->
+      <a class="btn btn-accent btn-store" href="#appstore" id="appstore"><span class="small">Download on the</span><span class="big">Mac App Store</span></a>
+      <a class="btn" href="manual/en/index.html">Read the manual <span class="arw" aria-hidden="true">→</span></a>
+    </div>
+    <div class="readout">
+      <div class="cell"><div class="n">45.45</div><div class="k">baud Baudot, up to 110</div></div>
+      <div class="cell"><div class="n">170 Hz</div><div class="k">shift, any shift you need</div></div>
+      <div class="cell"><div class="n">9</div><div class="k">RTTY contest presets</div></div>
+      <div class="cell"><div class="n">2</div><div class="k">APIs for your logger</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="shell">
+    <div class="sec-head">
+      <div class="eyebrow"><span class="silk">Features</span></div>
+      <h2>Everything an RTTY station needs.</h2>
+      <p class="sub">From the first CQ to the Cabrillo file — receive, transmit, log and score, with your radio on the USB cable and the Mac's sound card.</p>
+    </div>
+    <div class="rack-label"><span class="silk silk-sig">Rack A — Signal</span><span class="ln"></span></div>
+    <div class="rack">
+      <div class="module static"><div><div class="cat">Receive</div><div class="head"><h3>MMTTY demodulator</h3></div></div>
+        <div class="screen"><ul><li>IIR, FIR, PLL and FFT demodulators, AFC, ATC</li><li>Squelch, notch and LMS filters</li><li>Second decoder and multi-channel decoding</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">45.45–110 Bd</span><span class="conn">any shift</span></span></div></div>
+      <div class="module static"><div><div class="cat">Transmit</div><div class="head"><h3>AFSK or FSK</h3></div></div>
+        <div class="screen"><ul><li>AFSK through the sound card, FSK over a USB serial port</li><li>PTT by RTS/DTR or CAT</li><li>Macros F1–F12 with MMTTY variables</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">RTS/DTR</span><span class="conn">CAT PTT</span></span></div></div>
+      <div class="module static"><div><div class="cat">Tuning</div><div class="head"><h3>Spectrum &amp; waterfall</h3></div></div>
+        <div class="screen"><ul><li>Click to tune, right-click to notch</li><li>XY cross indicator and a demodulator scope</li><li>Spots shown as labels in the waterfall</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">XY scope</span><span class="conn">band labels</span></span></div></div>
+    </div>
+    <div class="rack-label"><span class="silk silk-sig">Rack B — Operating</span><span class="ln"></span></div>
+    <div class="rack">
+      <div class="module static"><div><div class="cat">Contests</div><div class="head"><h3>Score &amp; ESM</h3></div></div>
+        <div class="screen"><ul><li>ARRL RU, CQ WPX, CQ WW, BARTG, SARTG, Makrothen, JARTS, WAE, OK DX</li><li>Enter Sends Message, dupes, Super Check Partial</li><li>Multipliers, score per band, WAE QTC, Cabrillo</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">Cabrillo</span><span class="conn">MASTER.SCP</span></span></div></div>
+      <div class="module static"><div><div class="cat">Spots</div><div class="head"><h3>Band map &amp; DX cluster</h3></div></div>
+        <div class="screen"><ul><li>DX cluster and Reverse Beacon Network</li><li>Band and mode filters</li><li>Alerts: your call, needed stations, new countries</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">telnet</span><span class="conn">RBN</span></span></div></div>
+      <div class="module static"><div><div class="cat">Log</div><div class="head"><h3>ADIF log &amp; callbook</h3></div></div>
+        <div class="screen"><ul><li>An ADIF log any logger can read</li><li>QRZ.com / HamQTH, DXCC, beam heading</li><li>eQSL, Club Log, LoTW through TrustedQSL</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">ADIF</span><span class="conn">eQSL</span><span class="conn">Club Log</span></span></div></div>
+    </div>
+    <div class="rack-label"><span class="silk silk-sig">Rack C — Integration</span><span class="ln"></span></div>
+    <div class="rack">
+      <div class="module static"><div><div class="cat">Radio</div><div class="head"><h3>Rig control</h3></div></div>
+        <div class="screen"><ul><li>Built-in CAT: Icom, Yaesu, Kenwood, Elecraft</li><li>hamlib rigctld and flrig over the network</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">CI-V</span><span class="conn">rigctld</span><span class="conn">flrig</span></span></div></div>
+      <div class="module static"><div><div class="cat">Logger API</div><div class="head"><h3>Looks like fldigi</h3></div></div>
+        <div class="screen"><ul><li>fldigi XML-RPC for RUMlogNG, MacLoggerDX…</li><li>JSON-RPC over WebSocket with live events</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">:7362</span><span class="conn">:7363</span></span></div></div>
+      <div class="module static"><div><div class="cat">Try it</div><div class="head"><h3>No radio needed</h3></div></div>
+        <div class="screen"><ul><li>Help → Play Demo Signal decodes a contest QSO</li><li>Play or record any WAV file</li><li>Import macros and settings from Windows MMTTY</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">WAV</span><span class="conn">MMTTY.ini</span></span></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="shell"><hr class="divider"></div>
+
+<section id="screens">
+  <div class="shell">
+    <div class="sec-head">
+      <div class="eyebrow"><span class="silk">On screen</span></div>
+      <h2>One window for the whole QSO.</h2>
+    </div>
+    <div class="screens">
+      <figure class="faceplate shot"><img src="manual/img/en-main.png" alt="RYRY main window: spectrum, waterfall, received text, macros and the QSO panel" loading="lazy">
+        <figcaption>Spectrum and waterfall, received text, macros and the QSO panel with callbook data and previous QSOs.</figcaption></figure>
+      <div class="row3">
+        <figure class="faceplate shot"><img src="manual/img/en-score.png" alt="Contest score window" loading="lazy"><figcaption>Contest score and multipliers per band.</figcaption></figure>
+        <figure class="faceplate shot"><img src="manual/img/en-spots.png" alt="DX cluster spots window" loading="lazy"><figcaption>DX cluster and RBN spots with filters.</figcaption></figure>
+        <figure class="faceplate shot"><img src="manual/img/en-bandmap.png" alt="Band map window" loading="lazy"><figcaption>The band map with spots and the rig position.</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="shell"><hr class="divider"></div>
+
+<section id="requirements">
+  <div class="shell">
+    <div class="sec-head">
+      <div class="eyebrow"><span class="silk">Requirements</span></div>
+      <h2>What you need.</h2>
+    </div>
+    <div class="faceplate patchbay">
+      <div class="grp"><div class="silk">Mac</div><div class="chips"><span class="chip key">macOS 14 Sonoma or later</span><span class="chip">Apple silicon or Intel</span></div></div>
+      <div class="grp"><div class="silk">Station</div><div class="chips"><span class="chip">HF transceiver</span><span class="chip">USB audio (built-in or an interface)</span><span class="chip">USB CAT cable (optional)</span><span class="chip">amateur radio licence to transmit</span></div></div>
+      <div class="grp"><div class="silk">Heritage</div><div class="chips"><span class="chip">based on MMTTY by JE3HHT</span><span class="chip key">free · GNU LGPL v3</span><a class="chip" href="https://github.com/ok1xoe/mmtty4mac">source on GitHub →</a></div></div>
+    </div>
+  </div>
+</section>
+
+<div id="site-foot"></div>
+<script src="js/site.js"></script>
+</body>
+</html>

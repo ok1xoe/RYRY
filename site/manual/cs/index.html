@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mmtty4mac – příručka</title>
+<meta name="description" content="Uživatelská příručka programu mmtty4mac – RTTY pro macOS založené na MMTTY.">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../bridge.css">
+<link rel="icon" href="../img/icon.png">
+</head>
+<body>
+<header class="top"><div class="in">
+  <img class="icon" src="../img/icon.png" alt="">
+  <span class="brand">mmtty4mac</span><span class="ver">příručka · verze 0.14</span>
+  <a class="home" href="../../cs/index.html">← RYRY</a>
+  <span class="lang"><span>Čeština</span> <a href="../en/index.html">English</a></span>
+</div></header>
+
+<div class="wrap">
+<nav class="toc" aria-label="Obsah">
+  <ol>
+    <li><a href="#uvod">Úvod</a></li>
+    <li><a href="#instalace">1. Instalace</a></li>
+    <li><a href="#nastaveni">2. První nastavení</a></li>
+    <li><a href="#cat">3. Ovládání rádia (CAT)</a></li>
+    <li><a href="#prijem">4. Příjem</a></li>
+    <li><a href="#vysilani">5. Vysílání a makra</a></li>
+    <li><a href="#log">6. QSO a log</a></li>
+    <li><a href="#zavody">7. Závody a QTC</a></li>
+    <li><a href="#soubory">8. Soubory a WAV</a></li>
+    <li><a href="#api">9. API pro loggery</a></li>
+    <li><a href="#online">10. Online služby</a></li>
+    <li><a href="#zobrazeni">11. Zobrazení, jazyk, klávesy</a></li>
+    <li><a href="#problemy">12. Když něco nefunguje</a></li>
+  </ol>
+</nav>
+
+<main>
+<div class="hero" id="uvod">
+  <h1>RTTY pro macOS</h1>
+  <p class="lead">mmtty4mac je nativní přepis programu MMTTY (JE3HHT) pro Mac. Používá stejný osvědčený demodulátor a přidává log, podporu závodů, ovládání rádia přes USB a API pro loggery.</p>
+  <ul class="pills">
+    <li>demodulátor MMTTY</li><li>AFSK i FSK</li><li>CAT Icom / Yaesu / Kenwood / Elecraft + hamlib</li>
+    <li>log ADIF, Cabrillo</li><li>9 předvoleb závodů, WAE QTC</li><li>API kompatibilní s fldigi</li><li>čeština / English</li>
+  </ul>
+</div>
+<figure>
+  <a href="../img/cs-main.png"><img src="../img/cs-main.png" alt="Hlavní okno mmtty4mac při příjmu" loading="lazy"></a>
+  <figcaption>Hlavní okno: nahoře ovládání modemu, pod ním spektrum a vodopád (žlutá = mark, oranžová = space), přijatý text, okno vysílání a makra F1–⇧F4. Vpravo QSO okno se zemí DXCC, místním časem protistanice a předchozími spojeními.</figcaption>
+</figure>
+
+<section id="instalace">
+<h2>1. Instalace</h2>
+<ol>
+  <li>Otevřete <code>mmtty4mac-0.14.0.dmg</code> a přetáhněte aplikaci do složky <b>Aplikace</b>.</li>
+  <li>Při prvním spuštění se macOS zeptá na přístup k <b>mikrofonu</b> – potvrďte ho, jinak příjem nefunguje. Změnit to jde v Nastavení systému → Soukromí a zabezpečení → Mikrofon.</li>
+  <li>Aplikace je podepsaná a notarizovaná Applem, spustí se bez varování.</li>
+  <li>Tuto příručku otevřete kdykoli z aplikace: menu <b>Nápověda → Příručka mmtty4mac</b> (<kbd>⌘</kbd><kbd>?</kbd>).</li>
+</ol>
+<p>Volitelně: pro rádia, která vestavěný CAT nezná, nainstalujte hamlib příkazem <code>brew install hamlib</code>.</p>
+</section>
+
+<section id="nastaveni">
+<h2>2. První nastavení</h2>
+<p>Nastavení otevřete klávesou <kbd>⌘</kbd><kbd>,</kbd>. Změny se projeví tlačítkem <b>Použít</b> (restartuje zvuk, rig a API); parametry modemu a jazyk platí hned.</p>
+
+<h3>Stanice</h3>
+<p>Vaše značka se posílá v makrech (<code>%m</code>) a podle ní aplikace určí vaši CQ zónu a kontinent (pro závody a QTC).</p>
+<figure class="half"><a href="../img/cs-settings-0.png"><img src="../img/cs-settings-0.png" alt="Nastavení – Stanice" loading="lazy"></a></figure>
+
+<h3>Zvuk</h3>
+<p>Jako vstup i výstup zvolte zvukovou kartu rádia (typicky „USB Audio CODEC“). Hlasitost vysílání nastavte tak, aby ALC rádia jen lehce reagovalo. <b>Kalibrace hodin</b> změří skutečnou vzorkovací frekvenci zvukovky – u levných zvukovek zlepší dekódování.</p>
+<figure class="half"><a href="../img/cs-settings-1.png"><img src="../img/cs-settings-1.png" alt="Nastavení – Zvuk" loading="lazy"></a></figure>
+
+<h3>PTT / FSK</h3>
+<p>Jak se klíčuje vysílač: <b>CAT</b> (příkazem rádiu), <b>RTS/DTR</b> sériového portu, nebo VOX. <b>AFSK</b> = RTTY zvukem (rádio v SSB/DATA), <b>FSK</b> = klíčování sériovou linkou (rádio v režimu RTTY/FSK). Časování (zpoždění TX, doběh PTT) a bezpečnostní časovač, který vysílání vypne při zaseknutí.</p>
+<figure class="half"><a href="../img/cs-settings-2.png"><img src="../img/cs-settings-2.png" alt="Nastavení – PTT / FSK" loading="lazy"></a></figure>
+
+<h3>Modem</h3>
+<p>Parametry demodulátoru, filtrů, AFC a vysílání. Výchozí hodnoty odpovídají MMTTY; mění se hned, bez tlačítka Použít.</p>
+<figure class="half"><a href="../img/cs-settings-4.png"><img src="../img/cs-settings-4.png" alt="Nastavení – Modem" loading="lazy"></a></figure>
+</section>
+
+<section id="cat">
+<h2>3. Ovládání rádia (CAT)</h2>
+<p>V záložce <b>Rig</b> vyberte způsob ovládání:</p>
+<ul>
+  <li><b>CAT přes USB (vestavěný)</b> – bez dalších programů. Protokoly Icom CI-V (IC-7300, 7610, 705, 9700…; výběr modelu nastaví adresu CI-V), Yaesu (FT-991, FTDX10/101, FT-710), Kenwood (TS-590, TS-890) a Elecraft (K3, K4, KX3). Aplikace čte a nastavuje frekvenci a mód a ovládá PTT.</li>
+  <li><b>hamlib – spustit automaticky</b> – pro ostatní rádia: model vyberete ze seznamu hamlib, aplikace si <code>rigctld</code> spustí a ukončí sama.</li>
+  <li><b>hamlib rigctld (síť)</b> a <b>flrig</b> – připojení k již běžícímu programu.</li>
+</ul>
+<figure class="half"><a href="../img/cs-settings-3.png"><img src="../img/cs-settings-3.png" alt="Nastavení – Rig" loading="lazy"></a>
+  <figcaption>Vestavěný CAT: protokol, sériový port rádia, rychlost a stop bity (musí odpovídat menu rádia). Tlačítko „Vyzkoušet spojení“ ukáže frekvenci a mód.</figcaption></figure>
+<div class="note">Pro PTT přes CAT zvolte v záložce PTT / FSK metodu <b>CAT</b>. U nových Yaesu nechte zapnuté „RTS (Yaesu CAT RTS)“. Port CAT nejde sdílet s PTT přes RTS/DTR na stejném portu.</div>
+</section>
+
+<section id="prijem">
+<h2>4. Příjem</h2>
+<ul>
+  <li><b>Naladění:</b> klik do spektra nebo vodopádu naladí mark; space je o shift výš. <b>HAM</b> nastaví shift 170 Hz.</li>
+  <li><b>Kolečko myši</b> nad vodopádem mění úroveň squelche, <b>pravé tlačítko</b> vloží zářez (notch) proti rušení.</li>
+  <li><b>AFC</b> doladí signál (pravé tlačítko: jen při otevřeném squelchi, omezení rozsahu), <b>NET</b> vysílá na kmitočtu příjmu, <b>REV</b> prohodí mark a space, <b>ATC</b> a <b>SQ</b> jako v MMTTY.</li>
+  <li><b>Filtry</b> (menu vedle Shift): BPF, AA6YQ, notch/LMS, UOS. <b>XY</b> zapne křížový indikátor ladění.</li>
+  <li><b>Zvýraznění značek:</b> v přijatém textu je vaše značka červeně, stanice už v logu modře, nová tučně a duplicita přeškrtnutě. Když vás někdo volá, ozve se zvuk (volitelně i oznámení).</li>
+  <li><b>Hlídání:</b> v Nastavení → Spoty lze hlídat vybrané značky a nové země (na pásmu nebo vůbec) ve spotech i v příjmu.</li>
+  <li><b>Klik na slovo</b> v přijatém textu ho vloží do QSO okna – značku, RST, číslo, jméno podle typu slova.</li>
+</ul>
+<h3>Druhý dekodér a vícekanálové dekódování</h3>
+<ul>
+  <li><b>Druhý dekodér</b> (přepínač „2. dek.“ v horní liště) přijímá stejný signál jiným demodulátorem a jeho text ukazuje v panelu pod příjmem. Slabý nebo rušený signál tak často přečte jeden z nich – podobně jako se v závodech používá 2Tone vedle MMTTY.</li>
+  <li><b>Vícekanálové dekódování</b> (menu Okno → Kanály) samo najde RTTY signály ve vodopádu a každý dekóduje zvlášť (až 8 kanálů). Tlačítko <b>Naladit</b> přeladí hlavní dekodér na vybraný signál. Nastavení: Nastavení → Dekodéry.</li>
+</ul>
+<figure><a href="../img/cs-scope.png"><img src="../img/cs-scope.png" alt="Scope demodulátoru" loading="lazy"></a>
+  <figcaption>Okno → Scope demodulátoru: průběhy mark a space, rozhodnuté bity a synchronizace – pro jemné ladění parametrů demodulátoru.</figcaption></figure>
+</section>
+
+<section id="vysilani">
+<h2>5. Vysílání a makra</h2>
+<ul>
+  <li><b>TX / RX:</b> tlačítko TX nebo <kbd>⌘</kbd><kbd>T</kbd>. <kbd>Esc</kbd> = okamžitě RX. <b>Tune</b> = nosná pro ladění.</li>
+  <li><b>Okno vysílání:</b> odesílá po znacích, slovech nebo řádcích; <b>Odeslat vše</b> odešle celý text.</li>
+  <li><b>Makra F1–F12 a ⇧F1–⇧F4:</b> klik nebo klávesa; pravým tlačítkem <b>Upravit…</b> (název, text, barva, opakování).</li>
+  <li><b>Zprávy:</b> delší uložené texty (popis stanice, rozlučka) v menu Zprávy.</li>
+  <li><b>Odeslat textový soubor</b> najdete v menu Vysílání.</li>
+</ul>
+<table>
+  <tr><th>Proměnná</th><th>Význam</th><th>Proměnná</th><th>Význam</th></tr>
+  <tr><td><code>%m</code></td><td>moje značka</td><td><code>%c</code></td><td>značka protistanice</td></tr>
+  <tr><td><code>%n</code></td><td>jméno protistanice</td><td><code>%q</code></td><td>QTH protistanice</td></tr>
+  <tr><td><code>%r</code> / <code>%s</code></td><td>RST odeslané / přijaté</td><td><code>%N</code> / <code>%M</code></td><td>odesílané / přijaté číslo (výměna)</td></tr>
+  <tr><td><code>%g</code></td><td>pozdrav GM/GA/GE podle místního času protistanice</td><td><code>%D %T %t</code></td><td>datum a čas UTC</td></tr>
+  <tr><td><code>%L %F</code></td><td>LTRS / FIGS</td><td><code>%{…}</code></td><td>CW identifikace</td></tr>
+  <tr><td><code>%l</code></td><td>zalogovat spojení</td><td><code>\</code> / <code>#</code> na konci</td><td>po odvysílání RX / zůstat v TX</td></tr>
+</table>
+<p>Příklad makra „Answer“: <code>%c %c DE %m %m %m K\</code></p>
+</section>
+
+<section id="log">
+<h2>6. QSO a log</h2>
+<p>QSO okno ukazuje jen pole, která aktuální režim potřebuje. Pod značkou je země DXCC (z cty.dat), CQ a ITU zóna, místní čas protistanice a seznam předchozích spojení. <b>Log</b> (<kbd>⌘</kbd><kbd>L</kbd>) zapíše spojení, <b>Clear</b> okno vyprázdní.</p>
+<h3>Pásmo bez rigu, návrhy značek, callbook</h3>
+<ul>
+  <li><b>Pásmo:</b> bez připojeného rigu vyberte pod poli QSO pásmo nebo zadejte frekvenci v kHz – zapíše se do logu a zůstane i pro další spojení. S rigem se frekvence bere z rádia.</li>
+  <li><b>Super Check Partial:</b> při psaní značky se pod polem Call nabízejí známé značky (z MASTER.SCP a z vašeho logu); „≈“ označuje značky lišící se o jeden znak – pomohou opravit chybně přijatou značku. MASTER.SCP stáhnete v Nastavení → Závod.</li>
+  <li><b>Směr antény:</b> pod zemí je azimut a vzdálenost k protistanici (z lokátoru, jinak podle země) i dlouhou cestou.</li>
+  <li><b>Frekvence:</b> kliknutím na frekvenci v horní liště (nebo <kbd>⌥</kbd><kbd>⌘</kbd><kbd>F</kbd>) zadáte kmitočet nebo zvolíte pásmo – rig se přeladí (během vysílání ne).</li>
+  <li><b>Callbook:</b> po zadání značky se z QRZ.com nebo HamQTH doplní jméno, QTH a lokátor (Nastavení → API a log → Callbook; heslo je v Klíčence).</li>
+</ul>
+<figure><a href="../img/cs-log.png"><img src="../img/cs-log.png" alt="Okno Log" loading="lazy"></a>
+  <figcaption>Okno Log (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): hledání, oprava dvojklikem, mazání. Dole je cesta k otevřenému logu, menu <b>Log</b> (nový, otevřít, uložit jako, export ADIF), import ADIF a export Cabrillo. Záložka QTC ukazuje série QTC ze závodu WAE.</figcaption></figure>
+<p><b>Zálohy:</b> log se jednou denně zálohuje do složky <code>backup</code> vedle logu (posledních 10 záloh); ručně Soubor → Zálohovat log teď. <b>Import z MMTTY:</b> Soubor → Importovat z MMTTY… načte makra, zprávy, značku, parametry modemu a klávesové zkratky ze souboru <code>Mmtty.ini</code> z Windows; před importem ukáže náhled a co přepíše.</p>
+<p>Log se ukládá do <code>~/Documents/mmtty4mac</code> jako JSONL a zároveň jako ADIF (<code>mmtty4mac.adi</code>), který přečte každý logger. Starý log z MMTTY v MMTTY exportujte do ADIF a v mmtty4mac importujte – duplicity se přeskočí.</p>
+<h3>Správa logu</h3>
+<p>Každý log je samostatný soubor – třeba jeden pro běžný provoz a jeden pro každý závod. V menu <b>Soubor</b>:</p>
+<table>
+  <tr><th>Příkaz</th><th>Co dělá</th></tr>
+  <tr><td>Nový log… <kbd>⌘</kbd><kbd>N</kbd></td><td>založí prázdný log se zvoleným názvem a umístěním; pořadová čísla závodu začnou od 1</td></tr>
+  <tr><td>Otevřít log… <kbd>⌘</kbd><kbd>O</kbd></td><td>otevře log mmtty4mac nebo ADIF z jiného programu (ten se převede, originál zůstane jako <code>.adi.orig</code>)</td></tr>
+  <tr><td>Otevřít nedávný log</td><td>posledních 8 logů</td></tr>
+  <tr><td>Uložit log jako… <kbd>⇧</kbd><kbd>⌘</kbd><kbd>S</kbd></td><td>uloží kopii pod jiným názvem a dál se pracuje v ní</td></tr>
+  <tr><td>Exportovat ADIF…</td><td>kopie ADIF jinam, log zůstane otevřený</td></tr>
+  <tr><td>Importovat ADIF…</td><td>přidá spojení z ADIF do otevřeného logu (duplicity se přeskočí)</td></tr>
+</table>
+<p>Každé spojení se ukládá hned při zalogování, samostatné „Uložit“ proto není potřeba. Název otevřeného logu je v titulku okna Log.</p>
+</section>
+
+<section id="zavody">
+<h2>7. Závody a QTC</h2>
+<p>V záložce <b>Závod</b> zapněte závodní režim a vyberte předvolbu: ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE nebo OK DX RTTY. Předvolba nastaví název pro Cabrillo, formát výměny a nejbližší termín (vždy ho ověřte v pravidlech).</p>
+<div class="gallery">
+  <figure><a href="../img/cs-settings-5.png"><img src="../img/cs-settings-5.png" alt="Nastavení – Závod" loading="lazy"></a><figcaption>Předvolba, výměna, Cabrillo a začátek závodu.</figcaption></figure>
+  <figure><a href="../img/cs-contest.png"><img src="../img/cs-contest.png" alt="OK DX RTTY Contest v hlavním okně" loading="lazy"></a><figcaption>OK DX RTTY: QSO okno nabízí jen RST a CQ zónu; vaši zónu doplní aplikace, zónu protistanice předvyplní podle značky.</figcaption></figure>
+</div>
+<p><b>Duplicity:</b> když se stanicí už máte v tomto závodě spojení na stejném pásmu a módu, zobrazí se u značky červené <b>DUPE</b>. Zalogovat lze i tak.</p>
+<p>Formáty výměny: RST + pořadové číslo (nebo pevná výměna), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Pořadová čísla se po zalogování zvyšují sama.</p>
+<h3>ESM – Enter posílá zprávy (Run / S&amp;P)</h3>
+<p>Po zapnutí v Nastavení → Závod → ESM pošle Enter v poli Call nebo výměny makro podle stavu spojení, podobně jako v N1MM: <b>Run</b> (voláte CQ) – CQ → výměna → TU a zalogování; <b>S&amp;P</b> (odpovídáte) – moje značka → výměna a zalogování. Režim přepnete v hlavičce QSO panelu nebo <kbd>⌃</kbd><kbd>R</kbd>; panel ukazuje, co Enter pošle. Během vysílání Enter nic neposílá a prázdné makro se nikdy neodešle.</p>
+<p><b>Rychlost:</b> ve stavovém řádku je v závodě počet spojení a rychlost za posledních 10 a 60 minut (spojení za hodinu); v okně Log jsou počty podle pásem.</p>
+<h3>Skóre</h3>
+<p>Okno <b>Okno → Skóre</b> ukazuje pro zvolenou předvolbu počet spojení, duplicit, bodů a násobičů po pásmech a celkem, a výsledné skóre i s výpočtem (např. „Body 120 × násobiče 35 = 4 200“). Aktualizuje se s každým zalogovaným, opraveným nebo smazaným spojením; skóre je vidět i ve stavovém řádku. Jde o odhad – vyhodnocení závodu odečte chybná a nepotvrzená spojení. Pravidla, která nešlo ověřit, okno označí.</p>
+<div class="gallery">
+  <figure><a href="../img/cs-score.png"><img src="../img/cs-score.png" alt="Okno Skóre" loading="lazy"></a><figcaption>Body, spojení a násobiče po pásmech a celkem.</figcaption></figure>
+</div>
+<h3>Násobiče a band mapa</h3>
+<p>Okno <b>Okno → Násobiče</b> ukazuje u zvolené předvolby odpracované násobiče po pásmech (země DXCC, CQ zóny, prefixy WPX, státy a provincie, oblasti…) a u konečných množin i chybějící. U zadané značky se v QSO okně objeví zelené <b>NEW MULT</b>. Pravidla, která nešlo ověřit v oficiálních pravidlech závodu, jsou v okně označena. <b>Okno → Band mapa</b> ukazuje RTTY část pásma se spoty podle frekvence a naladěním rigu; klik na spot naladí rig a vloží značku. Pásmo se volí samo podle rigu, frekvence v QSO okně nebo podle toho, kde je nejvíc spotů; ručně ho vyberete v rozbalovacím seznamu. Stupnice pokrývá celé pásmo (mapa se otevře na digitální části, kde bývá RTTY). Kolečkem myši ji posunete, se <b>Shiftem</b> přiblížíte nebo oddálíte; totéž umí lupy a tažení myší, tlačítko <b>⤢</b> zobrazí celé pásmo.</p>
+<p><b>Historie značek:</b> soubor ve formátu N1MM Call History (Nastavení → Závod) předvyplní jméno, lokátor a výměnu protistanice (např. zónu).</p>
+<h3>WAE a QTC</h3>
+<p>Ve formátu WAE je v QSO okně panel QTC: <b>QTC?</b> se zeptá protistanice, <b>QRV – přijmout</b> otevře příjem série, <b>Poslat…</b> připraví a odvysílá sérii z vašeho logu. Aplikace hlídá pravidla – nejvýše 10 QTC na dvojici stanic, jen mezi kontinenty, každé spojení jen jednou. Přijaté řádky se plní klikem na slova nebo tlačítkem <b>Načíst z příjmu</b>.</p>
+</section>
+
+<section id="soubory">
+<h2>8. Soubory a WAV</h2>
+<table>
+  <tr><th>Menu Soubor</th><th>Co dělá</th></tr>
+  <tr><td>Uložit příjem do souboru…</td><td>uloží obsah okna příjmu</td></tr>
+  <tr><td>Průběžně zapisovat příjem do souboru</td><td>denní soubory <code>rx-RRRR-MM-DD.txt</code> ve složce <code>rx</code> pod adresářem logu, volitelně s časem UTC</td></tr>
+  <tr><td>Přehrát WAV do příjmu</td><td>reálný čas, 4× nebo co nejrychleji; v horní liště pauza, posun a převinutí</td></tr>
+  <tr><td>Nahrávat příjem do WAV…</td><td>nahrávání ukazuje červené „REC“, kliknutím se zastaví</td></tr>
+  <tr><td>Importovat ADIF…</td><td>spojení z jiného programu (duplicity se přeskočí)</td></tr>
+  <tr><td>Nastavení zvuku systému…, Audio MIDI Setup…</td><td>úroveň a formát zvukovky</td></tr>
+</table>
+</section>
+
+<section id="api">
+<h2>9. API pro loggery</h2>
+<p>mmtty4mac se loggerům představuje jako <b>fldigi</b> (XML-RPC na portu 7362), takže ho ovládají například RUMlogNG nebo MacLoggerDX – v loggeru zvolte „fldigi“. Druhé API je JSON-RPC přes WebSocket (<code>ws://127.0.0.1:7363/v1</code>) s událostmi o přijatém textu, stavu a zalogovaných spojeních; Java klient je v <code>clients/java</code>.</p>
+<figure class="half"><a href="../img/cs-settings-7.png"><img src="../img/cs-settings-7.png" alt="Nastavení – API a log" loading="lazy"></a>
+  <figcaption>API a log: porty API, adresář a název otevřeného logu a průběžný záznam příjmu.</figcaption></figure>
+<div class="note warn">API nemá autentizaci a umí zapnout vysílač. Ve výchozím stavu naslouchá jen na tomto Macu; přístup ze sítě zapínejte jen v důvěryhodné síti.</div>
+</section>
+
+<section id="online">
+<h2>10. Online služby</h2>
+<p>Všechny služby jsou ve výchozím stavu vypnuté a na internet se připojují jen po zapnutí. Hesla a klíče se ukládají do Klíčenky macOS.</p>
+<table>
+  <tr><th>Služba</th><th>Kde zapnout</th><th>Co dělá</th></tr>
+  <tr><td>Callbook (QRZ.com, HamQTH)</td><td>Nastavení → API a log</td><td>doplní jméno, QTH a lokátor protistanice</td></tr>
+  <tr><td>DX cluster a RBN</td><td>Nastavení → Spoty, okno Okno → Spoty</td><td>seznam RTTY spotů; dvojklik naladí rig a vloží značku (posun frekvence pro LSB/AFSK nastavíte); spoty v propustném pásmu se zobrazí jako štítky přímo ve vodopádu (zelená = nová stanice, oranžová = v logu, červená = duplicita), klik naladí mark</td></tr>
+  <tr><td>Příkazy pro DX cluster</td><td>okno Okno → Spoty (dole)</td><td>10 tlačítek s příkazy (např. <code>sh/dx 30</code>, <code>sh/wwv</code>, <code>set/skimmer</code>) a řádek pro ruční příkaz s historií (šipky ↑↓); odpovědi clusteru jsou v rozbalovací konzoli. Pravé tlačítko myši upraví příkaz stejným editorem jako makra pro vysílání; <code>%k</code> = frekvence rigu v kHz, <code>%c</code> = protistanice (např. <code>dx %k %c RTTY</code>)</td></tr>
+  <tr><td>LoTW, eQSL, Club Log</td><td>Nastavení → Online, okno Log → Nahrát</td><td>nahraje dosud nenahraná spojení (LoTW přes program TQSL); volitelně automaticky po zalogování</td></tr>
+  <tr><td>Aktualizace</td><td>menu aplikace → Zkontrolovat aktualizace…</td><td>upozorní na novou verzi a stáhne DMG (nic neinstaluje samo)</td></tr>
+</table>
+</section>
+
+<section id="zobrazeni">
+<h2>11. Zobrazení, jazyk, klávesy</h2>
+<div class="gallery">
+  <figure><a href="../img/cs-settings-6.png"><img src="../img/cs-settings-6.png" alt="Nastavení – Zobrazení" loading="lazy"></a>
+    <figcaption>Jazyk rozhraní, spektrum a vodopád (rozsah, zesílení, paleta, odezva), XY scope, písmo a barvy oken, volby okna vysílání, bublinová nápověda.</figcaption></figure>
+  <figure><a href="../img/cs-settings-8.png"><img src="../img/cs-settings-8.png" alt="Nastavení – Klávesy" loading="lazy"></a>
+    <figcaption>Klávesové zkratky: klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).</figcaption></figure>
+</div>
+<p>Ve výchozím stavu je rozhraní anglicky; češtinu zvolíte v Nastavení → Zobrazení → Jazyk rozhraní (volba se pamatuje).</p>
+<p><b>Jazykové soubory</b> <code>cs.json</code> a <code>en.json</code> najdete ve složce <code>~/Library/Application Support/mmtty4mac/Languages</code> (tlačítko se složkou v sekci Jazyk). Můžete je upravit – uložená změna se projeví okamžitě ve všech oknech. Upravený soubor aplikace při aktualizaci nepřepíše a texty, které v něm chybějí, doplní z přibalené verze.</p>
+<p><b>Vlastní překlad:</b> v sekci Jazyk zvolte <b>Uložit šablonu…</b>, přeložte hodnoty v <code>strings</code>, nastavte <code>code</code> a <code>name</code> a soubor nahrajte tlačítkem <b>Nahrát jazyk…</b>. Jazyk se přepne hned ve všech oknech.</p>
+</section>
+
+<section id="problemy">
+<h2>12. Když něco nefunguje</h2>
+<table>
+  <tr><th>Problém</th><th>Řešení</th></tr>
+  <tr><td>Vodopád je prázdný</td><td>Zkontrolujte vstup v Nastavení → Zvuk a povolení mikrofonu.</td></tr>
+  <tr><td>Text se nedekóduje</td><td>Mark na žluté čáře, shift 170 Hz, 45,45 Bd; zkuste <b>REV</b>.</td></tr>
+  <tr><td>Rádio nevysílá</td><td>Metoda PTT v záložce PTT / FSK; u CAT zkuste „Vyzkoušet spojení“ v záložce Rig.</td></tr>
+  <tr><td>Rig offline</td><td>Port a rychlost musí odpovídat menu rádia a port nesmí mít otevřený jiný program.</td></tr>
+  <tr><td>Vysílání je zkreslené</td><td>Snižte hlasitost vysílání (Nastavení → Zvuk) a sledujte ALC rádia.</td></tr>
+  <tr><td>Logger se nepřipojí</td><td>Nastavení → API a log: fldigi XML-RPC zapnuté, port 7362.</td></tr>
+</table>
+</section>
+
+<footer>mmtty4mac © 2026 OK1XOE · licence GNU LGPL v3 · jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RYRY — Support</title>
+<meta name="description" content="Help with RYRY, the RTTY app for macOS: audio, PTT, rig control, LoTW, the log folder and moving from mmtty4mac.">
+<meta name="theme-color" content="#0A0C0E">
+<link rel="icon" href="img/icon-64.png">
+<link rel="alternate" hreflang="cs" href="https://ryry.ok1xoe.dev/cs/support.html">
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/ryry.css">
+</head>
+<body data-page="support" data-lang="en" data-root=".">
+<div id="site-head"></div>
+<main class="shell doc">
+  <div class="silk silk-sig">Support</div>
+  <h1>Help with RYRY</h1>
+  <p>Start with the <a href="manual/en/index.html">manual</a> – it covers the first setup, radio control, receiving,
+    transmitting, contests and the logger API. If something does not work, the answers below solve most problems.</p>
+
+  <h2>Frequently asked questions</h2>
+  <div class="faq">
+    <details class="faceplate"><summary>I see no signal in the waterfall.</summary>
+      <p>Settings → Audio: choose the input of your radio's USB sound card (e.g. “USB Audio CODEC”) and check the level
+        in the top bar. The first time, macOS asks for microphone access – if you declined, allow RYRY in System Settings
+        → Privacy &amp; Security → Microphone. Without a radio, try Help → Play Demo Signal.</p></details>
+    <details class="faceplate"><summary>The radio does not transmit (PTT).</summary>
+      <p>Settings → PTT / FSK: choose RTS or DTR on the serial port of your interface, or CAT PTT when the rig is
+        controlled over CAT. The CAT port cannot be shared with PTT over RTS/DTR.</p></details>
+    <details class="faceplate"><summary>How do I control my radio?</summary>
+      <p>Settings → Rig: “CAT via USB (built-in)” for Icom, Yaesu, Kenwood and Elecraft. For other radios start
+        hamlib yourself, e.g. <code>rigctld -m &lt;model&gt; -r /dev/cu.X -s &lt;baud&gt;</code>, and choose
+        “hamlib rigctld (network)”, or use flrig. The App Store version cannot start rigctld for you.</p></details>
+    <details class="faceplate"><summary>How does LoTW upload work?</summary>
+      <p>Turn on LoTW in Settings → Online and click L in the Log window. RYRY saves the QSOs not uploaded yet to
+        your Downloads folder and opens the file in TrustedQSL, where you sign and send it (the certificate and
+        Station Location are set up in TQSL). Then confirm in RYRY and the QSOs are marked as uploaded.</p></details>
+    <details class="faceplate"><summary>Where is my log?</summary>
+      <p>In the folder shown in Settings → API and log (by default <code>~/Documents/RYRY</code>): a JSONL file and an
+        ADIF file any logger can read. macOS lets RYRY into a folder only after you choose it, so RYRY asks once and
+        remembers the access. If you refused, the log is inside the app's container – the message in the status bar
+        says where.</p></details>
+    <details class="faceplate"><summary>I used mmtty4mac before. What happens to my settings?</summary>
+      <p>RYRY is the new name of mmtty4mac. On the first launch your settings move over automatically, and RYRY asks
+        once for access to your log folder (usually <code>~/Documents/mmtty4mac</code>). Passwords and API keys for
+        online services are stored in the Keychain and may have to be entered again.</p></details>
+    <details class="faceplate"><summary>My logger does not see RYRY.</summary>
+      <p>Choose “fldigi” in the logger: RYRY answers fldigi's XML-RPC on port 7362. Check Settings → API and log that
+        the fldigi API is on. By default it listens on this Mac only.</p></details>
+  </div>
+
+  <h2>Contact</h2>
+  <p>Write to <a href="mailto:tomas.kaplan@gmail.com">tomas.kaplan@gmail.com</a> (Tomáš Kaplan, OK1XOE) – in English
+    or Czech. Please include your macOS version, the RYRY version (RYRY → About RYRY) and your radio and interface.</p>
+  <p>Found a bug or want a feature? Open an issue on
+    <a href="https://github.com/ok1xoe/mmtty4mac/issues">GitHub</a>.</p>
+</main>
+<div id="site-foot"></div>
+<script src="js/site.js"></script>
+</body>
+</html>
