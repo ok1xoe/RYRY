@@ -1,6 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import AppKit
 import AppUI
+import Localization
 import Settings
 import SwiftUI
 
@@ -33,6 +34,8 @@ struct RxTextView: NSViewRepresentable {
         var trimmed = 0
         var style: Style?
         var highlightVersion = -1
+        /// The accessibility help last set (it contains the shortcuts, so it is only rebuilt when they change).
+        var help = ""
     }
 
     /// A callsign in the transmitted text (echo) - highlighting skips it.
@@ -84,7 +87,19 @@ struct RxTextView: NSViewRepresentable {
         tv.onWord = { [model] w in Task { @MainActor in await model.insertWord(w) } }
         scroll.documentView = tv
         scroll.hasVerticalScroller = true
+        // Accessibility: an NSTextView is readable by a screen reader on its own (and its role stays "text area", so
+        // navigation by lines and words keeps working), it only has no name. The text is deliberately not read
+        // continuously - RTTY arrives character by character and is often garbled; the operator asks for the last
+        // line with a shortcut, see AppModel.speakLastRxLine().
+        tv.setAccessibilityLabel(L("Přijatý text"))
+        scroll.setAccessibilityLabel(L("Přijatý text"))
         return scroll
+    }
+
+    /// The help for the screen reader: how to read the received text without watching the screen.
+    static func accessibilityHelp(_ s: AppSettings) -> String {
+        L("Klik na slovo vloží značku do QSO. Přečtení posledního řádku: %@, předchozího: %@.",
+          s.binding(for: .readLastLine).display, s.binding(for: .readPreviousLine).display)
     }
 
     /// Colors the calls in the words from position `from` on (excluding echo). All other words get the base style,
@@ -109,6 +124,8 @@ struct RxTextView: NSViewRepresentable {
         let cut = model.rxTrimmedTotal - c.trimmed
         let style = Style(model.settings.display)
         if style != c.style { tv.backgroundColor = style.backgroundColor; tv.insertionPointColor = style.attrs(echo: false)[.foregroundColor] as? NSColor ?? .textColor }
+        let help = Self.accessibilityHelp(model.settings)
+        if help != c.help { c.help = help; tv.setAccessibilityHelp(help) }
         let hv = model.highlightVersion
         var restyleFrom: Int?
         storage.beginEditing()

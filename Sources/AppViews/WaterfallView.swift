@@ -59,8 +59,15 @@ struct WaterfallView: View {
                     Task { await model.tune(toMarkHz: hz) }
                 }
                 .hint(L("Klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = úroveň squelche"))
+                // a picture of noise says nothing spoken: one element whose value is the tuning and the signal
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(L("Vodopád"))
+                .accessibilityValue(model.tuningSummary)
+                .accessibilityHint(L("Rozsah %ld až %ld Hz. Hodnota se čte na vyžádání, nehlásí se sama.",
+                                     Int(model.waterfallFromHz), Int(model.waterfallToHz)))
                 .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
-                                            onRightClick: { f in notch(f) }))
+                                            onRightClick: { f in notch(f) })
+                    .accessibilityHidden(true))
                 BandMapOverlay(model: model, topInset: 16)
                 if model.xyEnabled {
                     let side = min(g.size.height, model.settings.display.xySize.points)
@@ -75,6 +82,7 @@ struct WaterfallView: View {
                     .font(.caption.monospaced()).padding(4)
                     .background(.black.opacity(0.5)).foregroundStyle(.white)
                     .padding(4).frame(maxWidth: .infinity, alignment: .trailing)
+                    .accessibilityHidden(true)      // the same values are in the waterfall's accessibility value
             }
         }
     }
@@ -129,6 +137,7 @@ struct XYScopeView: View {
             ctx.fill(p, with: .color(.green))
         }
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(.gray.opacity(0.6)))
+        .accessibilityHidden(true)      // decorative drawing; the tuning is in the waterfall's accessibility value
     }
 }
 
@@ -178,11 +187,17 @@ struct SpectrumView: View {
                 let hz = model.waterfallFromHz + Double(loc.x / g.size.width) * (model.waterfallToHz - model.waterfallFromHz)
                 Task { await model.tune(toMarkHz: hz) }
             }
+            // the same as the waterfall: instead of the picture, the values behind it (mark, space, shift, AFC, signal)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(L("Spektrum"))
+            .accessibilityValue(model.tuningSummary)
+            .accessibilityHint(L("Rozsah %ld až %ld Hz. Hodnota se čte na vyžádání, nehlásí se sama.",
+                                 Int(model.waterfallFromHz), Int(model.waterfallToHz)))
             .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
                                         onRightClick: { f in
                 let hz = model.waterfallFromHz + f * (model.waterfallToHz - model.waterfallFromHz)
                 Task { await model.notchClick(hz: hz) }
-            }))
+            }).accessibilityHidden(true))
             .hint(L("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch"))
             .overlay { BandMapOverlay(model: model, topInset: 24) }
             .overlay(alignment: .topLeading) { SpectrumMenu(model: model).padding(4) }

@@ -116,6 +116,18 @@ public final class AppModel {
     public internal(set) var highlightVersion = 0
     var highlightBand: String?
     public var alertSink: AlertSink
+    /// Spoken announcements for a screen reader (see AppModel+A11y.swift); replaceable in tests.
+    public var announcer: SpeechAnnouncing
+    /// Rate limit of the spoken announcements (one at a time, a minimum gap, a ceiling per minute).
+    var announcementLimiter = AnnouncementLimiter()
+    /// The last text handed to the screen reader (diagnostics and tests).
+    public internal(set) var lastAnnouncement = ""
+    /// The callsign / the multiplier already announced (DUPE and NEW MULT are spoken on a change, not on every keystroke).
+    var spokenDupeCall = ""
+    var spokenMultText = ""
+    /// A snapshot of the received lines for reading on demand and the position in it (0 = the last line).
+    var rxReadLines: [String] = []
+    var rxReadBack = 0
     let alertClock: () -> Date
     var alertThrottle = AlertThrottle()
     var rxScanner = RxWordScanner()
@@ -201,8 +213,9 @@ public final class AppModel {
                 engineFactory: EngineFactory? = nil, spectrumFPS: Double = 15,
                 secrets: SecretStore = KeychainSecretStore(), callbookFetcher: @escaping HTTPFetcher = CallbookFactory.liveFetcher,
                 callbookDelay: Duration = .milliseconds(800),
-                alertSink: AlertSink = NullAlertSink(), alertClock: @escaping () -> Date = { Date() }) {
-        self.alertSink = alertSink; self.alertClock = alertClock
+                alertSink: AlertSink = NullAlertSink(), alertClock: @escaping () -> Date = { Date() },
+                announcer: SpeechAnnouncing = NullSpeechAnnouncer()) {
+        self.alertSink = alertSink; self.alertClock = alertClock; self.announcer = announcer
         self.secrets = secrets; self.callbookFetcher = callbookFetcher; self.callbookDelay = callbookDelay
         self.settingsStore = settingsStore; self.profileStore = profileStore
         self.engineFactory = engineFactory ?? AppModel.realEngine
@@ -610,7 +623,10 @@ public final class AppModel {
         try Data(rxPlainText.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "").utf8)
             .write(to: url, options: .atomic)
     }
-    public func clearRx() { rxTrimmedTotal += rxCharCount; rxRuns.removeAll(); rxCharCount = 0 }
+    public func clearRx() {
+        rxTrimmedTotal += rxCharCount; rxRuns.removeAll(); rxCharCount = 0
+        rxReadLines = []; rxReadBack = 0                 // the snapshot for reading aloud no longer has anything to point at
+    }
 
     // MARK: Dupes and Super Check Partial
 
@@ -624,7 +640,10 @@ public final class AppModel {
     private var historyCalls: Set<String> = []
     private(set) var superCheck = SuperCheck(calls: [])
 
-    func refreshDupe() async { isDupe = await app?.dupe() ?? false }
+    func refreshDupe() async {
+        isDupe = await app?.dupe() ?? false
+        announceQSOState()
+    }
 
     // MARK: Multipliers
 
@@ -692,7 +711,7 @@ public final class AppModel {
         if let calc = scoreCalculator?.multipliers, let t = multipliers, !qso.call.isEmpty {
             n = t.newHits(calc.hits(call: qso.call, exchange: qso.exchangeRcvd), band: currentBand)
         }
-        if n != newMultiplier { newMultiplier = n }
+        if n != newMultiplier { newMultiplier = n; announceQSOState() }
     }
 
     /// The MASTER.SCP file - in the settings folder (Application Support/mmtty4mac in the app; the tests have their own folder).
@@ -1428,6 +1447,14 @@ public final class AppModel {
         noReconnect.filterOtherBands = p.filterOtherBands; noReconnect.previousFilterModes = p.previousFilterModes
         if noReconnect == p { return }                                   // display only, the connection does not change
         startSpots()
+    }
+
+    /// Turning the spoken announcements (VoiceOver) on and off from the menu - saved immediately.
+    /// The same switch is in Settings → Alerts.
+    public func setSpeakAlerts(_ on: Bool) {
+        guard settings.alerts.speakAlerts != on else { return }
+        settings.alerts.speakAlerts = on
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
     }
 
     /// Double-clicking a spot: tunes the rig to the spot's frequency (plus the offset) and puts the call into the QSO window.

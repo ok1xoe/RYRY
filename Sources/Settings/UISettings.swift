@@ -80,9 +80,12 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
     case macro(Int), toggleTx, rxNow, tune, logQSO, clearQSO, clearRx, stopMacro, openLog, esmMode, enterFrequency
     /// Keyboard routes for actions that used to need the mouse (waterfall / spectrum / receive window).
     case tuneStrongest, notchStrongest, insertLastCall
+    /// Accessibility (VoiceOver): read the received text and the tuning aloud on demand.
+    case readLastLine, readPreviousLine, speakTuning
     public static var allCases: [ShortcutCommand] {
         (0..<AppSettings.macroCount).map { .macro($0) } + [.toggleTx, .rxNow, .tune, .logQSO, .clearQSO, .clearRx, .stopMacro, .openLog, .esmMode, .enterFrequency,
-                                                          .tuneStrongest, .notchStrongest, .insertLastCall]
+                                                          .tuneStrongest, .notchStrongest, .insertLastCall,
+                                                          .readLastLine, .readPreviousLine, .speakTuning]
     }
     public var id: String {
         switch self {
@@ -92,10 +95,12 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
         case .esmMode: "esmMode"
         case .enterFrequency: "enterFrequency"
         case .tuneStrongest: "tuneStrongest"; case .notchStrongest: "notchStrongest"; case .insertLastCall: "insertLastCall"
+        case .readLastLine: "readLastLine"; case .readPreviousLine: "readPreviousLine"; case .speakTuning: "speakTuning"
         }
     }
     /// Default shortcuts (the existing fixed ones): F1–F12, ⇧F1–⇧F4, ⌘T, ⌘., ⌘L, ⌘K, ⇧⌘L; ⌃R toggles Run / S&P, ⌥⌘F frequency entry,
     /// ⌥⌘S tune to the strongest signal, ⌥⌘N notch the strongest interference, ⌥⌘C last received callsign into the QSO window.
+    /// Accessibility: ⌥⌘R the last received line, ⇧⌥⌘R the previous one, ⌥⌘T the tuning summary.
     public var defaultBinding: KeyBinding {
         switch self {
         case .macro(let i): i < 12 ? KeyBinding(key: "f\(i + 1)") : KeyBinding(key: "f\(i - 11)", modifiers: [.shift])
@@ -109,6 +114,9 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
         case .tuneStrongest: KeyBinding(key: "s", modifiers: [.option, .command])
         case .notchStrongest: KeyBinding(key: "n", modifiers: [.option, .command])
         case .insertLastCall: KeyBinding(key: "c", modifiers: [.option, .command])
+        case .readLastLine: KeyBinding(key: "r", modifiers: [.option, .command])
+        case .readPreviousLine: KeyBinding(key: "r", modifiers: [.option, .command, .shift])
+        case .speakTuning: KeyBinding(key: "t", modifiers: [.option, .command])
         case .tune, .clearQSO, .stopMacro: .none
         }
     }
