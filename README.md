@@ -7,6 +7,21 @@ A native macOS RTTY application based on MMTTY (JE3HHT, Makoto Mori).
 - User manual: docs/manual.md (English), docs/prirucka.md (the Czech original); HTML in docs/html (English in docs/html/en/). The rest of the documentation under docs/ is in Czech.
 - Design: docs/superpowers/specs/2026-09-28-mmtty4mac-design.md
 
+## Screenshots
+
+![Main window: waterfall, receive pane, macros and the QSO panel](docs/html/img/en-main.png)
+
+The main window: spectrum and waterfall (click tunes to mark), the receive pane
+(click a word to put it in the QSO), the transmit pane, macros F1-F12 and the QSO
+panel with callbook data and previous QSOs.
+
+| Contest score | DX cluster spots | Band map |
+|---|---|---|
+| ![Score window](docs/html/img/en-score.png) | ![Spots window](docs/html/img/en-spots.png) | ![Band map](docs/html/img/en-bandmap.png) |
+| Points, QSOs and multipliers per band and in total, for nine RTTY contests. | Spots from a DX cluster and the RBN, with band and mode filters. | The RTTY segment of the band with spots and the rig position. |
+
+More screenshots are in the manual: [English](docs/html/en/index.html), [Czech](docs/html/cs/index.html).
+
 ## Development
 
 Requires Xcode (Swift Testing). If `xcode-select` points at the Command Line Tools,
