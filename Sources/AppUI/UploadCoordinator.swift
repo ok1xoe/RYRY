@@ -40,7 +40,7 @@ public struct UploadCoordinator: Sendable {
         let u = settings.upload
         guard Self.isEnabled(t, u) else { throw UploadError.notConfigured(L("%@ není v Nastavení → Online zapnuto", t.title)) }
         let (eligible, missing) = UploadSelection.pending(await log.records, target: t)
-        var suffix = missing > 0 ? " " + L("Bez pásma (přeskočeno): %ld.", missing) : ""
+        let suffix = missing > 0 ? " " + L("Bez pásma (přeskočeno): %ld.", missing) : ""
         guard !eligible.isEmpty else { return L("%@: žádná nenahraná spojení.", t.title) + suffix }
         let outcome: UploadOutcome
         switch t {

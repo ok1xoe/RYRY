@@ -1,11 +1,12 @@
 #!/bin/zsh
-# Sestaví build/mmtty4mac.app (release) a podepíše ho.
+# Sestaví build/mmtty4mac.app (RYRY, release, App Sandbox) a podepíše ho pro vývoj.
+# Pro App Store: scripts/release-appstore.sh (volá tento skript a znovu podepíše certifikátem Apple Distribution).
 #
 # Podpis (SIGN_ID):
-#   nenastaveno → „Developer ID Application“, jinak „Apple Development“ z klíčenky, jinak ad-hoc.
+#   nenastaveno → „Apple Development“ z klíčenky, jinak ad-hoc.
 #                 Se stabilním podpisem si macOS pamatuje povolení mikrofonu i po novém sestavení.
 #   SIGN_ID=-   → ad-hoc (macOS se na mikrofon zeptá po každém sestavení).
-#   SIGN_ID="Developer ID Application: …" → konkrétní identita.
+#   SIGN_ID=<SHA-1 nebo název> → konkrétní identita.
 #
 # Architektury (MMTTY_ARCHS): výchozí „arm64 x86_64“ = univerzální aplikace (Apple Silicon i Intel, lipo).
 #   MMTTY_ARCHS=arm64 → rychlé sestavení jen pro Apple Silicon (vývoj).
@@ -49,7 +50,7 @@ if [[ -n "${SIGN_ID:-}" ]]; then
     ID="$SIGN_ID"; ID_NAME="$SIGN_ID"
 else
     IDS=$(security find-identity -v -p codesigning 2>/dev/null || true)
-    for kind in "Developer ID Application" "Apple Development"; do
+    for kind in "Apple Development"; do
         LINE=$(print -r -- "$IDS" | grep -m1 "\"$kind" || true)
         if [[ -n "$LINE" ]]; then
             ID=$(print -r -- "$LINE" | awk '{print $2}')
@@ -58,12 +59,7 @@ else
         fi
     done
 fi
-if [[ "$ID" == "-" ]]; then
-    codesign --force --sign - --entitlements Resources/mmtty4mac.entitlements --options runtime "$APP"
-elif [[ "$ID_NAME" == Developer\ ID* ]]; then   # pro notarizaci: hardened runtime + časové razítko
-    codesign --force --sign "$ID" --entitlements Resources/mmtty4mac.entitlements --options runtime --timestamp "$APP"
-else
-    codesign --force --sign "$ID" --entitlements Resources/mmtty4mac.entitlements --options runtime "$APP"
-fi
+# Vývojový podpis se sandboxem; pro App Store aplikaci znovu podepíše release-appstore.sh (Apple Distribution).
+codesign --force --sign "$ID" --entitlements Resources/mmtty4mac.entitlements --options runtime "$APP"
 echo "Podpis: $ID_NAME"
 echo "Hotovo: $APP (verze $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist") ($BUILD_NO))"
