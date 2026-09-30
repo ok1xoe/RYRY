@@ -52,11 +52,19 @@ Zbytky testů, které můžeš smazat: `~/Library/Containers/cz.ok1xoe.sandboxpr
 - [ ] Zrušený dialog: log v kontejneru a zpráva ve stavovém řádku s cestou.
 - [ ] Přesunutá nebo přejmenovaná složka logu: aplikace se znovu zeptá.
 - [ ] Nápověda → Přehrát ukázkový signál: v okně příjmu se objeví „RYRYRYRY CQ TEST OK1XOE…“.
-- [ ] Mikrofon: systémový dialog s textem „RYRY needs the audio input…“.
-- [ ] DX cluster se připojí (okno Spoty).
+- [x] Příjem ze zvukové karty rádia (USB Audio CODEC) v sandboxu – 2026-09-30, TS-590SG.
+- [x] DX cluster se připojí (okno Spoty) a dvojklik na spot přeladí rig – 2026-09-30.
 - [ ] LoTW bez TQSL: zpráva s názvem souboru ve Stažených souborech, dotaz na potvrzení, bez potvrzení se nic
       neoznačí.
 - [ ] Ikona v Docku a ve Finderu (macOS 26: skleněný tvar, žádný šedý rámeček); ve Finderu se aplikace jmenuje RYRY.app.
 - [ ] Historie značek (N1MM): po výběru souboru a restartu se načte; bez nového výběru se ukáže výzva vybrat ho znovu.
 - [ ] Snímky: `./scripts/appstore-screenshots.sh` (potřebuje povolení Nahrávání obrazovky pro Terminál).
 - [ ] `TEAM_ID=GN8G426WK4 ./scripts/release-appstore.sh --export-only` po přihlášení účtu v Xcode.
+- [x] Rig přes rigctld (TCP 127.0.0.1:4532) v sandboxu, vysílání AFSK s PTT přes CAT – 2026-09-30, TS-590SG.
+      Zjištěno: PTT `T 1` klíčovalo mikrofonní vstup (rádio vysílalo ticho); opraveno na datové PTT `T 3` (Kenwood `TX1;`).
+
+## Poznámka z testu na stanici (2026-09-30)
+
+Převodník CP2102 v TS-590SG měl na Macu dva ovladače najednou: Silicon Labs VCP (`/dev/cu.SLAB_USBtoUART`) a vestavěný
+`AppleUSBSLCOM` (`/dev/cu.usbserial-<sériové číslo>`). Oba uzly jsou jedno zařízení – když ho jeden program otevře přes
+jeden uzel, druhý hlásí „Resource busy“ bez viditelného vlastníka. Na rádio proto používej jen jeden uzel (nebo jeden ovladač).
