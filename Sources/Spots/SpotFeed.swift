@@ -13,11 +13,11 @@ public struct SpotFeedConfig: Sendable, Equatable {
     public var call: String
     public var cluster: SpotEndpoint?
     public var rbn: SpotEndpoint?
-    /// Počáteční stav filtru zobrazení (pásma + módy; příjem nefiltruje, na spojení nemá vliv, proto není v `==`).
+    /// Initial state of the display filter (bands + modes; does not filter reception, no effect on QSOs, so not in `==`).
     public var filter = SpotFilter()
     public var maxAgeMinutes = 30
     public var clientTuning: (initialDelay: Double, maxDelay: Double)?
-    /// Čekání na výzvu k přihlášení (s); nil = výchozí klienta (testy zkracují).
+    /// Wait for the login prompt (s); nil = the client's default (tests shorten it).
     public var loginWait: Double?
     public init(call: String, cluster: SpotEndpoint? = nil, rbn: SpotEndpoint? = nil,
                 filter: SpotFilter = SpotFilter(), maxAgeMinutes: Int = 30) {
@@ -28,27 +28,27 @@ public struct SpotFeedConfig: Sendable, Equatable {
     }
 }
 
-/// Stav spotů pro UI: seznam + stav obou spojení. Síť běží v aktorech, sem se spoty jen předávají po dávkách.
+/// Spot state for the UI: list + state of both connections. The network runs in actors, spots only arrive here in batches.
 @MainActor @Observable
 public final class SpotFeed {
     public private(set) var book = SpotBook()
     public private(set) var clusterState = TelnetSpotClient.State.off
     public private(set) var rbnState = TelnetSpotClient.State.off
-    /// DX cluster přijímá příkazy (přihlášeno, nebo server bez výzvy po uvítání) – tlačítka příkazů jen tehdy.
+    /// The DX cluster accepts commands (logged in, or a server with no prompt after the greeting) – command buttons only then.
     public var clusterCommandsReady: Bool { clusterLoggedIn && clusterState == .connected }
-    /// Klient hlásí připravenost na příkazy (po přihlášení / uvítání bez výzvy).
+    /// The client reports readiness for commands (after login / a greeting without a prompt).
     private var clusterLoggedIn = false
     public private(set) var config = SpotFeedConfig(call: "")
-    /// Filtr zobrazení (zaškrtnutá pásma a skupiny módů) – jen zobrazení (seznam, band mapa, štítky);
-    /// ukládají se spoty všech pásem a módů.
+    /// Display filter (checked bands and mode groups) – display only (list, band map, labels in the waterfall);
+    /// spots of all bands and modes are stored.
     public var filter = SpotFilter()
-    /// Posledních ~500 ne-spotových řádků z DX clusteru (odpovědi na příkazy, uvítání) a odeslané příkazy (`> příkaz`).
+    /// The last ~500 non-spot lines from the DX cluster (command replies, the greeting) and the commands sent (`> command`).
     public private(set) var consoleLines: [String] = []
     public static let consoleMax = 500
-    /// Volá se pro každý nově přidaný spot (značka + pásmo, které v seznamu ještě nebylo).
+    /// Called for every newly added spot (a call + band that was not in the list yet).
     @ObservationIgnored public var onNewSpot: (@MainActor (Spot) -> Void)?
 
-    /// Počet spuštění (`start`) – test, že změna filtru nepřipojuje znovu.
+    /// Number of starts (`start`) – a test that changing the filter does not reconnect.
     @ObservationIgnored public private(set) var starts = 0
     @ObservationIgnored private var clients: [TelnetSpotClient] = []
     @ObservationIgnored private var clusterClient: TelnetSpotClient?
@@ -61,7 +61,7 @@ public final class SpotFeed {
     public var visible: [Spot] { book.visible(filter) }
     public var isRunning: Bool { !clients.isEmpty }
 
-    /// Zastaví staré klienty a spustí ty, které konfigurace zapíná. Seznam spotů zůstává.
+    /// Stops the old clients and starts those the configuration enables. The spot list is kept.
     public func start(_ cfg: SpotFeedConfig) {
         stop()
         starts += 1
@@ -106,7 +106,7 @@ public final class SpotFeed {
         clusterState = .off; rbnState = .off; clusterLoggedIn = false
     }
 
-    /// Pošle příkaz do DX clusteru (ne do RBN) přes existující spojení: `příkaz\r\n`. Bez spojení vyhodí `ClusterCommandError`.
+    /// Sends a command to the DX cluster (not RBN) over the existing connection: `command\r\n`; none → `ClusterCommandError`.
     public func sendClusterCommand(_ line: String) async throws {
         let clean = try ClusterCommand.validate(line)
         guard let c = clusterClient, clusterCommandsReady else { throw ClusterCommandError.notConnected }

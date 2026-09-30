@@ -1,7 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Jedno QTC (WAE DX Contest): čas, značka a přijaté číslo dřívějšího spojení.
+/// One QTC (WAE DX Contest): time, call and the received serial number of an earlier QSO.
 public struct QTCLine: Codable, Sendable, Equatable, Hashable {
     public var time: String        // HHMM UTC
     public var call: String
@@ -11,20 +11,20 @@ public struct QTCLine: Codable, Sendable, Equatable, Hashable {
     }
 }
 
-/// Série QTC `QTC n/k` odeslaná nebo přijatá od jedné stanice.
+/// A QTC series `QTC n/k` sent to or received from a single station.
 public struct QTCSeries: Codable, Sendable, Equatable, Identifiable {
     public enum Direction: String, Codable, Sendable { case sent, received }
     public var id: UUID
     public var direction: Direction
-    public var number: Int                 // pořadí série odesílatele (n v n/k)
-    public var counterpart: String         // komu posíláno / od koho přijato
-    public var time: Date                  // čas přenosu
+    public var number: Int                 // the sender's series number (n in n/k)
+    public var counterpart: String         // to whom sent / from whom received
+    public var time: Date                  // time of the transfer
     public var frequency: Double?          // Hz
     public var lines: [QTCLine]
-    /// k z hlavičky „QTC n/k“ u přijaté série (když se nepodařilo přečíst všechny řádky); jinak nil.
+    /// k from the "QTC n/k" header of a received series (when not all lines could be read); otherwise nil.
     public var declaredCount: Int?
     public var count: Int { lines.count }
-    /// Skupina pro Cabrillo „n/k“.
+    /// Group for Cabrillo "n/k".
     public var groupSize: Int { declaredCount ?? lines.count }
 
     public init(id: UUID = UUID(), direction: Direction, number: Int, counterpart: String, time: Date,
@@ -35,15 +35,15 @@ public struct QTCSeries: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
-/// Pravidla QTC (WAE RTTY): dvojice stanic ≤ 10 QTC (odeslaná + přijatá), každé QSO nahlásit jen jednou
-/// a nikdy stanici, které se týká; do QTC jen spojení s přijatým číslem, nejstarší první.
+/// QTC rules (WAE RTTY): a pair of stations ≤ 10 QTC (sent + received), report each QSO only once
+/// and never to the station it concerns; only QSOs with a received serial number go into QTC, oldest first.
 public struct QTCPlanner: Sendable {
     public static let maxPerPair = 10
     public let records: [QSORecord]
     public let series: [QTCSeries]
 
-    /// `since` = začátek závodu: starší QSO a série se nepočítají (log i qtc.jsonl jsou společné pro všechny závody).
-    /// Do QTC jdou jen RTTY spojení s odeslaným i přijatým číslem.
+    /// `since` = contest start: older QSOs and series do not count (the log and qtc.jsonl are shared by all contests).
+    /// Only RTTY QSOs with both a sent and a received serial number go into QTC.
     public init(records: [QSORecord], series: [QTCSeries], since: Date? = nil) {
         let from = since ?? .distantPast
         self.records = records.filter {
@@ -57,13 +57,13 @@ public struct QTCPlanner: Sendable {
         f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HHmm"; return f
     }()
 
-    /// Kolik QTC už proběhlo s touto stanicí (odeslaná i přijatá, podle základní značky).
+    /// How many QTC have already been exchanged with this station (sent and received, by base call).
     public func exchanged(with call: String) -> Int {
         let b = QSORecord.baseCall(call)
         return series.filter { QSORecord.baseCall($0.counterpart) == b }.reduce(0) { $0 + $1.count }
     }
 
-    /// Řádky, které lze této stanici ještě poslat (nejvýše 10 − už vyměněno).
+    /// Lines that can still be sent to this station (at most 10 − already exchanged).
     public func available(for call: String) -> [QTCLine] {
         let room = Self.maxPerPair - exchanged(with: call)
         guard room > 0 else { return [] }
@@ -76,24 +76,24 @@ public struct QTCPlanner: Sendable {
             .prefix(room).map { $0 }
     }
 
-    /// Pořadí příští odesílané série.
+    /// Number of the next series to be sent.
     public var nextSeriesNumber: Int { (series.filter { $0.direction == .sent }.map(\.number).max() ?? 0) + 1 }
 
-    /// Body za QTC (1 za každé odeslané i přijaté).
+    /// Points for QTC (1 for each sent and each received one).
     public var points: Int { series.reduce(0) { $0 + $1.count } }
 }
 
-/// Text QTC pro vysílání a rozbor přijatého textu.
+/// QTC text for transmit and parsing of the received text.
 public enum QTCText {
     public static func header(number: Int, count: Int) -> String { "QTC \(number)/\(count) QTC \(number)/\(count)" }
     public static func line(_ l: QTCLine) -> String { "\(l.time) \(l.call) \(String(format: "%03d", l.serial))" }
     public static func body(number: Int, lines: [QTCLine]) -> String {
         "\r\n" + header(number: number, count: lines.count) + "\r\n" + lines.map(line).joined(separator: "\r\n") + "\r\n"
     }
-    /// Opakování řádku (na žádost AGN N) – pořadí a řádek dvakrát.
+    /// Repeating a line (on an AGN N request) – the index and the line twice.
     public static func repeatLine(_ l: QTCLine, index: Int) -> String { "\r\n\(index) \(line(l)) \(line(l))\r\n" }
 
-    /// `QTC 3/7` nebo `3/7` → (3, 7).
+    /// `QTC 3/7` or `3/7` → (3, 7).
     public static func parseHeader(_ s: String) -> (Int, Int)? {
         guard let r = s.range(of: #"(?<!\d)(\d{1,4})/(\d{1,2})(?!\d)"#, options: .regularExpression) else { return nil }
         let p = s[r].split(separator: "/")
@@ -106,7 +106,7 @@ public enum QTCText {
         return v / 100 < 24 && v % 100 < 60
     }
 
-    /// Trojice čas–značka–číslo od pozice `i` (nil = neplatná).
+    /// A time–call–serial triple starting at position `i` (nil = invalid).
     static func triple(_ tok: [Substring], _ i: Int) -> QTCLine? {
         guard i + 2 < tok.count, isTime(tok[i]) else { return nil }
         let call = tok[i + 1], nr = tok[i + 2]
@@ -120,7 +120,7 @@ public enum QTCText {
         s.uppercased().split(whereSeparator: { $0 == " " || $0 == "\r" || $0 == "\n" || $0 == "\t" })
     }
 
-    /// `1307 DA1AA 431` (i opakovaný) → řádek QTC. Když se opakovaná kopie liší, vrátí nil (vyžádat AGN).
+    /// `1307 DA1AA 431` (also repeated) → a QTC line. If the repeated copy differs, returns nil (request AGN).
     public static func parseLine(_ s: String) -> QTCLine? {
         let tok = tokens(s)
         var found: [QTCLine] = []
@@ -132,15 +132,15 @@ public enum QTCText {
         return first
     }
 
-    /// Opakovaný řádek na žádost AGN: `3 1310 OK2PBR 015 1310 OK2PBR 015` → (3, řádek).
+    /// A repeated line on an AGN request: `3 1310 OK2PBR 015 1310 OK2PBR 015` → (3, line).
     public static func parseIndexedLine(_ s: String) -> (Int, QTCLine)? {
         let tok = tokens(s)
         if tok.count >= 4, tok[0].count <= 2, let idx = Int(tok[0]), (1...10).contains(idx), triple(tok, 1) != nil,
            let l = parseLine(tok.dropFirst().joined(separator: " ")) {
             return (idx, l)
         }
-        // číslo řádku slepené s předchozím textem („BKKA8 0803 BY4AOM 176 0803 BY4AOM 176“) – jen když je řádek
-        // zopakovaný dvakrát (tak se AGN posílá), jinak by šlo splést s šumem
+        // line index glued to the preceding text ("BKKA8 0803 BY4AOM 176 0803 BY4AOM 176") – only when the line is
+        // repeated twice (that is how AGN is sent), otherwise it could be confused with noise
         guard tok.count >= 7, triple(tok, 1) != nil, let l = parseLine(tok.dropFirst().joined(separator: " ")),
               triple(tok, 4) == l else { return nil }
         let digits = tok[0].reversed().prefix { $0.isNumber }
@@ -149,8 +149,8 @@ public enum QTCText {
         return (idx, l)
     }
 
-    /// Řádek vypadá jako (poškozený) pokus o QTC: aspoň 3 slova, první 2–5 znaků převážně číslic (čas),
-    /// druhé se znaky jako značka – pro zachování pořadí řádků.
+    /// The line looks like a (corrupted) QTC attempt: at least 3 words, the first 2–5 characters mostly digits (time),
+    /// the second with characters like a call – in order to preserve the line order.
     public static func looksLikeLine(_ s: String) -> Bool {
         guard !s.uppercased().contains("QTC") else { return false }
         let tok = tokens(s)
@@ -160,11 +160,11 @@ public enum QTCText {
     }
 }
 
-/// Úložiště sérií QTC (`qtc.jsonl` v adresáři logu, jedna série na řádek).
+/// Storage of QTC series (`qtc.jsonl` in the log directory, one series per line).
 public actor QTCStore {
     public enum StoreError: Error, Equatable { case notFound(UUID) }
     public private(set) var series: [QTCSeries] = []
-    /// Nečitelné řádky souboru (např. po havárii) – pro zobrazení v UI.
+    /// Unreadable lines of the file (e.g. after a crash) – for display in the UI.
     public private(set) var warnings: [String] = []
     private let url: URL
     private static let encoder: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .deferredToDate; return e }()
@@ -181,7 +181,7 @@ public actor QTCStore {
         }
     }
 
-    /// Oprava série (protistanice, řádky…) – soubor se přepíše atomicky.
+    /// Editing a series (counterpart, lines…) – the file is rewritten atomically.
     public func update(_ s: QTCSeries) throws {
         guard let i = series.firstIndex(where: { $0.id == s.id }) else { throw StoreError.notFound(s.id) }
         var copy = series; copy[i] = s
@@ -207,7 +207,7 @@ public actor QTCStore {
             let h = try FileHandle(forUpdating: url)
             defer { try? h.close() }
             let end = try h.seekToEnd()
-            if end > 0 {                                   // neúplný poslední řádek (havárie) → nejdřív ho ukončit
+            if end > 0 {                                   // incomplete last line (a crash) → terminate it first
                 try h.seek(toOffset: end - 1)
                 if h.readData(ofLength: 1) != Data([UInt8(ascii: "\n")]) { line.insert(UInt8(ascii: "\n"), at: 0) }
                 try h.seekToEnd()

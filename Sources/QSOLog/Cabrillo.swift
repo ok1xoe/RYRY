@@ -1,20 +1,20 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Hlavička Cabrillo 3.0.
+/// Cabrillo 3.0 header.
 public struct CabrilloHeader: Sendable, Equatable {
     public var callsign: String
     public var contest: String
-    /// Položky „KLÍČ: hodnota“; bez předpony se doplní `CATEGORY-` (např. „OPERATOR: SINGLE-OP“).
+    /// Entries "KEY: value"; without a prefix `CATEGORY-` is prepended (e.g. "OPERATOR: SINGLE-OP").
     public var categories: [String] = []
     public var locator = ""
     public var name = ""
     public init(callsign: String, contest: String) { self.callsign = callsign; self.contest = contest }
 }
 
-/// Export logu do formátu Cabrillo 3.0 (mód RY = RTTY).
+/// Log export to the Cabrillo 3.0 format (mode RY = RTTY).
 public enum Cabrillo {
-    /// `qtc` = série QTC (WAE) – za řádky QSO jako `QTC:` (DARC: QRG MODE DATE TIME CALL-RX QTC-GRP CALL-TX TIME-QSO CALL-QSO NR-QSO).
+    /// `qtc` = QTC series (WAE) – after the QSO lines as `QTC:` (DARC: QRG MODE DATE TIME CALL-RX QTC-GRP CALL-TX TIME-QSO CALL-QSO NR-QSO).
     public static func export(_ records: [QSORecord], header h: CabrilloHeader, qtc: [QTCSeries] = []) -> String {
         var lines = ["START-OF-LOG: 3.0", "CREATED-BY: mmtty4mac", "CALLSIGN: \(h.callsign.uppercased())"]
         if !h.contest.isEmpty { lines.append("CONTEST: \(h.contest)") }
@@ -23,7 +23,7 @@ public enum Cabrillo {
             guard !t.isEmpty else { continue }
             if t.uppercased().hasPrefix("CATEGORY-") { lines.append(t) }
             else if t.contains(":") { lines.append("CATEGORY-" + t) }
-            else { lines.append("X-CATEGORY: " + t) }        // bez klíče není platná značka Cabrillo 3.0
+            else { lines.append("X-CATEGORY: " + t) }        // without a key it is not a valid Cabrillo 3.0 tag
         }
         if !h.locator.isEmpty { lines.append("GRID-LOCATOR: \(h.locator.uppercased())") }
         if !h.name.isEmpty { lines.append("NAME: \(h.name)") }
@@ -51,7 +51,7 @@ public enum Cabrillo {
     }
 
     static func pad(_ s: String, _ n: Int) -> String { s.count >= n ? s : s + String(repeating: " ", count: n - s.count) }
-    /// Výměna: číslo a/nebo text (BARTG „015 1203“, CQ/RJ „14 OH“).
+    /// Exchange: number and/or text (BARTG "015 1203", CQ/RJ "14 OH").
     static func exch(_ serial: Int?, _ text: String?) -> String {
         [serial.map { String(format: "%03d", $0) }, text].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
     }
@@ -59,7 +59,7 @@ public enum Cabrillo {
     static func qsoLine(_ r: QSORecord, myCall: String) -> String {
         let khz = r.frequency.map { Int(($0 / 1000).rounded(.down)) } ?? 0
         let freq = String(repeating: " ", count: max(0, 5 - String(khz).count)) + String(khz)
-        // bez kmitočtu není QSO řádek platný – X-QSO vyhodnocovač přeskočí, v logu ale zůstane
+        // without a frequency the QSO line is not valid – the adjudicator skips X-QSO, but it stays in the log
         var s = (r.frequency == nil ? "X-QSO: " : "QSO: ") + "\(freq) RY \(dateFmt.string(from: r.timeOn)) "
         s += pad(myCall, 13) + " " + pad(r.rstSent ?? "599", 3) + " " + pad(exch(r.serialSent, r.exchangeSent), 6) + " "
         s += pad(r.call, 13) + " " + pad(r.rstRcvd ?? "599", 3) + " " + exch(r.serialRcvd, r.exchangeRcvd)

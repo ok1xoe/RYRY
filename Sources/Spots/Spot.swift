@@ -2,17 +2,17 @@
 import Foundation
 import QSOLog
 
-/// Odkud spot přišel.
+/// Where the spot came from.
 public enum SpotSource: String, Sendable, Equatable { case cluster, rbn }
 
-/// Jeden spot z DX clusteru nebo Reverse Beacon Network.
+/// A single spot from a DX cluster or the Reverse Beacon Network.
 public struct Spot: Sendable, Equatable, Identifiable {
     public var frequencyKHz: Double
     public var call: String
     public var spotter: String
     public var comment: String
     public var time: Date
-    /// „RTTY“, jiný rozpoznaný mód (CW, FT8…), nebo nil, když z komentáře ani frekvence nejde poznat.
+    /// "RTTY", another recognized mode (CW, FT8…), or nil when it cannot be told from the comment or the frequency.
     public var mode: String?
     public var snr: Int?
     public var source: SpotSource
@@ -26,14 +26,14 @@ public struct Spot: Sendable, Equatable, Identifiable {
     public var isRTTY: Bool { mode == "RTTY" }
     public var frequencyHz: Double { frequencyKHz * 1000 }
     public var band: String? { Bands.band(forHz: frequencyHz) }
-    /// Klíč deduplikace: značka + pásmo.
+    /// Deduplication key: call + band.
     public var id: String { call + "|" + (band ?? "?") }
 }
 
-/// Parser řádků „DX de SPOTTER:  14080.0  DL1ABC  komentář  1203Z“ (DX cluster i RBN) a řádků výpisu `sh/dx`
-/// z DX clusteru „14080.0  JA1ABC  30-Sep-2026 0701Z  komentář  <SPOTTER>“ (DXSpider, AR-Cluster, CC Cluster).
+/// Parser of "DX de SPOTTER:  14080.0  DL1ABC  comment  1203Z" lines (DX cluster and RBN) and of `sh/dx` listing lines
+/// from a DX cluster: "14080.0  JA1ABC  30-Sep-2026 0701Z  comment  <SPOTTER>" (DXSpider, AR-Cluster, CC Cluster).
 public enum SpotParser {
-    /// Segmenty RTTY v kHz (orientačně, IARU pásmové plány) – pro spoty bez módu v komentáři.
+    /// RTTY segments in kHz (approximate, IARU band plans) – for spots without a mode in the comment.
     public static let rttySegments: [ClosedRange<Double>] = [
         3580...3600, 7030...7060, 10130...10150, 14070...14100, 18095...18109,
         21070...21100, 24910...24930, 28070...28120,
@@ -43,7 +43,7 @@ public enum SpotParser {
     static let otherModes: Set<String> = ["CW", "PSK", "PSK31", "PSK63", "PSK125", "FT8", "FT4", "JT65", "JT9", "SSB", "USB", "LSB",
                                           "FM", "AM", "MFSK", "OLIVIA", "SSTV", "WSPR", "FSK441", "HELL", "MSK144", "Q65"]
 
-    /// `now` = aktuální čas (čas ve spotu je jen HHMM UTC; datum se dopočítá).
+    /// `now` = the current time (the time in a spot is only HHMM UTC; the date is computed).
     public static func parse(_ line: String, now: Date = Date(), source: SpotSource = .cluster) -> Spot? {
         let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.lowercased().hasPrefix("dx de ") else {
@@ -57,7 +57,7 @@ public enum SpotParser {
         guard tokens.count >= 3, let kHz = Double(tokens[0]), kHz >= 100, kHz < 1e7 else { return nil }
         let call = tokens[1].uppercased()
         guard validCall(call) else { return nil }
-        // čas HHMMZ je poslední token, případně před lokátorem (CC cluster ho přidává)
+        // the HHMMZ time is the last token, possibly before the locator (CC cluster adds it)
         var timeIdx: Int?
         for i in stride(from: tokens.count - 1, through: max(2, tokens.count - 2), by: -1) where parseHHMM(tokens[i]) != nil {
             timeIdx = i; break
@@ -68,12 +68,12 @@ public enum SpotParser {
         var comps = cal.dateComponents([.year, .month, .day], from: now)
         comps.hour = hm.0; comps.minute = hm.1; comps.second = 0
         guard var t = cal.date(from: comps) else { return nil }
-        if t > now.addingTimeInterval(300) { t = cal.date(byAdding: .day, value: -1, to: t) ?? t }   // spot z minulého dne (půlnoc UTC)
+        if t > now.addingTimeInterval(300) { t = cal.date(byAdding: .day, value: -1, to: t) ?? t }   // spot from the previous day (UTC midnight)
         return Spot(frequencyKHz: kHz, call: call, spotter: spotter, comment: comment, time: t,
                     mode: mode(comment: comment, kHz: kHz), snr: snr(in: comment), source: source)
     }
 
-    /// Mód spotu: slovo RTTY v komentáři, jiný známý mód, jinak RTTY podle segmentu pásma; nil = nepoznáno.
+    /// Spot mode: the word RTTY in the comment, another known mode, otherwise RTTY by band segment; nil = unrecognized.
     static func mode(comment: String, kHz: Double) -> String? {
         let words = comment.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
         if words.contains("RTTY") { return "RTTY" }
@@ -81,8 +81,8 @@ public enum SpotParser {
         return inRTTYSegment(kHz: kHz) ? "RTTY" : nil
     }
 
-    /// Řádek výpisu `sh/dx`: kmitočet, značka, datum, čas HHMMZ, komentář, `<spotter>` (za ním nejvýš 2 slova,
-    /// např. lokátor CC Clusteru). Vyžaduje celý vzor, aby se jako spot nebral libovolný text z konzole.
+    /// A `sh/dx` listing line: frequency, call, date, HHMMZ time, comment, `<spotter>` (at most 2 words after it,
+    /// e.g. a CC Cluster locator). Requires the whole pattern so that arbitrary console text is not taken as a spot.
     static func parseListing(_ text: String, now: Date) -> Spot? {
         let tokens = text.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
         guard tokens.count >= 5, let kHz = Double(tokens[0]), kHz >= 100, kHz < 1e7 else { return nil }
@@ -101,7 +101,7 @@ public enum SpotParser {
 
     private static let months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 
-    /// Datum výpisu: „30-Sep-2026“, „30-Sep-26“, „30-Sep“ (rok dopočítán; budoucí = loňský) nebo „2026-09-30“.
+    /// Listing date: "30-Sep-2026", "30-Sep-26", "30-Sep" (year computed; a future one = last year) or "2026-09-30".
     static func listingDate(_ s: String, hour: Int, minute: Int, now: Date) -> Date? {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
         let p = s.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
@@ -136,7 +136,7 @@ public enum SpotParser {
         return c.contains(where: \.isNumber) && c.contains(where: \.isLetter)
     }
 
-    /// „25 dB“ nebo „25dB“ v komentáři.
+    /// "25 dB" or "25dB" in the comment.
     static func snr(in comment: String) -> Int? {
         let t = comment.split(separator: " ").map(String.init)
         for (i, w) in t.enumerated() {

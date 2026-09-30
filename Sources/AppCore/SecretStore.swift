@@ -2,16 +2,16 @@
 import Foundation
 import Security
 
-/// Úložiště hesel (Klíčenka). Služba = např. "qrz", "hamqth"; účet = uživatelské jméno.
+/// Password storage (Keychain). Service = e.g. "qrz", "hamqth"; account = the user name.
 public protocol SecretStore: Sendable {
     func password(service: String, account: String) -> String?
-    /// Prázdné heslo položku smaže.
+    /// An empty password deletes the item.
     func setPassword(_ password: String, service: String, account: String) throws
 }
 
 public struct SecretStoreError: Error, Equatable, Sendable { public let status: Int32 }
 
-/// Klíčenka macOS (`kSecClassGenericPassword`, služba `cz.ok1xoe.mmtty4mac.<služba>`).
+/// macOS Keychain (`kSecClassGenericPassword`, service `cz.ok1xoe.mmtty4mac.<service>`).
 public struct KeychainSecretStore: SecretStore {
     public init() {}
     static func serviceName(_ s: String) -> String { "cz.ok1xoe.mmtty4mac.\(s)" }
@@ -44,7 +44,7 @@ public struct KeychainSecretStore: SecretStore {
     }
 }
 
-/// Paměťová implementace (testy).
+/// In-memory implementation (tests).
 public final class MemorySecretStore: SecretStore, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String: String] = [:]

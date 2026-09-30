@@ -2,57 +2,57 @@
 import Foundation
 import Spots
 
-/// Spoty z DX clusteru a Reverse Beacon Network (telnet). Přihlašovací značka = značka ze Stanice.
-/// Výchozí stav je vypnuto – síť se použije jen na výslovné zapnutí.
+/// Spots from a DX cluster and the Reverse Beacon Network (telnet). The login call = the call from Station.
+/// The default state is off – the network is used only on an explicit enable.
 public struct SpotSettings: Codable, Sendable, Equatable {
     public var clusterEnabled = false
     public var clusterHost = "dxc.ve7cc.net"
     public var clusterPort = 23
-    /// Příkazy po přihlášení, jeden na řádek (např. `set/skimmer`, `sh/dx 30`).
+    /// Commands after login, one per line (e.g. `set/skimmer`, `sh/dx 30`).
     public var clusterCommands: [String] = ["sh/dx 30"]
-    /// Makra tlačítek příkazů DX clusteru (vždy 10 položek); text = příkaz(y), jeden na řádek, proměnné jako u maker pro vysílání.
+    /// Macros of the DX cluster command buttons (always 10 items); text = command(s), one per line, variables as in transmit macros.
     public var clusterMacros: [Macro] = SpotSettings.defaultClusterMacros
     public var rbnEnabled = false
     public var rbnHost = "telnet.reversebeacon.net"
     public var rbnPort = 7000
-    /// Filtr zobrazení – zaškrtnutá pásma (pevný seznam `SpotFilter.allBands`). Výchozí: všechna.
+    /// Display filter – checked bands (the fixed list `SpotFilter.allBands`). Default: all.
     public var filterBands = SpotFilter.allBandsSet
-    /// Filtr zobrazení – zaškrtávátko „ostatní“ u pásem (spoty mimo pevný seznam). Výchozí: zaškrtnuté.
+    /// Display filter – the "other" checkbox for bands (spots outside the fixed list). Default: checked.
     public var filterOtherBands = true
-    /// Filtr zobrazení – zaškrtnuté skupiny módů. Výchozí jen RTTY (jako dřívější „Jen RTTY“).
+    /// Display filter – checked mode groups. Default only RTTY (like the former "RTTY only").
     public var filterModes: Set<SpotModeGroup> = [.rtty]
-    /// Volba módů před zapnutím „Jen RTTY“ – jen pro obnovení po odškrtnutí; zdroj pravdy je `filterModes`.
+    /// The mode selection before turning on "RTTY only" – only for restoring after unchecking; source of truth `filterModes`.
     public var previousFilterModes = SpotFilter.allModes
-    /// Stáří spotů v minutách (1…240).
+    /// Spot age in minutes (1…240).
     public var maxAgeMinutes = 30
-    /// Posun frekvence rigu proti frekvenci spotu (Hz): rádio v LSB/AFSK s mark 2125 Hz potřebuje +2125.
+    /// Offset of the rig frequency against the spot frequency (Hz): a radio in LSB/AFSK with mark 2125 Hz needs +2125.
     public var offsetHz = 0.0
-    /// Štítky spotů (band map) ve vodopádu a spektru.
+    /// Spot labels (band map) in the waterfall and the spectrum.
     public var showInWaterfall = true
 
-    /// Filtr zobrazení pro seznam spotů, band mapu a štítky ve vodopádu.
+    /// Display filter for the spot list, the band map and the waterfall labels.
     public var filter: SpotFilter { SpotFilter(bands: filterBands, modes: filterModes, otherBands: filterOtherBands) }
 
-    /// Tlačítka Vše / Nic v okně „Filtr pásem“ – zaškrtávátko „ostatní“ se přepíná spolu s pevným seznamem,
-    /// aby „Nic“ tabulku skutečně vyprázdnilo a „Vše“ vrátilo všechny spoty.
+    /// The All / None buttons in the "Band filter" window – the "other" checkbox is toggled together with the fixed list,
+    /// so that "None" really empties the table and "All" brings back all spots.
     public mutating func setAllBands(_ on: Bool) {
         filterBands = on ? SpotFilter.allBandsSet : []
         filterOtherBands = on
     }
 
-    /// Zaškrtávátko „Jen RTTY“: zobrazená je právě skupina RTTY. Počítá se z `filterModes` (vlastní klíč nemá),
-    /// takže se zaškrtne i po zaškrtnutí samotného RTTY v okně „Filtr módů“ a odškrtne po jakékoli další skupině.
+    /// The "RTTY only" checkbox: exactly the RTTY group is displayed. It is computed from `filterModes` (it has no own key),
+    /// so it also gets checked after checking RTTY alone in the "Mode filter" window and unchecked after any further group.
     public var rttyOnly: Bool { filterModes == [.rtty] }
 
-    /// Nastaví filtr módů (zaškrtávátka v okně „Filtr módů“, tlačítka Vše / Nic) a zapamatuje si volbu,
-    /// kterou tím uživatel opouští kvůli „Jen RTTY“ – odškrtnutí ji pak vrátí.
+    /// Sets the mode filter (checkboxes in the "Mode filter" window, the All / None buttons) and remembers the selection
+    /// the user is leaving because of "RTTY only" – unchecking then brings it back.
     public mutating func setFilterModes(_ v: Set<SpotModeGroup>) {
         if v == [.rtty], !rttyOnly { previousFilterModes = filterModes }
         filterModes = v
     }
 
-    /// Zaškrtnutí „Jen RTTY“ nechá jen skupinu RTTY, odškrtnutí vrátí předchozí volbu módů;
-    /// když není co vracet (prázdná volba nebo zase jen RTTY), zaškrtnou se všechny skupiny.
+    /// Checking "RTTY only" leaves just the RTTY group, unchecking brings back the previous mode selection;
+    /// when there is nothing to bring back (an empty selection or again only RTTY), all groups get checked.
     public mutating func setRTTYOnly(_ on: Bool) {
         if on { setFilterModes([.rtty]) }
         else if rttyOnly {
@@ -65,7 +65,7 @@ public struct SpotSettings: Codable, Sendable, Equatable {
     public static let offsetRange = -10_000.0...10_000.0
     public static let maxCommands = 10
     public static let clusterMacroCount = 10
-    /// Výchozí příkazy DXSpider / CC Cluster (názvy jazykově neutrální, jako příkazy). „RTTY“ (`sh/dx 30 info rtty`) – kvalifikátor `info` hledá v komentáři.
+    /// Default DXSpider / CC Cluster commands (language-neutral names, like the commands). "RTTY" (`sh/dx 30 info rtty`) – the `info` qualifier searches the comment.
     public static let defaultClusterMacros: [Macro] = [
         Macro(name: "SH/DX", text: "sh/dx 30"),
         Macro(name: "RTTY", text: "sh/dx 30 info rtty"),
@@ -85,7 +85,7 @@ public struct SpotSettings: Codable, Sendable, Equatable {
         case filterBands, filterOtherBands, filterModes, previousFilterModes, maxAgeMinutes, offsetHz, showInWaterfall
     }
 
-    /// Zrušené nastavení „Jen RTTY“ – čte se jen kvůli migraci na `filterModes` (už se neukládá).
+    /// The dropped "RTTY only" setting – it is read only for the migration to `filterModes` (it is no longer saved).
     enum LegacyKeys: String, CodingKey { case rttyOnly }
 
     static func validHost(_ h: String) -> Bool {
@@ -106,7 +106,7 @@ public struct SpotSettings: Codable, Sendable, Equatable {
             ? Array(c.tolerant(.clusterMacros, TolerantArray<Macro>(), w, s).items.prefix(Self.clusterMacroCount))
             : x.clusterMacros
         while cm.count < Self.clusterMacroCount { cm.append(Macro(name: "", text: "")) }
-        // dřívější výchozí české názvy → jazykově neutrální (jen nezměněná výchozí makra)
+        // earlier default Czech names → language-neutral (only unchanged default macros)
         for (i, m) in cm.enumerated() {
             if m == Macro(name: "Slunce", text: "sh/sun") { cm[i].name = "SUN" }
             if m == Macro(name: "Uživatelé", text: "sh/users") { cm[i].name = "USERS" }
@@ -116,19 +116,19 @@ public struct SpotSettings: Codable, Sendable, Equatable {
         let rh = c.tolerant(.rbnHost, x.rbnHost, w, s).trimmingCharacters(in: .whitespaces)
         rbnHost = Self.validHost(rh) ? rh : x.rbnHost
         let rp = c.tolerant(.rbnPort, x.rbnPort, w, s); rbnPort = (1...65535).contains(rp) ? rp : x.rbnPort
-        // pásma: neznámé názvy se vynechají, prázdný seznam je platný („Nic“), neplatná hodnota = výchozí
+        // bands: unknown names are dropped, an empty list is valid ("None"), an invalid value = the default
         let fb: TolerantArray<String>? = c.tolerant(.filterBands, nil, w, s)
         filterBands = fb.map { Set($0.items.filter(SpotFilter.allBandsSet.contains)) } ?? x.filterBands
-        // „ostatní“ (spoty mimo pevný seznam pásem): chybějící i neplatná hodnota = výchozí zaškrtnuto
+        // "other" (spots outside the fixed band list): a missing as well as an invalid value = the default, checked
         filterOtherBands = c.tolerant(.filterOtherBands, x.filterOtherBands, w, s)
-        // migrace: starší settings.json má jen „rttyOnly“ (true = jen RTTY, false = všechny módy)
+        // migration: an older settings.json has only "rttyOnly" (true = only RTTY, false = all modes)
         let fm: TolerantArray<SpotModeGroup>? = c.tolerant(.filterModes, nil, w, s)
         let legacy = try? d.container(keyedBy: LegacyKeys.self)
         if let fm { filterModes = Set(fm.items) }
         else if let legacy, legacy.contains(.rttyOnly) {
             filterModes = legacy.tolerant(.rttyOnly, true, w, s) ? [.rtty] : SpotFilter.allModes
         } else { filterModes = x.filterModes }
-        // pamatovaná volba pro odškrtnutí „Jen RTTY“ (neplatná hodnota = výchozí, prázdný seznam je platný)
+        // the remembered selection for unchecking "RTTY only" (an invalid value = the default, an empty list is valid)
         let pm: TolerantArray<SpotModeGroup>? = c.tolerant(.previousFilterModes, nil, w, s)
         previousFilterModes = pm.map { Set($0.items) } ?? x.previousFilterModes
         let a = c.tolerant(.maxAgeMinutes, x.maxAgeMinutes, w, s); maxAgeMinutes = Self.ageRange.contains(a) ? a : x.maxAgeMinutes

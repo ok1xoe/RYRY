@@ -19,7 +19,7 @@ private func writeAtomically<T: Encodable>(_ value: T, to url: URL) throws {
     } catch { throw SettingsError.io("\(url.lastPathComponent): \(error)") }
 }
 
-/// settings.json – tolerantní načtení (nikdy nespadne), atomické uložení.
+/// settings.json – tolerant load (never crashes), atomic save.
 public final class SettingsStore: Sendable {
     public let url: URL
     public init(directory: URL = SettingsPaths.defaultDirectory) { url = directory.appendingPathComponent("settings.json") }
@@ -45,7 +45,7 @@ public struct Profile: Codable, Sendable, Equatable {
     public init(name: String, rtty: [String: ParameterValue]) { self.name = name; self.rtty = rtty }
 }
 
-/// 16 profilů parametrů modemu (jako UserPara.ini v MMTTY).
+/// 16 modem parameter profiles (like UserPara.ini in MMTTY).
 public final class ProfileStore: Sendable {
     public static let slotCount = 16
     public let url: URL
@@ -53,7 +53,7 @@ public final class ProfileStore: Sendable {
 
     private struct File: Codable { var slots: [Profile?] }
 
-    /// nil = soubor existuje, ale nejde přečíst (pak se odmítá zápis, aby se nepřepsal).
+    /// nil = the file exists but cannot be read (writing is then refused so that it is not overwritten).
     private func loadChecked() -> [Profile?]? {
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
         return (try? JSONDecoder().decode(File.self, from: Data(contentsOf: url)))?.slots

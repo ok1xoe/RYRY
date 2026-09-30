@@ -1,8 +1,8 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Zálohy logu: kopie `<název>.jsonl`, `.adi` a QTC do `<složka logu>/backup/<název>-RRRRMMDD-HHMMSS/`;
-/// drží se jen posledních `keep` záloh daného logu.
+/// Log backups: copies of `<name>.jsonl`, `.adi` and QTC into `<log folder>/backup/<name>-YYYYMMDD-HHMMSS/`;
+/// only the last `keep` backups of the given log are kept.
 public enum LogBackup {
     public enum BackupError: Error, Equatable { case nothingToBackup }
 
@@ -13,7 +13,7 @@ public enum LogBackup {
 
     public static func directory(for loc: LogLocation) -> URL { loc.directory.appendingPathComponent("backup") }
 
-    /// Zálohy daného logu, nejstarší první.
+    /// Backups of the given log, oldest first.
     public static func existing(for loc: LogLocation) -> [URL] {
         let root = directory(for: loc)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
@@ -38,7 +38,7 @@ public enum LogBackup {
         return dst
     }
 
-    /// Je čas na denní zálohu (poslední je starší než 24 h, nebo žádná není)?
+    /// Is it time for a daily backup (the last one is older than 24 h, or there is none)?
     public static func isDue(_ loc: LogLocation, now: Date = Date(), interval: TimeInterval = 86_400) -> Bool {
         guard let last = existing(for: loc).last,
               let d = stamp.date(from: String(last.lastPathComponent.dropFirst(loc.name.count + 1))) else { return true }
@@ -46,7 +46,7 @@ public enum LogBackup {
     }
 }
 
-/// Statistika logu: rychlost (spojení/h za posledních 10 a 60 min) a počty podle pásem.
+/// Log statistics: rate (QSOs/h over the last 10 and 60 min) and counts per band.
 public struct LogStats: Sendable, Equatable {
     public struct BandCount: Sendable, Equatable, Identifiable {
         public var band: String, count: Int

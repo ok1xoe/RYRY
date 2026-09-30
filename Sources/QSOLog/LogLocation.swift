@@ -1,8 +1,8 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Umístění logu: složka a název. Log tvoří `<název>.jsonl` (zdroj pravdy), `<název>.adi` (odvozený ADIF)
-/// a série QTC (`<název>-qtc.jsonl`; výchozí log „mmtty4mac“ používá dosavadní `qtc.jsonl`).
+/// Log location: folder and name. A log consists of `<name>.jsonl` (source of truth), `<name>.adi` (derived ADIF)
+/// and the QTC series (`<name>-qtc.jsonl`; the default log "mmtty4mac" uses the existing `qtc.jsonl`).
 public struct LogLocation: Sendable, Equatable {
     public enum LocationError: Error, Equatable, LocalizedError {
         case exists(String), same
@@ -20,7 +20,7 @@ public struct LogLocation: Sendable, Equatable {
 
     public init(directory: URL, name: String) { self.directory = directory.standardizedFileURL; self.name = name }
 
-    /// Z vybraného souboru (`.adi`, `.adif`, `.jsonl` nebo bez přípony).
+    /// From the selected file (`.adi`, `.adif`, `.jsonl` or without an extension).
     public init(file: URL) {
         var n = file.lastPathComponent
         for ext in [".jsonl", ".adif", ".adi"] where n.lowercased().hasSuffix(ext) { n = String(n.dropLast(ext.count)); break }
@@ -31,20 +31,20 @@ public struct LogLocation: Sendable, Equatable {
     public var adifURL: URL { directory.appendingPathComponent(name + ".adi") }
     public var qtcFileName: String { name == Self.defaultName ? "qtc.jsonl" : name + "-qtc.jsonl" }
     public var qtcURL: URL { directory.appendingPathComponent(qtcFileName) }
-    /// Cesta pro zobrazení a seznam nedávných logů (ADIF – ten uživatel zná).
+    /// Path for display and for the list of recent logs (ADIF – the one the user knows).
     public var displayPath: String { adifURL.path }
 
     public struct OpenResult: Sendable { public var imported = 0; public var skipped = 0; public var backup: URL? }
 
-    /// Před otevřením: ADIF bez JSONL (log z jiného programu) se převede do JSONL, originál se uloží jako `.adi.orig`
-    /// (log pak ADIF přepíše ze svých záznamů).
+    /// Before opening: ADIF without JSONL (log from another program) is converted to JSONL, the original saved as `.adi.orig`
+    /// (the log then rewrites the ADIF from its own records).
     public func prepareForOpen() async throws -> OpenResult {
         let fm = FileManager.default
         guard !fm.fileExists(atPath: jsonlURL.path) else { return OpenResult() }
         var src = adifURL
         if !fm.fileExists(atPath: src.path) {
             let alt = directory.appendingPathComponent(name + ".adif")
-            guard fm.fileExists(atPath: alt.path) else { return OpenResult() }         // nový prázdný log
+            guard fm.fileExists(atPath: alt.path) else { return OpenResult() }         // a new empty log
             src = alt
         }
         let data = try Data(contentsOf: src)
@@ -61,7 +61,7 @@ public struct LogLocation: Sendable, Equatable {
         return OpenResult(imported: r.added, skipped: parsed.skipped + r.duplicates, backup: backup)
     }
 
-    /// Kopie logu (JSONL, ADIF, QTC) pod jiným názvem nebo jinam. Cíl nesmí existovat.
+    /// Copy of the log (JSONL, ADIF, QTC) under a different name or elsewhere. The destination must not exist.
     public func copy(to dst: LogLocation) throws {
         guard dst != self else { throw LocationError.same }
         let fm = FileManager.default

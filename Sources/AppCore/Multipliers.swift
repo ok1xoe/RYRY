@@ -5,27 +5,27 @@ import Localization
 import QSOLog
 import Settings
 
-// Násobiče v závodech (jen násobiče, ne body ani skóre). Pravidla a zdroje: docs/rulings.md, „Násobiče v závodech“.
+// Contest multipliers (multipliers only, not points or score). Rules and sources: docs/rulings.md, "Multipliers in contests".
 
-/// Druh násobiče.
+/// Kind of multiplier.
 public enum MultiplierKind: String, Sendable, CaseIterable, Hashable, Codable {
-    /// Země DXCC (u CQ WW i seznam WAE).
+    /// DXCC country (with CQ WW also the WAE list).
     case dxcc
-    /// CQ zóna 1–40 (z přijaté výměny, jinak z DXCC).
+    /// CQ zone 1–40 (from the received exchange, otherwise from DXCC).
     case cqZone
-    /// Prefix podle pravidel CQ WPX.
+    /// Prefix per the CQ WPX rules.
     case wpxPrefix
-    /// Stát USA z přijaté výměny (48 kontinentálních + DC).
+    /// US state from the received exchange (48 continental + DC).
     case usState
-    /// Kanadská provincie/oblast z přijaté výměny (14 včetně LB).
+    /// Canadian province/area from the received exchange (14 including LB).
     case veProvince
-    /// Číselná oblast JA/W/VE/VK (W1, VE3, JA7, VK2 …).
+    /// JA/W/VE/VK call area (W1, VE3, JA7, VK2 …).
     case callArea
-    /// WAE DX Contest: země seznamu WAE, u W/VE/VK/ZL/ZS/JA/BY/PY/UA9 číselné oblasti.
+    /// WAE DX Contest: countries of the WAE list, with W/VE/VK/ZL/ZS/JA/BY/PY/UA9 the call areas.
     case waeCountry
-    /// Kontinent (BARTG, jednou za závod).
+    /// Continent (BARTG, once per contest).
     case continent
-    /// OK DX RTTY: každá stanice OK/OL.
+    /// OK DX RTTY: every OK/OL station.
     case okStation
 
     public var title: String {
@@ -42,7 +42,7 @@ public enum MultiplierKind: String, Sendable, CaseIterable, Hashable, Codable {
         }
     }
 
-    /// Konečná množina hodnot (pro seznam chybějících); nil = otevřená množina.
+    /// A finite set of values (for the list of missing ones); nil = an open set.
     public var universe: [String]? {
         switch self {
         case .cqZone: return (1...40).map(String.init)
@@ -53,43 +53,43 @@ public enum MultiplierKind: String, Sendable, CaseIterable, Hashable, Codable {
         }
     }
 
-    /// Hodnota pro štítek (zóna jako „Z14“, ostatní beze změny).
+    /// Value for the label (a zone as "Z14", the rest unchanged).
     public func label(_ value: String) -> String { self == .cqZone ? "Z\(value)" : value }
 }
 
-/// Jeden druh násobiče v pravidlech závodu.
+/// One kind of multiplier in the contest rules.
 public struct MultiplierComponent: Sendable, Equatable, Hashable {
     public var kind: MultiplierKind
-    /// true = počítá se na každém pásmu zvlášť, false = jednou za závod.
+    /// true = counted separately on every band, false = once per contest.
     public var perBand: Bool
     public init(_ kind: MultiplierKind, perBand: Bool) { self.kind = kind; self.perBand = perBand }
 }
 
-/// Pravidla násobičů jednoho závodu.
+/// Multiplier rules of a single contest.
 public struct MultiplierRule: Sendable, Equatable {
     public var preset: ContestPreset
     public var components: [MultiplierComponent]
-    /// Země (primární prefix cty.dat), které se jako země DXCC nepočítají.
+    /// Countries (cty.dat primary prefix) that do not count as DXCC countries.
     public var excludedCountries: Set<String> = []
-    /// Země se hledají i v seznamu WAE (Sicílie, Shetlandy, evropské Turecko, …).
+    /// Countries are looked up in the WAE list as well (Sicily, Shetland, European Turkey, …).
     public var waeList = false
-    /// Země (primární prefix cty.dat), u kterých se počítají číselné oblasti.
+    /// Countries (cty.dat primary prefix) for which call areas are counted.
     public var callAreaCountries: [String] = []
-    /// Váha pásma (WAE: 80 m × 4, 40 m × 3, ostatní × 2); chybějící pásmo = 1.
+    /// Band weight (WAE: 80 m × 4, 40 m × 3, the rest × 2); a missing band = 1.
     public var bandWeights: [String: Int] = [:]
-    /// Pravidlo ověřené v oficiálních pravidlech závodu (zdroj v `source`).
+    /// A rule verified in the official contest rules (the source is in `source`).
     public var verified: Bool
-    /// Neověřené části pravidla (prázdné = vše ověřeno).
+    /// Unverified parts of the rule (empty = everything verified).
     public var unverifiedNote: String = ""
     public var source: String
-    /// Poznámka k závodu pro okno Násobiče.
+    /// Note about the contest for the Multipliers window.
     public var note: String = ""
 
     public var hasMultipliers: Bool { !components.isEmpty }
     public func component(_ k: MultiplierKind) -> MultiplierComponent? { components.first { $0.kind == k } }
 
-    /// Pravidla pro závodní nastavení; nil = mimo závod nebo vlastní (nerozpoznaný) závod.
-    /// `ownCountry` = primární prefix vlastní země (OK DX RTTY: stanice OK/OL mají jiné násobiče).
+    /// Rules for the contest settings; nil = outside a contest or a custom (unrecognized) contest.
+    /// `ownCountry` = the primary prefix of my own country (OK DX RTTY: OK/OL stations have different multipliers).
     public static func rule(for contest: ContestSettings, ownCountry: String?) -> MultiplierRule? {
         guard contest.enabled, let p = contest.selectedPreset else { return nil }
         return rule(for: p, ownCountry: ownCountry)
@@ -151,7 +151,7 @@ public struct MultiplierRule: Sendable, Equatable {
     }
 }
 
-/// Jeden násobič spojení (druh + hodnota).
+/// One multiplier of a QSO (kind + value).
 public struct MultiplierHit: Sendable, Hashable, Codable {
     public var kind: MultiplierKind
     public var value: String
@@ -159,10 +159,10 @@ public struct MultiplierHit: Sendable, Hashable, Codable {
     public var label: String { kind.label(value) }
 }
 
-/// Násobiče, které by spojení přineslo (pro štítek NEW MULT).
+/// Multipliers a QSO would bring (for the NEW MULT label).
 public struct NewMultiplier: Sendable, Equatable {
     public var hits: [MultiplierHit]
-    /// Pásmo, na kterém jsou nové (nil = pásmo neznámé, nové jen násobiče „jednou za závod“).
+    /// The band on which they are new (nil = band unknown, only "once per contest" multipliers are new).
     public var band: String?
     public init(hits: [MultiplierHit] = [], band: String? = nil) { self.hits = hits; self.band = band }
     public var isEmpty: Bool { hits.isEmpty }
@@ -172,7 +172,7 @@ public struct NewMultiplier: Sendable, Equatable {
     }
 }
 
-/// Odpracované násobiče závodu: pro každé pásmo a pro násobiče „jednou za závod“.
+/// Worked multipliers of a contest: for every band and for the "once per contest" multipliers.
 public struct MultiplierTally: Sendable, Equatable {
     public let rule: MultiplierRule
     public private(set) var perBand: [String: [MultiplierKind: Set<String>]] = [:]
@@ -194,41 +194,41 @@ public struct MultiplierTally: Sendable, Equatable {
         }
     }
 
-    /// Odpracované hodnoty; `band` se použije jen u násobičů po pásmech.
+    /// Worked values; `band` is used only for per-band multipliers.
     public func worked(_ kind: MultiplierKind, band: String?) -> Set<String> {
         guard let c = rule.component(kind) else { return [] }
         if c.perBand { return band.flatMap { perBand[$0]?[kind] } ?? [] }
         return once[kind] ?? []
     }
 
-    /// Chybějící hodnoty (jen konečné množiny), seřazené.
+    /// Missing values (finite sets only), sorted.
     public func missing(_ kind: MultiplierKind, band: String?) -> [String]? {
         guard let u = kind.universe else { return nil }
         let w = worked(kind, band: band)
         return u.filter { !w.contains($0) }
     }
 
-    /// Pásma s aspoň jedním násobičem po pásmech, v pořadí od nejdelšího.
+    /// Bands with at least one per-band multiplier, in order from the longest one.
     public var bands: [String] { Multipliers.sortBands(Array(perBand.keys)) }
 
-    /// Násobiče po pásmech na daném pásmu (všechny druhy).
+    /// Per-band multipliers on the given band (all kinds).
     public func count(band: String) -> Int { perBand[band]?.values.reduce(0) { $0 + $1.count } ?? 0 }
-    /// Násobiče jednou za závod.
+    /// Multipliers counted once per contest.
     public var onceCount: Int { once.values.reduce(0) { $0 + $1.count } }
-    /// Celkový počet druhu (po pásmech sečteno přes pásma).
+    /// Total count of a kind (the per-band ones summed across bands).
     public func total(_ kind: MultiplierKind) -> Int {
         guard let c = rule.component(kind) else { return 0 }
         if c.perBand { return perBand.values.reduce(0) { $0 + ($1[kind]?.count ?? 0) } }
         return once[kind]?.count ?? 0
     }
-    /// Násobičů celkem (bez vah pásem).
+    /// Total multipliers (without band weights).
     public var total: Int { perBand.keys.reduce(0) { $0 + count(band: $1) } + onceCount }
-    /// Násobičů celkem s váhou pásem (WAE); bez vah = `total`.
+    /// Total multipliers with band weights (WAE); without weights = `total`.
     public var weightedTotal: Int {
         perBand.keys.reduce(0) { $0 + count(band: $1) * (rule.bandWeights[$1] ?? 1) } + onceCount
     }
 
-    /// Které z násobičů spojení jsou nové (na daném pásmu / v závodě).
+    /// Which of a QSO's multipliers are new (on the given band / in the contest).
     public func newHits(_ hits: [MultiplierHit], band: String?) -> NewMultiplier {
         var out: [MultiplierHit] = []
         for h in hits where !out.contains(h) {
@@ -241,7 +241,7 @@ public struct MultiplierTally: Sendable, Equatable {
     }
 }
 
-/// Výpočet násobičů spojení podle pravidel závodu.
+/// Computation of a QSO's multipliers according to the contest rules.
 public struct MultiplierCalculator: Sendable {
     public let rule: MultiplierRule
     let lookup: @Sendable (String, Bool) -> CountryInfo?
@@ -253,7 +253,7 @@ public struct MultiplierCalculator: Sendable {
         self.init(rule: rule) { call, wae in countries?.lookup(call, wae: wae) }
     }
 
-    /// Násobiče jednoho spojení. `exchange` = přijatá výměna (zóna, stát …), `zone` = CQ zóna uložená v logu.
+    /// Multipliers of a single QSO. `exchange` = the received exchange (zone, state …), `zone` = the CQ zone from the log.
     public func hits(call: String, exchange: String?, zone: Int? = nil) -> [MultiplierHit] {
         let c = QSORecord.normalizeCall(call)
         guard !c.isEmpty, rule.hasMultipliers else { return [] }
@@ -290,8 +290,8 @@ public struct MultiplierCalculator: Sendable {
         return out
     }
 
-    /// Číselná oblast (W1, VE3, JA0, RA9 …) pro země s oblastmi; číslice = poslední číslice prefixu WPX
-    /// (portable prefix bez číslice = 0, /číslice mění oblast).
+    /// Call area (W1, VE3, JA0, RA9 …) for countries with areas; the digit = the last digit of the WPX prefix
+    /// (a portable prefix without a digit = 0, /digit changes the area).
     func callArea(_ call: String, country: CountryInfo?) -> String? {
         guard let country, rule.callAreaCountries.contains(country.primaryPrefix),
               let p = WPX.prefix(call), let d = p.last, d.isNumber else { return nil }
@@ -306,27 +306,27 @@ public struct MultiplierCalculator: Sendable {
 
     public func hits(_ r: QSORecord) -> [MultiplierHit] { hits(call: r.call, exchange: r.exchangeRcvd, zone: r.cqZone) }
 
-    /// Násobiče ze spojení od začátku závodu.
+    /// Multipliers from the QSOs since the contest start.
     public func tally(records: [QSORecord], since: Date) -> MultiplierTally {
         var t = MultiplierTally(rule: rule)
         for r in records.sorted(by: { $0.timeOn < $1.timeOn }) { add(r, to: &t, since: since) }
         return t
     }
 
-    /// Přidá jedno spojení do průběžného součtu (po zalogování; bez přepočtu celého logu).
+    /// Adds one QSO to the running total (after logging; without recomputing the whole log).
     public func add(_ r: QSORecord, to t: inout MultiplierTally, since: Date) {
         guard rule.hasMultipliers, r.timeOn >= since else { return }
         t.add(hits(r), band: r.band)
     }
 }
 
-/// Pomocné tabulky a rozbor výměny.
+/// Helper tables and exchange parsing.
 public enum Multipliers {
-    /// 48 kontinentálních států USA + DC (KH6 a KL7 jsou země DXCC, ne státy).
+    /// 48 continental US states + DC (KH6 and KL7 are DXCC countries, not states).
     public static let usStates = ["AL", "AR", "AZ", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "IA", "ID", "IL", "IN", "KS", "KY",
                                   "LA", "MA", "MD", "ME", "MI", "MN", "MO", "MS", "MT", "NC", "ND", "NE", "NH", "NJ", "NM", "NV",
                                   "NY", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VA", "VT", "WA", "WI", "WV", "WY"]
-    /// 14 kanadských oblastí (CQ WW RTTY; ARRL: provincie a teritoria + Labrador).
+    /// 14 Canadian areas (CQ WW RTTY; ARRL: provinces and territories + Labrador).
     public static let veProvinces = ["AB", "BC", "LB", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]
     static let aliases: [String: String] = ["NWT": "NT", "NF": "NL", "NFL": "NL", "NFLD": "NL", "PEI": "PE", "PQ": "QC",
                                             "YK": "YT", "LAB": "LB"]
@@ -335,7 +335,7 @@ public enum Multipliers {
     static func tokens(_ s: String?) -> [String] {
         (s ?? "").uppercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
     }
-    /// CQ zóna z výměny („14“, „05 NY“, „599 14“ → první číslo 1–40 po vynechání RST 5NN).
+    /// CQ zone from the exchange ("14", "05 NY", "599 14" → the first number 1–40 after skipping the RST 5NN).
     static func zone(in exchange: String?) -> Int? {
         for t in tokens(exchange) where t.allSatisfy(\.isNumber) && t.count <= 2 {
             if let z = Int(t), (1...40).contains(z) { return z }
@@ -348,7 +348,7 @@ public enum Multipliers {
     static func province(in exchange: String?) -> String? {
         tokens(exchange).lazy.map { aliases[$0] ?? $0 }.first { provinceSet.contains($0) }
     }
-    /// Jedno slovo jako stát USA (48 + DC) nebo kanadská oblast (i zkratky NWT, PEI …); jinak nil.
+    /// A single word as a US state (48 + DC) or a Canadian area (including the abbreviations NWT, PEI …); otherwise nil.
     public static func stateOrProvince(_ word: String) -> String? {
         let w = word.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let n = aliases[w] ?? w
@@ -360,16 +360,16 @@ public enum Multipliers {
     public static func sortBands(_ b: [String]) -> [String] {
         b.sorted { (bandOrder.firstIndex(of: $0) ?? 99, $0) < (bandOrder.firstIndex(of: $1) ?? 99, $1) }
     }
-    /// Pásma závodu (RTTY závody na KV bez WARC) – řádky mřížky i bez spojení.
+    /// Contest bands (RTTY contests on HF without WARC) – grid rows even without QSOs.
     public static let contestBands = ["80m", "40m", "20m", "15m", "10m"]
 }
 
-/// Prefix podle pravidel CQ WPX.
+/// Prefix per the CQ WPX rules.
 ///
-/// Prefix = písmena a číslice první části značky až po číslici před sufixem (N8, WD8, OE25, LY1000).
-/// Portable designátor se stává prefixem; designátor bez číslice dostane 0 (PA/N8BJQ = PA0),
-/// značka bez číslice dostane 0 za první dvě písmena (XEFTJW = XE0). /P, /M, /MM, /AM, /QRP, /A, /E, /J
-/// se ignorují. /číslice mění číslo prefixu (W1ABC/3 = W3) – v pravidlech neuvedeno, obvyklá praxe.
+/// Prefix = the letters and digits of the first part of the call up to the digit before the suffix (N8, WD8, OE25, LY1000).
+/// A portable designator becomes the prefix; a designator without a digit gets 0 (PA/N8BJQ = PA0),
+/// a call without a digit gets 0 after the first two letters (XEFTJW = XE0). /P, /M, /MM, /AM, /QRP, /A, /E, /J
+/// are ignored. /digit changes the prefix number (W1ABC/3 = W3) – not stated in the rules, common practice.
 public enum WPX {
     static let ignored: Set<String> = ["P", "M", "MM", "AM", "QRP", "QRPP", "A", "E", "J", "LH", "R", "B", "N", "T", "X"]
 
@@ -396,7 +396,7 @@ public enum WPX {
         return p.isEmpty ? nil : p
     }
 
-    /// Portable designátor: část, která není celá značka (končí číslicí nebo nemá číslici); jinak nejkratší.
+    /// Portable designator: the part that is not a whole call (ends with a digit or has none); otherwise the shortest one.
     static func designator(_ parts: [String]) -> String {
         let looksLikeCall: (String) -> Bool = { s in s.contains(where: \.isNumber) && s.last?.isLetter == true }
         let cands = parts.filter { !looksLikeCall($0) }
@@ -410,13 +410,13 @@ public enum WPX {
         return callPrefix(d)                                                // VP2E → VP2
     }
 
-    /// Prefix celé značky: vše až po poslední číslici, za kterou následuje písmeno.
+    /// Prefix of a whole call: everything up to the last digit that is followed by a letter.
     static func callPrefix(_ c: String) -> String {
         let a = Array(c)
         var end: Int?
         for i in a.indices.dropLast() where a[i].isNumber && a[i + 1].isLetter { end = i }
         if let end { return String(a[...end]) }
         if !a.contains(where: \.isNumber) { return String(c.prefix(2)) + "0" }       // XEFTJW → XE0
-        return c                                                                     // jen číslice na konci
+        return c                                                                     // only digits at the end
     }
 }

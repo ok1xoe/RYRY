@@ -9,17 +9,17 @@ import QSOLog
 import RigControl
 import Settings
 
-/// Pole QSO okna.
+/// Fields of the QSO window.
 public struct QSOFields: Codable, Sendable, Equatable {
     public var call = "", name = "", qth = "", locator = ""
     public var rstSent = "599", rstRcvd = "599"
     public var serialSent: Int?, serialRcvd: Int?
     public var exchangeSent = "", exchangeRcvd = "", notes = ""
     public var timeOn: Date?
-    /// Ručně zadaná frekvence v Hz (bez rigu); zůstává i pro další spojení.
+    /// Manually entered frequency in Hz (without a rig); it stays for further QSOs as well.
     public var frequency: Double?
-    /// Pole doplněná z historie značek (název pole → doplněná hodnota); jen pro GUI („z historie“), do JSON se nezapisuje.
-    /// Pole se počítá jako doplněné jen dokud má stále tuto hodnotu.
+    /// Fields filled from the call history (field name → value); for the GUI only ("from history"), not written to JSON.
+    /// A field counts as filled only as long as it still has this value.
     public var historyFilled: [String: String] = [:]
     public init() {}
 
@@ -30,7 +30,7 @@ public struct QSOFields: Codable, Sendable, Equatable {
     public static let fieldNames = ["call", "name", "qth", "locator", "rstSent", "rstRcvd",
                                     "serialSent", "serialRcvd", "exchangeSent", "exchangeRcvd", "notes", "freq"]
 
-    /// Frekvence v kHz pro zobrazení (bez zbytečných nul).
+    /// Frequency in kHz for display (without needless zeros).
     public static func kHzString(_ hz: Double?) -> String {
         guard let hz else { return "" }
         var s = String(format: "%.3f", hz / 1000)
@@ -56,9 +56,9 @@ public struct QSOFields: Codable, Sendable, Equatable {
 
 public enum AppError: Error, Equatable, Sendable {
     case unknownField(String), noLog, badMacro(Int), badMessage(Int), profile(String), log(String), qtc(String), badValue(String)
-    /// Během vysílání se rig nepřelaďuje.
+    /// The rig is not retuned while transmitting.
     case transmitting
-    /// Engine neběží (zvuk nespuštěn / zastaveno) – rig není připojený.
+    /// The engine is not running (audio not started / stopped) – the rig is not connected.
     case engineStopped
 }
 
@@ -66,11 +66,11 @@ public enum AppEvent: Sendable {
     case engine(EngineEvent)
     case qsoChanged(QSOFields)
     case qsoLogged(QSORecord), qsoUpdated(QSORecord), qsoDeleted(UUID)
-    /// Parametry modemu se změnily (GUI, API, profil) – aktuální hodnoty.
+    /// The modem parameters have changed (GUI, API, profile) – the current values.
     case paramsChanged([String: ParameterValue])
-    /// WAE: série QTC se změnily (odeslána nebo přijata).
+    /// WAE: the QTC series have changed (one was sent or received).
     case qtcChanged
-    /// Závod: další pořadové číslo se změnilo (po zalogování) – klient ho uloží do nastavení.
+    /// Contest: the next serial number has changed (after logging) – the client saves it into the settings.
     case contestSerial(Int)
     case error(String)
 }
@@ -93,7 +93,7 @@ final class AppBroadcaster: @unchecked Sendable {
     }
 }
 
-/// Aplikační vrstva nad Engine: QSO okno, log, makra, historie textu. Společná pro GUI i API.
+/// The application layer above Engine: QSO window, log, macros, text history. Shared by the GUI and the API.
 public actor AppController {
     public nonisolated let engine: Engine
     public private(set) var settings: AppSettings
@@ -106,19 +106,19 @@ public actor AppController {
     private let broadcaster = AppBroadcaster()
     private var eventTask: Task<Void, Never>?
     private var repeatTask: Task<Void, Never>?
-    /// Počet vyřízených požadavků na zalogování z makra (%l) – úspěšných i neúspěšných (ESM na ně čeká).
+    /// Number of handled log requests from a macro (%l) – both successful and unsuccessful (ESM waits for them).
     public private(set) var logRequestsHandled = 0
 
-    /// Databáze zemí DXCC (cty.dat); nil = bez zjišťování zemí.
+    /// The DXCC country database (cty.dat); nil = without country lookup.
     public nonisolated let countries: CountryDB?
 
-    /// Série QTC (WAE DX Contest); nil = bez QTC.
+    /// QTC series (WAE DX Contest); nil = without QTC.
     public nonisolated let qtcStore: QTCStore?
-    /// Odeslaná série čekající na potvrzení příjemce (R R ALL OK).
+    /// A sent series waiting for the recipient's confirmation (R R ALL OK).
     private var pendingQTC: QTCSeries?
-    /// Historie značek (N1MM Call History); nil = nenačtena. Používá se jen při `settings.callHistory.enabled`.
+    /// Call history (N1MM Call History); nil = not loaded. Used only when `settings.callHistory.enabled`.
     private var callHistory: CallHistory?
-    /// Zóna protistanice předvyplněná z DXCC (počítá se jako prázdná: historie ji přepíše, změna značky ji přepočítá).
+    /// The other station's zone prefilled from DXCC (counts as empty: the history overwrites it, a call change recomputes it).
     private var dxccFilledZone: String?
 
     public init(settings: AppSettings, engine: Engine, log: QSOLogStore?, profiles: ProfileStore? = nil,
@@ -133,7 +133,7 @@ public actor AppController {
         }
     }
 
-    /// Prázdné QSO okno podle závodního formátu (odesílané číslo nebo pevná výměna).
+    /// An empty QSO window according to the contest format (the sent serial number or a fixed exchange).
     static func contestDefaults(_ c: ContestSettings) -> QSOFields {
         var q = QSOFields()
         guard c.enabled else { return q }
@@ -141,10 +141,10 @@ public actor AppController {
         case .serial:
             if c.exchange.isEmpty { q.serialSent = c.nextSerial } else { q.exchangeSent = c.exchange }
         case .cqrj: q.exchangeSent = c.exchange
-        case .bartg: q.serialSent = c.nextSerial                 // čas se doplní se začátkem QSO
+        case .bartg: q.serialSent = c.nextSerial                 // the time is filled in at the QSO start
         case .ped: break
         case .wae: q.serialSent = c.nextSerial
-        case .zone: q.exchangeSent = c.exchange              // prázdné → doplní vlastní zónu z DXCC
+        case .zone: q.exchangeSent = c.exchange              // empty → fills in my own zone from DXCC
         }
         return q
     }
@@ -156,8 +156,8 @@ public actor AppController {
 
     public nonisolated func events() -> AsyncStream<AppEvent> { broadcaster.subscribe() }
 
-    /// Pořadí uložených parametrů při startu: kmitočty a typ filtru před zářezy
-    /// (CLMS::SetWindow přesune zářez uvnitř okna mark–space do středu).
+    /// Order of the saved parameters at startup: frequencies and filter type before the notches
+    /// (CLMS::SetWindow moves a notch inside the mark–space window to the center).
     static func startupOrder(_ p: [String: ParameterValue]) -> [(String, ParameterValue)] {
         let first = ["baud", "mark", "shift", "reverse", "lmsType", "notchTaps", "twoNotch"]
         let last = ["notchFreq", "notch2Freq", "lms"]
@@ -217,8 +217,8 @@ public actor AppController {
         var c = MacroContext()
         c.myCall = settings.station.call.uppercased()
         c.hisCall = qso.call; c.name = qso.name; c.qth = qso.qth
-        // MMTTY: HisRST = co posílám (%r %N), MyRST = co jsem dostal (%s %M); v závodě „599“ + číslo nebo výměna
-        // BARTG: do začátku QSO aktuální čas (MMTTY UpdateBARTG každou minutu)
+        // MMTTY: HisRST = what I send (%r %N), MyRST = what I received (%s %M); in a contest "599" + serial or exchange
+        // BARTG: until the QSO start the current time (MMTTY UpdateBARTG every minute)
         let sentExch = isBARTG && qso.exchangeSent.isEmpty ? Self.hhmm.string(from: Date()) : qso.exchangeSent
         c.hisRST = qso.rstSent + Self.exchangeSuffix(qso.serialSent, sentExch)
         c.myRST = qso.rstRcvd + Self.exchangeSuffix(qso.serialRcvd, qso.exchangeRcvd)
@@ -227,7 +227,7 @@ public actor AppController {
         return c
     }
 
-    /// Kontext pro příkazy DX clusteru: jako `macroContext()` + kmitočet stanice v kHz pro `%k` (viz `clusterSpotKHz`).
+    /// Context for DX cluster commands: like `macroContext()` + the station frequency in kHz for `%k` (see `clusterSpotKHz`).
     public func clusterMacroContext() async -> MacroContext {
         var c = macroContext()
         var rigHz: Double?
@@ -237,9 +237,9 @@ public actor AppController {
         return c
     }
 
-    /// Kmitočet pro spot (`%k`, kHz): z rigu = rig − posun spotů (opak `AppModel.useSpot`, který ladí na spot + posun;
-    /// posun oříznutý stejně), aby spot nesl RF kmitočet stanice a ne dial; ruční frekvence QSO je už RF (bez rigu
-    /// se do ní zapisuje přímo frekvence spotu) – posun se neodečítá. nil = neznámá nebo ≤ 0.
+    /// Frequency for a spot (`%k`, kHz): from the rig = rig − the spot offset (the opposite of `AppModel.useSpot`, which tunes
+    /// to spot + offset, the offset clamped the same), so the spot carries the station's RF frequency and not the dial; the manual
+    /// QSO frequency is already RF (without a rig the spot frequency goes in directly) – no offset subtracted. nil = unknown or ≤ 0.
     public static func clusterSpotKHz(rigHz: Double?, manualHz: Double?, offsetHz: Double) -> Double? {
         let off = min(max(offsetHz, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound)
         let hz: Double? = rigHz.map { $0 - off } ?? manualHz
@@ -249,14 +249,14 @@ public actor AppController {
 
     private var isBARTG: Bool { settings.contest.enabled && settings.contest.format == .bartg }
 
-    /// BARTG: první vysílání se zadanou značkou = začátek QSO → čas se zafixuje (MMTTY SetHisUTC).
+    /// BARTG: the first transmission with a call entered = the QSO start → the time is fixed (MMTTY SetHisUTC).
     private func lockBARTGTime() {
         guard isBARTG, !qso.call.isEmpty, qso.exchangeSent.isEmpty else { return }
         qso.exchangeSent = Self.hhmm.string(from: Date())
         broadcaster.send(.qsoChanged(qso))
     }
 
-    /// Část za RST: číslo, výměna, nebo obojí „NNN-výměna“ (MMTTY BARTG „599NNN-HHMM“; %x/%y).
+    /// The part after RST: a serial, an exchange, or both "NNN-exchange" (MMTTY BARTG "599NNN-HHMM"; %x/%y).
     static func exchangeSuffix(_ serial: Int?, _ exch: String) -> String {
         switch (serial, exch.isEmpty) {
         case (let n?, true): return String(format: "%03d", n)
@@ -279,15 +279,15 @@ public actor AppController {
         try await engine.sendMacro(m)
     }
 
-    /// CQ smyčka (MMTTY UserTimer): po návratu do RX počkat `every` s a makro zopakovat.
-    /// Zastaví ji přijatý znak (někdo odpověděl), stopMacroRepeat() nebo rxNow().
+    /// CQ loop (MMTTY UserTimer): after returning to RX wait `every` s and repeat the macro.
+    /// It is stopped by a received character (somebody answered), stopMacroRepeat() or rxNow().
     private func startRepeat(_ index: Int, every sec: Double) {
         let engine = self.engine, rx = rxText
         repeatTask = Task { [weak self] in
             while !Task.isCancelled {
                 while await engine.state != .rx, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(50)) }
-                let mark = rx.absoluteEnd                 // absolutní – text.clear_rx ji nesníží
-                try? await Task.sleep(for: .seconds(sec))           // sec ověřené (0,1–3600 s)
+                let mark = rx.absoluteEnd                 // absolute – text.clear_rx does not lower it
+                try? await Task.sleep(for: .seconds(sec))           // sec validated (0.1–3600 s)
                 if Task.isCancelled || rx.absoluteEnd > mark { break }
                 guard await engine.state == .rx else { continue }
                 do { try await self?.runMacroOnce(index) } catch { break }
@@ -302,7 +302,7 @@ public actor AppController {
     public func setMacros(_ m: [Macro]) { settings.macros = m }
     public func setMessages(_ m: [Macro]) { settings.messages = m }
 
-    /// Zpráva ze seznamu (MMTTY MsgList) – odešle se stejně jako makro.
+    /// A message from the list (MMTTY MsgList) – it is sent the same way as a macro.
     public func runMessage(index: Int) async throws {
         guard settings.messages.indices.contains(index) else { throw AppError.badMessage(index) }
         stopMacroRepeat()
@@ -323,15 +323,15 @@ public actor AppController {
             qso.call = v.uppercased()
             if !v.isEmpty, qso.timeOn == nil { qso.timeOn = Date() }
             if changed { releaseAutoFilled() }
-            // Priorita: ruční zadání > historie značek > (callbook, v GUI) > odhad zóny z DXCC
+            // Priority: manual entry > call history > (callbook, in the GUI) > zone guess from DXCC
             applyCallHistory(v)
-            // RST + CQ zóna: zóna protistanice podle DXCC (klik na číslo v příjmu ji přepíše)
+            // RST + CQ zone: the other station's zone by DXCC (a click on a number in the receive text overwrites it)
             if !v.isEmpty, settings.contest.enabled, settings.contest.prefillsZone, qso.exchangeRcvd.isEmpty,
                let z = country(for: v)?.cqZone {
                 qso.exchangeRcvd = String(z)
                 dxccFilledZone = String(z)
             }
-            // BARTG: smazaná značka = QSO nezačalo, čas se znovu bere aktuální (MMTTY UpdateBARTG)
+            // BARTG: a cleared call = the QSO has not started, the time is taken as current again (MMTTY UpdateBARTG)
             if v.isEmpty, isBARTG { qso.exchangeSent = ""; qso.timeOn = nil }
         case "name": qso.name = v
         case "qth": qso.qth = v
@@ -351,16 +351,16 @@ public actor AppController {
             manualFrequencySetThisSession = true
         default: throw AppError.unknownField(name)
         }
-        if name != "call" {                                // ruční zadání pole (i shodné hodnoty) zruší označení „z historie“; změna zruší „z DXCC“
+        if name != "call" {                                // a manual field entry (even with the same value) clears the "from history" mark; a change clears "from DXCC"
             qso.historyFilled[name] = nil
             if name == "exchangeRcvd", qso.exchangeRcvd != dxccFilledZone { dxccFilledZone = nil }
         }
         broadcaster.send(.qsoChanged(qso))
     }
 
-    // MARK: Historie značek
+    // MARK: Call history
 
-    /// Nastaví (nebo zruší) načtenou historii značek. Změna se projeví při další změně značky.
+    /// Sets (or clears) the loaded call history. A change takes effect on the next call change.
     public func setCallHistory(_ h: CallHistory?) { callHistory = h }
 
     private func setAutoField(_ f: String, _ v: String) {
@@ -372,7 +372,7 @@ public actor AppController {
         }
     }
 
-    /// Změna značky: hodnoty doplněné automaticky (a od té doby neupravené) patřily staré značce – vymažou se.
+    /// Call change: values filled automatically (and not edited since) belonged to the old call – they are cleared.
     private func releaseAutoFilled() {
         for (f, val) in qso.historyFilled where qso.value(f) == val { setAutoField(f, "") }
         qso.historyFilled = [:]
@@ -399,33 +399,33 @@ public actor AppController {
         let f = qso.frequency
         qso = QSOFields()
         dxccFilledZone = nil
-        qso.frequency = f                                // pásmo zůstává pro další spojení
+        qso.frequency = f                                // the band stays for further QSOs
         applyContestDefaults()
         broadcaster.send(.qsoChanged(qso))
     }
 
-    /// Závod: odesílané pořadové číslo (nebo pevná výměna) do prázdného QSO okna.
+    /// Contest: the sent serial number (or a fixed exchange) into an empty QSO window.
     private func applyContestDefaults() {
         let d = Self.contestDefaults(settings.contest)
         qso.serialSent = d.serialSent; qso.exchangeSent = d.exchangeSent
         if settings.contest.enabled, settings.contest.sendsOwnZone, qso.exchangeSent.isEmpty,
            let z = country(for: settings.station.call)?.cqZone {
-            qso.exchangeSent = String(z)                      // RST + CQ zóna, CQ/RJ: moje zóna z DXCC
+            qso.exchangeSent = String(z)                      // RST + CQ zone, CQ/RJ: my zone from DXCC
         }
     }
 
-    /// Frekvence pro log: rig online, jinak ručně zadaná.
+    /// Frequency for the log: the rig if online, otherwise the manually entered one.
     func currentFrequency(manual: Double?) async -> Double? {
         if let st = await engine.rigStatus, st.online, let f = st.frequency { return f }
-        // s nastaveným rigem, který zrovna neodpovídá, jen frekvenci zadanou v této relaci (ne starou uloženou)
+        // with a rig configured but not responding, only the frequency entered in this session (not an old saved one)
         if settings.rig.type != .none, !manualFrequencySetThisSession { return nil }
         return manual
     }
 
-    /// Ruční frekvence zadaná od startu (ne jen převzatá z uloženého nastavení).
+    /// A manual frequency entered since startup (not just taken from the saved settings).
     private var manualFrequencySetThisSession = false
 
-    /// Duplicita v závodě pro značku v QSO okně (stejná stanice a pásmo od začátku závodu; mód jen u vlastního závodu).
+    /// Dupe in a contest for the call in the QSO window (same station and band since the start; mode only in a custom contest).
     public func dupe() async -> Bool {
         guard settings.contest.enabled, !qso.call.isEmpty, let log else { return false }
         let band = Bands.band(forHz: await currentFrequency(manual: qso.frequency))
@@ -441,7 +441,7 @@ public actor AppController {
     public func logQSO() async throws -> QSORecord {
         guard let log else { throw AppError.noLog }
         lockBARTGTime()
-        let qso = self.qso                      // snímek – během await se pole mohou změnit
+        let qso = self.qso                      // snapshot – the fields may change during await
         guard !qso.call.isEmpty else { throw AppError.log(L("chybí značka")) }
         let now = Date()
         var r = QSORecord(call: qso.call, timeOn: qso.timeOn ?? now, mode: await engine.currentMode().adifMode)
@@ -466,11 +466,11 @@ public actor AppController {
                 settings.contest.nextSerial = n + 1
                 broadcaster.send(.contestSerial(n + 1))
             }
-            // závod: rovnou další spojení s dalším číslem – ale nemazat, co operátor mezitím napsal
+            // contest: on to the next QSO with the next serial – but do not erase what the operator typed meanwhile
             if self.qso == qso { clearQSO() }
             else if settings.contest.sendsSerial, self.qso.serialSent == r.serialSent {
                 self.qso.serialSent = settings.contest.nextSerial
-                if isBARTG { self.qso.exchangeSent = "" }   // čas zalogovaného QSO nedědit
+                if isBARTG { self.qso.exchangeSent = "" }   // do not inherit the logged QSO's time
                 broadcaster.send(.qsoChanged(self.qso))
             }
         }
@@ -480,11 +480,11 @@ public actor AppController {
     // MARK: QTC (WAE DX Contest)
 
     public struct QTCStatus: Sendable, Equatable {
-        public var available: [QTCLine]        // co lze stanici poslat
-        public var exchanged: Int              // už vyměněno (odeslaná + přijatá), max. 10
+        public var available: [QTCLine]        // what can be sent to the station
+        public var exchanged: Int              // already exchanged (sent + received), max. 10
         public var nextSeries: Int
-        public var differentContinent: Bool?   // v RTTY jen mezi kontinenty; nil = neznámý kontinent
-        public var points: Int                 // body za QTC celkem
+        public var differentContinent: Bool?   // in RTTY only between continents; nil = unknown continent
+        public var points: Int                 // total points for QTC
     }
 
     private func planner() async -> QTCPlanner {
@@ -499,8 +499,8 @@ public actor AppController {
                          nextSeries: p.nextSeriesNumber, differentContinent: diff, points: p.points)
     }
 
-    /// Odešle sérii QTC stanici v QSO okně (uloží se až po `confirmSentQTC`).
-    /// Kontroluje pravidla: jiný kontinent, limit dvojice, řádky nenahlášené a ne o této stanici.
+    /// Sends a QTC series to the station in the QSO window (it is stored only after `confirmSentQTC`).
+    /// It checks the rules: a different continent, the per-pair limit, lines not yet reported and not about this station.
     public func sendQTC(_ lines: [QTCLine]) async throws {
         guard qtcStore != nil else { throw AppError.qtc(L("QTC není k dispozici")) }
         let call = qso.call
@@ -509,7 +509,7 @@ public actor AppController {
         let st = await qtcStatus(for: call)
         if st.differentContinent == false { throw AppError.qtc(L("%@ je na stejném kontinentu – v RTTY QTC nelze", call)) }
         if pendingQTC?.counterpart == call, pendingQTC?.lines == lines {
-            // stejná série znovu (před potvrzením) – číslo i limity už ověřené
+            // the same series again (before confirmation) – the number and the limits are already checked
         } else {
             guard st.exchanged + lines.count <= QTCPlanner.maxPerPair else { throw AppError.qtc(L("s %@ už vyměněno %ld QTC", call, st.exchanged)) }
             guard Set(lines).isSubset(of: Set(st.available)) else { throw AppError.qtc(L("řádky nejsou pro %@ povolené (už nahlášené nebo o této stanici)", call)) }
@@ -518,16 +518,16 @@ public actor AppController {
         let series = QTCSeries(direction: .sent, number: number, counterpart: call, time: Date(),
                                frequency: await engine.rigStatus?.frequency, lines: lines)
         try await sendPlain(QTCText.body(number: number, lines: lines))
-        pendingQTC = series                          // až po úspěšném předání k vysílání
+        pendingQTC = series                          // only after it has been successfully handed over for transmission
     }
 
-    /// Zopakuje řádek odesílané série (index od 1, na žádost AGN N).
+    /// Repeats a line of the sent series (index from 1, on an AGN N request).
     public func repeatQTC(index: Int) async throws {
         guard let p = pendingQTC, (1...p.count).contains(index) else { throw AppError.qtc(L("není co opakovat")) }
         try await sendPlain(QTCText.repeatLine(p.lines[index - 1], index: index))
     }
 
-    /// Příjemce potvrdil – série se zaloguje.
+    /// The recipient confirmed – the series is logged.
     public func confirmSentQTC() async throws {
         guard let p = pendingQTC, let store = qtcStore else { throw AppError.qtc(L("žádná odeslaná série")) }
         do { try await store.append(p) } catch { throw AppError.qtc("\(error)") }
@@ -538,7 +538,7 @@ public actor AppController {
     public func cancelSentQTC() { pendingQTC = nil }
     public var pendingQTCSeries: QTCSeries? { pendingQTC }
 
-    /// Uloží přijatou sérii (protistanice se předává explicitně – QSO okno se mezitím mohlo vyčistit).
+    /// Stores a received series (the counterpart is passed explicitly – the QSO window may have been cleared meanwhile).
     public func saveReceivedQTC(counterpart: String, number: Int, declaredCount: Int?, lines: [QTCLine]) async throws {
         guard let store = qtcStore else { throw AppError.qtc(L("QTC není k dispozici")) }
         let call = counterpart.uppercased()
@@ -554,7 +554,7 @@ public actor AppController {
         broadcaster.send(.qtcChanged)
     }
 
-    /// Oprava uložené série (okno Log → QTC).
+    /// Editing a stored series (the Log → QTC window).
     public func updateQTCSeries(_ s: QTCSeries) async throws {
         guard let store = qtcStore else { throw AppError.qtc(L("QTC není k dispozici")) }
         guard !s.counterpart.isEmpty, !s.lines.isEmpty, s.lines.count <= QTCPlanner.maxPerPair else {
@@ -570,7 +570,7 @@ public actor AppController {
         broadcaster.send(.qtcChanged)
     }
 
-    /// Krátké provozní zprávy QTC.
+    /// Short QTC operating messages.
     public enum QTCPhrase: Sendable { case ask, qrvQuery, qrv, agn(Int), allOK }
     public func sendQTCPhrase(_ p: QTCPhrase) async throws {
         let c = qso.call.isEmpty ? "" : "\(qso.call) "
@@ -585,7 +585,7 @@ public actor AppController {
         try await sendPlain("\r\n" + t + "\r\n")
     }
 
-    // MARK: Odeslání textového souboru (MMTTY „Send Text…“)
+    // MARK: Sending a text file (MMTTY "Send Text…")
 
     public enum FileTextError: Error, LocalizedError {
         case empty, tooLong
@@ -598,7 +598,7 @@ public actor AppController {
     }
     static let fileTextLimit = 20_000
 
-    /// Obsah souboru → text k vysílání: UTF-8 (jinak Latin-1), CR LF, tabulátor = mezera, bez řídicích znaků.
+    /// File contents → text to transmit: UTF-8 (otherwise Latin-1), CR LF, tab = space, without control characters.
     public static func fileText(_ data: Data) throws -> String {
         guard data.count <= fileTextLimit * 4 else { throw FileTextError.tooLong }
         let raw = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
@@ -610,21 +610,21 @@ public actor AppController {
         return clean.replacingOccurrences(of: "\n", with: "\r\n")
     }
 
-    /// Vyšle text souboru (bez maker) a po dovysílání přejde na RX.
+    /// Transmits the text of the file (without macros) and switches to RX once it has been sent.
     public func sendFileText(_ data: Data) async throws { try await sendPlain(Self.fileText(data)) }
 
-    /// Text bez maker: vysílat a po dovysílání RX.
+    /// Text without macros: transmit and go to RX once it has been sent.
     private func sendPlain(_ text: String) async throws {
         if txDisabled { throw EngineError.pttUnavailable(L("TX zakázáno (rx_only)")) }
-        // bez MacroEngine.expand: značky v QTC se nesmí vykládat jako proměnné (%…) ani řídicí znaky
+        // without MacroEngine.expand: calls in QTC must not be interpreted as variables (%…) or control characters
         try await engine.sendMacro(MacroResult.plain(text, end: .rxAfter))
     }
 
-    /// Země DXCC pro značku (nil = neznámá nebo /MM).
+    /// DXCC country for a call (nil = unknown or /MM).
     public nonisolated func country(for call: String) -> CountryInfo? { countries?.lookup(call) }
 
-    /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
-    /// `contestOnly` = jen spojení s odeslaným číslem nebo výměnou.
+    /// The log (optionally for a period) in the Cabrillo format with a header from the station and contest settings.
+    /// `contestOnly` = only QSOs with a sent serial number or exchange.
     public func cabrillo(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
         var recs = await log?.query(from: from, to: to) ?? []
         if contestOnly { recs = recs.filter { $0.serialSent != nil || !($0.exchangeSent ?? "").isEmpty } }
@@ -640,7 +640,7 @@ public actor AppController {
     public func updateQSO(_ r0: QSORecord) async throws {
         guard let log else { throw AppError.noLog }
         var r = r0
-        // opravená značka → znovu zjistit zemi DXCC
+        // a corrected call → look up the DXCC country again
         if let old = await log.records.first(where: { $0.id == r.id }), old.call != r.call {
             let ci = country(for: r.call)
             r.country = ci?.name; r.continent = ci?.continent; r.cqZone = ci?.cqZone; r.ituZone = ci?.ituZone
@@ -655,17 +655,17 @@ public actor AppController {
         broadcaster.send(.qsoDeleted(id))
     }
 
-    // MARK: Rig a modem
+    // MARK: Rig and modem
 
-    /// Přeladí rig. Během vysílání (zaklíčovaný vysílač) a se zastaveným enginem odmítne – stav se bere z enginu,
-    /// takže platí pro GUI i API (vzor `notchClick`).
+    /// Retunes the rig. Refuses while transmitting (the transmitter keyed) and with the engine stopped – the state is taken
+    /// from the engine, so it applies to both the GUI and the API (the `notchClick` pattern).
     public func setFrequency(_ hz: Double) async throws {
         let st = await engine.state
         if Self.transmittingStates.contains(st) { throw AppError.transmitting }
         if st == .stopped { throw AppError.engineStopped }
         try await engine.setRigFrequency(hz)
     }
-    /// Stavy enginu, kdy je vysílač zaklíčovaný nebo se klíčuje.
+    /// Engine states in which the transmitter is keyed or is being keyed.
     public static let transmittingStates: Set<EngineState> = [.keying, .pttOn, .tx, .drain, .pttOff]
     public func setRigMode(_ m: String) async throws { try await engine.setRigMode(m) }
     public func modemParam(_ id: String) async -> ParameterValue? { await engine.modemParam(id) }
@@ -674,15 +674,15 @@ public actor AppController {
         broadcaster.send(.paramsChanged(await engine.modemParams()))
     }
     public func modemParams() async -> [String: ParameterValue] { await engine.modemParams() }
-    /// Zářez na kmitočtu (pravé tlačítko ve spektru jako MMTTY).
+    /// A notch at a frequency (right mouse button in the spectrum as in MMTTY).
     public func notchClick(hz: Double) async {
-        // MMTTY: během vysílání se kliky do spektra ignorují
+        // MMTTY: clicks in the spectrum are ignored while transmitting
         guard !Self.transmittingStates.contains(await engine.state) else { return }
         await engine.withModem { $0.notchClick(hz: hz) }
         broadcaster.send(.paramsChanged(await engine.modemParams()))
     }
 
-    // MARK: Profily
+    // MARK: Profiles
 
     public func loadProfile(_ slot: Int) async throws {
         guard let profiles else { throw AppError.profile(L("bez úložiště profilů")) }
