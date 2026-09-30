@@ -1,16 +1,16 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Verze aplikace: semver (major.minor.patch[-předvydání]) + volitelné číslo sestavení.
+/// Application version: semver (major.minor.patch[-prerelease]) + an optional build number.
 public struct AppVersion: Sendable, Equatable, Comparable, CustomStringConvertible {
-    public var numbers: [Int]          // vždy 3 prvky
-    public var prerelease: [String]    // části za „-“ (prázdné = plné vydání)
+    public var numbers: [Int]          // always 3 elements
+    public var prerelease: [String]    // the parts after "-" (empty = a full release)
     public var build: Int?
 
     public init?(_ text: String, build: Int? = nil) {
         var t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if t.first == "v" || t.first == "V" { t.removeFirst() }
-        if let plus = t.firstIndex(of: "+") { t = String(t[..<plus]) }      // build metadata se ignorují
+        if let plus = t.firstIndex(of: "+") { t = String(t[..<plus]) }      // build metadata is ignored
         var pre: [String] = []
         if let dash = t.firstIndex(of: "-") {
             pre = t[t.index(after: dash)...].split(separator: ".", omittingEmptySubsequences: false).map(String.init)
@@ -32,17 +32,17 @@ public struct AppVersion: Sendable, Equatable, Comparable, CustomStringConvertib
         numbers.map(String.init).joined(separator: ".") + (prerelease.isEmpty ? "" : "-" + prerelease.joined(separator: "."))
     }
 
-    /// Řazení podle semver; číslo sestavení se do `<` nezahrnuje (viz `isNewer`).
+    /// Ordering by semver; the build number is not part of `<` (see `isNewer`).
     public static func < (a: AppVersion, b: AppVersion) -> Bool { compareSemver(a, b) < 0 }
     public static func == (a: AppVersion, b: AppVersion) -> Bool { compareSemver(a, b) == 0 && a.build == b.build }
 
     static func compareSemver(_ a: AppVersion, _ b: AppVersion) -> Int {
         for i in 0..<3 where a.numbers[i] != b.numbers[i] { return a.numbers[i] < b.numbers[i] ? -1 : 1 }
-        if a.prerelease.isEmpty != b.prerelease.isEmpty { return a.prerelease.isEmpty ? 1 : -1 }   // vydání > předvydání
+        if a.prerelease.isEmpty != b.prerelease.isEmpty { return a.prerelease.isEmpty ? 1 : -1 }   // release > prerelease
         for (x, y) in zip(a.prerelease, b.prerelease) where x != y {
             switch (Int(x), Int(y)) {
             case let (i?, j?): return i < j ? -1 : 1
-            case (_?, nil): return -1                     // číselné < textové
+            case (_?, nil): return -1                     // numeric < textual
             case (nil, _?): return 1
             default: return x < y ? -1 : 1
             }
@@ -51,7 +51,7 @@ public struct AppVersion: Sendable, Equatable, Comparable, CustomStringConvertib
         return 0
     }
 
-    /// Je `self` novější než `other`? Při shodné verzi rozhoduje číslo sestavení (jen když je známé u obou).
+    /// Is `self` newer than `other`? With equal versions the build number decides (only when known for both).
     public func isNewer(than other: AppVersion) -> Bool {
         let c = Self.compareSemver(self, other)
         if c != 0 { return c > 0 }

@@ -11,11 +11,11 @@ int cserial_open(const char* path, int* fd_out) {
     int fd = open(path, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd < 0) return errno;
     if (ioctl(fd, TIOCEXCL) < 0) { int e = errno; close(fd); return e; }
-    /* macOS při otevření zvedne DTR/RTS – hned shodit, aby PTT neblikl (klidový stav nastaví PTTController) */
+    /* macOS raises DTR/RTS on open – drop them at once so PTT does not blip (PTTController sets the idle state) */
     int bits = TIOCM_DTR | TIOCM_RTS;
     ioctl(fd, TIOCMBIC, &bits);
     int flags = fcntl(fd, F_GETFL);
-    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);   /* zápis blokující */
+    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);   /* blocking writes */
     *fd_out = fd;
     return 0;
 }
@@ -31,7 +31,7 @@ int cserial_configure(int fd, int dataBits, int stopBits) {
     switch (dataBits) { case 5: t.c_cflag |= CS5; break; case 6: t.c_cflag |= CS6; break;
                         case 7: t.c_cflag |= CS7; break; default: t.c_cflag |= CS8; break; }
     if (stopBits >= 2) t.c_cflag |= CSTOPB;
-    t.c_cflag |= HUPCL;                       /* při zavření (i pádu procesu) shodit DTR/RTS → PTT off */
+    t.c_cflag |= HUPCL;                       /* on close (including a process crash) drop DTR/RTS → PTT off */
     if (tcsetattr(fd, TCSANOW, &t) < 0) return errno;
     return 0;
 }
@@ -41,7 +41,7 @@ int cserial_set_speed(int fd, unsigned long baud) {
     if (ioctl(fd, IOSSIOSPEED, &s) == 0) return 0;
     int e = errno;
     if (e != ENOTTY && e != EINVAL) return e;
-    /* ovladač bez IOSSIOSPEED (pseudoterminál, některé USB převodníky): standardní rychlost přes termios */
+    /* driver without IOSSIOSPEED (pseudoterminal, some USB adapters): standard speed via termios */
     struct termios t;
     if (tcgetattr(fd, &t) < 0) return e;
     if (cfsetspeed(&t, s) < 0) return e;
@@ -84,7 +84,7 @@ int cserial_read(int fd, unsigned char* buf, unsigned long n, int timeout_ms, lo
 
 int cserial_flush_input(int fd) { return tcflush(fd, TCIFLUSH) < 0 ? errno : 0; }
 
-/* Zápis s celkovým limitem (zaseknutý USB CDC nesmí zablokovat vlákno natrvalo): ETIMEDOUT po limitu. */
+/* Write with an overall limit (a stuck USB CDC must not block the thread forever): ETIMEDOUT after the limit. */
 int cserial_write_timeout(int fd, const unsigned char* buf, unsigned long n, int timeout_ms) {
     unsigned long done = 0;
     int left = timeout_ms;
@@ -95,7 +95,7 @@ int cserial_write_timeout(int fd, const unsigned char* buf, unsigned long n, int
         if (r == 0) return ETIMEDOUT;
         if (p.revents & (POLLHUP | POLLNVAL | POLLERR)) return EIO;
         int flags = fcntl(fd, F_GETFL);
-        fcntl(fd, F_SETFL, flags | O_NONBLOCK);             /* nezablokovat, když se vejde jen část */
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);             /* do not block when only a part fits */
         ssize_t k = write(fd, buf + done, n - done);
         int e = errno;
         fcntl(fd, F_SETFL, flags);

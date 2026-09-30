@@ -5,7 +5,7 @@ public enum AudioError: Error, Equatable, Sendable {
     case converter(String), device(String), engine(String)
 }
 
-/// Stavový převodník vzorkovací frekvence (mono float32) nad AVAudioConverter.
+/// Stateful sample rate converter (mono float32) on top of AVAudioConverter.
 public final class SampleRateConverter {
     private let conv: AVAudioConverter
     private let inFmt: AVAudioFormat
@@ -31,7 +31,7 @@ public final class SampleRateConverter {
         }
         let cap = AVAudioFrameCount(Double(input.count) * ratio + 64)
         guard let outBuf = AVAudioPCMBuffer(pcmFormat: outFmt, frameCapacity: cap) else { return [] }
-        // Vstupní blok volá AVAudioConverter synchronně uvnitř convert() – sdílení je bezpečné.
+        // AVAudioConverter calls the input block synchronously inside convert() – sharing is safe.
         nonisolated(unsafe) var consumed = false
         nonisolated(unsafe) let src = inBuf
         var err: NSError?

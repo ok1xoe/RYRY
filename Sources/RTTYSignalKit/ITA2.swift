@@ -1,4 +1,4 @@
-/// Nezávislá ITA2 / US-TTY tabulka pro testy (NEsdílí kód s MMTTY CRTTY).
+/// Independent ITA2 / US-TTY table for tests (does NOT share code with MMTTY CRTTY).
 public enum ITA2 {
     public static let ltrs: UInt8 = 0x1F
     public static let figs: UInt8 = 0x1B
@@ -10,19 +10,19 @@ public enum ITA2 {
         "P": 0x16, "Q": 0x17, "O": 0x18, "B": 0x19, "G": 0x1A, "M": 0x1C, "X": 0x1D,
         "V": 0x1E,
     ]
-    /// Jen znaky společné pro US-TTY i ITA2 (bez $ ! " # & ; ' BELL).
+    /// Only the characters common to both US-TTY and ITA2 (without $ ! " # & ; ' BELL).
     static let figures: [Character: UInt8] = [
         "3": 0x01, "-": 0x03, "8": 0x06, "7": 0x07, "4": 0x0A, ",": 0x0C, ":": 0x0E,
         "(": 0x0F, "5": 0x10, ")": 0x12, "2": 0x13, "6": 0x15, "0": 0x16, "1": 0x17,
         "9": 0x18, "?": 0x19, ".": 0x1C, "/": 0x1D,
     ]
 
-    /// Text → 5bitové kódy. Začíná LTRS, FIGS/LTRS vkládá podle potřeby.
-    /// Mezera, CR a LF jsou v obou registrech (bez přepnutí). Neznámé znaky vynechá.
+    /// Text → 5-bit codes. Starts with LTRS, inserts FIGS/LTRS as needed.
+    /// Space, CR and LF exist in both shifts (no switching). Unknown characters are skipped.
     public static func encode(_ text: String) -> [UInt8] {
         var out: [UInt8] = [ltrs]
         var inFigs = false
-        // Po znacích Unicode (CR LF je v Swiftu jeden Character, proto přes unicodeScalars).
+        // Character by Unicode scalar (CR LF is a single Character in Swift, hence unicodeScalars).
         for scalar in text.uppercased().unicodeScalars {
             let ch = Character(scalar)
             if ch == " " || ch == "\r" || ch == "\n" {

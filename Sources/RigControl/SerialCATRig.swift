@@ -2,26 +2,26 @@
 import CSerial
 import Foundation
 
-/// Bajtový kanál k rádiu (USB sériový port). Volání jsou blokující – SerialCATRig je volá na vlastní frontě.
+/// A byte channel to the radio (USB serial port). The calls block – SerialCATRig makes them on its own queue.
 public protocol CATTransport: AnyObject, Sendable {
     func open() throws
     func close()
     func write(_ bytes: [UInt8]) throws
-    /// Až `max` bajtů; čeká nejvýše `timeout` (prázdné = nic nepřišlo).
+    /// Up to `max` bytes; waits at most `timeout` (empty = nothing arrived).
     func read(max: Int, timeout: Duration) throws -> [UInt8]
     func discardInput()
 }
 
-/// Chyba vstupu/výstupu portu (odpojené USB apod.) – port se zavře a příští dotaz ho otevře znovu.
+/// A port I/O error (disconnected USB etc.) – the port is closed and the next request reopens it.
 public enum CATIOError: Error, Equatable { case io(String) }
 
-/// Protokol CAT: Icom CI-V (adresa rádia) nebo textový (Kenwood, Elecraft, Yaesu).
+/// The CAT protocol: Icom CI-V (radio address) or text (Kenwood, Elecraft, Yaesu).
 public enum CATProtocol: Sendable, Equatable {
     case icom(address: UInt8)
     case text(TextCAT.Dialect)
 }
 
-/// Vestavěné ovládání rádia přes CAT (bez hamlib). Požadavky se zpracují postupně na sériové frontě.
+/// Built-in radio control over CAT (without hamlib). Requests are handled one by one on a serial queue.
 public final class SerialCATRig: Rig, @unchecked Sendable {
     public let name: String
     private let transport: CATTransport
@@ -29,9 +29,9 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
     private let timeout: Duration
     private let queue = DispatchQueue(label: "mmtty4mac.cat")
     private var isOpen = false { didSet { let v = isOpen; openLock.withLock { openFlag = v } } }
-    /// Po výslovném disconnect() se port znovu neotevírá (dokud nepřijde connect()).
+    /// After an explicit disconnect() the port is not reopened (until a connect() arrives).
     private var closedByOwner = false
-    /// Počet číslic frekvence podle poslední odpovědi rádia (starší Yaesu mají 8).
+    /// The number of frequency digits from the radio's last response (older Yaesu have 8).
     private var faDigits: Int?
 
     public init(transport: CATTransport, protocol p: CATProtocol, timeout: Duration = .milliseconds(500), name: String = "CAT") {
@@ -44,7 +44,7 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
         }
     }
 
-    /// Bez blokování (queue.sync by čekal na běžící CAT dotaz až ~1 s na vlákně actoru Engine).
+    /// Non-blocking (queue.sync would wait for a running CAT request up to ~1 s on the Engine actor's thread).
     public var isIdle: Bool { openLock.withLock { !openFlag } }
     private let openLock = NSLock()
     private var openFlag = false
@@ -70,14 +70,14 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
 
     private func io<T>(_ body: () throws -> T) throws -> T {
         do { return try body() } catch let e as RigError { throw e } catch {
-            transport.close(); isOpen = false                   // odpojené USB → příště otevřít znovu
+            transport.close(); isOpen = false                   // disconnected USB → reopen next time
             throw RigError.offline
         }
     }
 
     // MARK: Icom CI-V
 
-    /// Odešle rámec a počká na odpověď s příkazem `expect` (nebo FB/FA u nastavení).
+    /// Sends a frame and waits for a response with command `expect` (or FB/FA for a set command).
     private func civ(_ addr: UInt8, _ frame: [UInt8], expect: UInt8?) throws -> CIV.Frame? {
         try ensureOpen()
         return try io {
@@ -96,9 +96,9 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
         }
     }
 
-    // MARK: Textový CAT
+    // MARK: Text CAT
 
-    /// Dotaz: odpověď končí „;“ a začíná stejnými dvěma písmeny jako dotaz.
+    /// Query: the response ends with ";" and starts with the same two letters as the query.
     private func textQuery(_ q: String) throws -> String {
         try ensureOpen()
         return try io {
@@ -174,7 +174,7 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
                 guard let c = CIV.modeCode(mode) else { throw RigError.protocolError("neznámý mód \(mode)") }
                 _ = try civ(a, CIV.frame(to: a, cmd: 0x06, [c]), expect: nil)
                 let data = mode.uppercased().hasPrefix("PKT")
-                // datový režim podporují jen novější rádia – u starších odmítnutí ignorovat, pokud ho nechceme zapnout
+                // only newer radios support the data mode – on older ones ignore the rejection unless we want it on
                 do { _ = try civ(a, CIV.dataMode(data, to: a), expect: nil) } catch { if data { throw error } }
             case .text(let d):
                 guard let cmd = TextCAT.setMode(mode, dialect: d) else { throw RigError.protocolError("neznámý mód \(mode)") }
@@ -193,13 +193,13 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
     }
 }
 
-/// USB sériový port pro CAT (termios přes CSerial): 8 datových bitů, bez parity, 1 nebo 2 stop bity.
+/// A USB serial port for CAT (termios via CSerial): 8 data bits, no parity, 1 or 2 stop bits.
 public final class SerialCATTransport: CATTransport, @unchecked Sendable {
     public let path: String
     let baud: Int, stopBits: Int
     private var fd: Int32 = -1
 
-    /// `rts`: po otevření zapnout RTS (Yaesu „CAT RTS = ENABLE“ bez něj příkazy nepřijme).
+    /// `rts`: raise RTS after opening (a Yaesu with "CAT RTS = ENABLE" will not accept commands without it).
     let rts: Bool
     public init(path: String, baud: Int, stopBits: Int = 1, rts: Bool = false) {
         self.path = path; self.baud = baud; self.stopBits = stopBits; self.rts = rts
@@ -224,7 +224,7 @@ public final class SerialCATTransport: CATTransport, @unchecked Sendable {
 
     public func write(_ bytes: [UInt8]) throws {
         guard fd >= 0 else { throw CATIOError.io("port zavřený") }
-        // limit 1 s: zaseknutý USB port nesmí zablokovat frontu CAT (a s ní odpojení a zastavení engine)
+        // 1 s limit: a stuck USB port must not block the CAT queue (and with it the disconnect and engine stop)
         let e = bytes.withUnsafeBufferPointer { cserial_write_timeout(fd, $0.baseAddress, UInt($0.count), 1000) }
         if e != 0 { throw CATIOError.io("zápis: \(Self.err(e))") }
     }

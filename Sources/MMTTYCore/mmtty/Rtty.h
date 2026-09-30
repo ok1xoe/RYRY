@@ -880,7 +880,7 @@ public:
 	void PutData(int d);
 	double Do(int echo);
 	inline void SetDem(CFSKDEM *p){pDem = p;};
-	// mmtty4mac: kódy, které modulátor začal vysílat (pro FSK klíčovač)
+	// mmtty4mac: the codes the modulator has started transmitting (for the FSK keyer)
 	BYTE	m_FskOut[256];
 	int		m_FskW, m_FskR;
 	inline void PushFskCode(BYTE c){ m_FskOut[m_FskW & 255] = c; m_FskW++; if( m_FskW - m_FskR > 256 ) m_FskR = m_FskW - 256; };

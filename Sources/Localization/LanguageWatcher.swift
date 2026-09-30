@@ -1,12 +1,12 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Hlídá složku jazyků: po uložení upraveného souboru znovu načte aktivní jazyk (bez restartu aplikace).
+/// Watches the languages folder: reloads the active language after an edited file is saved (no app restart needed).
 public final class LanguageWatcher: @unchecked Sendable {
     let library: LanguageLibrary
     let localizer: Localizer
     let defaults: UserDefaults
-    /// Fronta, na které se jazyk přepne (aplikace: hlavní – tam překresluje SwiftUI).
+    /// The queue the language switch happens on (in the app: the main one – that is where SwiftUI redraws).
     let deliverOn: DispatchQueue
     private var source: DispatchSourceFileSystemObject?
     private var fd: Int32 = -1
@@ -23,7 +23,7 @@ public final class LanguageWatcher: @unchecked Sendable {
         try? FileManager.default.createDirectory(at: library.userDirectory, withIntermediateDirectories: true)
         fd = open(library.userDirectory.path, O_EVTONLY)
         guard fd >= 0 else { return }
-        // zápis „atomic“ nahradí soubor přejmenováním → změna obsahu adresáře
+        // an "atomic" write replaces the file by renaming → a change of the directory contents
         let s = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete, .extend], queue: queue)
         s.setEventHandler { [weak self] in self?.scheduleReload() }
         s.setCancelHandler { [fd] in close(fd) }
@@ -38,7 +38,7 @@ public final class LanguageWatcher: @unchecked Sendable {
 
     deinit { stop() }
 
-    /// Editory ukládají po částech – načíst až po krátké pauze.
+    /// Editors save in pieces – reload only after a short pause.
     private func scheduleReload() {
         pending?.cancel()
         let w = DispatchWorkItem { [weak self] in self?.reload() }
@@ -49,7 +49,7 @@ public final class LanguageWatcher: @unchecked Sendable {
     func reload() {
         let code = localizer.code
         let p = library.pack(code: code)
-        guard p != nil || code == Localizer.baseCode else { return }        // rozbitý soubor – ponechat současný jazyk
+        guard p != nil || code == Localizer.baseCode else { return }        // broken file – keep the current language
         let l = localizer
         deliverOn.async { if l.code == code { l.use(p) } }
     }

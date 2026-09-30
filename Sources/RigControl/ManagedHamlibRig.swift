@@ -1,7 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Model rádia v hamlib (`rigctld -l`).
+/// A radio model in hamlib (`rigctld -l`).
 public struct HamlibModel: Sendable, Equatable, Hashable, Identifiable {
     public var id: Int
     public var manufacturer: String
@@ -10,8 +10,8 @@ public struct HamlibModel: Sendable, Equatable, Hashable, Identifiable {
     public init(id: Int, manufacturer: String, model: String) { self.id = id; self.manufacturer = manufacturer; self.model = model }
 }
 
-/// hamlib, který si aplikace spustí sama: `rigctld` s modelem, portem a rychlostí z Nastavení
-/// na místním TCP portu; ovládá se přes HamlibClient a při odpojení se ukončí.
+/// hamlib started by the app itself: `rigctld` with the model, port and speed from Settings
+/// on a local TCP port; it is controlled through HamlibClient and terminated on disconnect.
 public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     public let name: String
     let binary: String, model: Int, serialPort: String, baud: Int, tcpPort: UInt16
@@ -21,13 +21,13 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
     private var process: Process?
     private var stderrText = ""
     private var failedAt: ContinuousClock.Instant?
-    /// Po výslovném disconnect() se rigctld znovu nespouští (dokud nepřijde connect()).
+    /// After an explicit disconnect() rigctld is not started again (until a connect() arrives).
     private var closedByOwner = false
-    /// Probíhající spuštění – souběžné dotazy (poll, PTT, zkouška) čekají na totéž, nespouští další rigctld.
+    /// A start in progress – concurrent requests (poll, PTT, test) wait for it and do not start another rigctld.
     private var starting: Task<Void, Error>?
-    /// Kolikrát se rigctld spouštěl (pro testy).
+    /// How many times rigctld has been started (for tests).
     public private(set) var startCount = 0
-    /// Po neúspěšném spuštění se rigctld znovu nespouští dřív než za tuto dobu (dotazování rigu běží stále).
+    /// After a failed start rigctld is not started again sooner than after this time (rig polling keeps running).
     static let retryAfter: Duration = .seconds(10)
 
     public init(binary: String, model: Int, serialPort: String, baud: Int, tcpPort: UInt16 = 4534,
@@ -40,7 +40,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
 
     deinit { process?.terminate() }
 
-    /// rigctld z Homebrew (Apple Silicon i Intel) nebo z PATH.
+    /// rigctld from Homebrew (both Apple Silicon and Intel) or from PATH.
     public static func findRigctld(extra: [String] = []) -> String? {
         var c = extra + ["/opt/homebrew/bin/rigctld", "/usr/local/bin/rigctld"]
         if let path = ProcessInfo.processInfo.environment["PATH"] {
@@ -56,7 +56,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
         return a + ["-T", "127.0.0.1", "-t", "\(tcpPort)"]
     }
 
-    /// Rozbor `rigctld -l` podle pozic sloupců v hlavičce.
+    /// Parses `rigctld -l` using the column positions in the header.
     public static func parseModels(_ text: String) -> [HamlibModel] {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
         guard let header = lines.first(where: { $0.contains("Mfg") && $0.contains("Model") }),
@@ -77,7 +77,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
         }
     }
 
-    /// Seznam modelů z nainstalovaného rigctld (seřazený podle výrobce a modelu).
+    /// The list of models from the installed rigctld (sorted by manufacturer and model).
     public static func availableModels(binary: String) -> [HamlibModel] {
         let p = Process(); p.executableURL = URL(fileURLWithPath: binary); p.arguments = ["-l"]
         let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
@@ -111,7 +111,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
         (p.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
         guard p.isRunning else { return }
         p.terminate()
-        // nereaguje-li rigctld na SIGTERM do 2 s, ukončit natvrdo (jinak by visel stop Engine i konec aplikace)
+        // if rigctld does not react to SIGTERM within 2 s, kill it (otherwise the Engine stop and app exit would hang)
         let deadline = Date().addingTimeInterval(2)
         while p.isRunning, Date() < deadline { usleep(20_000) }
         if p.isRunning { kill(p.processIdentifier, SIGKILL); p.waitUntilExit() }
@@ -133,7 +133,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
         lock.withLock { failedAt = nil }
     }
 
-    /// Líné spuštění při prvním dotazu (Engine rig nepřipojuje zvlášť).
+    /// Lazy start on the first request (the Engine does not connect the rig separately).
     private func ensureStarted() async throws {
         if isRunning { return }
         if lock.withLock({ closedByOwner }) { throw RigError.offline }
@@ -143,7 +143,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
 
     private func start() async throws {
         if isRunning { return }
-        // na portu už něco naslouchá (rigctld po pádu aplikace, jiný program) – nepřipojovat se k cizímu procesu
+        // the port is already taken (rigctld after an app crash, another program) – do not attach to a foreign process
         if (try? await client.connect()) != nil {
             await client.disconnect()
             throw RigError.protocolError("TCP port \(tcpPort) je obsazený (běží jiný rigctld?) – zvol jiný místní port")
@@ -153,7 +153,7 @@ public final class ManagedHamlibRig: Rig, @unchecked Sendable {
         while true {
             do {
                 try await client.connect()
-                // rigctld 4.x naslouchá i při chybě portu – ověřit, že rádio odpovídá
+                // rigctld 4.x listens even when the port failed – verify that the radio responds
                 do { _ = try await client.frequency() } catch {
                     try? await Task.sleep(for: .milliseconds(200))
                     let msg = lock.withLock { stderrText }.split(separator: "\n").last.map(String.init) ?? ""

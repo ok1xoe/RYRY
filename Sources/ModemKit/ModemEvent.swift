@@ -31,14 +31,14 @@ public enum ModemEvent: Sendable, Equatable {
 
 public enum TxStatus: Sendable, Equatable { case active, finished }
 
-/// Bod XY scope (mark, space), přibližně ±1.
+/// XY scope point (mark, space), roughly ±1.
 public struct XYPoint: Sendable, Equatable {
     public let x: Float, y: Float
     public init(x: Float, y: Float) { self.x = x; self.y = y }
 }
 
-/// Dávka scope demodulátoru (MMTTY TTScope): úrovně mark/space ze všech míst demodulátoru téhož okamžiku
-/// (index = zdroj, prázdné = zdroj se neplní), bit 0/1, sync: 1 = vzorkování bitu, −1 = start bit, −0,5 = stop bit.
+/// Demodulator scope batch (MMTTY TTScope): mark/space levels from all points of the demodulator at the same instant
+/// (index = source, empty = the source is not filled), bit 0/1, sync: 1 = bit sampling, −1 = start bit, −0.5 = stop bit.
 public struct DemodScope: Sendable, Equatable {
     public var marks: [[Float]], spaces: [[Float]], bit: [Float], sync: [Float]
     public init(marks: [[Float]], spaces: [[Float]], bit: [Float], sync: [Float]) {

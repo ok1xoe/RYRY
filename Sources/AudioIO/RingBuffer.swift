@@ -1,7 +1,7 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import CRingBuffer
 
-/// Lock-free SPSC ring buffer (jeden zapisovatel, jeden čtenář). Metody s ukazateli nealokují.
+/// Lock-free SPSC ring buffer (one writer, one reader). The pointer-based methods do not allocate.
 public final class RingBuffer: @unchecked Sendable {
     private let r: OpaquePointer
 
@@ -22,6 +22,6 @@ public final class RingBuffer: @unchecked Sendable {
         return a.withUnsafeMutableBufferPointer { cring_read(r, $0.baseAddress, n) }
     }
     public func clear() { cring_clear(r) }
-    /// Vyprázdnění z vlákna producenta (provede konzument při dalším čtení).
+    /// Flush from the producer thread (the consumer performs it on the next read).
     public func requestClear() { cring_request_clear(r) }
 }

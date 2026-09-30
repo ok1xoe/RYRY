@@ -1,7 +1,7 @@
-// AFC.cpp – doslovný přepis TSound::DoAFC (MMTTY Sound.cpp:479).
+// AFC.cpp – a literal rewrite of TSound::DoAFC (MMTTY Sound.cpp:479).
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba; Modifications Copyright 2026 OK1XOE, LGPL v3
-// Změny: globály sys.* → AFCParams, fftIN.m_fft → fft, Suspend/Resume vynechány (běží v DSP
-// vlákně), CalcBPF() → návratová hodnota AFC_CHANGED_RECALC_BPF, podmínka m_Tx je u volajícího.
+// Changes: the sys.* globals → AFCParams, fftIN.m_fft → fft, Suspend/Resume left out (it runs on the DSP
+// thread), CalcBPF() → the return value AFC_CHANGED_RECALC_BPF, the m_Tx condition is at the caller.
 #include "AFC.h"
 #include <climits>
 

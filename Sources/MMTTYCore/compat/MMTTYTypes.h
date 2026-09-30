@@ -1,4 +1,4 @@
-// MMTTYTypes.h – náhrady typů a maker z Windows/VCL/ComLib.h pro jádro MMTTY.
+// MMTTYTypes.h – replacements for the types and macros from Windows/VCL/ComLib.h for the MMTTY core.
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 #pragma once
 #include <cstdint>
@@ -22,10 +22,10 @@ typedef char* LPSTR;
 #endif
 #define ABS(c) (((c) < 0) ? (-(c)) : (c))
 
-// z ComLib.h
+// from ComLib.h
 enum { txSound, txTXD, txTXDOnly };
 
-// Podmnožina SYSSET z ComLib.h, kterou jádro skutečně čte (výchozí hodnoty z Main.cpp).
+// The subset of SYSSET from ComLib.h that the core actually reads (default values from Main.cpp).
 struct CoreSys {
     double m_SampFreq = 11025.0;
     double m_TxOffset = 0.0;

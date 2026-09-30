@@ -2,7 +2,7 @@
 import Foundation
 
 public enum XMLRPCCodec {
-    // MARK: Kódování
+    // MARK: Encoding
 
     public static func encodeCall(method: String, params: [XMLRPCValue]) -> Data {
         var s = "<?xml version=\"1.0\"?>\n<methodCall><methodName>\(escape(method))</methodName><params>"
@@ -51,7 +51,7 @@ public enum XMLRPCCodec {
         return r
     }
 
-    // MARK: Dekódování
+    // MARK: Decoding
 
     public static func decodeCall(_ data: Data) throws -> (method: String, params: [XMLRPCValue]) {
         let root = try Node.parse(data)
@@ -81,7 +81,7 @@ public enum XMLRPCCodec {
     }
 
     static func value(_ n: Node) throws -> XMLRPCValue {
-        guard let t = n.elements.first else { return .string(n.text) }   // bez typu = string
+        guard let t = n.elements.first else { return .string(n.text) }   // no type = string
         let text = t.text.trimmingCharacters(in: .whitespacesAndNewlines)
         switch t.name {
         case "int", "i4", "i8":
@@ -118,7 +118,7 @@ public enum XMLRPCCodec {
     }
 }
 
-/// Minimální DOM nad XMLParser.
+/// A minimal DOM on top of XMLParser.
 final class Node {
     let name: String
     var elements: [Node] = []

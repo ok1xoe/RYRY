@@ -105,7 +105,7 @@ CVCO::CVCO()
 
 CVCO::~CVCO()
 {
-	/* if( m_vlock ) ::VirtualUnlock(...) – na macOS nepotřebné */
+	/* if( m_vlock ) ::VirtualUnlock(...) – not needed on macOS */
 	delete[] pSinTbl;
 }
 
@@ -117,7 +117,7 @@ void CVCO::SetGain(double gain)
 void CVCO::VirtualLock(void)
 {
 	if( !m_vlock ){
-		/* ::VirtualLock – na macOS nepotřebné */
+		/* ::VirtualLock – not needed on macOS */
 		m_vlock = 1;
 	}
 }
@@ -128,12 +128,12 @@ void CVCO::SetSampleFreq(double f)
 	int size = int(m_SampleFreq*2);
 	if( m_TableSize != size ){
 		if( pSinTbl != NULL ){
-			/* if( m_vlock ) ::VirtualUnlock(...) – na macOS nepotřebné */
+			/* if( m_vlock ) ::VirtualUnlock(...) – not needed on macOS */
 			delete[] pSinTbl;
 		}
 		m_TableSize = size;
 		pSinTbl = new double[m_TableSize];
-		/* if( m_vlock ) ::VirtualLock(...) – na macOS nepotřebné */
+		/* if( m_vlock ) ::VirtualLock(...) – not needed on macOS */
 		double pi2t = 2 * PI / double(m_TableSize);
 		for( int i = 0; i < m_TableSize; i++ ){
 			pSinTbl[i] = sin(double(i) * pi2t);
@@ -450,7 +450,7 @@ _try:;
 						}
 					}
 					m_figout = 0;
-					PushFskCode(BYTE(m_Data));	// mmtty4mac: kód pro FSK klíčovač
+					PushFskCode(BYTE(m_Data));	// mmtty4mac: the code for the FSK keyer
 					m_DataCount = m_BitLen;
 					m_SumParity = 0;
 					m_mode++;
@@ -492,7 +492,7 @@ _try:;
 							}
 							break;
 					}
-					PushFskCode(BYTE(m_Data));	// mmtty4mac: kód pro FSK klíčovač
+					PushFskCode(BYTE(m_Data));	// mmtty4mac: the code for the FSK keyer
 					m_DataCount = m_BitLen;
 					m_SumParity = 0;
 					m_mode++;

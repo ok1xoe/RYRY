@@ -6,7 +6,7 @@ import ModemKit
 import QSOLog
 import XMLRPC
 
-/// XML-RPC server kompatibilní s fldigi (podmnožina metod, viz spec 7.1).
+/// An XML-RPC server compatible with fldigi (a subset of the methods, see spec 7.1).
 public final class FldigiXMLRPCServer: @unchecked Sendable {
     public static let version = "0.1.0"
     private let app: AppController
@@ -14,7 +14,7 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
     private let host: String, port: UInt16
     private let lock = NSLock()
     private var rxCursor = 0, txCursor = 0
-    private var rxAfterTx = false          // fldigi ^r v text.add_tx před main.tx
+    private var rxAfterTx = false          // fldigi ^r in text.add_tx before main.tx
 
     public init(app: AppController, host: String = "127.0.0.1", port: UInt16 = 7362) {
         self.app = app; self.host = host; self.port = port
@@ -173,7 +173,7 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
             let f = try dbl(p, m)
             guard f.isFinite, f > 0 else { throw Self.badParams(m) }
             let old = await engine.rigStatus?.frequency ?? 0
-            // bez rigu (nebo offline) tiše jako fldigi – loggery volají set_frequency při každé změně pásma
+            // without a rig (or offline) stay quiet like fldigi – loggers call set_frequency on every band change
             try? await app.setFrequency(f)
             return .double(old)
 
@@ -215,7 +215,7 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
         case "rig.get_name": return .string(await engine.rigName)
 
         case "text.add_tx":
-            // fldigi: ^r / ^R = po odvysílání textu přejít na RX
+            // fldigi: ^r / ^R = switch to RX after the text has been transmitted
             var text = try str(p, m)
             var rxAfter = false
             for marker in ["^r", "^R"] where text.contains(marker) {
