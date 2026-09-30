@@ -38,23 +38,31 @@ public struct SpotFilter: Sendable, Equatable, Codable {
     public var bands: Set<String>
     /// Zaškrtnuté skupiny módů.
     public var modes: Set<SpotModeGroup>
+    /// Zaškrtávátko „ostatní“ u pásem: spoty mimo pevný seznam (630 m a níž, 4 m a výš, neznámé pásmo).
+    public var otherBands: Bool
 
     /// Pevný seznam pásem se zaškrtávátky (nezávisí na tom, co přišlo ve spotech).
     public static let allBands = Bands.hfAnd6m
     public static let allBandsSet = Set(Bands.hfAnd6m)
     public static let allModes = Set(SpotModeGroup.allCases)
     /// Vše zaškrtnuté (tlačítka „Vše“).
-    public static let all = SpotFilter(bands: allBandsSet, modes: allModes)
+    public static let all = SpotFilter(bands: allBandsSet, modes: allModes, otherBands: true)
 
-    /// Výchozí stav: všechna pásma, jen RTTY (stejné zobrazení jako dřívější zaškrtávátko „Jen RTTY“).
-    public init(bands: Set<String> = SpotFilter.allBandsSet, modes: Set<SpotModeGroup> = [.rtty]) {
-        self.bands = bands; self.modes = modes
+    /// Pásma rozdělená do řádků zaškrtávátek (okno „Filtr pásem“) – vždy celý seznam `allBands` v pořadí.
+    public static func bandRows(perRow: Int) -> [[String]] {
+        guard perRow > 0 else { return [allBands] }
+        return stride(from: 0, to: allBands.count, by: perRow).map { Array(allBands[$0..<min($0 + perRow, allBands.count)]) }
     }
 
-    /// Pásmo spotu projde, jen když je zaškrtnuté. Spot mimo seznam pásem (VHF/UHF nebo neznámé pásmo) žádné
-    /// zaškrtávátko nemá, proto se zobrazí vždy – filtr nesmí schovat spot, který se jím nedá zapnout zpátky.
+    /// Výchozí stav: všechna pásma včetně „ostatní“, jen RTTY (stejné zobrazení jako dřívější „Jen RTTY“).
+    public init(bands: Set<String> = SpotFilter.allBandsSet, modes: Set<SpotModeGroup> = [.rtty], otherBands: Bool = true) {
+        self.bands = bands; self.modes = modes; self.otherBands = otherBands
+    }
+
+    /// Pásmo spotu projde, jen když je zaškrtnuté. Spot mimo pevný seznam (630 m a níž, 4 m a výš nebo neznámé
+    /// pásmo) patří pod zaškrtávátko „ostatní“ – každý spot tak má právě jedno zaškrtávátko jako u skupin módů.
     public func matchesBand(_ s: Spot) -> Bool {
-        guard let b = s.band, Self.allBandsSet.contains(b) else { return true }
+        guard let b = s.band, Self.allBandsSet.contains(b) else { return otherBands }
         return bands.contains(b)
     }
 

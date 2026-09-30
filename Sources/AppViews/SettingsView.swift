@@ -37,7 +37,7 @@ public struct SettingsView: View {
                 APITab(s: $draft, model: model, callbookPassword: $callbookPassword, callbookPasswordDirty: $callbookPasswordDirty).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
                 KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
                 UploadTab(s: $draft, secrets: model.uploader.secrets).tabItem { Label("Online", systemImage: "icloud.and.arrow.up") }.tag(9)
-                SpotsTab(s: $draft).tabItem { Label(L("Spoty"), systemImage: "dot.radiowaves.left.and.right") }.tag(10)
+                SpotsTab(s: $draft, model: model).tabItem { Label(L("Spoty"), systemImage: "dot.radiowaves.left.and.right") }.tag(10)
                 DecodersTab(s: $draft).tabItem { Label(L("Dekodéry"), systemImage: "square.stack.3d.down.right") }.tag(11)
             }
             Divider()
@@ -462,6 +462,8 @@ struct APITab: View {
 /// Spoty: DX cluster a Reverse Beacon Network (telnet).
 struct SpotsTab: View {
     @Binding var s: AppSettings
+    /// Filtr zobrazení (okna „Filtr pásem“ / „Filtr módů“ a „Jen RTTY“) se mění hned, ne přes koncept dialogu.
+    @Bindable var model: AppModel
     var commands: Binding<String> {
         Binding(get: { s.spots.clusterCommands.joined(separator: "\n") },
                 set: { s.spots.clusterCommands = Array($0.split(separator: "\n", omittingEmptySubsequences: true)
@@ -492,7 +494,7 @@ struct SpotsTab: View {
                 Text(L("Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat ve filtru módů jen RTTY."))
             }
             Section {
-                SpotFilterBar(bands: $s.spots.filterBands, modes: $s.spots.filterModes)
+                SpotFilterBar(model: model)
                 Toggle(L("Spoty ve vodopádu"), isOn: $s.spots.showInWaterfall)
                 NumberRow(title: L("Stáří spotů"), value: $s.spots.maxAgeMinutes, range: SpotSettings.ageRange, unit: "min")
                 LabeledContent(L("Posun frekvence rigu")) {

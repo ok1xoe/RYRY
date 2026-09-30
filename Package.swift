@@ -64,10 +64,11 @@ let package = Package(
                                                            "RigControl", "RTTYModem", "RTTYSignalKit", "TestSupport", "AudioIO", "Keying"]),
         .target(name: "AppUI", dependencies: ["DXCC", "AppCore", "APIServer", "Engine", "Settings", "QSOLog", "ModemKit",
                                                "AudioIO", "Keying", "RigControl", "RTTYModem", "WaveFile", "Localization", "Upload", "Updates", "Spots"]),
-        .testTarget(name: "AppUITests", dependencies: ["AppUI", "Upload", "QSOLog", "AppCore", "Engine", "Settings", "ModemKit", "AudioIO",
-                                                       "Keying", "RigControl", "RTTYModem", "RTTYSignalKit", "TestSupport", "WaveFile", "Updates", "Spots"]),
         .target(name: "AppViews", dependencies: ["AppUI", "Upload", "AppCore", "QSOLog", "Settings", "AudioIO", "Keying",
                                                   "ModemKit", "Engine", "RigControl", "RTTYModem", "Localization", "Updates", "Spots"]),
+        // AppViews kvůli obsahu oken (např. seznam zaškrtávátek filtru spotů); AppViews závisí na AppUI, ne naopak
+        .testTarget(name: "AppUITests", dependencies: ["AppUI", "AppViews", "Upload", "QSOLog", "AppCore", "Engine", "Settings", "ModemKit", "AudioIO",
+                                                       "Keying", "RigControl", "RTTYModem", "RTTYSignalKit", "TestSupport", "WaveFile", "Updates", "Spots"]),
         .executableTarget(name: "MMTTY4MacApp", dependencies: ["AppViews", "AppUI", "Localization", "Settings", "Updates"]),
         .target(name: "DXCC"),
         .target(name: "Spots", dependencies: ["QSOLog"]),

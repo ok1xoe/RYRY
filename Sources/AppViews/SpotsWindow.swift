@@ -59,10 +59,7 @@ public struct SpotsWindow: View {
                               format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 64)
                 }.fixedSize()
             }
-            SpotFilterBar(bands: Binding(get: { model.settings.spots.filterBands },
-                                        set: { v in model.setSpots { $0.filterBands = v } }),
-                          modes: Binding(get: { model.settings.spots.filterModes },
-                                         set: { v in model.setSpots { $0.filterModes = v } }))
+            SpotFilterBar(model: model)
             if !model.settings.spots.clusterEnabled && !model.settings.spots.rbnEnabled {
                 Text(L("Spoty jsou vypnuté – zapněte DX cluster nebo RBN v Nastavení → Spoty."))
                     .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)

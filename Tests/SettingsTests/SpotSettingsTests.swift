@@ -79,3 +79,89 @@ import Testing
     #expect(back.filterBands == ["160m", "6m"] && back.filterModes == [.digi, .ssb, .psk])
     #expect(back.filter == SpotFilter(bands: ["160m", "6m"], modes: [.digi, .ssb, .psk]))
 }
+
+// Zaškrtávátko „ostatní“ u pásem (spoty mimo pevný seznam): výchozí zaškrtnuté, i ve starém settings.json;
+// tlačítka Vše / Nic ho přepínají spolu s pevným seznamem, takže po „Nic“ neprojde ani jeden spot.
+@Test func otherBandsFilterDefaultsOnAndIsTolerant() throws {
+    #expect(SpotSettings().filterOtherBands && SpotSettings().filter.otherBands)
+    let dir = tmp()
+    func load(_ json: String) throws -> SpotSettings {
+        try json.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+        return SettingsStore(directory: dir).load().0.spots
+    }
+    #expect(try load(#"{"spots":{}}"#).filterOtherBands)                                  // starý settings.json
+    #expect(try load(#"{"spots":{"filterBands":["20m"]}}"#).filterOtherBands)              // i s filtrem pásem
+    #expect(try load(#"{"spots":{"rttyOnly":true}}"#).filterOtherBands)                    // migrace „Jen RTTY“
+    #expect(try load(#"{"spots":{"filterOtherBands":"ne"}}"#).filterOtherBands)            // neplatná = výchozí
+    #expect(try load(#"{"spots":{"filterOtherBands":false}}"#).filterOtherBands == false)
+
+    var s = AppSettings()
+    s.spots.setAllBands(false)
+    #expect(s.spots.filterBands.isEmpty && !s.spots.filterOtherBands)
+    let hidden = [Spot(frequencyKHz: 475, call: "OK1LF", spotter: "OK1XOE", comment: "", time: Date(), mode: "RTTY"),
+                  Spot(frequencyKHz: 5000, call: "OK1UNK", spotter: "OK1XOE", comment: "", time: Date(), mode: "RTTY")]
+    #expect(hidden.map(\.band) == ["630m", nil])
+    #expect(s.spots.filter.apply(to: hidden).isEmpty)                                     // „Nic“ = prázdná tabulka
+    s.spots.setAllBands(true)
+    #expect(s.spots.filterBands == SpotFilter.allBandsSet && s.spots.filterOtherBands)
+    #expect(s.spots.filter.apply(to: hidden).count == 2)                                  // „Vše“ = zpátky vidět
+    try SettingsStore(directory: dir).save(s)
+    #expect(SettingsStore(directory: dir).load().0 == s)                                   // kolo uložení/načtení
+}
+
+// „Jen RTTY“ se počítá z filtru módů (vlastní klíč nemá); zaškrtnutí si pamatuje předchozí volbu
+// a odškrtnutí ji vrátí. Když není co vracet, zaškrtnou se všechny skupiny.
+@Test func rttyOnlyRemembersPreviousModes() {
+    var s = SpotSettings()
+    #expect(s.rttyOnly)                                               // výchozí: jen RTTY
+    s.setRTTYOnly(false)
+    #expect(!s.rttyOnly && s.filterModes == SpotFilter.allModes)       // nebylo co vracet → všechny skupiny
+    s.setFilterModes([.cw, .psk])
+    #expect(!s.rttyOnly)
+    s.setRTTYOnly(true)
+    #expect(s.rttyOnly && s.filterModes == [.rtty] && s.previousFilterModes == [.cw, .psk])
+    s.setRTTYOnly(false)
+    #expect(s.filterModes == [.cw, .psk])                             // vrátí se předchozí volba
+    // zaškrtnutí právě RTTY v okně módů má stejný účinek jako zaškrtávátko
+    s.setFilterModes([.rtty])
+    #expect(s.rttyOnly && s.previousFilterModes == [.cw, .psk])
+    s.setRTTYOnly(false)
+    #expect(s.filterModes == [.cw, .psk])
+    // prázdná volba („Nic“) není co vracet
+    s.setFilterModes([])
+    #expect(!s.rttyOnly)
+    s.setRTTYOnly(true)
+    #expect(s.filterModes == [.rtty] && s.previousFilterModes.isEmpty)
+    s.setRTTYOnly(false)
+    #expect(s.filterModes == SpotFilter.allModes)
+    // opakované zaškrtnutí pamatovanou volbu nepřepíše na „jen RTTY“
+    s.setRTTYOnly(true); s.setRTTYOnly(true)
+    #expect(s.previousFilterModes == SpotFilter.allModes && s.filterModes == [.rtty])
+    s.setRTTYOnly(false)
+    #expect(s.filterModes == SpotFilter.allModes)
+}
+
+// Pamatovaná volba módů přežije restart a dekóduje se tolerantně; zrušený klíč „rttyOnly“ se neukládá.
+@Test func rttyOnlyPreviousModesSurviveRestart() throws {
+    let dir = tmp()
+    var s = AppSettings()
+    s.spots.setFilterModes([.cw, .digi]); s.spots.setRTTYOnly(true)
+    try SettingsStore(directory: dir).save(s)
+    var back = SettingsStore(directory: dir).load().0
+    #expect(back.spots.rttyOnly && back.spots.previousFilterModes == [.cw, .digi])
+    back.spots.setRTTYOnly(false)
+    #expect(back.spots.filterModes == [.cw, .digi])                   // po restartu se vrátí totéž
+
+    func load(_ json: String) throws -> SpotSettings {
+        try json.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+        return SettingsStore(directory: dir).load().0.spots
+    }
+    #expect(try load(#"{"spots":{}}"#).previousFilterModes == SpotFilter.allModes)       // bez klíče = výchozí
+    #expect(try load(#"{"spots":{"previousFilterModes":"CW"}}"#).previousFilterModes == SpotFilter.allModes)
+    #expect(try load(#"{"spots":{"previousFilterModes":["CW","NIC"]}}"#).previousFilterModes == [.cw])
+    #expect(try load(#"{"spots":{"previousFilterModes":[]}}"#).previousFilterModes.isEmpty)
+    var e = AppSettings(); e.spots.setRTTYOnly(true)
+    try SettingsStore(directory: dir).save(e)
+    let json = try String(contentsOf: dir.appendingPathComponent("settings.json"), encoding: .utf8)
+    #expect(!json.contains("rttyOnly"))
+}
