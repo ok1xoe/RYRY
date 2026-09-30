@@ -2,18 +2,18 @@
 import AudioIO
 import Foundation
 
-/// Zvuk bez hardwaru: RX z pole vzorků, TX se ukládá.
+/// Audio without hardware: RX from an array of samples, TX is stored.
 public final class FakeAudioBackend: AudioBackend, @unchecked Sendable {
     private let lock = NSLock()
     private var rx: [Float] = []
     private var rxPos = 0
     public private(set) var tx: [Float] = []
     public private(set) var writeCalls = 0
-    public var rxChunk = 1103            // vzorků na jedno readRx (≈ 100 ms)
+    public var rxChunk = 1103            // samples per readRx call (≈ 100 ms)
     public var failStart = false
     public private(set) var isRunning = false
-    public var stuckQueued = 0            // >0 = výstup se zasekl (zařízení zmizelo)
-    public var txQueued: Int { stuckQueued }   // jinak výstup „spotřebuje“ vzorky okamžitě
+    public var stuckQueued = 0            // >0 = the output is stuck (the device disappeared)
+    public var txQueued: Int { stuckQueued }   // otherwise the output "consumes" samples immediately
     public var failure: String?
 
     public init() {}

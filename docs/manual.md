@@ -89,7 +89,7 @@ Log management (File menu): **New Log…** (⌘N; contest serials start at 1), *
 
 Settings → Contest: turn on **Contest mode** and pick a **Preset** (ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE, OK DX RTTY). The preset sets the Cabrillo name, the exchange format and the next start date – always check the date in the contest rules.
 
-Exchange formats: RST + serial number (or a fixed exchange), RST + CQ zone, CQ/RJ (zone + QTH), BARTG (number + time), WAE (number + QTC), PED. Serial numbers increase automatically after logging. The app does not compute points or multipliers.
+Exchange formats: RST + serial number (or a fixed exchange), RST + CQ zone, CQ/RJ (zone + QTH), BARTG (number + time), WAE (number + QTC), PED. Serial numbers increase automatically after logging. With a contest preset selected the app computes multipliers (Window → Multipliers) and points and score (Window → Score: QSOs, dupes, points and multipliers per band, QTCs for WAE; final score with its formula, plus “Score N” in the status bar). It is an estimate – log checking removes bad QSOs.
 
 **WAE and QTC:** the QSO window has a QTC panel – **QTC?** asks the other station, **QRV – receive** opens receiving a series, **Send…** prepares and sends a series from your log (max. 10 QTC per pair of stations, only between continents, each QSO once). Received lines are filled by clicking words in the RX text or with **Load from RX**. Series are on the QTC tab of the Log window and in Cabrillo.
 

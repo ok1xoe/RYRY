@@ -1,10 +1,10 @@
 import MMTTYCore
 import ModemKit
 
-/// RTTY modem nad jádrem MMTTY (C API `rttycore_*`).
+/// An RTTY modem on top of the MMTTY core (the `rttycore_*` C API).
 ///
-/// Není thread-safe: DSP metody (`processRx`, `generateTx`, `spectrum`) i řídicí metody musí volat
-/// jeden sériový kontext (Engine). `events` lze číst odkudkoli.
+/// Not thread-safe: the DSP methods (`processRx`, `generateTx`, `spectrum`) and the control methods must all be called
+/// from one serial context (Engine). `events` can be read from anywhere.
 public final class RTTYModem: Modem, @unchecked Sendable {
     public enum CodeSet: Sendable { case us, japanese }
     public struct Config: Sendable {
@@ -12,7 +12,7 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         public var doubleShift = false
         public var txUOS = true
         public var txOffset = 0.0
-        /// Korekce hodin zvukové karty v ppm (kladná = zařízení běží rychleji než nominálně).
+        /// Sound card clock correction in ppm (positive = the device runs faster than nominal).
         public var rxClockPPM = 0.0
         public var txClockPPM = 0.0
         public init() {}
@@ -41,7 +41,7 @@ public final class RTTYModem: Modem, @unchecked Sendable {
     private let continuation: AsyncStream<ModemEvent>.Continuation
     private var samplesSinceTick = 0
     private let tickInterval: Int
-    /// Fronta čekající na místo v jádře; text a surové kódy ve správném pořadí.
+    /// A queue waiting for room in the core; text and raw codes in the right order.
     private enum TxItem { case text([UInt8]), raw([UInt8]) }
     private var txItems: [TxItem] = []
     private var txWasActive = false
@@ -51,7 +51,7 @@ public final class RTTYModem: Modem, @unchecked Sendable {
 
     public init(sampleRate: Double = 11025, config: Config = .init()) throws(Error) {
         var cfg = rttycore_default_config()
-        // Jako MMTTY SampFreq/TxOffset: jádro počítá s kalibrovanou frekvencí, audio zůstává nominální.
+        // Like MMTTY SampFreq/TxOffset: the core works with the calibrated rate, the audio stays nominal.
         let rxRate = sampleRate * (1 + config.rxClockPPM / 1e6)
         cfg.sampleRate = rxRate
         cfg.codeSet = config.codeSet == .us ? 0 : 1
@@ -64,7 +64,7 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         tickInterval = max(1, Int(sampleRate / 10))
         currentMode = modes[0]
         lastTuning = TuningInfo(mark: rttycore_get_param(c, RC_MARK), space: rttycore_get_param(c, RC_SPACE))
-        // Neomezený buffer: pomalý odběratel nesmí přijít o přijatý text (Engine events vždy odebírá).
+        // Unbounded buffer: a slow subscriber must not lose received text (the Engine always consumes events).
         (events, continuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
     }
 
@@ -73,7 +73,7 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         rttycore_destroy(core)
     }
 
-    /// Ukončí proud událostí (např. na konci dekódování souboru).
+    /// Finishes the event stream (e.g. at the end of decoding a file).
     public func finishEvents() { continuation.finish() }
 
     public func select(mode: ModeDescriptor) throws {
@@ -142,19 +142,19 @@ public final class RTTYModem: Modem, @unchecked Sendable {
     }
 
     public func beginTx(tune: Bool) {
-        // Text zadaný před beginTx (makro, pak TX) se neztrácí.
+        // Text entered before beginTx (a macro, then TX) is not lost.
         rttycore_tx_begin(core, tune ? 1 : 0)
         txWasActive = true
     }
 
     public func queueTx(text: String) {
-        let bytes = text.utf8.filter { $0 != 0 }   // NUL by v C řetězci zablokoval frontu
+        let bytes = text.utf8.filter { $0 != 0 }   // a NUL would block the queue in a C string
         if !bytes.isEmpty { txItems.append(.text(bytes)) }
         feedCore()
     }
 
     public func queueTxRaw(_ codes: [UInt8]) {
-        // LTRS/FIGS jdou textovou cestou (jádro si zapamatuje registr, jako MMTTY %L/%F)
+        // LTRS/FIGS go through the text path (the core remembers the shift, like MMTTY %L/%F)
         var run: [UInt8] = []
         for c in codes {
             if c == 0x1B || c == 0x1F {
@@ -188,7 +188,7 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         guard let base = buffer.baseAddress else { return rttycore_is_tx(core) != 0 ? .active : .finished }
         feedCore()
         let n = rttycore_generate_tx(core, base, buffer.count)
-        drainChars()                                   // echo odvysílaného textu
+        drainChars()                                   // echo of the transmitted text
         if n < buffer.count {
             if txWasActive { txWasActive = false; continuation.yield(.txFinished) }
             return .finished
@@ -220,16 +220,16 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         return out
     }
 
-    /// XY scope (mark/space) – zapnout sběr.
+    /// XY scope (mark/space) – enable collection.
     public func setXYScope(_ on: Bool) { rttycore_set_xy(core, on ? 1 : 0) }
 
     public func notchClick(hz: Double) { rttycore_notch_click(core, hz) }
 
-    /// Názvy zdrojů scope demodulátoru (MMTTY TTScope „Source“).
+    /// The names of the demodulator scope sources (MMTTY TTScope "Source").
     public static let scopeSources = ["Filtr", "Det.", "LPF", "ATC"]
     public func setDemodScope(_ on: Bool) { rttycore_set_scope(core, on ? 1 : 0) }
     public func demodScope() -> DemodScope? {
-        guard rttycore_scope_ready(core) != 0 else { return nil }      // bez zbytečných alokací při každém snímku
+        guard rttycore_scope_ready(core) != 0 else { return nil }      // without needless allocations on every frame
         let n = 8192
         var m = [Float](repeating: 0, count: n), s = m, b = m, y = m
         var marks: [[Float]] = [], spaces: [[Float]] = []
@@ -243,7 +243,7 @@ public final class RTTYModem: Modem, @unchecked Sendable {
         return DemodScope(marks: marks, spaces: spaces, bit: Array(b[..<len]), sync: Array(y[..<len]))
     }
 
-    /// Poslední plná dávka bodů XY scope (x = mark, y = space), nebo nil.
+    /// The last full batch of XY scope points (x = mark, y = space), or nil.
     public func xyScope() -> [XYPoint]? {
         var x = [Float](repeating: 0, count: 512), y = x
         let n = rttycore_read_xy(core, &x, &y, 512)

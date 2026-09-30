@@ -9,7 +9,7 @@ public enum PTTError: Error, Equatable, Sendable {
     case failed(String)
 }
 
-/// Ovládání PTT jednou metodou. Volání serializuje Engine.
+/// PTT control by a single method. Calls are serialized by the Engine.
 public final class PTTController: @unchecked Sendable {
     public let method: PTTMethod
     private let port: SerialPort?
@@ -21,7 +21,7 @@ public final class PTTController: @unchecked Sendable {
         self.method = method; self.port = port; self.rig = rig; self.invert = invert
     }
 
-    /// Ověří dostupnost a nastaví klidový stav (PTT vypnuté).
+    /// Verifies availability and sets the idle state (PTT off).
     public func prepare() async throws {
         switch method {
         case .none: return
@@ -54,17 +54,17 @@ public final class PTTController: @unchecked Sendable {
         }
     }
 
-    /// Vypne PTT všemi dostupnými cestami; nikdy nehází.
+    /// Switches PTT off by every available path; never throws.
     public func forceOff() async {
         isOn = false
         if let port {
             try? port.setRTS(invert)
             try? port.setDTR(invert)
         }
-        // CAT vypnout vždy, když je rig (i při RTS/DTR PTT – rig mohl být zaklíčován jinudy).
-        // Čeká max. 2 s a nečeká na úkol, který zrušení ignoruje.
-        // PTT přes RTS/DTR: CAT jen pro jistotu a jen otevřenému rigu (neotvírat kvůli tomu port / nespouštět rigctld),
-        // bez čekání. Pozdě doběhlý příkaz po odpojení rigu nic neotevře (rig po disconnect() hlásí offline).
+        // Always switch CAT off when there is a rig (even with RTS/DTR PTT – the rig may have been keyed elsewhere).
+        // Waits at most 2 s and does not wait for a task that ignores cancellation.
+        // PTT via RTS/DTR: CAT just in case and only on an open rig (do not open a port / start rigctld for it),
+        // without waiting. A late command after rig disconnect opens nothing (rig reports offline after disconnect()).
         guard let rig else { return }
         if method != .cat {
             if !rig.isIdle { Task { try? await rig.setPTT(false) } }

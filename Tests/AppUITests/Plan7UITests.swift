@@ -40,7 +40,7 @@ import RTTYSignalKit
     f.model.clockRates = { _, input in input ? (48000, 48000 * (1 + 50e-6)) : (44100, 44100 * (1 - 20e-6)) }
     let r = await f.model.measureClock(seconds: 0.2)
     #expect(abs((r.rx ?? 0) - 50) < 0.01 && abs((r.tx ?? 0) + 20) < 0.01)
-    f.model.clockRates = { _, _ in (48000, 0) }             // zařízení neběží
+    f.model.clockRates = { _, _ in (48000, 0) }             // the device is not running
     let none = await f.model.measureClock(seconds: 0.1)
     #expect(none.rx == nil && none.tx == nil)
     await f.model.stop()
@@ -100,7 +100,7 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     var a = WaterfallRenderer(width: 100, height: 2), b = WaterfallRenderer(width: 100, height: 2)
     b.gainDB = 6
     var mags = frame(peakAt: 2125, level: 200).magnitudes
-    mags[200] = 100                                           // střední úroveň – zesílení ji zjasní
+    mags[200] = 100                                           // a medium level – the gain brightens it
     let f = SpectrumFrame(binHz: 5.3833, magnitudes: mags)
     a.push(f, fromHz: 0, toHz: 3000); b.push(f, fromHz: 0, toHz: 3000)
     let sa = a.row(0).map(\.brightness).reduce(0, +), sb = b.row(0).map(\.brightness).reduce(0, +)
@@ -110,7 +110,7 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
 @Test func manualGainShowsWeakSignalDarkerThanAuto() {
     var auto = WaterfallRenderer(width: 100, height: 2), manual = WaterfallRenderer(width: 100, height: 2)
     manual.autoGain = false
-    let f = frame(peakAt: 2125, level: 60)                   // slabý signál
+    let f = frame(peakAt: 2125, level: 60)                   // a weak signal
     auto.push(f, fromHz: 0, toHz: 3000); manual.push(f, fromHz: 0, toHz: 3000)
     let x = Int(2125.0 / 30)
     #expect(manual.row(0)[x].brightness < auto.row(0)[x].brightness)
@@ -126,7 +126,7 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     await f.model.setDisplay { $0.fromHz = 0; $0.toHz = 4000; $0.gainDB = -6 }
     #expect(f.model.waterfallToHz == 4000 && f.model.waterfall.gainDB == -6)
     #expect(SettingsStore(directory: f.dir).load().0.display.toHz == 4000)
-    #expect(f.engines.count == 1)                            // bez restartu
+    #expect(f.engines.count == 1)                            // without a restart
     await f.model.stop()
 }
 
@@ -160,41 +160,41 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     await f.model.start()
     let text = "CQ CQ DE DL1ABC DL1ABC K"
     let s = RTTYSignalGenerator(sampleRate: 11025).generate(text: text + "\r\n")
-    // WAV na 48 kHz – musí se převzorkovat
+    // a WAV at 48 kHz – it has to be resampled
     let conv = try SampleRateConverter(from: 11025, to: 48000)
     let url = f.dir.appendingPathComponent("rx.wav")
     try WaveFile.write(samples: conv.process(s) + conv.process([Float](repeating: 0, count: 4096)), sampleRate: 48000, to: url)
-    try await f.model.playWAV(url, speed: 0)                    // 0 = co nejrychleji
+    try await f.model.playWAV(url, speed: 0)                    // 0 = as fast as possible
     #expect(f.model.wavPlaying)
     for _ in 0..<100 where !f.model.rxRuns.map(\.text).joined().contains(text) { await f.pump(); await f.settle() }
     #expect(f.model.rxRuns.map(\.text).joined().contains(text))
     for _ in 0..<50 where f.model.wavPlaying { await f.settle(); try? await Task.sleep(for: .milliseconds(20)) }
     #expect(f.model.wavPlaying == false)
-    // restart (Použít) přehrávání ukončí
+    // a restart (Apply) stops the playback
     try await f.model.playWAV(url, speed: 1)
     await f.model.applySettings(f.model.settings)
     #expect(f.model.wavPlaying == false)
     await f.model.stop()
 }
 
-// Review I-1: dialog otevřený se starými hodnotami nesmí vrátit pořadové číslo ani změny zobrazení z rychlého menu
+// Review I-1: a dialog opened with the old values must not revert the serial number or the display changes from the quick menu
 @Test @MainActor func staleDraftKeepsSerialAndDisplayChanges() async throws {
     let f = Fixture()
     f.configure = { $0.contest.enabled = true; $0.contest.nextSerial = 5 }
     await f.model.start()
-    let baseline = f.model.settings                       // dialog otevřen
+    let baseline = f.model.settings                       // the dialog is open
     await f.model.clearQSO()
     await f.model.setQSOField("call", "DL1ABC")
     await f.model.logQSO()
     await f.settle()
     #expect(f.model.settings.contest.nextSerial == 6)
-    await f.model.setDisplay { $0.toHz = 4000 }           // rychlé menu u spektra
+    await f.model.setDisplay { $0.toHz = 4000 }           // the quick menu at the spectrum
     var draft = baseline
-    draft.display.fontSize = 20                            // uživatel v dialogu změnil jen písmo
+    draft.display.fontSize = 20                            // the user changed only the font in the dialog
     await f.model.applySettings(draft, baseline: baseline)
     #expect(f.model.settings.contest.nextSerial == 6)
     #expect(f.model.settings.display.toHz == 4000 && f.model.settings.display.fontSize == 20)
-    // explicitní změna čísla v dialogu platí
+    // an explicit change of the number in the dialog does apply
     var d2 = f.model.settings; let b2 = d2
     d2.contest.nextSerial = 100
     await f.model.applySettings(d2, baseline: b2)
@@ -202,7 +202,7 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     await f.model.stop()
 }
 
-// Review minor: QSO okno po startu ukazuje odesílané číslo závodu (bez Clear)
+// Review minor: after start-up the QSO window shows the contest number being sent (without Clear)
 @Test @MainActor func contestSerialVisibleAfterStart() async throws {
     let f = Fixture()
     f.configure = { $0.contest.enabled = true; $0.contest.nextSerial = 42 }
@@ -211,7 +211,7 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     await f.model.stop()
 }
 
-// Review minor: uložený zářez mimo okno mark–space přežije start bez ohledu na pořadí parametrů
+// Review minor: a stored notch outside the mark–space window survives start-up regardless of the parameter order
 @Test @MainActor func persistedNotchSurvivesStartupOrder() async throws {
     let f = Fixture()
     f.configure = {
@@ -231,21 +231,21 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     #expect(SettingsStore(directory: dir).load().0.display.toHz == 3000)
 }
 
-// Plán 8 / T3: scope v AppModel (dotazování jen když je zapnutý)
+// Plan 8 / T3: the scope in AppModel (polled only while it is on)
 @Test @MainActor func demodScopeInModel() async throws {
     let f = Fixture()
     await f.model.start()
     f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
     await f.pump(30)
     await f.model.pollDemodScope()
-    #expect(f.model.demodScope == nil)                   // vypnutý
+    #expect(f.model.demodScope == nil)                   // off
     await f.model.setDemodScope(true)
     f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
     await f.pump(30)
     await f.model.pollDemodScope()
     let d = try #require(f.model.demodScope)
     #expect(d.bit.count == 8192 && d.marks[0].count == 8192 && d.marks[2].count == 8192)
-    // zmrazený záznam se dalšími dávkami nepřepíše (a obsahuje všechny zdroje pro přepínání)
+    // a frozen record is not overwritten by further batches (and it holds all the sources for switching)
     f.model.scopeFrozen = true
     f.audio.feedRx(RTTYSignalGenerator().generate(text: String(repeating: "RYRYRYRY ", count: 12)))
     await f.pump(30)
@@ -254,7 +254,7 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     await f.model.stop()
 }
 
-// Plán 8 / T1: zprávy v modelu – uložení a odeslání
+// Plan 8 / T1: messages in the model – storing and sending
 @Test @MainActor func messagesSavedAndSent() async throws {
     let f = Fixture()
     await f.model.start()
@@ -268,7 +268,7 @@ private func frame(peakAt hz: Double, level: Float) -> SpectrumFrame {
     await f.model.stop()
 }
 
-// Plán 8 / T5: klik na slovo v závodních formátech (MMTTY StoreZone/StoreQTH/StoreNR/StoreUTC)
+// Plan 8 / T5: clicking a word in the contest formats (MMTTY StoreZone/StoreQTH/StoreNR/StoreUTC)
 func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = true) -> [String: String] {
     var q = QSOFields(); q.call = "DL1ABC"; q.exchangeRcvd = exch
     return Dictionary(uniqueKeysWithValues: WordClassifier.contestUpdate(w, format: f, serialMode: serialMode, current: q))
@@ -289,7 +289,7 @@ func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = t
     #expect(cu("599015", .bartg) == ["serialRcvd": "15"])
     #expect(cu("1203", .bartg) == ["exchangeRcvd": "1203"])
     #expect(cu("12:03", .bartg) == ["exchangeRcvd": "1203"])
-    #expect(cu("2599", .bartg) == ["serialRcvd": "2599"])          // neplatný čas → číslo (MMTTY StoreUTC → StoreNR)
+    #expect(cu("2599", .bartg) == ["serialRcvd": "2599"])          // an invalid time → a number (MMTTY StoreUTC → StoreNR)
     #expect(cu("TU", .bartg).isEmpty)
 }
 
@@ -298,13 +298,13 @@ func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = t
     f.configure = { $0.contest.enabled = true; $0.contest.format = .ped }
     await f.model.start()
     await f.model.insertWord("DL1ABC")
-    await f.model.insertWord("OK2PBR")                       // i když značka už je vyplněná
+    await f.model.insertWord("OK2PBR")                       // even when the call is already filled in
     await f.settle()
     #expect(f.model.qso.call == "OK2PBR" && f.model.qso.serialSent == nil)
     await f.model.stop()
 }
 
-// Review plán 8 #1: formát závodu z dialogu Nastavení se musí uložit
+// Review plan 8 #1: the contest format from the Settings dialog must be stored
 @Test @MainActor func contestFormatAppliedFromSettingsDialog() async throws {
     let f = Fixture()
     await f.model.start()
@@ -316,33 +316,33 @@ func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = t
     await f.model.stop()
 }
 
-// Review plán 8 #4, #5
+// Review plan 8 #4, #5
 @Test func contestUpdateEdgeCases() {
     #expect(cu("OK", .cqrj, exch: "04") == ["exchangeRcvd": "04 OK"])      // Oklahoma
     #expect(cu("AR", .cqrj, exch: "04") == ["exchangeRcvd": "04 AR"])      // Arkansas
     #expect(cu("TU", .cqrj).isEmpty)
-    #expect(cu("01203", .bartg) == ["exchangeRcvd": "1203"])               // MMTTY StoreUTC: > 3 číslice = čas, je-li platný
+    #expect(cu("01203", .bartg) == ["exchangeRcvd": "1203"])               // MMTTY StoreUTC: more than 3 digits = a time, if it is valid
 }
 
-// Plán 9: po skončení signálu nesmí šum pásma vodopád přesvítit (AGC klesla na úroveň šumu)
+// Plan 9: once the signal ends, band noise must not wash out the waterfall (the AGC has dropped to the noise level)
 @Test func noiseOnlyWaterfallStaysDarkAfterSignal() {
     var w = WaterfallRenderer(width: 200, height: 2)
     var g = NoiseGenerator(seed: 5)
     func noiseFrame(signal: Bool) -> SpectrumFrame {
-        var m = (0..<743).map { _ in 45 + 12 * g.gaussian() }          // šum pásma v log jednotkách jádra (≈ 45)
+        var m = (0..<743).map { _ in 45 + 12 * g.gaussian() }          // band noise in the log units of the core (≈ 45)
         if signal { m[395] = 238; m[426] = 230 }
         return SpectrumFrame(binHz: 5.3833, magnitudes: m)
     }
     for _ in 0..<50 { w.push(noiseFrame(signal: true), fromHz: 0, toHz: 3000) }
-    for _ in 0..<600 { w.push(noiseFrame(signal: false), fromHz: 0, toHz: 3000) }   // 40 s jen šum
+    for _ in 0..<600 { w.push(noiseFrame(signal: false), fromHz: 0, toHz: 3000) }   // 40 s of noise only
     let avg = w.row(0).map(\.brightness).reduce(0, +) / 200
-    #expect(avg < 200, "průměrný jas šumu \(avg)")                  // tmavě modrá, ne žlutá (~500+)
-    // silný signál je pořád výrazný
+    #expect(avg < 200, "průměrný jas šumu \(avg)")                  // dark blue, not yellow (~500+)
+    // a strong signal still stands out
     w.push(noiseFrame(signal: true), fromHz: 0, toHz: 3000)
     #expect((135...147).map { w.row(0)[$0].brightness }.max()! > 500)
 }
 
-// Plán 9: měření hodin měří zařízení zvolené v dialogu; neúspěšné načtení profilu nemění nastavení
+// Plan 9: the clock measurement measures the device selected in the dialog; a failed profile load does not change the settings
 @Test @MainActor func measureClockUsesGivenDevices() async throws {
     let f = Fixture()
     await f.model.start()
@@ -359,7 +359,7 @@ func cu(_ w: String, _ f: ContestFormat, exch: String = "", serialMode: Bool = t
     let before = SettingsStore(directory: f.dir).load().0
     await f.model.setParam("baud", .double(50))
     let mid = SettingsStore(directory: f.dir).load().0
-    await f.model.loadProfile(7)                                // prázdný slot → chyba
+    await f.model.loadProfile(7)                                // an empty slot → an error
     #expect(SettingsStore(directory: f.dir).load().0 == mid)
     #expect(f.model.messages.contains { $0.contains("Profil") })
     _ = before

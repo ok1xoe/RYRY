@@ -42,7 +42,7 @@ import Settings
     let d = try #require(f.model.qtcReceive)
     #expect(d.number == 3 && d.count == 2)
     #expect(d.lines.compactMap { $0 } == [QTCLine(time: "1307", call: "DA1AA", serial: 431), QTCLine(time: "1310", call: "OK2PBR", serial: 15)])
-    #expect(f.model.qso.call == "W1AW")                         // klik při příjmu QTC nepřepisuje QSO okno
+    #expect(f.model.qso.call == "W1AW")                         // a click while receiving QTC does not overwrite the QSO window
     f.model.cancelQTCReceive()
     await f.model.stop()
 }
@@ -58,24 +58,24 @@ import Settings
     await f.model.stop()
 }
 
-// Review plán 12: AGN řádek na správné místo, jen k řádků, protistanice ze začátku příjmu, směrování jen ve WAE
+// Review plan 12: the AGN line in the right place, only k lines, the other station taken from the start of the reception, routing only in WAE
 @Test @MainActor func qtcFillPlacesAGNLineAndKeepsCounterpart() async throws {
     let f = await waeFixture()
     await f.model.setQSOField("call", "W1AW")
     f.model.startQTCReceive()
     f.model.appendRx("QTC 4/3 QTC 4/3\r\n0915 JA1YY 007\r\n09#5 UA0AA 012\r\n0931 VK2XX 015\r\n", echo: false)
     f.model.qtcFillFromRx()
-    #expect(f.model.qtcReceive?.lines[1] == nil && f.model.qtcReceive?.lines[2]?.call == "VK2XX")   // řádky zůstaly zarovnané
+    #expect(f.model.qtcReceive?.lines[1] == nil && f.model.qtcReceive?.lines[2]?.call == "VK2XX")   // the lines stayed aligned
     f.model.appendRx("2 0920 UA0AA 012 0920 UA0AA 012\r\n1111 EXTRA1 001\r\n", echo: false)
     f.model.qtcFillFromRx()
     let d = try #require(f.model.qtcReceive)
     #expect(d.lines[1]?.call == "UA0AA")
-    await f.model.logQSO()                                                    // závod: okno se vyčistí
+    await f.model.logQSO()                                                    // contest: the window is cleared
     await f.settle()
     await f.model.qtcSaveReceived()
     await f.model.refreshQTC()
     let st = await f.model.app!.qtcStatus(for: "W1AW")
-    #expect(st.exchanged == 3)                                                // jen k = 3 řádky, pod W1AW
+    #expect(st.exchanged == 3)                                                // only k = 3 lines, below W1AW
     await f.model.stop()
 }
 
@@ -91,7 +91,7 @@ import Settings
     await f.model.stop()
 }
 
-// Chyba z ukázky: druhé „Načíst z příjmu“ po AGN nedoplnilo řádek 8
+// A bug from a real example: a second "Load from receive" after AGN did not fill in line 8
 @Test @MainActor func agnRepeatAfterEchoFillsRow() async throws {
     let f = await waeFixture()
     await f.model.setQSOField("call", "K3LR")
@@ -100,7 +100,7 @@ import Settings
     f.model.appendRx("QTC 12/10 QTC 12/10\r\n0712 JA3YBK 118\r\n0719 UA9CDC 204\r\n0725 VK4KW 067\r\n0734 ZS1ADD 093\r\n0741 PY2ZEA 150\r\n0752 LU1DX 041\r\n0758 VU2PTT 022\r\n083 BY4AOM 176\r\n0811 JE1CKA 233\r\n0820 ZL3IO 087\r\nBKKA", echo: false)
     f.model.qtcFillFromRx()
     #expect(f.model.qtcReceive?.lines[7] == nil && f.model.qtcReceive?.lines[8]?.call == "JE1CKA")
-    // jako na pásmu: moje AGN (echo) a opakování protistanice bez úvodního CR/LF → „BKKA8 0803 …“
+    // as on the band: my AGN (echo) and the other station's repeat with no leading CR/LF → "BKKA8 0803 …"
     f.model.appendRx("\r\nK3LR AGN 8 8 BK\r\n", echo: true)
     f.model.appendRx("8 0803 BY4AOM 176 0803 BY4AOM 176 BKNWU", echo: false)
     f.model.qtcFillFromRx()
@@ -124,11 +124,11 @@ import Settings
     await f.model.stop()
 }
 
-// Série přišla dřív, než operátor otevřel příjem → příjem začne od poslední zmínky protistanice
+// The series arrived before the operator opened the reception → reception starts from the last mention of the other station
 @Test @MainActor func lateReceiveStartLooksBackToCounterpart() async throws {
     let f = await waeFixture()
     await f.model.setQSOField("call", "K3LR")
-    f.model.appendRx("OK1XOE DE DL5XYZ QTC 3/2 QRV?\r\n1111 AA1AA 001\r\n", echo: false)     // starší, jiná stanice
+    f.model.appendRx("OK1XOE DE DL5XYZ QTC 3/2 QRV?\r\n1111 AA1AA 001\r\n", echo: false)     // older, a different station
     f.model.appendRx("OK1XOE DE K3LR YES QTC 9/2 QRV? BK", echo: false)
     f.model.appendRx("QRV", echo: true)
     f.model.appendRx("\r\nQTC 9/2 QTC 9/2\r\n0707 BY4AOM 101\r\n0714 A71A 174\r\nBK", echo: false)

@@ -3,9 +3,9 @@ import Foundation
 
 public enum FSKLine: String, Sendable, Codable, CaseIterable { case txdBreak, dtr, rts }
 
-/// Softwarově časované FSK na TxD (break), DTR nebo RTS – náhrada EXTFSK.
-/// Aktivní linka = space, klidová = mark (invert prohodí). Časy se počítají absolutně
-/// od začátku znaku, takže se chyba nekumuluje.
+/// Software-timed FSK on TxD (break), DTR or RTS – a replacement for EXTFSK.
+/// An active line = space, an idle one = mark (invert swaps them). The times are computed absolutely
+/// from the start of the character, so the error does not accumulate.
 public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
     private let port: SerialPort
     private let line: FSKLine
@@ -15,14 +15,14 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
     private let clock: Clock
     private let cond = NSCondition()
     private var queue: [UInt8] = []
-    private var head = 0                     // čtecí index (bez removeFirst v real-time smyčce)
+    private var head = 0                     // read index (no removeFirst in the real-time loop)
     private var sending = 0
     private var running = false
     private var generation = 0
     private var thread: Thread?
     private var exited: DispatchSemaphore?
     private var _lastError: Error?
-    /// Poslední chyba zápisu na linku (čte Engine; zapisuje vlákno klíčovače).
+    /// The last error while writing to the line (read by the Engine; written by the keyer thread).
     public var lastError: Error? { cond.lock(); defer { cond.unlock() }; return _lastError }
 
     public init(port: SerialPort, line: FSKLine, baud: Double = 45.45, stopBits: Double = 1.5,
@@ -32,7 +32,7 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
     }
 
     private func setLevel(mark: Bool) {
-        let active = mark == invert          // space = aktivní (bez invert)
+        let active = mark == invert          // space = active (without invert)
         do {
             switch line {
             case .txdBreak: try port.setBreak(active)
@@ -63,7 +63,7 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
 
     public func send(codes: [UInt8]) {
         cond.lock()
-        if head > 0 && head * 2 >= queue.count { queue.removeFirst(head); head = 0 }   // úklid mimo RT vlákno
+        if head > 0 && head * 2 >= queue.count { queue.removeFirst(head); head = 0 }   // cleanup outside the RT thread
         queue += codes
         cond.signal()
         cond.unlock()
@@ -89,12 +89,12 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
         exited = nil
         cond.broadcast()
         cond.unlock()
-        // počkat na vlákno (nejdéle ~1 bit), aby po stop() už na linku nesáhlo
+        // wait for the thread (at most ~1 bit) so that it no longer touches the line after stop()
         _ = done?.wait(timeout: .now() + .milliseconds(200))
         setLevel(mark: true)
     }
 
-    /// Real-time priorita vlákna (best effort) – přesnost hran v řádu desítek µs.
+    /// Real-time thread priority (best effort) – edge accuracy in the order of tens of µs.
     private static func makeRealtime() {
         var tb = mach_timebase_info_data_t(); mach_timebase_info(&tb)
         func abs(_ ns: Double) -> UInt32 { UInt32(ns * Double(tb.denom) / Double(tb.numer)) }
@@ -121,11 +121,11 @@ public final class SoftFSKKeyer: FSKKeyer, @unchecked Sendable {
             cond.unlock()
 
             let now = clock.now()
-            let t0 = max(now, nextStart)          // navazující znak bez mezery
+            let t0 = max(now, nextStart)          // a following character with no gap
             let ita2 = UARTFSKKeyer.reverse5(code)
             var last: Bool? = nil
             var aborted = false
-            for i in 0..<6 {                      // start (space) + 5 datových bitů, bez alokací
+            for i in 0..<6 {                      // start (space) + 5 data bits, no allocations
                 let mark = i == 0 ? false : (ita2 & (1 << (i - 1)) != 0)
                 clock.sleep(untilNanos: t0 + UInt64((Double(i) * bitNs).rounded()))
                 if isAborted(gen) { aborted = true; break }

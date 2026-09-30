@@ -11,11 +11,11 @@ import Spots
 import TestSupport
 @testable import AppUI
 
-// Kontrola plánu 17
+// Plan 17 check
 
 private let roundup = ContestSettings.preset(.arrlRoundup, year: 2027)
 
-// MARK: 1 – ARRL RU: stát/provincie je přijatá výměna
+// MARK: 1 – ARRL RU: the state/province is the received exchange
 
 @Test func esmRoundupStateCompletesExchange() {
     var w = QSOFields(); w.call = "W1AW"; w.exchangeRcvd = "CT"
@@ -39,16 +39,16 @@ private let roundup = ContestSettings.preset(.arrlRoundup, year: 2027)
     await f.model.setQSOField("call", "W1AW")
     await f.model.insertWord("CT")
     #expect(f.model.qso.exchangeRcvd == "CT")
-    await f.model.insertWord("ON")                                       // provincie (i když je to i běžná zkratka)
+    await f.model.insertWord("ON")                                       // a province (even though it is also a common abbreviation)
     #expect(f.model.qso.exchangeRcvd == "ON")
-    await f.model.insertWord("599015")                                   // číslo dál jde do čísla
+    await f.model.insertWord("599015")                                   // a number still goes into the number
     #expect(f.model.qso.serialRcvd == 15)
-    await f.model.insertWord("XX")                                       // není stát → nic
+    await f.model.insertWord("XX")                                       // not a state → nothing
     #expect(f.model.qso.exchangeRcvd == "ON")
     await f.model.stop()
 }
 
-// MARK: 3 + minor 5 – engine zastavený ≠ vysílání
+// MARK: 3 + minor 5 – a stopped engine ≠ transmitting
 
 @Test @MainActor func stoppedEngineIsNotReportedAsTransmitting() async throws {
     let dir = tempDir()
@@ -72,7 +72,7 @@ private let roundup = ContestSettings.preset(.arrlRoundup, year: 2027)
     await m.stop()
 }
 
-// MARK: 5 – falešná „potřebná“ ze šumu
+// MARK: 5 – a false "needed" spot out of noise
 
 @MainActor private func alertFixture(watch: String = "") -> (Fixture, RecordingSink) {
     let f = Fixture()
@@ -85,7 +85,7 @@ private let roundup = ContestSettings.preset(.arrlRoundup, year: 2027)
 @Test @MainActor func rxNoiseCallDoesNotAlertNewCountry() async throws {
     let (f, _) = alertFixture()
     await f.model.start()
-    f.model.appendRx("RYRY 5R8ZQ EEE TTT ", echo: false)                 // jednorázová „značka“ ve šumu
+    f.model.appendRx("RYRY 5R8ZQ EEE TTT ", echo: false)                 // a one-off "call" in the noise
     #expect(!f.model.messages.contains { $0.contains("5R8ZQ") })
     await f.model.stop()
 }
@@ -93,16 +93,16 @@ private let roundup = ContestSettings.preset(.arrlRoundup, year: 2027)
 @Test @MainActor func rxRepeatedOrAfterDECallAlerts() async throws {
     let (f, _) = alertFixture()
     await f.model.start()
-    f.model.appendRx("CQ TEST DE 3B8ZZ ", echo: false)                   // po DE
+    f.model.appendRx("CQ TEST DE 3B8ZZ ", echo: false)                   // after DE
     #expect(f.model.messages.contains { $0.contains("3B8ZZ") })
     f.model.appendRx("VU2QQQ RYRY ", echo: false)
     #expect(!f.model.messages.contains { $0.contains("VU2QQQ") })
-    f.model.appendRx("TU VU2QQQ ", echo: false)                          // podruhé do 10 min
+    f.model.appendRx("TU VU2QQQ ", echo: false)                          // a second time within 10 min
     #expect(f.model.messages.contains { $0.contains("VU2QQQ") })
     await f.model.stop()
 }
 
-// MARK: 8 – dávka spotů = souhrnný řádek
+// MARK: 8 – a batch of spots = one summary line
 
 final class TestClock: @unchecked Sendable { var now = Date(timeIntervalSince1970: 5000) }
 
@@ -125,17 +125,17 @@ final class TestClock: @unchecked Sendable { var now = Date(timeIntervalSince197
     }
     #expect(m.messages.filter { $0.contains("Potřebné") }.count == 1)
     #expect(sink.sounds == 1)
-    m.flushNeededSummary()                                               // po 5 s: jeden souhrnný řádek
+    m.flushNeededSummary()                                               // after 5 s: a single summary line
     let lines = m.messages.filter { $0.contains("Potřebné") }
     #expect(lines.count == 2)
     #expect(lines.last?.contains("9") == true && lines.last?.contains("DL1ABC") == true)
-    // po uplynutí intervalu jde další spot zase hned
+    // once the interval has elapsed the next spot goes out immediately again
     clock.now = clock.now.addingTimeInterval(10)
     m.checkSpotNeeded(Spot(frequencyKHz: 14085, call: "DL10ABC", spotter: "X", comment: "", time: clock.now, mode: "RTTY", source: .rbn))
     #expect(m.messages.filter { $0.contains("Potřebné") }.count == 3)
 }
 
-// MARK: 7 – násobiče průběžně
+// MARK: 7 – multipliers updated continuously
 
 @Test @MainActor func loggedQSOAddsMultipliersIncrementally() async throws {
     let f = Fixture()
@@ -154,7 +154,7 @@ final class TestClock: @unchecked Sendable { var now = Date(timeIntervalSince197
         for _ in 0..<100 where !f.model.logRecords.contains(where: { $0.call == call }) { await f.settle() }
     }
     #expect(f.model.logRecords.count == 3)
-    #expect(f.model.multiplierFullRecomputes == before)                   // žádný úplný přepočet
+    #expect(f.model.multiplierFullRecomputes == before)                   // no full recomputation
     let calc = MultiplierCalculator(rule: try #require(f.model.multiplierRule), countries: CountryDB.shared)
     let full = calc.tally(records: f.model.logRecords, since: f.model.settings.contest.effectiveStart)
     #expect(f.model.multipliers == full)
@@ -162,7 +162,7 @@ final class TestClock: @unchecked Sendable { var now = Date(timeIntervalSince197
     await f.model.stop()
 }
 
-// MARK: 4 – stav spotů v band mapě přes index logu
+// MARK: 4 – the state of spots in the band map through the log index
 
 @Test func spotStatusFastWithLargeLog() {
     let now = Date()
@@ -175,14 +175,14 @@ final class TestClock: @unchecked Sendable { var now = Date(timeIntervalSince197
              time: now, mode: "RTTY")
     }
     let since = now.addingTimeInterval(-86400)
-    let index = LogIndex(records: recs, contestSince: since, country: { _ in nil })   // v AppModel udržovaný průběžně
+    let index = LogIndex(records: recs, contestSince: since, country: { _ in nil })   // kept up to date in AppModel
     let t0 = Date()
     let st = spots.map { AppModel.spotStatus($0, index: index, contest: true) }
     let ms = Date().timeIntervalSince(t0) * 1000
     #expect(st.filter { $0 == .dupe }.count == 25)
     #expect(st.filter { $0 == .new }.count == 25)
     #expect(ms < 50, "\(ms) ms")
-    // stejný výsledek jako úplná kontrola duplicit
+    // the same result as the full dupe check
     for (s, got) in zip(spots, st) {
         let dupe = DupeCheck.isDupe(call: s.call, band: s.band, mode: s.mode ?? "RTTY", records: recs, since: since)
         #expect((got == .dupe) == dupe)
@@ -204,7 +204,7 @@ final class TestClock: @unchecked Sendable { var now = Date(timeIntervalSince197
     await f.model.stop()
 }
 
-// MARK: 1 – klik na stát v RU (čistá funkce)
+// MARK: 1 – clicking a state in RU (a pure function)
 
 @Test func contestUpdateRoundupStates() {
     var q = QSOFields(); q.call = "W1AW"
@@ -214,44 +214,44 @@ final class TestClock: @unchecked Sendable { var now = Date(timeIntervalSince197
     #expect(f("CT") == ["exchangeRcvd=CT"])
     #expect(f("ct,") == ["exchangeRcvd=CT"])
     #expect(f("DC") == ["exchangeRcvd=DC"])
-    #expect(f("OK") == ["exchangeRcvd=OK"])                               // Oklahoma, i když je to stop slovo
+    #expect(f("OK") == ["exchangeRcvd=OK"])                               // Oklahoma, even though it is a stop word
     #expect(f("QC") == ["exchangeRcvd=QC"] && f("PEI") == ["exchangeRcvd=PE"])
     #expect(f("599015") == ["serialRcvd=15"])
-    #expect(f("HI").isEmpty && f("AK").isEmpty && f("XX").isEmpty)       // KH6/KL7 nejsou státy RU (země DXCC)
-    #expect(f("CT", false).isEmpty)                                       // mimo RU se text nebere
+    #expect(f("HI").isEmpty && f("AK").isEmpty && f("XX").isEmpty)       // KH6/KL7 are not RU states (they are DXCC entities)
+    #expect(f("CT", false).isEmpty)                                       // outside RU the text is not taken
 }
 
-// MARK: 10 – zoom trackpadem po krocích
+// MARK: 10 – trackpad zoom in steps
 
 @Test func scrollZoomAccumulatesTrackpadSteps() {
     var a = ScrollZoomAccumulator()
-    // trackpad: 1 krok na 20 bodů
+    // trackpad: one step per 20 points
     #expect(a.feed(deltaY: 5, precise: true, momentum: false) == 0)
     #expect(a.feed(deltaY: 10, precise: true, momentum: false) == 0)
     #expect(a.feed(deltaY: 10, precise: true, momentum: false) == 1)
     #expect(a.feed(deltaY: 45, precise: true, momentum: false) == 2)
-    // setrvačnost se ignoruje
+    // inertia is ignored
     #expect(a.feed(deltaY: 200, precise: true, momentum: true) == 0)
-    // změna směru začíná znovu
+    // a change of direction starts over
     #expect(a.feed(deltaY: -15, precise: true, momentum: false) == 0)
     #expect(a.feed(deltaY: -30, precise: true, momentum: false) == -2)
     a.reset()
     #expect(a.accumulated == 0)
-    // kolečko myši: krok za událost
+    // mouse wheel: one step per event
     #expect(a.feed(deltaY: 1, precise: false, momentum: false) == 1)
     #expect(a.feed(deltaY: -3, precise: false, momentum: false) == -1)
     #expect(a.feed(deltaY: .nan, precise: true, momentum: false) == 0)
     #expect(a.feed(deltaY: 0, precise: false, momentum: false) == 0)
 }
 
-// MARK: 5 – pomocné struktury
+// MARK: 5 – helper structures
 
 @Test func rxCallSightingsWindowAndBound() {
     var s = RxCallSightings(maxKeys: 5)
     let t0 = Date(timeIntervalSince1970: 1000)
     #expect(s.record("DL1ABC", now: t0) == 1)
     #expect(s.record("DL1ABC", now: t0.addingTimeInterval(599)) == 2)
-    #expect(s.record("DL1ABC", now: t0.addingTimeInterval(1300)) == 1)     // mimo 10 min
+    #expect(s.record("DL1ABC", now: t0.addingTimeInterval(1300)) == 1)     // outside the 10 min window
     for i in 0..<50 { _ = s.record("K\(i)AB", now: t0.addingTimeInterval(1300)) }
     #expect(s.count <= 5)
 }
@@ -267,9 +267,9 @@ final class TestClock: @unchecked Sendable { var now = Date(timeIntervalSince197
     let (f, _) = alertFixture(watch: "5R8QQ")
     try "5H3XY\n".write(to: f.dir.appendingPathComponent("MASTER.SCP"), atomically: true, encoding: .utf8)
     await f.model.start()
-    f.model.appendRx("RYRY 5R8QQ RYRY ", echo: false)                   // hlídaná: hned
+    f.model.appendRx("RYRY 5R8QQ RYRY ", echo: false)                   // a watched call: right away
     #expect(f.model.messages.contains { $0.contains("5R8QQ") })
-    f.model.appendRx("RYRY 5H3XY RYRY ", echo: false)                   // zná ji Super Check Partial
+    f.model.appendRx("RYRY 5H3XY RYRY ", echo: false)                   // Super Check Partial knows it
     #expect(f.model.messages.contains { $0.contains("5H3XY") })
     await f.model.stop()
 }

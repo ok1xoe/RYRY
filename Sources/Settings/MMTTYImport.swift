@@ -1,20 +1,20 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
-// Import nastavení z Windows MMTTY (Mmtty.ini). Sekce a klíče podle TMmttyWd::ReadRegister / WriteRegister
-// (MMTTY Main.cpp), escapování maker podle Yen2CrLf / CrLf2Yen (ComLib.cpp). Čistý parser bez vedlejších účinků.
+// Import of settings from Windows MMTTY (Mmtty.ini). Sections and keys per TMmttyWd::ReadRegister / WriteRegister
+// (MMTTY Main.cpp), macro escaping per Yen2CrLf / CrLf2Yen (ComLib.cpp). A pure parser without side effects.
 import Foundation
 import Localization
 import ModemKit
 
 // MARK: INI
 
-/// Minimální parser INI jako TMemIniFile: `[sekce]`, `klíč=hodnota`, komentáře `;`.
-/// Jména sekcí a klíčů nerozlišují velikost písmen; sekce se stejným jménem se sloučí,
-/// u duplicitního klíče platí první výskyt (jako `ReadString`).
+/// Minimal INI parser like TMemIniFile: `[section]`, `key=value`, `;` comments.
+/// Section and key names are case-insensitive; sections with the same name are merged,
+/// for a duplicate key the first occurrence wins (like `ReadString`).
 public struct INIFile: Sendable {
     public struct Entry: Sendable, Equatable { public var section: String, key: String, value: String }
     public private(set) var entries: [Entry] = []
     public private(set) var duplicateKeys = 0
-    /// Neprázdné řádky, které nejsou komentář, sekce ani `klíč=hodnota` uvnitř sekce.
+    /// Non-empty lines that are neither a comment, a section nor `key=value` inside a section.
     public private(set) var ignoredLines = 0
     private var index: [String: Int] = [:]
     private var sections: Set<String> = []
@@ -50,9 +50,9 @@ public struct INIFile: Sendable {
     public func hasSection(_ name: String) -> Bool { sections.contains(name.lowercased()) }
 }
 
-// MARK: Výsledek
+// MARK: Result
 
-/// Co se z importu přepíše.
+/// What the import overwrites.
 public struct MMTTYImportOptions: OptionSet, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
@@ -65,24 +65,24 @@ public struct MMTTYImportOptions: OptionSet, Sendable {
 }
 
 public struct MMTTYImportResult: Sendable, Equatable {
-    /// 16 maker (`AppSettings.macroCount`), nil = soubor makra neobsahuje.
+    /// 16 macros (`AppSettings.macroCount`), nil = the file contains no macros.
     public var macros: [Macro]?
-    /// Seznam zpráv (MsgList), nil = žádné zprávy.
+    /// The message list (MsgList), nil = no messages.
     public var messages: [Macro]?
-    /// Jen `call` (MMTTY jméno, QTH ani lokátor stanice neukládá), nil = nevyplněno nebo NOCALL.
+    /// Only `call` (MMTTY stores neither the station name, QTH nor locator), nil = not filled in or NOCALL.
     public var station: Station?
-    /// Parametry modemu podle `ParameterDescriptor.id`, už ve správném typu.
+    /// Modem parameters by `ParameterDescriptor.id`, already in the right type.
     public var rtty: [String: ParameterValue] = [:]
-    /// Vlastní klávesové zkratky (id příkazu → zkratka), jen ty, které lze na macOS použít.
+    /// Custom keyboard shortcuts (command id → shortcut), only those usable on macOS.
     public var shortcuts: [String: KeyBinding] = [:]
     public var warnings: [String] = []
-    /// Kolik klíčů souboru nemá v mmtty4mac protějšek (okna, písma, TNC, …).
+    /// How many keys of the file have no counterpart in mmtty4mac (windows, fonts, TNC, …).
     public var ignoredKeyCount = 0
 
     public init() {}
     public var isEmpty: Bool { macros == nil && messages == nil && station == nil && rtty.isEmpty && shortcuts.isEmpty }
 
-    /// Zapíše vybrané části do nastavení (čistá funkce; ukládání a aplikace do běžícího modemu řeší AppModel).
+    /// Writes the selected parts into the settings (pure function; saving and applying to the running modem is AppModel's job).
     @discardableResult
     public func apply(to s: inout AppSettings, options: MMTTYImportOptions) -> [String] {
         if options.contains(.macros), let macros { s.macros = macros }
@@ -90,8 +90,8 @@ public struct MMTTYImportResult: Sendable, Equatable {
         if options.contains(.station), let station { s.station.call = station.call }
         if options.contains(.modem) { for (k, v) in rtty { s.rtty[k] = v } }
         guard options.contains(.shortcuts), !shortcuts.isEmpty else { return [] }
-        // Kolize se počítají proti skutečnému cílovému nastavení: zkratka, která by se kryla s jiným příkazem,
-        // se nepřevezme (zůstane původní). Opakuje se, dokud vrácení nevyřeší všechny kolize způsobené importem.
+        // Collisions are computed against the actual target settings: a shortcut that would clash with another command
+        // is not taken over (the original stays). It repeats until reverting resolves all collisions caused by the import.
         let original = s
         var accepted = Dictionary(uniqueKeysWithValues: ShortcutCommand.allCases.compactMap { c in
             shortcuts[c.id].map { (c.id, $0) }
@@ -124,21 +124,21 @@ public struct MMTTYImportResult: Sendable, Equatable {
 // MARK: Import
 
 public enum MMTTYImport {
-    /// Mmtty.ini má desítky kB; větší soubor se nečte.
+    /// Mmtty.ini is tens of kB; a larger file is not read.
     public static let maxFileSize = 1_048_576
 
-    /// Bezpečný převod čísla z ini na Int (Int(1e20) by aplikaci shodil); mimo ±2³¹ nebo nekonečno → nil.
+    /// Safe conversion of a number from the ini to Int (Int(1e20) would crash the app); outside ±2³¹ or infinite → nil.
     static func safeInt(_ d: Double) -> Int? {
         guard d.isFinite, abs(d) < 2_147_483_648 else { return nil }
         return Int(d.rounded())
     }
 
-    /// Značka: jen A–Z, 0–9 a /, nejvýše 15 znaků.
+    /// Call: only A–Z, 0–9 and /, at most 15 characters.
     static func isValidCall(_ c: String) -> Bool {
         (1...15).contains(c.count) && c.unicodeScalars.allSatisfy { ("A"..."Z").contains($0) || ("0"..."9").contains($0) || $0 == "/" }
     }
-    /// Bajty souboru → text. Platné UTF-8 se nemění (včetně BOM), jinak se každý bajt ≥ 0x80 nahradí „?“
-    /// (Shift-JIS / Windows-1250 – v makrech RTTY stačí ASCII).
+    /// File bytes → text. Valid UTF-8 is left unchanged (including the BOM), otherwise every byte ≥ 0x80 is replaced by "?"
+    /// (Shift-JIS / Windows-1250 – ASCII is enough in RTTY macros).
     public static func decode(_ data: Data) -> (text: String, replaced: Int) {
         var d = data
         if d.starts(with: [0xEF, 0xBB, 0xBF]) { d = d.dropFirst(3) }
@@ -150,8 +150,8 @@ public enum MMTTYImport {
         return (out, n)
     }
 
-    /// Hodnota z ini → text makra (MMTTY Yen2CrLf): volitelná úvodní `"`, `\r` `\n` `\\`,
-    /// jiná escape sekvence = znak bez zpětného lomítka, koncová `"` se zahodí.
+    /// Value from the ini → macro text (MMTTY Yen2CrLf): an optional leading `"`, `\r` `\n` `\\`,
+    /// any other escape sequence = the character without the backslash, a trailing `"` is discarded.
     public static func unescape(_ s: String) -> String {
         var out = ""
         let c = Array(s)
@@ -176,8 +176,8 @@ public enum MMTTYImport {
         return out
     }
 
-    /// Text makra MMTTY → mmtty4mac. Syntaxe (`%c`, `\` na začátku a konci, `#`, `%{…}`) je stejná;
-    /// řídicí znaky MMTTY `_ ~ [ ]` (mark, nosná vyp., diddle) jádro nevysílá, proto se mimo CW ID `%{…}` odstraní.
+    /// MMTTY macro text → mmtty4mac. The syntax (`%c`, `\` at the start and the end, `#`, `%{…}`) is the same; the MMTTY
+    /// control characters `_ ~ [ ]` (mark, carrier off, diddle) are not sent by the core, so they are removed outside CW ID `%{…}`.
     public static func convertMacroText(_ s: String, removed: inout Int) -> String {
         var out = "", inCW = false
         let c = Array(s)
@@ -211,10 +211,10 @@ public enum MMTTYImport {
         return r
     }
 
-    // MARK: parametry modemu
+    // MARK: modem parameters
 
     private enum Kind { case bool, int, double, choice([String]) }
-    /// Klíče sekce [Define] → id parametru modemu (RTTYParameters). Mark/shift se řeší zvlášť.
+    /// Keys of the [Define] section → modem parameter id (RTTYParameters). Mark/shift are handled separately.
     private static let table: [(key: String, id: String, kind: Kind)] = [
         ("BaudRate", "baud", .double), ("Rev", "reverse", .bool),
         ("AFC", "afc", .bool), ("AFCFixShift", "afcMode", .choice(["free", "fixed", "ham", "fsk"])),
@@ -242,19 +242,19 @@ public enum MMTTYImport {
         ("pllOutOrder", "pllOutOrder", .int), ("pllOutFC", "pllOutFc", .double),
     ]
 
-    // MARK: zkratky
+    // MARK: shortcuts
 
-    /// SysKey: index výčtu kk… v ComLib.h (klíč `S<index+1>`) → příkaz mmtty4mac, výchozí kód MMTTY se nepřenáší.
+    /// SysKey: index of the kk… enum in ComLib.h (key `S<index+1>`) → mmtty4mac command; the MMTTY default code is not taken.
     private static let sysKeys: [(index: Int, id: String, mmttyDefault: Int)] = [
         (3, "openLog", 0), (24, "toggleTx", 0x78), (25, "rxNow", 0x77), (58, "clearRx", 0),
     ]
-    /// ⌘ + písmeno, které v macOS/menu aplikace už něco dělá.
+    /// ⌘ + a letter that already does something in macOS / the app menu.
     private static let reservedLetters: Set<String> = ["q", "w", "h", "m", "n", "o", "c", "v", "x", "a", "z", "s", "p"]
 
     private enum KeyConversion { case ok(KeyBinding), unsupported, reserved }
 
-    /// Kód klávesy MMTTY (KEYTBL v ComLib.cpp): dolních 8 bitů = VK, 0x100 Ctrl, 0x200 Alt, 0x400 Shift.
-    /// Ctrl → ⌘ (zvyk při přenosu z Windows), Alt → ⌥, Shift → ⇧.
+    /// MMTTY key code (KEYTBL in ComLib.cpp): the low 8 bits = VK, 0x100 Ctrl, 0x200 Alt, 0x400 Shift.
+    /// Ctrl → ⌘ (the habit when moving from Windows), Alt → ⌥, Shift → ⇧.
     private static func convertKey(_ code: Int) -> KeyConversion {
         guard code > 0, code < 0x800 else { return .unsupported }
         let vk = code & 0xFF
@@ -298,16 +298,16 @@ public enum MMTTYImport {
         var controlChars = 0
         var badTimers: [String] = []
 
-        // makra: 16 tlačítek
+        // macros: 16 buttons
         if ini.hasSection("Macro") || ini.hasSection("MacroName") {
             var list: [Macro] = []
             for i in 1...AppSettings.macroCount {
                 let k = "M\(i)"
                 var name = get("MacroName", k) ?? ""
                 let raw = get("Macro", k).map { convertMacroText(unescape($0), removed: &controlChars) } ?? ""
-                if raw.isEmpty && name == k { name = "" }                     // zástupné jméno MMTTY prázdného tlačítka
+                if raw.isEmpty && name == k { name = "" }                     // MMTTY placeholder name of an empty button
                 var timer: Double?
-                if let t = number("MacroTimer", k), t != 0 {                  // MMTTY: násobky 0,1 s
+                if let t = number("MacroTimer", k), t != 0 {                  // MMTTY: multiples of 0.1 s
                     timer = Macro.validRepeat(t / 10)
                     if timer == nil { badTimers.append(k) }
                 }
@@ -323,7 +323,7 @@ public enum MMTTYImport {
             }
         }
 
-        // zprávy: MsgName + MsgList, seznam končí prvním prázdným jménem / textem (jako ReadRegister)
+        // messages: MsgName + MsgList, the list ends at the first empty name / text (like ReadRegister)
         if ini.hasSection("MsgName") || ini.hasSection("MsgList") {
             var list: [Macro] = []
             for i in 1...64 {
@@ -338,14 +338,14 @@ public enum MMTTYImport {
             r.warnings.append(L("Makra a zprávy obsahovala řídicí znaky MMTTY _ ~ [ ] (%ld), které mmtty4mac nevysílá; odstraněny.", controlChars))
         }
 
-        // stanice: MMTTY ukládá jen značku
+        // station: MMTTY stores only the call
         if let call = get("Define", "Call")?.trimmingCharacters(in: .whitespaces).uppercased(),
            !call.isEmpty, call != "NOCALL" {
             if isValidCall(call) { var st = Station(); st.call = call; r.station = st }
             else { r.warnings.append(L("Značka „%@“ není platná (jen A–Z, 0–9 a /, nejvýše 15 znaků); nepřevzata.", call)) }
         }
 
-        // parametry modemu
+        // modem parameters
         let byID = Dictionary(descriptors.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         func accept(_ id: String, _ v: ParameterValue) {
             if !descriptors.isEmpty {
@@ -376,7 +376,7 @@ public enum MMTTYImport {
             else { r.warnings.append(L("Parametr %@ má hodnotu mimo povolený rozsah; přeskočeno.", "shift")) }
         }
 
-        // PTT / FSK: port COMx nemá na macOS protějšek, nastavuje se ručně
+        // PTT / FSK: a COMx port has no counterpart on macOS, it is set manually
         let ptt = get("Define", "PTT")?.trimmingCharacters(in: .whitespaces) ?? ""
         let txPort = number("Define", "TxPort").flatMap(safeInt) ?? 0
         _ = get("Define", "InvPTT")
@@ -386,7 +386,7 @@ public enum MMTTYImport {
                 : L("FSK/PTT na portu %@ nelze převést (porty COM na macOS neexistují); zvolte port v Nastavení → FSK.", ptt))
         }
 
-        // klávesové zkratky: makra (MacroKey) a vybrané systémové (SysKey)
+        // keyboard shortcuts: macros (MacroKey) and selected system ones (SysKey)
         var unsupported: [String] = [], reserved: [String] = []
         func shortcut(_ id: String, section: String, key: String, skip: Int = 0) {
             guard let d = number(section, key), let code = safeInt(d), code != 0, code != skip else {
@@ -407,9 +407,9 @@ public enum MMTTYImport {
         if !reserved.isEmpty {
             r.warnings.append(L("Zkratky kolidující s menu macOS nebyly převzaty: %@.", reserved.joined(separator: ", ")))
         }
-        // kolize zkratek se ověřují až v apply(to:) proti skutečnému nastavení
+        // shortcut collisions are checked only in apply(to:) against the actual settings
 
-        // shrnutí
+        // summary
         if consumed.isEmpty {
             r.warnings.append(L("Soubor nevypadá jako Mmtty.ini z MMTTY – nenalezeno žádné známé nastavení."))
         }

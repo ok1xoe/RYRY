@@ -1,13 +1,13 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Text (RX nebo TX) s indexy od posledního vymazání; starší data nad limit se zahazují po dávkách.
-/// Interně se pracuje s absolutními pozicemi (kurzory `takeNew` jsou absolutní).
+/// Text (RX or TX) with indexes since the last clear; older data above the limit is discarded in batches.
+/// Internally absolute positions are used (the `takeNew` cursors are absolute).
 public final class TextHistory: @unchecked Sendable {
     private let lock = NSLock()
     private var buf: [Character] = []
-    private var offset = 0                    // absolutní pozice prvního znaku v buf
-    private var base = 0                      // absolutní pozice posledního clear()
+    private var offset = 0                    // absolute position of the first character in buf
+    private var base = 0                      // absolute position of the last clear()
     private let limit: Int
 
     public init(limit: Int = 1 << 20) { self.limit = max(1, limit) }
@@ -15,20 +15,20 @@ public final class TextHistory: @unchecked Sendable {
     public func append(_ s: String) {
         lock.withLock {
             buf.append(contentsOf: s)
-            if buf.count > limit + limit / 4 {          // ořez po dávkách (amortizovaně O(1) na znak)
+            if buf.count > limit + limit / 4 {          // trimming in batches (amortized O(1) per character)
                 let drop = buf.count - limit
                 buf.removeFirst(drop); offset += drop
             }
         }
     }
 
-    /// Absolutní počet znaků od startu (nemění se při clear) – pro detekci nového textu.
+    /// Absolute number of characters since the start (unchanged by clear) – for detecting new text.
     public var absoluteEnd: Int { lock.withLock { offset + buf.count } }
 
-    /// Délka od posledního clear() (fldigi text.get_rx_length).
+    /// Length since the last clear() (fldigi text.get_rx_length).
     public var totalLength: Int { lock.withLock { offset + buf.count - base } }
 
-    /// Znaky [start, start+length) od posledního clear() – co už bylo oříznuto, vynechá.
+    /// Characters [start, start+length) since the last clear() – what has already been trimmed is omitted.
     public func range(start: Int, length: Int) -> String {
         lock.withLock { absRange(start.addingReportingOverflow(base).partialValue, length) }
     }
@@ -42,7 +42,7 @@ public final class TextHistory: @unchecked Sendable {
         return String(buf[(lo - offset)..<(hi - offset)])
     }
 
-    /// Text od absolutního `cursor` do konce; posune kurzor.
+    /// Text from the absolute `cursor` to the end; advances the cursor.
     public func takeNew(cursor: inout Int) -> String {
         lock.withLock {
             let end = offset + buf.count

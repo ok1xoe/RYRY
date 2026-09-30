@@ -5,7 +5,7 @@ import Settings
 import SwiftUI
 import Localization
 
-/// Nabídka seznamu zpráv (MMTTY MsgList): výběr = odeslat jako makro.
+/// The message list menu (MMTTY MsgList): picking an item sends it as a macro.
 struct MessagesMenu: View {
     @Bindable var model: AppModel
     @State private var editing = false
@@ -24,8 +24,8 @@ struct MessagesMenu: View {
     }
 }
 
-/// Editor seznamu zpráv: přidat, smazat, přesunout, upravit název a text.
-/// Řádky mají stabilní ID (výběr ani rozepsané pole nesmí po smazání/přesunu ukazovat na jinou zprávu).
+/// Message list editor: add, delete, move, edit the name and the text.
+/// The rows have stable IDs (neither the selection nor a half-typed field may point at a different message after a delete/move).
 struct MessagesEditor: View {
     @Bindable var model: AppModel
     struct Row: Identifiable { let id = UUID(); var m: Macro }
@@ -51,7 +51,7 @@ struct MessagesEditor: View {
                     HStack {
                         Button { let r = Row(m: Macro(name: L("Nová"), text: "")); rows.append(r); sel = r.id } label: { Image(systemName: "plus") }
                         Button {
-                            NSApp.keyWindow?.makeFirstResponder(nil)        // dokončit rozepsané pole ještě před smazáním
+                            NSApp.keyWindow?.makeFirstResponder(nil)        // commit the half-typed field before deleting
                             if let s = sel { rows.removeAll { $0.id == s }; sel = rows.first?.id }
                         } label: { Image(systemName: "minus") }
                             .disabled(sel == nil)
@@ -65,7 +65,7 @@ struct MessagesEditor: View {
                                                  set: { binding(s, \.text).wrappedValue = $0.replacingOccurrences(of: "\n", with: "\r\n") }))
                             .font(.system(.body, design: .monospaced))
                     }
-                    .id(s)                                           // při změně výběru nové pole, žádný přenos stavu
+                    .id(s)                                           // a new field when the selection changes, no state carried over
                 } else {
                     Text(L("Vyberte zprávu vlevo")).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -88,12 +88,12 @@ struct MessagesEditor: View {
 }
 
 extension Color {
-    /// `#RRGGBB` → barva (nil = neplatné).
+    /// `#RRGGBB` → color (nil = invalid).
     init?(hex: String?) {
         guard let h = Macro.validColor(hex), let v = UInt32(h.dropFirst(), radix: 16) else { return nil }
         self.init(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
     }
-    /// Světlá barva (žlutá, světle zelená…) potřebuje tmavý text.
+    /// A light color (yellow, light green…) needs dark text.
     var isLight: Bool {
         guard let c = NSColor(self).usingColorSpace(.sRGB) else { return false }
         return 0.299 * c.redComponent + 0.587 * c.greenComponent + 0.114 * c.blueComponent > 0.6

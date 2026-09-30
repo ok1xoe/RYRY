@@ -61,7 +61,7 @@ func serialPTT(method: PTTMethod, invert: Bool) async throws {
     try await ptt.prepare()
     port.failLines = true
     rig.offline = true
-    await ptt.forceOff()           // nesmí hodit ani viset
+    await ptt.forceOff()           // must neither throw nor hang
 }
 
 @Test func reverse5() {

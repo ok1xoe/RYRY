@@ -11,17 +11,17 @@ import Localization
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var model: AppModel?
 
-    /// Při ukončení vždy bezpečně RX, PTT off, zastavit API.
+    /// On quit always go safely to RX, PTT off, stop the API.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let model else { return .terminateNow }
         Task { @MainActor in
-            await model.shutdown(timeout: .seconds(3))      // RX + PTT off hned, stop max. 3 s
+            await model.shutdown(timeout: .seconds(3))      // RX + PTT off at once, stop at most 3 s
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
     }
 
-    /// Zavřením hlavního okna se aplikace ukončí (nesmí vysílat bez okna).
+    /// Closing the main window quits the app (it must not transmit without a window).
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Otevře přibalenou HTML příručku v jazyce rozhraní (čeština, jinak angličtina).
+/// Opens the bundled HTML manual in the UI language (Czech, otherwise English).
 @MainActor func openManual() {
     let lang = Localizer.shared.code == "cs" ? "cs" : "en"
     guard let r = Bundle.main.resourceURL?.appendingPathComponent("Help/\(lang)/index.html"),
@@ -71,13 +71,13 @@ struct MMTTY4MacApp: App {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
-    /// Jazyk rozhraní z minulého spuštění (spouštěcí parametr -language en přepíše volbu).
-    /// Hlídá složku jazyků – uložený soubor se projeví hned.
+    /// The UI language from the previous launch (the -language en launch argument overrides the choice).
+    /// Watches the languages folder – a saved file takes effect at once.
     private let languageWatcher: LanguageWatcher
 
     init() {
         let lib = LanguageLibrary.standard()
-        lib.seedUserDirectory()                  // cs.json, en.json do složky jazyků (k úpravám)
+        lib.seedUserDirectory()                  // cs.json, en.json into the languages folder (for editing)
         lib.restore()
         languageWatcher = LanguageWatcher(library: lib)
         languageWatcher.start()
@@ -89,14 +89,14 @@ struct MMTTY4MacApp: App {
                 .environment(\.showHints, model.settings.display.showHints)
                 .task {
                     delegate.model = model
-                    // spouštěcí parametr -openSettings YES (+ -settingsTab N): otevřít Nastavení (snímky obrazovky, podpora)
+                    // the -openSettings YES launch argument (+ -settingsTab N): open Settings (screenshots, support)
                     if UserDefaults.standard.bool(forKey: "openSettings") { openSettings() }
-                    // -switchLanguage cs: za 4 s přepnout jazyk jako výběrem v Nastavení (zkouška živého přepnutí)
+                    // -switchLanguage cs: after 4 s switch the language as if chosen in Settings (live switch test)
                     if let c = UserDefaults.standard.string(forKey: "switchLanguage") {
                         try? await Task.sleep(for: .seconds(4))
                         LanguageLibrary.standard().select(c)
                     }
-                    // -openWindow log,scope: otevřít okna (snímky obrazovky do dokumentace)
+                    // -openWindow log,scope: open the windows (screenshots for the documentation)
                     for id in (UserDefaults.standard.string(forKey: "openWindow") ?? "").split(separator: ",") {
                         openWindow(id: String(id))
                     }
@@ -179,8 +179,11 @@ struct MMTTY4MacApp: App {
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
                 Button(L("Scope demodulátoru")) { openWindow(id: "scope") }
                 Button(L("Spoty")) { openWindow(id: "spots") }
+                Button(L("Filtr pásem")) { openWindow(id: SpotFilterWindowID.bands) }
+                Button(L("Filtr módů")) { openWindow(id: SpotFilterWindowID.modes) }
                 Button(L("Band mapa")) { openWindow(id: "bandmapwindow") }
                 Button(L("Násobiče")) { openWindow(id: "multipliers") }
+                Button(L("Skóre")) { openWindow(id: "score") }
                 Divider()
                 Toggle(L("2. dekodér"), isOn: Binding(get: { model.settings.decoders.secondEnabled },
                                                       set: { v in Task { await model.setSecondDecoder(v) } }))
@@ -198,11 +201,23 @@ struct MMTTY4MacApp: App {
         Window(L("Spoty"), id: "spots") {
             SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
+        // filtr zobrazení spotů ve dvou samostatných oknech (zaškrtávátka pásem a skupin módů)
+        Window(L("Filtr pásem"), id: SpotFilterWindowID.bands) {
+            SpotBandFilterWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        .windowResizability(.contentSize)
+        Window(L("Filtr módů"), id: SpotFilterWindowID.modes) {
+            SpotModeFilterWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        .windowResizability(.contentSize)
         Window(L("Band mapa"), id: "bandmapwindow") {
             BandMapWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
         Window(L("Násobiče"), id: "multipliers") {
             MultipliersWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+        }
+        Window(L("Skóre"), id: "score") {
+            ScoreWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
         Window(L("Kanály"), id: "channels") {
             ChannelsWindow(model: model).environment(\.showHints, model.settings.display.showHints)

@@ -11,7 +11,7 @@ private func tmp() -> URL {
 
 private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Audio", "Spojení: %d": "QSOs: %d"])
 
-// Bez načteného jazyka (čeština) vrací klíč; po načtení překlad, chybějící klíč zůstane česky
+// With no language loaded (Czech) the key is returned; after loading, the translation, and a missing key stays in Czech
 @Test func translatesWithFallback() {
     let l = Localizer()
     #expect(l.tr("Zvuk") == "Zvuk")
@@ -22,7 +22,7 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(l.tr("Zvuk") == "Zvuk" && l.code == "cs")
 }
 
-// Změna jazyka se ohlásí přes Observation (SwiftUI překreslí všechna okna)
+// A language change is announced through Observation (SwiftUI redraws all the windows)
 @Test func languageChangeIsObservable() {
     let l = Localizer()
     nonisolated(unsafe) var fired = false
@@ -31,7 +31,7 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(fired)
 }
 
-// Soubor jazyka: JSON s kódem, názvem a tabulkou; prázdné hodnoty se ignorují (neúplný překlad)
+// A language file: JSON with a code, a name and a table; empty values are ignored (an incomplete translation)
 @Test func packDecoding() throws {
     let json = #"{"code":"de","name":"Deutsch","version":1,"strings":{"Zvuk":"Ton","Rig":""}}"#
     let p = try LanguagePack.decode(Data(json.utf8))
@@ -45,14 +45,14 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(throws: LanguagePack.PackError.self) { try LanguagePack.decode(Data(#"{"code":"","name":"X","strings":{}}"#.utf8)) }
 }
 
-// Překlad s jiným počtem/typem zástupných znaků než klíč se nepoužije (String(format:) by spadl)
+// A translation with a different number/type of placeholders than the key is not used (String(format:) would crash)
 @Test func mismatchedPlaceholdersFallBack() {
     let l = Localizer()
     l.use(LanguagePack(code: "xx", name: "X", strings: ["Spojení: %d": "QSO %@ %d"]))
     #expect(l.tr("Spojení: %d", 3) == "Spojení: 3")
 }
 
-// Knihovna: přibalené + nahrané jazyky; nahrání zkopíruje soubor do složky jazyků
+// The library: the bundled plus the loaded languages; loading copies the file into the languages folder
 @Test func libraryImportAndList() throws {
     let bundled = tmp(), user = tmp()
     try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
@@ -65,19 +65,19 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(FileManager.default.fileExists(atPath: user.appendingPathComponent("de.json").path))
     #expect(lib.available().map(\.code) == ["de", "en"])
     #expect(lib.pack(code: "de")?.strings["Zvuk"] == "Ton")
-    // nahraný soubor stejného kódu má přednost před přibaleným
+    // a loaded file with the same code takes precedence over the bundled one
     _ = try lib.importPack(from: { let u = tmp().appendingPathComponent("en.json")
         try! LanguagePack(code: "en", name: "English (mine)", strings: [:]).encoded().write(to: u); return u }())
     #expect(lib.pack(code: "en")?.name == "English (mine)")
 }
 
-// Šablona pro překladatele: všechny klíče, hodnoty z referenčního jazyka
+// A template for translators: all the keys, with the values from the reference language
 @Test func templateHasAllKeys() throws {
     let t = LanguagePack.template(from: en)
     #expect(t.code == "xx" && Set(t.strings.keys) == Set(en.strings.keys) && t.strings["Zvuk"] == "Audio")
 }
 
-// Volba jazyka se zapamatuje a po restartu obnoví; zmizelý soubor → čeština
+// The language choice is remembered and restored after a restart; a file that is gone → Czech
 @Test func selectionPersists() throws {
     let bundled = tmp(), user = tmp()
     try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
@@ -100,7 +100,7 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(Localizer.placeholders("%m moje · %l zalogovat · %N") == [])
 }
 
-// Bez uložené volby je rozhraní anglicky; výslovně zvolená čeština se pamatuje
+// With no stored choice the interface is in English; Czech chosen explicitly is remembered
 @Test func defaultLanguageIsEnglish() throws {
     let bundled = tmp(), user = tmp()
     try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
@@ -116,14 +116,14 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
 }
 
 
-// Čeština je normální jazykový soubor (lze ho nahrát a upravit)
+// Czech is an ordinary language file (it can be loaded and edited)
 @Test func czechPackAllowed() throws {
     let p = try LanguagePack.decode(Data(#"{"code":"cs","name":"Čeština","strings":{"Zvuk":"Audio karta"}}"#.utf8))
     let l = Localizer(); l.use(p)
     #expect(l.code == "cs" && l.tr("Zvuk") == "Audio karta" && l.tr("Rig") == "Rig")
 }
 
-// Upravený soubor ve složce má přednost, chybějící texty doplní přibalená verze
+// An edited file in the folder takes precedence, missing texts are filled in from the bundled version
 @Test func userPackOverlaysBundled() throws {
     let bundled = tmp(), user = tmp()
     try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
@@ -133,7 +133,7 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(p.name == "English (mine)" && p.strings["Zvuk"] == "Sound" && p.strings["Spojení: %d"] == "QSOs: %d")
 }
 
-// Při startu se přibalené jazyky zkopírují do složky; neupravené kopie se s novou verzí obnoví, upravené ne
+// At start-up the bundled languages are copied into the folder; unedited copies are refreshed with a new version, edited ones are not
 @Test func seedUserDirectory() throws {
     let bundled = tmp(), user = tmp()
     try en.encoded().write(to: bundled.appendingPathComponent("en.json"))
@@ -141,12 +141,12 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     lib.seedUserDirectory()
     let u = user.appendingPathComponent("en.json")
     #expect(try LanguagePack.decode(Data(contentsOf: u)) == en)
-    // nová verze aplikace: neupravená kopie se obnoví
+    // a new version of the application: the unedited copy is refreshed
     var v2 = en; v2.strings["Zvuk"] = "Sound card"
     try v2.encoded().write(to: bundled.appendingPathComponent("en.json"))
     lib.seedUserDirectory()
     #expect(try LanguagePack.decode(Data(contentsOf: u)).strings["Zvuk"] == "Sound card")
-    // uživatel kopii upravil → další verze ji nepřepíše
+    // the user edited the copy → the next version does not overwrite it
     var mine = v2; mine.strings["Zvuk"] = "My audio"
     try mine.encoded().write(to: u)
     var v3 = v2; v3.strings["Zvuk"] = "Audio v3"
@@ -156,7 +156,7 @@ private let en = LanguagePack(code: "en", name: "English", strings: ["Zvuk": "Au
     #expect(lib.pack(code: "en")?.strings["Zvuk"] == "My audio")
 }
 
-// Uložení upraveného souboru ve složce jazyků se projeví hned (bez restartu)
+// Saving an edited file in the languages folder takes effect immediately (without a restart)
 @Test func editedFileAppliesLive() async throws {
     let bundled = tmp(), user = tmp()
     try en.encoded().write(to: bundled.appendingPathComponent("en.json"))

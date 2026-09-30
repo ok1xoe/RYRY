@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Test klienta: bez argumentu jen JSON, s URI i proti běžícímu mmtty4mac (rtty-tool live / aplikace). */
+/** Client test: with no argument JSON only, with a URI also against a running mmtty4mac (rtty-tool live / the app). */
 public final class SelfTest {
     static int failures = 0;
     static void check(boolean ok, String what) {
@@ -19,14 +19,14 @@ public final class SelfTest {
         System.out.println("JSON:");
         Object o = Json.parse("{\"a\":[1,2.5,\"x\\n\\u00e9\",true,null],\"b\":{}}");
         Map<String, Object> m = (Map<String, Object>) o;
-        check(((List<Object>) m.get("a")).get(0).equals(1L), "celé číslo → Long");
-        check(((List<Object>) m.get("a")).get(1).equals(2.5), "desetinné → Double");
-        check(((List<Object>) m.get("a")).get(2).equals("x\né"), "escape a \\u");
-        check(Json.write(Map.of("t", "a\"b\r\n")).equals("{\"t\":\"a\\\"b\\r\\n\"}"), "zápis řetězce");
-        check(Json.write(14083000.0).equals("14083000"), "celé double bez .0");
+        check(((List<Object>) m.get("a")).get(0).equals(1L), "integer → Long");
+        check(((List<Object>) m.get("a")).get(1).equals(2.5), "decimal → Double");
+        check(((List<Object>) m.get("a")).get(2).equals("x\né"), "escape and \\u");
+        check(Json.write(Map.of("t", "a\"b\r\n")).equals("{\"t\":\"a\\\"b\\r\\n\"}"), "writing a string");
+        check(Json.write(14083000.0).equals("14083000"), "whole double without .0");
         boolean threw = false;
         try { Json.parse("{\"a\":}"); } catch (IllegalArgumentException e) { threw = true; }
-        check(threw, "neplatný JSON → výjimka");
+        check(threw, "invalid JSON → an exception");
 
         if (args.length > 0) {
             System.out.println("Server " + args[0] + ":");
@@ -43,16 +43,16 @@ public final class SelfTest {
                 c.setMark(2100);
                 check(((Number) c.getParams().get("mark")).doubleValue() == 2100, "modem.setParams mark");
                 c.setMark(2125);
-                try { c.call("no.such.method"); check(false, "neznámá metoda"); }
-                catch (Mmtty4macClient.RpcException e) { check(e.code == -32601, "neznámá metoda → -32601"); }
-                try { c.runMacro(99); check(false, "špatné makro"); }
-                catch (Mmtty4macClient.RpcException e) { check(e.code == -32602, "špatné makro → -32602"); }
+                try { c.call("no.such.method"); check(false, "unknown method"); }
+                catch (Mmtty4macClient.RpcException e) { check(e.code == -32601, "unknown method → -32601"); }
+                try { c.runMacro(99); check(false, "bad macro"); }
+                catch (Mmtty4macClient.RpcException e) { check(e.code == -32602, "bad macro → -32602"); }
                 c.clearQso();
                 Thread.sleep(300);
-                check(events.contains("qso.changed"), "notifikace qso.changed");
+                check(events.contains("qso.changed"), "the qso.changed notification");
             }
         }
-        System.out.println(failures == 0 ? "VŠE OK" : failures + " CHYB");
+        System.out.println(failures == 0 ? "ALL OK" : failures + " FAILURES");
         System.exit(failures == 0 ? 0 : 1);
     }
 }

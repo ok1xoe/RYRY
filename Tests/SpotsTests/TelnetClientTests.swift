@@ -3,7 +3,7 @@ import Network
 import Testing
 @testable import Spots
 
-/// Lokální „cluster“: pošle výzvu, po přihlášení uvítání a spoty; zaznamenává, co klient poslal.
+/// A local "cluster": it sends a prompt, then a greeting and spots after the login; it records what the client sent.
 final class FakeCluster: @unchecked Sendable {
     private let listener: NWListener
     private let queue = DispatchQueue(label: "FakeCluster")
@@ -13,13 +13,15 @@ final class FakeCluster: @unchecked Sendable {
     let prompt: String
     let spots: [String]
     let dropAfterSpots: Bool
+    /// The replies to commands after the login (the key = the command).
+    let responses: [String: [String]]
     private(set) var port: UInt16 = 0
 
     var received: [String] { lock.withLock { _received } }
     var connections: Int { lock.withLock { _connections } }
 
-    init(prompt: String = "login: ", spots: [String], dropAfterSpots: Bool = false) throws {
-        self.prompt = prompt; self.spots = spots; self.dropAfterSpots = dropAfterSpots
+    init(prompt: String = "login: ", spots: [String], dropAfterSpots: Bool = false, responses: [String: [String]] = [:]) throws {
+        self.prompt = prompt; self.spots = spots; self.dropAfterSpots = dropAfterSpots; self.responses = responses
         listener = try NWListener(using: .tcp, on: .any)
     }
 
@@ -40,7 +42,7 @@ final class FakeCluster: @unchecked Sendable {
     private func handle(_ c: NWConnection) {
         lock.withLock { _connections += 1 }
         c.start(queue: queue)
-        // telnetová vyjednávání + výzva bez konce řádku
+        // the telnet negotiations + a prompt with no line ending
         c.send(content: Data([255, 253, 24]) + Data(prompt.utf8), completion: .idempotent)
         nonisolated(unsafe) var buf = ""
         nonisolated(unsafe) var loggedIn = false
@@ -51,6 +53,9 @@ final class FakeCluster: @unchecked Sendable {
                 while let r = buf.range(of: "\r\n") {
                     let line = String(buf[..<r.lowerBound]); buf.removeSubrange(..<r.upperBound)
                     self.lock.withLock { self._received.append(line) }
+                    if loggedIn, let r = self.responses[line] {
+                        c.send(content: Data((r.joined(separator: "\r\n") + "\r\n").utf8), completion: .idempotent)
+                    }
                     if !loggedIn {
                         loggedIn = true
                         let text = "Hello, " + line + "\r\n" + self.spots.joined(separator: "\r\n") + "\r\n"
@@ -84,7 +89,7 @@ final class Collector: @unchecked Sendable {
     func add(_ s: TelnetSpotClient.State) { lock.withLock { _states.append(s) } }
 }
 
-/// Čas HHMMZ aktuální minuty (spoty musí být „čerstvé“, aby je seznam přijal).
+/// The time HHMMZ of the current minute (spots have to be "fresh" for the list to accept them).
 func hhmmZ(_ d: Date = Date()) -> String {
     var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!
     let p = c.dateComponents([.hour, .minute], from: d)
@@ -104,9 +109,9 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     defer { server.stop() }
     let col = Collector()
     var cfg = TelnetSpotClient.Config(host: "127.0.0.1", port: server.port, login: "OK1XOE",
-                                      commands: ["set/skimmer", "sh/dx 30"], source: .cluster, rttyOnly: false)
+                                      commands: ["set/skimmer", "sh/dx 30"], source: .cluster)
     cfg.initialDelay = 0.05
-    // hodiny nastavené tak, aby HHMM ve spotech bylo „dnes“
+    // the clock set so that the HHMM in the spots falls on "today"
     let now = Date()
     let client = TelnetSpotClient(config: cfg, now: { now }, onSpots: { col.add($0) }, onState: { col.add($0) })
     await client.start()
@@ -117,18 +122,19 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     await client.stop()
 }
 
-@Test func clientFiltersRTTYOnly() async throws {
+// The client does not filter modes: "RTTY only" is just a display filter (SpotBook.visible), spots are not discarded on reception.
+@Test func clientPassesAllModes() async throws {
     let server = try FakeCluster(prompt: "Please enter your call: ", spots: sampleLines())
     await server.start()
     defer { server.stop() }
     let col = Collector()
-    var cfg = TelnetSpotClient.Config(host: "127.0.0.1", port: server.port, login: "OK1XOE", source: .rbn, rttyOnly: true)
+    var cfg = TelnetSpotClient.Config(host: "127.0.0.1", port: server.port, login: "OK1XOE", source: .rbn)
     cfg.initialDelay = 0.05
     let client = TelnetSpotClient(config: cfg, onSpots: { col.add($0) }, onState: { col.add($0) })
     await client.start()
-    #expect(await waitUntil { col.spots.count >= 2 })
+    #expect(await waitUntil { col.spots.count >= 3 })
     try await Task.sleep(for: .milliseconds(100))
-    #expect(col.spots.map(\.call) == ["DL1ABC", "JA1XYZ"])
+    #expect(col.spots.map(\.call) == ["DL1ABC", "UA3XYZ", "JA1XYZ"])
     #expect(col.spots.allSatisfy { $0.source == .rbn })
     await client.stop()
 }
@@ -148,7 +154,7 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
 }
 
 @Test func clientRetriesWhenServerDown() async throws {
-    // port, na kterém nikdo neposlouchá: uvolníme ho po startu listeneru
+    // a port nobody is listening on: we release it once the listener has started
     let server = try FakeCluster(spots: [])
     await server.start()
     let port = server.port
@@ -179,17 +185,16 @@ func sampleLines(_ t: String = hhmmZ()) -> [String] { [
     let now = Date()
     let feed = SpotFeed(clock: { now })
     var cfg = SpotFeedConfig(call: "OK1XOE", cluster: SpotEndpoint(host: "127.0.0.1", port: cluster.port),
-                             rbn: SpotEndpoint(host: "127.0.0.1", port: rbn.port), rttyOnly: false)
+                             rbn: SpotEndpoint(host: "127.0.0.1", port: rbn.port), filter: .all)
     cfg.clientTuning = (0.05, 0.1)
     feed.start(cfg)
     #expect(await waitUntil { await MainActor.run { feed.book.count >= 2 && feed.clusterState == .connected && feed.rbnState == .connected } })
     let v = feed.visible
-    #expect(v.map(\.call).sorted() == ["DL1ABC", "UA3XYZ"])              // DL1ABC jen jednou
-    feed.rttyOnly = true
+    #expect(v.map(\.call).sorted() == ["DL1ABC", "UA3XYZ"])              // DL1ABC only once
+    feed.filter.modes = [.rtty]
     #expect(feed.visible.map(\.call) == ["DL1ABC"])
-    feed.bandFilter = "40m"
+    feed.filter.bands = ["40m"]
     #expect(feed.visible.isEmpty)
-    #expect(feed.bands == ["20m"])
     feed.stop()
     #expect(feed.clusterState == .off && !feed.isRunning)
 }

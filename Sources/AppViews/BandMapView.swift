@@ -13,14 +13,14 @@ extension BandMapMarker.Status {
     }
 }
 
-/// Štítky spotů (band map) nad vodopádem/spektrem + svislé tečkované čáry; klik na štítek = mark na pozici spotu + značka do QSO.
+/// Spot labels (band map) above the waterfall/spectrum plus vertical dotted lines; clicking a label sets the mark to the spot's position and puts the call into the QSO panel.
 struct BandMapOverlay: View {
     @Bindable var model: AppModel
-    /// Odsazení prvního řádku od horního okraje (místo pro stupnici/menu).
+    /// Inset of the first row from the top edge (room for the scale/menu).
     var topInset: CGFloat = 16
     static let rowHeight: CGFloat = 15
 
-    /// Šířka štítku v bodech (monospace caption2 ≈ 6 bodů na znak + okraje).
+    /// Label width in points (monospace caption2 ≈ 6 points per character plus margins).
     static func width(of m: BandMapMarker) -> CGFloat { CGFloat(m.spot.call.count) * 6.2 + 10 }
 
     var body: some View {

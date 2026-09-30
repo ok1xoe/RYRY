@@ -22,14 +22,14 @@ Asiatic Russia:           17:  30:  AS:   55.88:   -84.08:    -7.0:  UA9:
     let ok = try #require(db.lookup("OK1XOE"))
     #expect(ok.name == "Czech Republic" && ok.continent == "EU" && ok.cqZone == 15 && ok.ituZone == 28)
     #expect(ok.utcOffsetHours == 1 && ok.primaryPrefix == "OK")
-    #expect(ok.latitude == 50 && ok.longitude == 16)              // cty.dat: západ kladně → převod na východ kladně
+    #expect(ok.latitude == 50 && ok.longitude == 16)              // cty.dat: west positive → converted to east positive
 }
 
 @Test func exactCallsAndOverrides() throws {
     let db = try CountryDB(text: fixture)
     let x = try #require(db.lookup("DL0XX"))
     #expect(x.name == "Fed. Rep. of Germany" && x.cqZone == 15 && x.ituZone == 29)
-    #expect(db.lookup("DL0XXA")?.cqZone == 14)                     // přesná značka neplatí pro delší
+    #expect(db.lookup("DL0XXA")?.cqZone == 14)                     // an exact call does not apply to longer ones
     let w = try #require(db.lookup("W1AW"))
     #expect(w.cqZone == 5 && w.ituZone == 8 && w.latitude == 41.7 && w.longitude == -72.7 && w.utcOffsetHours == -5)
     let r = try #require(db.lookup("R9ABC"))
@@ -39,7 +39,7 @@ Asiatic Russia:           17:  30:  AS:   55.88:   -84.08:    -7.0:  UA9:
 @Test func longestPrefixWins() throws {
     let db = try CountryDB(text: fixture)
     #expect(db.lookup("KH6XYZ")?.name == "Hawaii")
-    #expect(db.lookup("KH6ABC")?.name == "United States")          // delší prefix z jiné země
+    #expect(db.lookup("KH6ABC")?.name == "United States")          // a longer prefix from a different entity
     #expect(db.lookup("K1ABC")?.name == "United States")
     #expect(db.lookup("Q1ABC") == nil)
     #expect(db.lookup("") == nil)
@@ -74,8 +74,8 @@ func portableCalls(call: String, country: String) throws {
     #expect(db.lookup("JA1XYZ")?.utcOffsetHours == 9)
 }
 
-// Review I-5: M, R, B jsou prefixy zemí (Anglie, Rusko, Čína), modifikátory jen jako přípona;
-// entity jen pro WAE (*IT9 …) nejsou země DXCC.
+// Review I-5: M, R, B are entity prefixes (England, Russia, China), modifiers only as a suffix;
+// WAE-only entities (*IT9 …) are not DXCC entities.
 @Test func realCtyPortablePrefixesAndWAE() throws {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().appendingPathComponent("Resources/cty.dat")
@@ -89,7 +89,7 @@ func portableCalls(call: String, country: String) throws {
     #expect(db.lookup("OK1XOE/P")?.name == "Czech Republic")
 }
 
-// Násobiče: CQ WW a WAE počítají i země ze seznamu WAE (*IT9, *GM/s, *TA1, *4U1V, *JW/b, *IG9).
+// Multipliers: CQ WW and WAE also count the entities from the WAE list (*IT9, *GM/s, *TA1, *4U1V, *JW/b, *IG9).
 @Test func waeListLookup() throws {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().appendingPathComponent("Resources/cty.dat")
@@ -100,8 +100,8 @@ func portableCalls(call: String, country: String) throws {
     #expect(db.lookup("TA1ABC", wae: true)?.name == "European Turkey")
     #expect(db.lookup("IG9ABC", wae: true)?.name == "African Italy")
     #expect(db.lookup("4U1VIC", wae: true)?.name == "Vienna Intl Ctr")
-    #expect(db.lookup("I1ABC", wae: true)?.name == "Italy")                 // mimo seznam WAE = DXCC
+    #expect(db.lookup("I1ABC", wae: true)?.name == "Italy")                 // outside the WAE list = DXCC
     #expect(db.lookup("OK1XOE", wae: true)?.name == "Czech Republic")
     #expect(db.lookup("IT9ABC/P", wae: true)?.name == "Sicily")
-    #expect(db.count > 300 && db.count < 400)                               // count = jen země DXCC
+    #expect(db.count > 300 && db.count < 400)                               // count = DXCC entities only
 }

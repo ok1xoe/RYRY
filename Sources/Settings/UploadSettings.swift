@@ -1,11 +1,11 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Nahrávání spojení na LoTW (TQSL), eQSL a Club Log. Hesla a API klíč jsou v Klíčence, ne tady.
+/// Uploading QSOs to LoTW (TQSL), eQSL and Club Log. Passwords and the API key are in the Keychain, not here.
 public struct UploadSettings: Codable, Sendable, Equatable {
     public var lotwEnabled = false
-    public var lotwLocation = ""            // název Station Location v TQSL
-    public var lotwTqslPath = ""            // prázdné = autodetekce
+    public var lotwLocation = ""            // name of the Station Location in TQSL
+    public var lotwTqslPath = ""            // empty = autodetect
     public var lotwAuto = false
     public var eqslEnabled = false
     public var eqslUser = ""

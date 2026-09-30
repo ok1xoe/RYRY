@@ -65,31 +65,31 @@ public struct FSKSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// hamlib/flrig přes síť, vestavěný CAT přes USB sériový port, nebo hamlib spuštěný aplikací.
+/// hamlib/flrig over the network, the built-in CAT over a USB serial port, or hamlib launched by the app.
 public enum RigType: String, Codable, Sendable, CaseIterable { case none, hamlib, flrig, cat, hamlibManaged }
-/// Protokol vestavěného CAT.
+/// Protocol of the built-in CAT.
 public enum CATKind: String, Codable, Sendable, CaseIterable { case icom, yaesu, kenwood, elecraft }
 
 public struct RigSettings: Codable, Sendable, Equatable {
     public var type: RigType = .none
     public var host = "127.0.0.1"
-    public var port: Int?                     // nil = výchozí (4532 / 12345)
-    /// CAT přes USB (vestavěný i hamlib spuštěný aplikací): sériový port a rychlost.
+    public var port: Int?                     // nil = default (4532 / 12345)
+    /// CAT over USB (both the built-in one and hamlib launched by the app): serial port and speed.
     public var serialPort = ""
     public var baud = 19200
     public var stopBits = 1
     public var catProtocol = CATKind.icom
-    /// Adresa CI-V rádia Icom (IC-7300 = 94h).
+    /// CI-V address of an Icom radio (IC-7300 = 94h).
     public var civAddress = 0x94
-    /// Číslo modelu hamlib (`rigctld -l`), 1 = Dummy.
+    /// hamlib model number (`rigctld -l`), 1 = Dummy.
     public var hamlibModel = 1
-    /// RTS na portu CAT zapnuté (nil = podle protokolu: Yaesu ano – menu „CAT RTS“).
+    /// RTS on the CAT port enabled (nil = according to the protocol: Yaesu yes – the "CAT RTS" menu).
     public var catRTS: Bool?
     public var effectiveCatRTS: Bool { catRTS ?? (catProtocol == .yaesu) }
     public init() {}
     public var effectivePort: Int { port ?? (type == .flrig ? 12345 : 4532) }
     public static let baudRates = [4800, 9600, 19200, 38400, 57600, 115200]
-    /// Výchozí adresy CI-V běžných rádií Icom.
+    /// Default CI-V addresses of common Icom radios.
     public static let icomAddresses: [(String, Int)] = [("IC-7300", 0x94), ("IC-7610", 0x98), ("IC-705", 0xA4), ("IC-9700", 0xA2),
                                                         ("IC-7100", 0x88), ("IC-7851", 0x8E), ("IC-7600", 0x7A), ("IC-7000", 0x70),
                                                         ("IC-7410", 0x80), ("IC-718", 0x5E), ("IC-7300MK2", 0xB6)]
@@ -110,7 +110,7 @@ public struct RigSettings: Codable, Sendable, Equatable {
 public struct APISettings: Codable, Sendable, Equatable {
     public var fldigiEnabled = true, fldigiPort = 7362
     public var jsonRPCEnabled = true, jsonRPCPort = 7363
-    public var allowRemote = false            // false = jen 127.0.0.1
+    public var allowRemote = false            // false = only 127.0.0.1
     public init() {}
     enum CodingKeys: String, CodingKey { case fldigiEnabled, fldigiPort, jsonRPCEnabled, jsonRPCPort, allowRemote }
     public init(from d: Decoder) throws {
@@ -123,7 +123,7 @@ public struct APISettings: Codable, Sendable, Equatable {
 
 public enum CallbookKind: String, Codable, Sendable, CaseIterable { case none, qrz, hamqth }
 
-/// Vyhledání značky v callbooku (QRZ.com / HamQTH). Heslo je v Klíčence, ne tady.
+/// Callsign lookup in a callbook (QRZ.com / HamQTH). The password is in the Keychain, not here.
 public struct CallbookSettings: Codable, Sendable, Equatable {
     public var service: CallbookKind = .none
     public var username = ""
@@ -138,7 +138,7 @@ public struct CallbookSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Soubor historie značek (N1MM Call History): předvyplnění jména, lokátoru a výměny protistanice.
+/// Call history file (N1MM Call History): prefilling the other station's name, locator and exchange.
 public struct CallHistorySettings: Codable, Sendable, Equatable {
     public var enabled = false
     public var path = ""
@@ -156,22 +156,22 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
     public var name: String
     public var text: String
     public var repeatSeconds: Double?
-    /// Barva tlačítka `#RRGGBB` (MMTTY: barva tlačítka makra); nil = výchozí.
+    /// Button color `#RRGGBB` (MMTTY: macro button color); nil = default.
     public var color: String?
     public init(name: String, text: String, repeatSeconds: Double? = nil, color: String? = nil) {
         self.name = name; self.text = text; self.repeatSeconds = Self.validRepeat(repeatSeconds); self.color = Self.validColor(color)
     }
     static var fallback: Macro { Macro(name: "", text: "") }
-    /// Makro nic neobsahuje (jen bílé znaky) – spuštěním by se nic neodvysílalo.
+    /// The macro contains nothing (only whitespace) – running it would transmit nothing.
     public var isBlank: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    /// Povolený interval opakování makra (s).
+    /// Allowed macro repeat interval (s).
     public static let repeatRange = 0.1...3600.0
-    /// Interval opakování v rozsahu 0,1–3600 s, jinak nil (nekonečno, NaN, záporné, obří hodnoty).
+    /// Repeat interval in the range 0.1–3600 s, otherwise nil (infinity, NaN, negative, huge values).
     public static func validRepeat(_ s: Double?) -> Double? {
         guard let s, s.isFinite, repeatRange.contains(s) else { return nil }
         return s
     }
-    /// Jen `#RRGGBB`, jinak nil.
+    /// Only `#RRGGBB`, otherwise nil.
     public static func validColor(_ c: String?) -> String? {
         guard let c, c.count == 7, c.first == "#", c.dropFirst().allSatisfy(\.isHexDigit) else { return nil }
         return c.uppercased()
@@ -187,15 +187,15 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
 
 public struct LogSettings: Codable, Sendable, Equatable {
     public var directory: String = NSHomeDirectory() + "/Documents/mmtty4mac"
-    /// Název logu (soubory `<název>.jsonl`, `<název>.adi`).
+    /// Log name (the files `<name>.jsonl`, `<name>.adi`).
     public var name = "mmtty4mac"
-    /// Naposledy otevřené logy (cesty k ADIF), nejnovější první.
+    /// Most recently opened logs (paths to the ADIF), newest first.
     public var recent: [String] = []
-    /// Ručně zadaná frekvence (Hz) pro spojení bez rigu – pamatuje se mezi spuštěními.
+    /// Manually entered frequency (Hz) for QSOs without a rig – remembered between runs.
     public var manualFrequency: Double?
-    /// Super Check Partial (MASTER.SCP + značky z logu) pod polem Call.
+    /// Super Check Partial (MASTER.SCP + calls from the log) under the Call field.
     public var superCheck = true
-    /// Automatická denní záloha logu (složka backup vedle logu) a kolik záloh držet.
+    /// Automatic daily log backup (the backup folder next to the log) and how many backups to keep.
     public var backup = true
     public var backupKeep = 10
     public static let recentLimit = 8
@@ -207,9 +207,9 @@ public struct LogSettings: Codable, Sendable, Equatable {
     static func validName(_ n: String) -> Bool {
         !n.isEmpty && n.count <= 200 && !n.contains("/") && !n.contains(":") && !n.hasPrefix(".")
     }
-    /// Průběžný záznam přijatého textu do `<directory>/rx/rx-YYYY-MM-DD.txt` (MMTTY „Log Rx file“).
+    /// Continuous recording of the received text into `<directory>/rx/rx-YYYY-MM-DD.txt` (MMTTY "Log Rx file").
     public var rxText = false
-    /// Časová značka UTC na začátku řádku záznamu příjmu.
+    /// UTC timestamp at the start of a line of the receive log.
     public var rxTimestamps = true
     public init() {}
     public var rxDirectory: URL { URL(fileURLWithPath: directory).appendingPathComponent("rx") }
@@ -230,11 +230,11 @@ public struct LogSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Korekce hodin zvukové karty v ppm (MMTTY „Clock“/„TX offset“).
+/// Sound card clock correction in ppm (MMTTY "Clock"/"TX offset").
 public struct ClockSettings: Codable, Sendable, Equatable {
     public var rxPPM = 0.0, txPPM = 0.0
     public init() {}
-    public static let limit = 20_000.0                 // jádro přijme ± 2 %
+    public static let limit = 20_000.0                 // the core accepts ± 2 %
     public var clampedRx: Double { min(Self.limit, max(-Self.limit, rxPPM.isFinite ? rxPPM : 0)) }
     public var clampedTx: Double { min(Self.limit, max(-Self.limit, txPPM.isFinite ? txPPM : 0)) }
     enum CodingKeys: String, CodingKey { case rxPPM, txPPM }
@@ -244,11 +244,11 @@ public struct ClockSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Nastavení jádra RTTY, která vyžadují restart modemu (MMTTY sys.m_CodeSet, m_dblsft, m_txuos).
+/// RTTY core settings that require a modem restart (MMTTY sys.m_CodeSet, m_dblsft, m_txuos).
 public struct RTTYCoreSettings: Codable, Sendable, Equatable {
-    public var japanese = false            // J-BELL místo US (S-BELL)
-    public var doubleShift = false         // LTRS/FIGS posílat 2×
-    public var txUOS = true                // unshift on space při vysílání
+    public var japanese = false            // J-BELL instead of US (S-BELL)
+    public var doubleShift = false         // send LTRS/FIGS twice
+    public var txUOS = true                // unshift on space when transmitting
     public init() {}
     enum CodingKeys: String, CodingKey { case japanese, doubleShift, txUOS }
     public init(from d: Decoder) throws {
@@ -258,15 +258,15 @@ public struct RTTYCoreSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Doplňkové dekodéry: druhý dekodér (jiný demodulátor) a vícekanálové dekódování.
+/// Additional decoders: a second decoder (a different demodulator) and multi-channel decoding.
 public struct DecoderSettings: Codable, Sendable, Equatable {
     public var secondEnabled = false
-    /// Demodulátor druhého dekodéru (iir/fir/pll/fft); nil = automaticky jiný než hlavní.
+    /// Demodulator of the second decoder (iir/fir/pll/fft); nil = automatically a different one from the main one.
     public var secondDemod: String?
     public var channelsEnabled = false
     public var maxChannels = 4              // 1…8
-    public var channelTimeoutS = 15.0       // kanál zaniká po tolika s bez signálu
-    public var showChannelMarks = true      // značky kanálů ve vodopádu
+    public var channelTimeoutS = 15.0       // a channel expires after this many s without a signal
+    public var showChannelMarks = true      // channel marks in the waterfall
     public init() {}
     public static let channelRange = 1...8
     public static let timeoutRange = 2.0...300.0
@@ -283,7 +283,7 @@ public struct DecoderSettings: Codable, Sendable, Equatable {
         showChannelMarks = c.tolerant(.showChannelMarks, x.showChannelMarks, w, s)
     }
 
-    /// Konfigurace doplňkových dekodérů pro Engine.
+    /// Configuration of the additional decoders for Engine.
     public func auxConfig() -> AuxDecoderConfig {
         var a = AuxDecoderConfig()
         a.secondEnabled = secondEnabled; a.secondDemod = secondDemod
@@ -294,13 +294,13 @@ public struct DecoderSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Závodní formát (MMTTY Log m_Contest): ON = RST + číslo, CQ/RJ = zóna + QTH, BARTG = číslo + čas UTC,
-/// PED = klik na slovo vždy vyplní značku, bez čísel. WAE = RST + číslo a výměna QTC (WAE DX Contest).
-/// ZONE = RST + CQ zóna (OK DX RTTY Contest).
+/// Contest format (MMTTY Log m_Contest): ON = RST + serial, CQ/RJ = zone + QTH, BARTG = serial + UTC time,
+/// PED = a click on a word always fills the call, without serials. WAE = RST + serial and the QTC exchange (WAE DX Contest).
+/// ZONE = RST + CQ zone (OK DX RTTY Contest).
 public enum ContestFormat: String, Codable, Sendable, CaseIterable { case serial, cqrj, bartg, ped, wae, zone }
 
-/// Předvolby známých RTTY závodů (název pro Cabrillo, formát, začátek) – v pořadí kalendářního roku.
-/// Termíny podle obvyklých pravidel; přesné datum je třeba ověřit v pravidlech závodu.
+/// Presets of known RTTY contests (name for Cabrillo, format, start) – in calendar year order.
+/// The dates follow the usual rules; the exact date needs to be verified in the contest rules.
 public enum ContestPreset: String, CaseIterable, Codable, Sendable {
     case arrlRoundup, cqwpxRTTY, bartgHF, sartgRTTY, cqwwRTTY, makrothen, jartsRTTY, waeRTTY, okDXRTTY
     public var title: String {
@@ -316,7 +316,7 @@ public enum ContestPreset: String, CaseIterable, Codable, Sendable {
         case .okDXRTTY: return "OK DX RTTY Contest"
         }
     }
-    /// CONTEST: v Cabrillu.
+    /// CONTEST: in Cabrillo.
     public var cabrilloName: String {
         switch self {
         case .arrlRoundup: return "ARRL-RTTY"
@@ -339,7 +339,7 @@ public enum ContestPreset: String, CaseIterable, Codable, Sendable {
         case .arrlRoundup, .cqwpxRTTY, .sartgRTTY, .makrothen, .jartsRTTY: return .serial
         }
     }
-    /// Termín: měsíc, kolikátý celý víkend (0 = poslední) a hodina začátku v sobotu (UTC).
+    /// Date: month, which full weekend (0 = the last one) and the start hour on Saturday (UTC).
     var schedule: (month: Int, weekend: Int, hour: Int) {
         switch self {
         case .arrlRoundup: return (1, 1, 18)
@@ -353,7 +353,16 @@ public enum ContestPreset: String, CaseIterable, Codable, Sendable {
         case .okDXRTTY: return (12, 3, 0)
         }
     }
-    /// Termín a výměna jedním řádkem (pro nabídku a popisek v Nastavení).
+    /// Contest length in hours from the start according to the official rules (docs/rulings.md, "Scoring and score").
+    public var durationHours: Double {
+        switch self {
+        case .arrlRoundup: return 30                       // Sat 18:00 – Sun 23:59
+        case .sartgRTTY, .makrothen: return 40             // three legs: Sat 00–08, Sat 16–24, Sun 08–16
+        case .okDXRTTY: return 24                          // Sat 00:00 – 24:00
+        case .cqwpxRTTY, .bartgHF, .cqwwRTTY, .jartsRTTY, .waeRTTY: return 48   // BARTG Sat 02:00 – Mon 01:59
+        }
+    }
+    /// Date and exchange on one line (for the menu and the label in Settings).
     public var summary: String {
         switch self {
         case .arrlRoundup: return L("1. celý víkend v lednu · RST + číslo (W/VE stát)")
@@ -367,32 +376,37 @@ public enum ContestPreset: String, CaseIterable, Codable, Sendable {
         case .okDXRTTY: return L("3. celý víkend v prosinci · RST + CQ zóna")
         }
     }
-    /// Předvolba odpovídající nastavení (podle názvu a formátu); nil = vlastní nastavení.
+    /// The preset matching the settings (by name and format); nil = custom settings.
     public static func matching(_ c: ContestSettings) -> ContestPreset? {
         allCases.first { $0.cabrilloName == c.name && $0.format == c.format }
     }
 }
 
-/// Závodní režim: pořadová čísla a hlavička Cabrillo.
+/// Contest mode: serial numbers and the Cabrillo header.
 public struct ContestSettings: Codable, Sendable, Equatable {
     public var enabled = false
     public var format: ContestFormat = .serial
-    public var name = ""                   // CONTEST: v Cabrillu
-    public var category = ""               // CATEGORY-… (volný text, jeden řádek na „;“)
+    public var name = ""                   // CONTEST: in Cabrillo
+    public var category = ""               // CATEGORY-… (free text, one line per ";")
     public var nextSerial = 1
-    public var exchange = ""               // odesílaná výměna místo čísla (prázdné = pořadové číslo)
-    /// Začátek závodu (UTC) – QTC (WAE) počítá jen spojení a série od tohoto okamžiku; nil = posledních 72 h.
+    public var exchange = ""               // exchange sent instead of the serial (empty = serial number)
+    /// Contest start (UTC) – QTC (WAE) counts only QSOs and series from this moment; nil = the last 72 h.
     public var start: Date?
-    /// Zvolená předvolba; nil = vlastní nastavení.
+    /// The selected preset; nil = custom settings.
     public var preset: ContestPreset?
     public init() {}
-    /// Předvolba platná pro UI: jen dokud formát odpovídá předvolbě.
+    /// The preset valid for the UI: only as long as the format matches the preset.
     public var selectedPreset: ContestPreset? { preset.flatMap { $0.format == format ? $0 : nil } }
-    /// ARRL RTTY Roundup s pořadovými čísly: W/VE posílají místo čísla stát/provincii (pole „Stát/prov. r“).
+    /// ARRL RTTY Roundup with serial numbers: W/VE send a state/province instead of the serial (the "State/prov. r" field).
     public var isRoundupStateExchange: Bool { enabled && format == .serial && exchange.isEmpty && selectedPreset == .arrlRoundup }
     public var effectiveStart: Date { start ?? Date().addingTimeInterval(-72 * 3600) }
+    /// Contest end (start + preset length); nil = the start or the preset is unknown.
+    public var end: Date? {
+        guard let s = start, let p = selectedPreset else { return nil }
+        return s.addingTimeInterval(p.durationHours * 3600)
+    }
 
-    /// Nastavení podle předvolby závodu v daném roce. `locator` = vlastní lokátor (výměna Makrothenu).
+    /// Settings according to a contest preset in the given year. `locator` = own locator (the Makrothen exchange).
     public static func preset(_ p: ContestPreset, year: Int, locator: String = "") -> ContestSettings {
         var c = ContestSettings()
         c.enabled = true; c.nextSerial = 1
@@ -404,7 +418,7 @@ public struct ContestSettings: Codable, Sendable, Equatable {
         return c
     }
 
-    /// Nejbližší termín: letošní, pokud ještě neskončil (začátek + 48 h), jinak příští rok.
+    /// The nearest date: this year's if it has not ended yet (start + 48 h), otherwise next year.
     public static func upcoming(_ p: ContestPreset, now: Date = Date(), locator: String = "") -> ContestSettings {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
         let y = cal.component(.year, from: now)
@@ -413,7 +427,7 @@ public struct ContestSettings: Codable, Sendable, Equatable {
         return preset(p, year: y + 1, locator: locator)
     }
 
-    /// Sobota n-tého celého víkendu (sobota i neděle v měsíci), 00:00 UTC; n = 0 → poslední celý víkend.
+    /// Saturday of the n-th full weekend (both Saturday and Sunday in the month), 00:00 UTC; n = 0 → the last full weekend.
     static func fullWeekendSaturday(year: Int, month: Int, n: Int) -> Date? {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
         var found: [Date] = []
@@ -426,11 +440,11 @@ public struct ContestSettings: Codable, Sendable, Equatable {
         if n == 0 { return found.last }
         return found.count >= n ? found[n - 1] : nil
     }
-    /// Formát posílá pořadové číslo (ON bez pevné výměny, BARTG).
+    /// The format sends a serial number (ON without a fixed exchange, BARTG).
     public var sendsSerial: Bool { format == .bartg || format == .wae || (format == .serial && exchange.isEmpty) }
-    /// Formát, kde se zóna protistanice předvyplní z DXCC.
+    /// A format where the other station's zone is prefilled from DXCC.
     public var prefillsZone: Bool { format == .zone }
-    /// Formát, kde se bez vyplněné výměny posílá moje CQ zóna z DXCC (OK DX RTTY, CQ WW RTTY).
+    /// A format where, without a filled-in exchange, my CQ zone from DXCC is sent (OK DX RTTY, CQ WW RTTY).
     public var sendsOwnZone: Bool { format == .zone || format == .cqrj }
     enum CodingKeys: String, CodingKey { case enabled, format, name, category, nextSerial, exchange, start, preset }
     public init(from d: Decoder) throws {
@@ -440,10 +454,10 @@ public struct ContestSettings: Codable, Sendable, Equatable {
         category = c.tolerant(.category, x.category, w, s); nextSerial = max(1, c.tolerant(.nextSerial, x.nextSerial, w, s))
         exchange = c.tolerant(.exchange, x.exchange, w, s)
         start = c.tolerant(.start, x.start, w, s)
-        // starší soubor bez pole preset: odvodit z názvu a formátu
+        // an older file without the preset field: derive it from the name and the format
         preset = c.contains(.preset) ? c.tolerant(.preset, x.preset, w, s) : ContestPreset.matching(self)
     }
-    /// preset se zapisuje i jako null – „vlastní“ se tak odliší od starého souboru bez tohoto pole.
+    /// preset is written even as null – that is how "custom" is distinguished from an old file without this field.
     public func encode(to e: Encoder) throws {
         var c = e.container(keyedBy: CodingKeys.self)
         try c.encode(enabled, forKey: .enabled); try c.encode(format, forKey: .format); try c.encode(name, forKey: .name)
@@ -453,28 +467,28 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Zobrazení: rozsah a zesílení spektra/vodopádu, písmo, časové značky.
+/// Display: range and gain of the spectrum/waterfall, font, timestamps.
 public struct DisplaySettings: Codable, Sendable, Equatable {
     public var fromHz = 0.0, toHz = 3000.0
     public var gainDB = 0.0
     public var autoGain = true
     public var timestamps = false
     public var fontSize = 14.0
-    /// Písmo oken RX a TX (název rodiny; prázdné = systémové neproporcionální).
+    /// Font of the RX and TX windows (family name; empty = the system monospaced one).
     public var rxFont = ""
-    /// Barvy oken (#RRGGBB; nil = systémové): pozadí a text příjmu, echo vysílání, pozadí a text vysílání.
+    /// Window colors (#RRGGBB; nil = system): receive background and text, transmit echo, transmit background and text.
     public var rxBackground: String?, rxTextColor: String?, rxEchoColor: String?
     public var txBackground: String?, txTextColor: String?
     public var palette = WaterfallPalette.classic
     public var fftResponse = FFTResponse.normal
     public var xySize = XYScopeSize.medium
     public var xyQuality = XYScopeQuality.high
-    /// Bublinová nápověda tlačítek (MMTTY „Show Button Hint“).
+    /// Button tooltips (MMTTY "Show Button Hint").
     public var showHints = true
-    /// Zvýrazňovat značky v přijatém textu (vlastní, duplicita, v logu, nová).
+    /// Highlight calls in the received text (own, dupe, in the log, new).
     public var highlightCalls = true
     public init() {}
-    /// FFT jádra pokrývá 0–4000 Hz (TSound m_FFTWINDOW).
+    /// The core's FFT covers 0–4000 Hz (TSound m_FFTWINDOW).
     public static let maxHz = 4000.0
     enum CodingKeys: String, CodingKey { case fromHz, toHz, gainDB, autoGain, timestamps, fontSize, rxFont, rxBackground,
                                              rxTextColor, rxEchoColor, txBackground, txTextColor, palette, fftResponse,
@@ -499,9 +513,9 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     }
 }
 
-/// Kontrola aktualizací (poslední kontrola a přeskočená verze jsou v UserDefaults, ne tady).
+/// Update check (the last check and the skipped version are in UserDefaults, not here).
 public struct UpdateSettings: Codable, Sendable, Equatable {
-    /// Při startu (nejvýš 1× denně) zjistit, zda existuje novější verze.
+    /// At startup (at most once a day) find out whether a newer version exists.
     public var autoCheck = true
     public init() {}
     enum CodingKeys: String, CodingKey { case autoCheck }
@@ -528,20 +542,20 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var rttyCore = RTTYCoreSettings()
     public var contest = ContestSettings()
     public var display = DisplaySettings()
-    /// Seznam zpráv (MMTTY MsgList): pojmenované delší texty se syntaxí maker.
+    /// Message list (MMTTY MsgList): named longer texts with the macro syntax.
     public var messages: [Macro] = AppSettings.defaultMessages
     public var txWindow = TxWindowSettings()
     public var updates = UpdateSettings()
-    /// Vlastní klávesové zkratky (id příkazu → zkratka); chybějící = výchozí.
+    /// Custom keyboard shortcuts (command id → shortcut); missing = the default.
     public var shortcuts: [String: KeyBinding] = [:]
-    /// Nahrávání na LoTW / eQSL / Club Log.
+    /// Uploading to LoTW / eQSL / Club Log.
     public var upload = UploadSettings()
-    /// DX cluster a RBN spoty.
+    /// DX cluster and RBN spots.
     public var spots = SpotSettings()
     public var decoders = DecoderSettings()
-    /// Enter Sends Message (Run / S&P) v závodě.
+    /// Enter Sends Message (Run / S&P) in a contest.
     public var esm = ESMSettings()
-    /// Upozornění (moje značka, hlídané značky, potřebné země).
+    /// Alerts (my call, watched calls, needed countries).
     public var alerts = AlertSettings()
     public init() {}
     public static let macroCount = 16
@@ -569,7 +583,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
                                              shortcuts, updates, upload, spots, decoders, esm, alerts }
 
-    /// Výchozí zprávy podle MMTTY (sys.m_MsgList), bez údajů autora.
+    /// Default messages per MMTTY (sys.m_MsgList), without the author's details.
     public static let defaultMessages: [Macro] = [
         Macro(name: "Stanice", text: "\r\nRGR %c DE %m  %g DEAR %n\r\nTHANK YOU FOR THE NICE REPORT.\r\nUR RST %r %r %r\r\nMY NAME IS ...\r\nRIG IS ... ANT IS ...\r\nHOW COPY? BTU %c DE %m KN\r\n\\"),
         Macro(name: "Final", text: "\r\nOK DEAR %n\r\nMANY THANKS FOR THE NICE QSO.\r\nQSL VIA BURO. CUL AND BEST 73\r\n%c DE %m TU SK SK\r\n%l\\"),
@@ -585,11 +599,11 @@ public struct AppSettings: Codable, Sendable, Equatable {
         callHistory = c.tolerant(.callHistory, x.callHistory, w, s)
         rtty = c.tolerant(.rtty, TolerantDict<ParameterValue>(), w, s).items
         macros = c.contains(.macros) ? c.tolerant(.macros, TolerantArray<Macro>(), w, s).items : x.macros
-        // dřívější výchozí závodní makro mělo %M (v MMTTY přijaté číslo) místo %N (odesílané)
+        // the earlier default contest macro had %M (the received number in MMTTY) instead of %N (the sent one)
         for i in macros.indices where macros[i].text == "\r\n%c 599 %M %M %c\r\n\\" {
             macros[i].text = "\r\n%c 599 %N %N %c\r\n\\"
         }
-        // starší nastavení s 12 makry (nebo zkrácený seznam) doplnit na 16 prázdnými
+        // pad older settings with 12 macros (or a shortened list) to 16 with empty ones
         while macros.count < Self.macroCount { macros.append(Macro(name: "", text: "")) }
         log = c.tolerant(.log, x.log, w, s)
         clock = c.tolerant(.clock, x.clock, w, s); rttyCore = c.tolerant(.rttyCore, x.rttyCore, w, s)
@@ -601,7 +615,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         upload = c.tolerant(.upload, x.upload, w, s)
         spots = c.tolerant(.spots, x.spots, w, s)
         decoders = c.tolerant(.decoders, x.decoders, w, s)
-        // starší nastavení bez ESM: prázdný ⇧F3 dostane výchozí makro „My call“ (S&P)
+        // older settings without ESM: an empty ⇧F3 gets the default macro "My call" (S&P)
         if !c.contains(.esm), macros.indices.contains(14), macros[14].name.isEmpty, macros[14].text.isEmpty {
             macros[14] = Self.defaultMacros[14]
         }
@@ -609,7 +623,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         alerts = c.tolerant(.alerts, x.alerts, w, s)
     }
 
-    /// Konfigurace Engine z nastavení.
+    /// Engine configuration from the settings.
     public func engineConfig() -> EngineConfig {
         var e = EngineConfig()
         e.audio.inputUID = audio.inputUID; e.audio.outputUID = audio.outputUID

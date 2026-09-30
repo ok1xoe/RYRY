@@ -28,7 +28,7 @@ func waitIdle(_ k: FSKKeyer) {
         let dt = Double(ev[i].0 - t0) - w.0 * bit
         #expect(abs(dt) < 1000, "přechod \(i) posun \(dt) ns")
     }
-    // znak trvá 7,5 bitu: další znak by začal až po stop bitu
+    // a character takes 7.5 bits: the next character would start only after the stop bit
     #expect(clock.now() - t0 >= UInt64(7.5 * bit) - 1000)
 }
 
@@ -37,9 +37,9 @@ func waitIdle(_ k: FSKKeyer) {
     let port = FakeSerialPort(); port.clock = clock
     let k = SoftFSKKeyer(port: port, line: .rts, invert: true, clock: clock)
     try k.start()
-    #expect(port.events.last == .rts(true))          // mark = sepnuto při invert
+    #expect(port.events.last == .rts(true))          // mark = line asserted when inverted
     port.clearEvents()
-    k.send(codes: [0x1F])                            // LTRS = samé mark → jen start bit space
+    k.send(codes: [0x1F])                            // LTRS = all mark → only the start bit is space
     waitIdle(k)
     #expect(port.events.first == .rts(false))
     k.stop()
@@ -60,7 +60,7 @@ func waitIdle(_ k: FSKKeyer) {
 
 @Test func pendingCountsQueuedCodes() throws {
     let port = FakeSerialPort()
-    let k = SoftFSKKeyer(port: port, line: .dtr)   // skutečné hodiny: 3 znaky ≈ 0,5 s
+    let k = SoftFSKKeyer(port: port, line: .dtr)   // the real clock: 3 characters ≈ 0.5 s
     try k.start()
     k.send(codes: [0x1F, 0x1F, 0x1F])
     #expect(k.pending >= 2)
@@ -68,14 +68,14 @@ func waitIdle(_ k: FSKKeyer) {
     #expect(k.pending == 0)
 }
 
-/// Review: po stop() už vlákno nesmí sáhnout na linku a linka musí zůstat na mark.
+/// Review: after stop() the thread must not touch the line any more and the line must stay at mark.
 @Test func stopJoinsThreadAndLeavesMark() throws {
     for _ in 0..<5 {
         let port = FakeSerialPort()
-        let k = SoftFSKKeyer(port: port, line: .dtr)          // skutečné hodiny
+        let k = SoftFSKKeyer(port: port, line: .dtr)          // the real clock
         try k.start()
-        k.send(codes: [0x00, 0x00, 0x00, 0x00])               // samé space bity
-        usleep(40_000)                                        // uprostřed znaku
+        k.send(codes: [0x00, 0x00, 0x00, 0x00])               // all space bits
+        usleep(40_000)                                        // in the middle of a character
         k.stop()
         let n = port.events.count
         #expect(port.events.last == .dtr(false))

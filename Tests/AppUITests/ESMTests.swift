@@ -17,7 +17,7 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
     ESM.Progress(call: call, exchangeSent: exch, myCallSent: myCall)
 }
 
-// MARK: Čistá logika
+// MARK: Pure logic
 
 @Test func esmReceivedFieldsFollowLayout() {
     #expect(ESM.receivedFields(contest(.serial)) == ["serialRcvd"])
@@ -39,25 +39,25 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
     #expect(ESM.received(qso(call: "DL1ABC"), contest(.ped)) == .complete)
 }
 
-/// Tabulka přechodů: (režim, formát, QSO, průběh) → krok.
+/// Transition table: (mode, format, QSO, progress) → step.
 @Test func esmTransitionTable() {
     typealias Row = (ESMMode, ContestFormat, QSOFields, ESM.Progress, ESM.Step)
     let rows: [Row] = [
         // Run
         (.run, .serial, qso(), progress(""), .cq),
         (.run, .serial, qso(call: "DL1ABC"), progress("DL1ABC"), .exchange),
-        (.run, .serial, qso(call: "DL1ABC"), progress("DL1ABC", exch: true), .exchange),        // nic nepřišlo → znovu výměna
+        (.run, .serial, qso(call: "DL1ABC"), progress("DL1ABC", exch: true), .exchange),        // nothing came in → the exchange again
         (.run, .serial, qso(call: "DL1ABC", serialRcvd: 7), progress("DL1ABC", exch: true), .tu),
-        (.run, .serial, qso(call: "DL1ABC", serialRcvd: 7), progress("DL1ABC"), .exchange),     // výměna ještě neodešla
-        (.run, .zone, qso(call: "DL1ABC", exchangeRcvd: "14"), progress("DL1ABC"), .exchange),  // zóna předvyplněná z DXCC
+        (.run, .serial, qso(call: "DL1ABC", serialRcvd: 7), progress("DL1ABC"), .exchange),     // the exchange has not been sent yet
+        (.run, .zone, qso(call: "DL1ABC", exchangeRcvd: "14"), progress("DL1ABC"), .exchange),  // the zone prefilled from DXCC
         (.run, .zone, qso(call: "DL1ABC", exchangeRcvd: "14"), progress("DL1ABC", exch: true), .tu),
         (.run, .cqrj, qso(call: "W1AW"), progress("W1AW", exch: true), .exchange),
         (.run, .cqrj, qso(call: "W1AW", exchangeRcvd: "05 CT"), progress("W1AW", exch: true), .tu),
         (.run, .wae, qso(call: "JA1XYZ", serialRcvd: 101), progress("JA1XYZ", exch: true), .tu),
-        (.run, .bartg, qso(call: "G4ABC", serialRcvd: 3), progress("G4ABC", exch: true), .agn),  // jen část výměny
+        (.run, .bartg, qso(call: "G4ABC", serialRcvd: 3), progress("G4ABC", exch: true), .agn),  // only part of the exchange
         (.run, .ped, qso(call: "G4ABC"), progress("G4ABC"), .exchange),
         (.run, .ped, qso(call: "G4ABC"), progress("G4ABC", exch: true), .tu),
-        // průběh jiné značky neplatí (opravená značka → výměna znovu)
+        // progress for another call does not apply (a corrected call → the exchange again)
         (.run, .serial, qso(call: "DL1ABD", serialRcvd: 7), progress("DL1ABC", exch: true), .exchange),
         // S&P
         (.sp, .serial, qso(), progress(""), .none),
@@ -102,8 +102,8 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
 @Test func esmMacroLogDetection() {
     #expect(ESM.macroLogs("\r\nTU %c DE %m QRZ?\r\n%l\\"))
     #expect(!ESM.macroLogs("\r\n%c 599 %N %N %c\r\n\\"))
-    #expect(!ESM.macroLogs("TU %E %l"))                  // za %E se nic nezpracuje
-    #expect(!ESM.macroLogs("100%%l"))                   // %% není %l
+    #expect(!ESM.macroLogs("TU %E %l"))                  // nothing after %E is processed
+    #expect(!ESM.macroLogs("100%%l"))                   // %% is not %l
     #expect(ESM.needsExplicitLog(.tu, macroText: "TU %c\\") && !ESM.needsExplicitLog(.tu, macroText: "TU %l\\"))
     #expect(ESM.needsExplicitLog(.exchangeAndLog, macroText: "%c 599 %N\\"))
     #expect(!ESM.needsExplicitLog(.exchange, macroText: "%c 599 %N\\"))
@@ -132,7 +132,7 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
     return fx
 }
 
-/// Počká na návrat do RX (makro dovysílá).
+/// Waits for the return to RX (the macro finishes transmitting).
 @MainActor private func drain(_ f: Fixture) async {
     for _ in 0..<600 { await f.pump(); if await f.engine.state == .rx { break } }
     await f.settle()
@@ -151,11 +151,11 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
     #expect(await f.model.esmEnter() == "serialRcvd")
     #expect(f.model.lastESMMacroForTesting == 3)                    // F4 Contest
     await drain(f)
-    #expect(f.model.esmStep == .exchange)                           // nic nepřijato → znovu výměna
+    #expect(f.model.esmStep == .exchange)                           // nothing received → the exchange again
     await f.model.setQSOField("serialRcvd", "12")
     #expect(f.model.esmStep == .tu)
     #expect(await f.model.esmEnter() == "call")
-    #expect(f.model.lastESMMacroForTesting == 4)                    // F5 TU (%l zaloguje)
+    #expect(f.model.lastESMMacroForTesting == 4)                    // F5 TU (%l logs the QSO)
     await drain(f)
     for _ in 0..<50 where f.model.logRecords.isEmpty { await f.settle() }
     #expect(f.model.logRecords.count == 1)
@@ -168,19 +168,19 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
 @Test @MainActor func esmSearchAndPounceLogsExplicitly() async throws {
     let f = esmFixture(.zone, mode: .sp)
     await f.model.start()
-    #expect(await f.model.esmEnter() == "call")                     // prázdná značka → nic, jen fokus
+    #expect(await f.model.esmEnter() == "call")                     // an empty call → nothing, only focus
     #expect(f.model.lastESMMacroForTesting == nil)
     #expect(await f.engine.state == .rx)
     await f.model.setQSOField("call", "DL1ABC")
     await f.model.setQSOField("exchangeRcvd", "14")
     #expect(f.model.esmStep == .myCall)
     _ = await f.model.esmEnter()
-    #expect(f.model.lastESMMacroForTesting == 14)                   // ⇧F3 Moje značka
+    #expect(f.model.lastESMMacroForTesting == 14)                   // ⇧F3 My call
     await drain(f)
     #expect(f.model.esmStep == .exchangeAndLog)
     _ = await f.model.esmEnter()
     #expect(f.model.lastESMMacroForTesting == 3)
-    // F4 nemá %l → zalogováno explicitně hned
+    // F4 has no %l → logged explicitly right away
     #expect(f.model.logRecords.count == 1 && f.model.logRecords.first?.exchangeRcvd == "14")
     #expect(f.model.qso.call.isEmpty)
     await drain(f)
@@ -199,7 +199,7 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
     #expect(f.model.lastESMMacroForTesting == nil)
     await f.model.rxNow()
     await f.settle()
-    // ESM vypnuté → Enter nic nespustí
+    // ESM off → Enter starts nothing
     var s = f.model.settings; s.esm.enabled = false
     await f.model.applySettings(s)
     #expect(await f.model.esmEnter() == nil)
@@ -211,7 +211,7 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
     let f = esmFixture()
     await f.model.start()
     await f.model.setQSOField("call", "DL1ABC")
-    await f.model.runMacro(3)                                       // výměna ručně přes F4
+    await f.model.runMacro(3)                                       // the exchange manually via F4
     await drain(f)
     await f.model.setQSOField("serialRcvd", "5")
     #expect(f.model.esmStep == .tu)

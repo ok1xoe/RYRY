@@ -17,10 +17,10 @@ private func tmp() -> URL {
     let l = LogLocation(directory: d, name: "zavod")
     #expect(l.jsonlURL.lastPathComponent == "zavod.jsonl" && l.adifURL.lastPathComponent == "zavod.adi")
     #expect(l.qtcURL.lastPathComponent == "zavod-qtc.jsonl")
-    #expect(LogLocation(directory: d, name: "mmtty4mac").qtcURL.lastPathComponent == "qtc.jsonl")   // dosavadní soubor
+    #expect(LogLocation(directory: d, name: "mmtty4mac").qtcURL.lastPathComponent == "qtc.jsonl")   // the existing file
 }
 
-// Otevření cizího ADIF: převede se do JSONL, originál se zazálohuje
+// Opening a foreign ADIF: it is converted to JSONL, the original is backed up
 @Test func openForeignADIF() async throws {
     let dir = tmp()
     let adi = "<ADIF_VER:5>3.1.0 <EOH>\n<CALL:6>DL1ABC <QSO_DATE:8>20251012 <TIME_ON:4>1203 <MODE:4>RTTY <FREQ:6>14.085 <EOR>\n<CALL:3>BAD <EOR>\n"
@@ -31,12 +31,12 @@ private func tmp() -> URL {
     #expect(FileManager.default.fileExists(atPath: loc.jsonlURL.path))
     let store = try QSOLogStore(directory: loc.directory, baseName: loc.name)
     #expect(await store.records.map(\.call) == ["DL1ABC"])
-    // podruhé (JSONL už existuje) se nic nepřevádí
+    // the second time (the JSONL already exists) nothing is converted
     let again = try await loc.prepareForOpen()
     #expect(again.imported == 0 && again.backup == nil)
 }
 
-// Uložit jako: kopie JSONL, ADIF i QTC pod novým názvem
+// Save as: a copy of the JSONL, ADIF and QTC files under the new name
 @Test func saveLogAsCopiesFiles() async throws {
     let dir = tmp(), dst = tmp()
     let src = LogLocation(directory: dir, name: "mmtty4mac")
@@ -48,6 +48,6 @@ private func tmp() -> URL {
     let s2 = try QSOLogStore(directory: dst, baseName: "kopie")
     #expect(await s2.records.map(\.call) == ["OK2AA"])
     #expect(FileManager.default.fileExists(atPath: to.adifURL.path) && FileManager.default.fileExists(atPath: to.qtcURL.path))
-    #expect(throws: LogLocation.LocationError.self) { try src.copy(to: to) }          // cíl existuje
+    #expect(throws: LogLocation.LocationError.self) { try src.copy(to: to) }          // the target exists
     #expect(throws: LogLocation.LocationError.self) { try src.copy(to: src) }
 }

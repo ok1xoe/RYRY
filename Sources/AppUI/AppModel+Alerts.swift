@@ -6,15 +6,15 @@ import QSOLog
 import Settings
 import Spots
 
-/// Zvýrazňování značek v příjmu a upozornění (moje značka, hlídané značky, potřebné země).
+/// Highlighting of callsigns in the receive window and alerts (my own call, watched calls, needed entities).
 extension AppModel {
-    /// Moje značka jako základní značka (velkými písmeny; prázdné = nenastaveno).
+    /// My own call as a base callsign (uppercase; empty = not set).
     public var myBaseCall: String {
         let c = settings.station.call.trimmingCharacters(in: .whitespaces)
         return c.isEmpty ? "" : QSORecord.baseCall(c)
     }
 
-    // currentBand (pásmo rigu, jinak ruční frekvence) je v AppModel.swift – sdílí ho násobiče i upozornění
+    // currentBand (the rig's band, otherwise the manual frequency) lives in AppModel.swift - it is shared by the multipliers and the alerts
 
     func countryRef(_ call: String) -> CountryRef? {
         app?.country(for: call).map { CountryRef(key: $0.primaryPrefix, name: $0.name) }
@@ -22,10 +22,11 @@ extension AppModel {
 
     var contestSinceForIndex: Date? { settings.contest.enabled ? settings.contest.effectiveStart : nil }
 
-    /// Přestaví index logu (start, přepnutí logu, změna záznamů).
+    /// Rebuilds the log index (startup, switching logs, a change to the records).
     func rebuildLogIndex() {
         logIndexSince = contestSinceForIndex
-        logIndex = LogIndex(records: logRecords, contestSince: logIndexSince, country: { [app] in
+        logIndex = LogIndex(records: logRecords, contestSince: logIndexSince,
+                            dupePerMode: DupeCheck.perMode(preset: settings.contest.selectedPreset), country: { [app] in
             app?.country(for: $0).map { CountryRef(key: $0.primaryPrefix, name: $0.name) }
         })
         spotLogIndex = SpotLogIndex(logRecords)
@@ -39,21 +40,21 @@ extension AppModel {
         highlightVersion &+= 1
     }
 
-    /// Po změně frekvence/rigu: pokud se změnilo pásmo, styl duplicit a nových zemí se musí přepočítat.
+    /// After a frequency/rig change: if the band changed, the styling of dupes and new entities has to be recomputed.
     func updateHighlightBand() {
         let b = currentBand
         if b != highlightBand { highlightBand = b; highlightVersion &+= 1 }
     }
 
-    /// Styl značky pro okno příjmu (nil = beze změny stylu).
+    /// The style of a callsign for the receive window (nil = no style change).
     public func callStyle(for word: String) -> CallStyle? {
         CallHighlight.style(word: word, myBase: myBaseCall, band: currentBand, mode: "RTTY",
                             contest: settings.contest.enabled, index: logIndex)
     }
 
-    // MARK: Upozornění
+    // MARK: Alerts
 
-    /// Důvody, proč je spot potřebný (pro označení ve SpotsWindow i upozornění).
+    /// The reasons why a spot is needed (both for marking it in SpotsWindow and for the alert).
     public func neededReasons(for spot: Spot) -> [NeededCheck.Reason] {
         NeededCheck.check(call: spot.call, band: spot.band, country: countryRef(spot.call),
                           settings: settings.alerts, index: logIndex)
@@ -67,7 +68,7 @@ extension AppModel {
         }
     }
 
-    /// Text důvodů pro tooltip/stavový řádek.
+    /// The reasons as text for the tooltip/status bar.
     public static func neededText(_ rs: [NeededCheck.Reason]) -> String { rs.map(reasonText).joined(separator: ", ") }
 
     private var neededActive: Bool {
@@ -75,9 +76,10 @@ extension AppModel {
         return a.newCountryAny || a.newCountryBand || !a.watchCalls.isEmpty
     }
 
-    /// Nový spot: když je potřebný, upozorní (max. 1× za spot).
+    /// A new spot: alerts when it is needed (at most once per spot). A spot hidden by the display filter
+    /// (unchecked band or mode group) raises no alert - only what the Spots table shows is alerted on.
     public func checkSpotNeeded(_ spot: Spot) {
-        guard neededActive else { return }
+        guard neededActive, settings.spots.filter.matches(spot) else { return }
         let reasons = neededReasons(for: spot)
         guard !reasons.isEmpty else { return }
         emitNeeded(call: spot.call, band: spot.band, reasons: reasons, source: L("spot"), interval: 3600, batch: true)
@@ -90,16 +92,16 @@ extension AppModel {
         let text = Self.neededText(reasons)
         if batch { queueNeededSummary(call: call, text: text, source: source, now: now) }
         else { note(L("Potřebné (%@): %@ – %@", source, call, text)) }
-        // zvuk a oznámení nejvýš jednou za 3 s (po připojení ke clusteru přijde dávka spotů)
+        // sound and notification at most once every 3 s (a burst of spots arrives after connecting to the cluster)
         guard alertThrottle.allow("needed-sound", now: now, interval: 3) else { return }
         if settings.alerts.neededSound { alertSink.playSound() }
         if settings.alerts.neededNotification { alertSink.notify(title: L("Potřebná stanice: %@", call), body: text) }
     }
 
-    /// Interval souhrnného řádku „Potřebné: N (…)“ ve stavovém řádku.
+    /// Interval of the "Needed: N (…)" summary line in the status bar.
     static let neededSummaryInterval: TimeInterval = 5
 
-    /// Spoty: první potřebný hned jako řádek, další během `neededSummaryInterval` do jednoho souhrnu.
+    /// Spots: the first needed one goes out immediately as a line, further ones within `neededSummaryInterval` go into a single summary.
     private func queueNeededSummary(call: String, text: String, source: String, now: Date) {
         if neededPending.isEmpty, neededLastLine.map({ now.timeIntervalSince($0) >= Self.neededSummaryInterval }) ?? true {
             note(L("Potřebné (%@): %@ – %@", source, call, text))
@@ -114,7 +116,7 @@ extension AppModel {
         }
     }
 
-    /// Vypíše čekající souhrn (nejvýš 5 značek jmenovitě).
+    /// Emits the pending summary (at most 5 calls by name).
     func flushNeededSummary() {
         neededFlushTask?.cancel(); neededFlushTask = nil
         guard !neededPending.isEmpty else { return }
@@ -125,10 +127,10 @@ extension AppModel {
         neededLastLine = alertClock()
     }
 
-    /// Přijatý text: dokončená slova se zkontrolují na moji značku a potřebné značky. Echo se přeskakuje.
+    /// Received text: completed words are checked against my own call and the needed calls. Echo is skipped.
     ///
-    /// Šum RTTY tvoří náhodné „značky“: nová země se z příjmu hlásí jen u značky, kterou zná Super Check Partial
-    /// nebo log, která následuje po DE/CQ, nebo která přišla aspoň 2× během 10 minut. Hlídané značky se hlásí hned.
+    /// RTTY noise produces random "callsigns": a new entity is only reported from the receive side for a call known to Super Check Partial
+    /// or to the log, one that follows DE/CQ, or one that arrived at least twice within 10 minutes. Watched calls are reported immediately.
     func scanRxForAlerts(_ s: String, echo: Bool) {
         let words = rxScanner.feed(s, echo: echo)
         if echo { rxPrevWord = "" }

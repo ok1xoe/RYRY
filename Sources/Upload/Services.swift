@@ -5,8 +5,8 @@ import QSOLog
 
 // MARK: eQSL
 
-/// eQSL: multipart POST na ImportADIF.cfm (soubor `Filename`); přihlášení EQSL_USER/EQSL_PSWD v hlavičce ADIF
-/// (podle dokumentace eQSL) a pro jistotu i jako pole formuláře.
+/// eQSL: a multipart POST to ImportADIF.cfm (file `Filename`); the EQSL_USER/EQSL_PSWD login in the ADIF header
+/// (as the eQSL documentation says) and, just in case, as form fields too.
 public struct EQSLUploader: Sendable {
     public static let defaultURL = URL(string: "https://www.eQSL.cc/qslcard/ImportADIF.cfm")!
     let http: HTTPClient, url: URL, user: String, password: String
@@ -20,7 +20,7 @@ public struct EQSLUploader: Sendable {
         public var loginFailed = false
     }
 
-    /// Vyparsuje HTML odpověď („Result: X out of Y records added“, řádky Error:/Warning:).
+    /// Parses the HTML response ("Result: X out of Y records added", the Error:/Warning: lines).
     public static func parse(_ html: String) -> Parsed {
         var p = Parsed()
         let text = html.replacingOccurrences(of: "<[^>]+>", with: "\n", options: .regularExpression)
@@ -57,7 +57,7 @@ public struct EQSLUploader: Sendable {
             throw UploadError.unexpectedResponse(String(res.text.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines).prefix(160)))
         }
-        // nic nepřidáno a jen chyby (ne duplicity) → záznamy jsou špatně, neoznačovat
+        // nothing added and only errors (no duplicates) → the records are wrong, do not mark them
         let dupes = p.warnings.contains { $0.lowercased().contains("duplicate") }
         if added == 0, total > 0, !p.errors.isEmpty, !dupes { throw UploadError.rejected(p.errors.first!) }
         var msg = L("eQSL: přidáno %ld z %ld záznamů.", added, total)
@@ -81,7 +81,7 @@ public struct ClubLogUploader: Sendable {
         self.realtime = realtimeURL; self.putlogs = putLogsURL
     }
 
-    /// 200 OK, 400 (špatná data), 403 (přihlášení/klíč), ostatní = chyba serveru.
+    /// 200 OK, 400 (bad data), 403 (login/key), anything else = a server error.
     static func check(_ r: HTTPResult) throws {
         switch r.status {
         case 200: return
@@ -91,14 +91,14 @@ public struct ClubLogUploader: Sendable {
         }
     }
 
-    /// Jedno spojení hned (realtime.php).
+    /// A single QSO right away (realtime.php).
     public func uploadRealtime(_ r: QSORecord) async throws {
         let req = FormBody.request(url: realtime, [("email", email), ("password", password), ("callsign", callsign),
                                                    ("adif", ADIF.uploadRecord(r)), ("api", apiKey)])
         try Self.check(try await http.send(req))
     }
 
-    /// Dávka souborem (putlogs.php).
+    /// A batch as a file (putlogs.php).
     public func uploadBatch(_ records: [QSORecord]) async throws {
         var mp = MultipartBody()
         mp.addField("email", email); mp.addField("password", password); mp.addField("callsign", callsign); mp.addField("api", apiKey)
@@ -129,7 +129,7 @@ public protocol ProcessRunner: Sendable {
     func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> ProcessResult
 }
 
-/// Skutečný spouštěč (Foundation.Process); po vypršení limitu proces ukončí.
+/// The real runner (Foundation.Process); it terminates the process when the limit expires.
 public struct SystemProcessRunner: ProcessRunner {
     public init() {}
     public func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> ProcessResult {
@@ -153,14 +153,14 @@ public enum TQSLLocator {
     public static let standardPaths = ["/Applications/TrustedQSL/tqsl.app/Contents/MacOS/tqsl",
                                        "/Applications/tqsl.app/Contents/MacOS/tqsl",
                                        "/opt/homebrew/bin/tqsl", "/usr/local/bin/tqsl"]
-    /// Zadaná cesta → standardní místa → PATH.
+    /// The configured path → the standard locations → PATH.
     public static func find(custom: String?, path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
                             isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }) -> String? {
         var c: [String] = []
         if let custom, !custom.trimmingCharacters(in: .whitespaces).isEmpty {
             let t = (custom as NSString).expandingTildeInPath
             c.append(t)
-            // zadán balíček tqsl.app
+            // the tqsl.app bundle was given
             if t.hasSuffix(".app") { c.append(t + "/Contents/MacOS/tqsl") }
         }
         c += standardPaths + path.split(separator: ":").map { String($0) + "/tqsl" }
@@ -168,9 +168,9 @@ public enum TQSLLocator {
     }
 }
 
-/// LoTW přes TQSL: `tqsl -d -q -u -a compliant -l "<lokace>" -x <soubor.adi>` (-d bez dialogu s rozsahem dat,
-/// -q/-x dávkový režim, -u nahrát po podpisu, -a compliant = už nahrané a mimo rozsah přeskočit, -l Station Location).
-/// Návratové kódy: 0 = OK; 8 = vše už bylo nahráno / mimo rozsah; 9 a 14 = část už nahrána (ostatní odeslána).
+/// LoTW via TQSL: `tqsl -d -q -u -a compliant -l "<location>" -x <file.adi>` (-d no date-range dialog,
+/// -q/-x batch mode, -u upload after signing, -a compliant = skip already uploaded and out of range, -l Station Location).
+/// Return codes: 0 = OK; 8 = everything was already uploaded / out of range; 9 and 14 = part already uploaded (rest sent).
 public struct LoTWUploader: Sendable {
     let runner: ProcessRunner
     let tqslPath: String?, location: String
@@ -189,7 +189,7 @@ public struct LoTWUploader: Sendable {
         ["-d", "-q", "-u", "-a", "compliant", "-l", location, "-x", file]
     }
 
-    /// Poslední řádek „Final Status: popis (kód)“ z výstupu TQSL.
+    /// The last "Final Status: description (code)" line from the TQSL output.
     static func finalStatus(_ out: String) -> String? {
         out.split(whereSeparator: \.isNewline).last { $0.contains("Final Status:") }
             .map { String($0).components(separatedBy: "Final Status:").last!.trimmingCharacters(in: .whitespaces) }

@@ -5,7 +5,7 @@ import Settings
 
 public enum WordKind: Equatable, Sendable { case call, rst, name, other }
 
-/// Rozpozná, co je slovo z RX textu (klik → pole QSO okna).
+/// Recognizes what a word from the RX text is (click → a QSO window field).
 public enum WordClassifier {
     static let stopWords: Set<String> = [
         "CQ", "DE", "TU", "PSE", "RST", "UR", "UR", "K", "KN", "SK", "BK", "AR", "QTH", "NAME", "HW", "HR", "ES",
@@ -13,10 +13,10 @@ public enum WordClassifier {
         "AGN", "NR", "MY", "IS", "THE", "AND", "FER", "FOR", "OP", "RIG", "ANT", "WX", "PWR", "ALL", "OK", "SRI",
         "RRR", "R", "CFM", "INFO", "VIA", "BURO", "EQSL", "LOTW", "CL", "QRL", "QRM", "QRN", "QSB", "QSY",
     ]
-    // ITU značka: [prefix/]znaky s číslicí uprostřed[/suffix]
+    // ITU callsign: [prefix/]characters with a digit in the middle[/suffix]
     static let callRegex = try! NSRegularExpression(
         pattern: "^([A-Z0-9]{1,4}/)?([A-Z]{1,2}[0-9]{1,2}[A-Z]{1,4}|[0-9][A-Z][0-9]{1,2}[A-Z]{2,4})(/[A-Z0-9]{1,4})?$")
-    // RST 3 znaky, nebo 599/5NN + číslo závodu
+    // RST is 3 characters, or 599/5NN + the contest number
     static let rstRegex = try! NSRegularExpression(pattern: "^([1-5][1-9N][1-9N]|5[1-9N][9N][0-9]{1,4})$")
 
     public static func classify(_ word: String) -> WordKind {
@@ -24,7 +24,7 @@ public enum WordClassifier {
         guard !w.isEmpty else { return .other }
         let r = NSRange(w.startIndex..., in: w)
         if rstRegex.firstMatch(in: w, range: r) != nil { return .rst }
-        // značka: min. 4 znaky (nebo s lomítkem), aby šum typu E5T nepřepsal pole
+        // callsign: at least 4 characters (or with a slash), so that noise like E5T does not overwrite the field
         if !stopWords.contains(w), w.count >= 4 || w.contains("/"), callRegex.firstMatch(in: w, range: r) != nil {
             return .call
         }
@@ -36,8 +36,8 @@ public enum WordClassifier {
         return .other
     }
 
-    /// Závod (MMTTY „Misc“): slovo z RX textu jako přijaté číslo, RST nebo výměna; nil = nevkládat.
-    /// `serialMode` = výměna je pořadové číslo („599“ + číslo), jinak libovolná výměna (zóna, stát…).
+    /// Contest (MMTTY "Misc"): a word from the RX text as the received number, RST or exchange; nil = do not insert.
+    /// `serialMode` = the exchange is a serial number ("599" + a number), otherwise any exchange (zone, state…).
     public static func contestField(_ word: String, serialMode: Bool) -> (String, String)? {
         let w = word.uppercased().trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
         guard !w.isEmpty, !stopWords.contains(w) else { return nil }
@@ -52,16 +52,16 @@ public enum WordClassifier {
         return ("exchangeRcvd", String(rest))
     }
 
-    /// Klik na slovo v závodě podle formátu (MMTTY TMmttyWd::PBoxRxMouseDown, StoreZone/StoreQTH/StoreNR/StoreUTC).
-    /// Vrací pole QSO okna k nastavení. PED řeší volající (každé slovo = značka).
-    /// `roundup` = ARRL RTTY Roundup: stát/provincie (W/VE) jde do přijaté výměny, číslo do čísla.
+    /// Clicking a word during a contest, per format (MMTTY TMmttyWd::PBoxRxMouseDown, StoreZone/StoreQTH/StoreNR/StoreUTC).
+    /// Returns the QSO window field to set. PED is handled by the caller (every word is a call).
+    /// `roundup` = ARRL RTTY Roundup: the state/province (W/VE) goes into the received exchange, a number into the number.
     public static func contestUpdate(_ word: String, format: ContestFormat, serialMode: Bool, roundup: Bool = false,
                                      current q: QSOFields) -> [(String, String)] {
         let w = word.uppercased().trimmingCharacters(in: .punctuationCharacters.subtracting(CharacterSet(charactersIn: ":"))
             .union(.whitespaces))
-        // státy/provincie, které jsou zároveň běžné zkratky (CQ WW RTTY: OK = Oklahoma, AR = Arkansas)
+        // states/provinces that are also common abbreviations (CQ WW RTTY: OK = Oklahoma, AR = Arkansas)
         let qthAbbrev: Set<String> = ["OK", "AR", "OR", "ME", "HI", "IN", "MA", "ON", "AB"]
-        // ARRL RU: stát/provincie má přednost i před běžnými zkratkami (OK, DE, ON …) – klik je výslovná volba
+        // ARRL RU: the state/province wins even over the common abbreviations (OK, DE, ON …) - a click is an explicit choice
         if roundup, let sp = Multipliers.stateOrProvince(w) { return [("exchangeRcvd", sp)] }
         guard !w.isEmpty, !stopWords.contains(w) || (format == .cqrj && qthAbbrev.contains(w)) else { return [] }
         if w == "599" { return [("rstRcvd", w)] }
@@ -69,13 +69,13 @@ public enum WordClassifier {
         if w.count >= 4, w.hasPrefix("599"), w.dropFirst(3).allSatisfy(\.isNumber) { rest = rest.dropFirst(3) }
         switch format {
         case .zone:
-            // RST + CQ zóna: číslo 1–40 (i „59914“) = zóna protistanice
+            // RST + CQ zone: a number 1–40 (including "59914") = the other station's zone
             guard !rest.isEmpty, rest.count <= 2, rest.allSatisfy(\.isNumber), let z = Int(rest), (1...40).contains(z) else { return [] }
             return [("exchangeRcvd", String(z))]
         case .serial, .ped, .wae:
             return contestField(word, serialMode: serialMode).map { [$0] } ?? []
         case .cqrj:
-            // „ZZ QTH“: číslo = zóna, text = QTH (druhá část zůstane)
+            // "ZZ QTH": a number = the zone, text = the QTH (the second part is kept)
             let parts = q.exchangeRcvd.split(separator: " ", maxSplits: 1).map(String.init)
             var zone = parts.first.flatMap { Int($0) != nil ? $0 : nil } ?? ""
             var qth = parts.count > 1 ? parts[1] : (zone.isEmpty ? (parts.first ?? "") : "")
@@ -94,7 +94,7 @@ public enum WordClassifier {
                 return [("exchangeRcvd", String(format: "%02d%02d", h, m))]
             }
             guard !rest.isEmpty, rest.count <= 5, rest.allSatisfy(\.isNumber), let n = Int(rest) else { return [] }
-            // MMTTY: do 3 číslic číslo, delší = čas HHMM, pokud je platný (StoreUTC → jinak StoreNR)
+            // MMTTY: up to 3 digits is a number, longer = the time HHMM when it is valid (StoreUTC → otherwise StoreNR)
             if rest.count > 3, n / 100 < 24, n % 100 < 60 { return [("exchangeRcvd", String(format: "%02d%02d", n / 100, n % 100))] }
             return [("serialRcvd", String(n))]
         }

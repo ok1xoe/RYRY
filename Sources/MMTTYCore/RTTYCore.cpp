@@ -1,4 +1,4 @@
-// RTTYCore.cpp – C++ obal jádra MMTTY za C API.
+// RTTYCore.cpp – a C++ wrapper around the MMTTY core behind the C API.
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 #include "include/RTTYCore.h"
 #include "MMTTYCompat.h"
@@ -10,8 +10,8 @@
 #include <new>
 #include <vector>
 
-// MMTTY třídy nenastavují v konstruktorech všechny členy – v originálu je VCL (TObject)
-// alokoval ve vynulované paměti. Zachováváme to: raw paměť → memset 0 → placement new.
+// The MMTTY classes do not set all members in their constructors – in the original, VCL (TObject)
+// allocated them in zeroed memory. We keep that: raw memory → memset 0 → placement new.
 template <class T> struct ZeroedDeleter {
     void operator()(T* p) const { if (p) { p->~T(); ::operator delete(p); } }
 };
@@ -23,7 +23,7 @@ template <class T> static ZeroedPtr<T> makeZeroed() {
 }
 
 struct RTTYCore {
-    CoreContext ctx;          // MUSÍ být první: ostatní členy se ničí, dokud je kontext platný
+    CoreContext ctx;          // MUST be first: the other members are destroyed while the context is valid
     RTTYCoreConfig cfg;
     ZeroedPtr<CFSKDEM> dem;
     ZeroedPtr<CFSKMOD> mod;
@@ -42,15 +42,15 @@ struct RTTYCore {
     int    echo = 1;
     int    afc = 1, afcMode = 1;
     double afcSQ = 32, afcTime = 8.0, afcSweep = 1.0;
-    double afcMaxDev = 0, afcAnchor = 2125;   // plán 9: omezení AFC kolem ručně nastaveného marku
+    double afcMaxDev = 0, afcAnchor = 2125;   // plan 9: limiting AFC around the manually set mark
     int    afcGate = 0;
     int    txActive = 0;
     int    txStopping = 0;
     int    tuning = 0;
-    long   echoHold = 0;          // po konci TX ještě chvíli značit znaky jako echo (echo=1)
+    long   echoHold = 0;          // after TX ends keep marking characters as echo for a while (echo=1)
     std::vector<double> txBlock;
-    std::vector<double> echoTail;     // předalokované ticho pro doběh echa
-    static constexpr int kBufSize = 1024;   // MMTTY m_BuffSize při 11025 Hz
+    std::vector<double> echoTail;     // pre-allocated silence for the echo tail
+    static constexpr int kBufSize = 1024;   // MMTTY m_BuffSize at 11025 Hz
     int    overflowLatched = 0;
     std::vector<double> block;
 
@@ -79,7 +79,7 @@ extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     try {
     auto* c = new RTTYCore();
     CoreScope scope(&c->ctx);
-    // Kontext MUSÍ být nastavený PŘED konstrukcí CFSKDEM/CFSKMOD/CFFT (konstruktory ho čtou).
+    // The context MUST be set BEFORE constructing CFSKDEM/CFSKMOD/CFFT (their constructors read it).
     SampFreq = cfg->sampleRate;
     InitSampType();
     sys.m_SampFreq = SampFreq;
@@ -104,16 +104,16 @@ extern "C" RTTYCore* rttycore_create(const RTTYCoreConfig* cfg) {
     c->calcBPF();
     c->echoTail.assign(size_t(SampFreq * 0.2), 0.0);
     return c;
-    } catch (...) { return nullptr; }          // bad_alloc nesmí projít přes extern "C"
+    } catch (...) { return nullptr; }          // bad_alloc must not escape through extern "C"
 }
 
 extern "C" void rttycore_destroy(RTTYCore* c) {
     if (!c) return;
     CoreScope scope(&c->ctx);
-    delete c;   // scope.prev se obnoví až po destrukci (ctx je uvnitř c, ale ~CoreScope ho nečte)
+    delete c;   // scope.prev is restored only after destruction (ctx is inside c, but ~CoreScope does not read it)
 }
 
-// RX řetězec jako TSound::Execute: BPF/LMS → sběr FFT → demodulátor.
+// The RX chain as in TSound::Execute: BPF/LMS → FFT collection → demodulator.
 static void rxPipeline(RTTYCore* c, double* lp, size_t n) {
     if (c->bpf || c->lmsOn) {
         for (size_t i = 0; i < n; i++) {
@@ -130,7 +130,7 @@ extern "C" void rttycore_process_rx(RTTYCore* c, const float* s, size_t n) {
     if (!c || !s || n == 0) return;
     CoreScope scope(&c->ctx);
     if (c->echoHold > 0) c->echoHold -= long(n);
-    // Během TX je v MMTTY vstup zavřený (echo 0/1); jen echo=2 poslouchá skutečný vstup.
+    // During TX the input is closed in MMTTY (echo 0/1); only echo=2 listens to the real input.
     if (c->txActive && c->echo != 2) return;
     c->block.resize(n);
     for (size_t i = 0; i < n; i++) c->block[i] = std::isfinite(s[i]) ? double(s[i]) * 32768.0 : 0.0;
@@ -160,7 +160,7 @@ extern "C" RTTYCoreSignal rttycore_signal(RTTYCore* c) {
     if (!c) return r;
     CoreScope scope(&c->ctx);
     r.level = c->dem->m_avgdeff;
-    // Stejný práh jako CFSKDEM::DoFSK: při příjmu (m_Limit) SQLevel × 10.
+    // The same threshold as CFSKDEM::DoFSK: on receive (m_Limit) SQLevel × 10.
     double thr = c->dem->m_Limit ? c->dem->GetSQLevel() * 10.0 : c->dem->GetSQLevel();
     r.squelchOpen = (!c->dem->GetSQ() || c->dem->m_avgdeff >= thr) ? 1 : 0;
     r.overflow = c->overflowLatched; c->overflowLatched = 0;
@@ -173,7 +173,7 @@ extern "C" RTTYCoreSignal rttycore_signal(RTTYCore* c) {
 static bool inRange(double v, double lo, double hi) { return std::isfinite(v) && v >= lo && v <= hi; }
 static bool isBool(double v) { return v == 0.0 || v == 1.0; }
 static bool isInt(double v, int lo, int hi) { return inRange(v, lo, hi) && v == std::floor(v); }
-// FIR s lichým počtem odboček: MakeFilter zapíše jen n koeficientů z n+1 → vždy sudé (nahoru).
+// FIR with an odd number of taps: MakeFilter writes only n coefficients out of n+1 → always even (rounded up).
 static int evenTaps(double v) { int n = int(v); return (n & 1) ? n + 1 : n; }
 
 extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
@@ -293,7 +293,7 @@ extern "C" int rttycore_set_param(RTTYCore* c, RTTYCoreParam p, double v) {
         if (!isBool(v)) return RC_ERR_RANGE;
         if (dem.m_AA6YQ.m_fEnabled != int(v)) {
             dem.m_AA6YQ.m_fEnabled = int(v);
-            if (v != 0) dem.m_AA6YQ.Create();       // jako TOptionDlg (CBAA6YQ)
+            if (v != 0) dem.m_AA6YQ.Create();       // like TOptionDlg (CBAA6YQ)
         }
         break;
     case RC_AA6YQ_BPF_TAPS:
@@ -463,7 +463,7 @@ extern "C" double rttycore_get_param(const RTTYCore* c, RTTYCoreParam p) {
     }
 }
 
-// TMmttyWd::PBoxFFTINMouseDown, pravé tlačítko + SBLMSClick.
+// TMmttyWd::PBoxFFTINMouseDown, right button + SBLMSClick.
 extern "C" void rttycore_notch_click(RTTYCore* c, double hz) {
     if (!c || !std::isfinite(hz) || hz < 0 || hz > 3000) return;
     CoreScope scope(&c->ctx);
@@ -480,12 +480,12 @@ extern "C" void rttycore_notch_click(RTTYCore* c, double hz) {
     c->calcBPF();
 }
 
-// --- Vysílání (podle TMmttyWd::XMIT, ToRX a TX větve TSound::Execute) ---
+// --- Transmitting (after TMmttyWd::XMIT, ToRX and the TX branch of TSound::Execute) ---
 
 extern "C" void rttycore_tx_begin(RTTYCore* c, int tune) {
     if (!c) return;
     CoreScope scope(const_cast<CoreContext*>(&c->ctx));
-    if (c->net) {   // UpdateNet(): TX na kmitočtu RX (po AFC)
+    if (c->net) {   // UpdateNet(): TX on the RX frequency (after AFC)
         c->mod->SetMarkFreq(c->dem->GetMarkFreq());
         c->mod->SetSpaceFreq(c->dem->GetSpaceFreq());
     }
@@ -500,7 +500,7 @@ extern "C" void rttycore_tx_begin(RTTYCore* c, int tune) {
     c->mod->InitPhase();
     c->mod->SetCount(RTTYCore::kBufSize * 3);
     c->tuning = tune ? 1 : 0;
-    c->mod->SetDiddleTimer(tune ? -1 : int(SampFreq / 4));   // tune: čistá nosná, jinak 0,25 s jako XMIT
+    c->mod->SetDiddleTimer(tune ? -1 : int(SampFreq / 4));   // tune: a plain carrier, otherwise 0.25 s as in XMIT
     c->txActive = 1;
     c->txStopping = 0;
 }
@@ -524,9 +524,9 @@ extern "C" size_t rttycore_queue_tx(RTTYCore* c, const char* text) {
         used++;
         if (u >= 'a' && u <= 'z') u = u - 'a' + 'A';
         if (!(u == '\r' || u == '\n' || u == 0x1B || u == 0x1F || (u >= 0x20 && u < 0x7F))) continue;
-        // Řídicí znaky MMTTY (_ ~ [ ]) jen přes rttycore_queue_tx_raw.
+        // The MMTTY control characters (_ ~ [ ]) only through rttycore_queue_tx_raw.
         if (u == '_' || u == '~' || u == '[' || u == ']') continue;
-        // Znak bez Baudot kódu (tabulka dává 0x00) nevysílat – zkouška na kopii (ConvRTTY mění stav).
+        // Do not send a character without a Baudot code (the table gives 0x00) – tested on a copy (ConvRTTY changes state).
         CRTTY probe = c->rtty();
         if (u != 0x1B && u != 0x1F && (probe.ConvRTTY(char(u)) & 0xff) == 0) continue;
         char one[2] = { char(u), 0 };
@@ -555,9 +555,9 @@ extern "C" size_t rttycore_generate_tx(RTTYCore* c, float* out, size_t n) {
                 c->txActive = 0; c->txStopping = 0; c->tuning = 0;
                 c->echoHold = long(SampFreq / 2);
                 if (c->echo == 1) {
-                    // doběh: TX vzorky tohoto bloku + 0,2 s ticha, aby demodulátor dokončil poslední znak
+                    // tail: this block's TX samples + 0.2 s of silence so the demodulator finishes the last character
                     if (i > 0) rxPipeline(c, c->txBlock.data(), i);
-                    std::fill(c->echoTail.begin(), c->echoTail.end(), 0.0);   // rxPipeline buffer mění (BPF/LMS)
+                    std::fill(c->echoTail.begin(), c->echoTail.end(), 0.0);   // rxPipeline modifies the buffer (BPF/LMS)
                     rxPipeline(c, c->echoTail.data(), c->echoTail.size());
                     for (size_t k = i; k < n; k++) out[k] = 0.0f;
                     return i;
@@ -569,7 +569,7 @@ extern "C" size_t rttycore_generate_tx(RTTYCore* c, float* out, size_t n) {
             double f = d / 32768.0;
             out[i] = float(f > 1.0 ? 1.0 : (f < -1.0 ? -1.0 : f));
         }
-        // echo=1: demodulátor dekóduje vlastní vysílaný zvuk (TSound: vstup zavřený, Buff = TX blok).
+        // echo=1: the demodulator decodes our own transmitted audio (TSound: input closed, Buff = the TX block).
         if (c->echo == 1 && i > 0) rxPipeline(c, c->txBlock.data(), i);
     }
     for (size_t k = i; k < n; k++) out[k] = 0.0f;
@@ -594,7 +594,7 @@ extern "C" void rttycore_tx_abort(RTTYCore* c) {
 
 extern "C" int rttycore_is_tx(const RTTYCore* c) { return c && c->txActive ? 1 : 0; }
 
-// --- Spektrum a AFC (podle TSound::DrawFFT a volání DoAFC z TMmttyWd::TimerTimer) ---
+// --- Spectrum and AFC (after TSound::DrawFFT and the DoAFC call from TMmttyWd::TimerTimer) ---
 
 extern "C" int rttycore_tick(RTTYCore* c) {
     if (!c) return 0;
@@ -612,8 +612,8 @@ extern "C" int rttycore_tick(RTTYCore* c) {
         c->fft->TrigFFT();
     }
     if (!c->afc) return 0;
-    if (c->txActive && c->echo != 2) return 0;        // během vysílání AFC neběží
-    // plán 9: AFC jen při signálu nad prahem squelche (jinak v šumu přeskakuje na jiné stanice)
+    if (c->txActive && c->echo != 2) return 0;        // AFC does not run while transmitting
+    // plan 9: AFC only when the signal is above the squelch threshold (in noise it jumps to other stations)
     if (c->afcGate) {
         double thr = c->dem->m_Limit ? c->dem->GetSQLevel() * 10.0 : c->dem->GetSQLevel();
         if (c->dem->m_avgdeff < thr) return 0;
@@ -655,7 +655,7 @@ extern "C" size_t rttycore_read_fsk_codes(RTTYCore* c, uint8_t* out, size_t max)
     return k;
 }
 
-// --- XY scope (CFSKDEM::m_XYScopeMark/Space, sběr po dávkách jako v TMmttyWd::UpdateXYScope) ---
+// --- XY scope (CFSKDEM::m_XYScopeMark/Space, collected in batches as in TMmttyWd::UpdateXYScope) ---
 static const int kXYSize = 512;
 
 static void scopeCollect(CFSKDEM& d) {
@@ -666,7 +666,7 @@ static void scopeCollect(CFSKDEM& d) {
 extern "C" void rttycore_set_scope(RTTYCore* c, int on) {
     if (!c) return;
     CoreScope scope(&c->ctx);
-    c->dem->m_Scope = 0;                       // jako TTScope: nejdřív vypnout, pak připravit a zapnout
+    c->dem->m_Scope = 0;                       // like TTScope: switch off first, then prepare and switch on
     if (on) { scopeCollect(*c->dem); c->dem->m_Scope = 1; }
 }
 

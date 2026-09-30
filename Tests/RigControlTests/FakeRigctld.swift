@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-/// Falešný rigctld (výchozí protokol) pro testy. Běží na náhodném portu na 127.0.0.1.
+/// A fake rigctld (the default protocol) for the tests. It runs on a random port on 127.0.0.1.
 final class FakeRigctld: @unchecked Sendable {
     enum Mode { case normal, rejectAll, silent, garbageFreq }
     private let queue = DispatchQueue(label: "FakeRigctld")
@@ -12,7 +12,7 @@ final class FakeRigctld: @unchecked Sendable {
     var freq = 14_080_000.0
     var rigMode = "PKTUSB"
     var ptt = false
-    var replyDelayMs = 0          // zpoždění odpovědi (odhalí souběžné požadavky)
+    var replyDelayMs = 0          // the response delay (reveals concurrent requests)
     private(set) var commands: [String] = []
 
     func start() async throws {
@@ -29,7 +29,7 @@ final class FakeRigctld: @unchecked Sendable {
         port = l.port?.rawValue ?? 0
     }
 
-    /// Restartuje na stejném portu (simulace znovuspuštění rigctld).
+    /// Restarts on the same port (simulates rigctld being started again).
     func restart() async throws {
         let p = port
         stop()

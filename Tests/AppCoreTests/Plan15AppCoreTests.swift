@@ -9,7 +9,7 @@ import RTTYModem
 import TestSupport
 @testable import AppCore
 
-// Bod 2: bez rigu se zapíše ručně zadaná frekvence; zůstává pro další QSO; rig online má přednost
+// Item 2: with no rig the manually entered frequency is logged; it stays for the next QSO; an online rig wins
 @Test func manualFrequencyIsLogged() async throws {
     let h = try makeApp(ptt: .none)
     try await h.app.setQSOField("freq", "14085.5")
@@ -18,17 +18,17 @@ import TestSupport
     let r = try await h.app.logQSO()
     #expect(r.frequency == 14_085_500 && r.band == "20m")
     await h.app.clearQSO()
-    #expect(await h.app.qso.frequency == 14_085_500)          // pásmo zůstává
+    #expect(await h.app.qso.frequency == 14_085_500)          // the band stays
     await #expect(throws: AppError.self) { try await h.app.setQSOField("freq", "abc") }
-    try await h.app.setQSOField("freq", "")                    // smazání
+    try await h.app.setQSOField("freq", "")                    // clearing
     #expect(await h.app.qso.frequency == nil)
     try await h.app.setQSOField("freq", "7040")
-    await h.engine.pollRig()                                   // rig online (14,083 MHz)
+    await h.engine.pollRig()                                   // rig online (14.083 MHz)
     try await h.app.setQSOField("call", "OK2AA")
     #expect(try await h.app.logQSO().frequency == 14_083_000)
 }
 
-// Bod 1: duplicita v závodě = stejná základní značka, pásmo a mód od začátku závodu
+// Item 1: a dupe in a contest = the same base call, band and mode since the contest started
 @Test func dupeCheck() {
     let t0 = Date(timeIntervalSince1970: 1_800_000_000)
     func rec(_ c: String, _ f: Double, _ m: String = "RTTY", _ dt: Double = 60) -> QSORecord {
@@ -37,10 +37,10 @@ import TestSupport
     let log = [rec("W1AW", 14_080_000), rec("DL1ABC/P", 7_040_000), rec("OK2AA", 14_080_000, "RTTY", -3600)]
     #expect(DupeCheck.isDupe(call: "W1AW", band: "20m", mode: "RTTY", records: log, since: t0))
     #expect(!DupeCheck.isDupe(call: "W1AW", band: "40m", mode: "RTTY", records: log, since: t0))
-    #expect(DupeCheck.isDupe(call: "DL1ABC", band: "40m", mode: "RTTY", records: log, since: t0))    // /P = stejná stanice
-    #expect(!DupeCheck.isDupe(call: "OK2AA", band: "20m", mode: "RTTY", records: log, since: t0))    // před začátkem
+    #expect(DupeCheck.isDupe(call: "DL1ABC", band: "40m", mode: "RTTY", records: log, since: t0))    // /P = the same station
+    #expect(!DupeCheck.isDupe(call: "OK2AA", band: "20m", mode: "RTTY", records: log, since: t0))    // before the start
     #expect(!DupeCheck.isDupe(call: "W1AW", band: "20m", mode: "PSK", records: log, since: t0))
-    #expect(DupeCheck.isDupe(call: "W1AW", band: nil, mode: "RTTY", records: log, since: t0))          // bez pásma = podle značky
+    #expect(DupeCheck.isDupe(call: "W1AW", band: nil, mode: "RTTY", records: log, since: t0))          // without a band = by the call
 }
 
 @Test func dupeInController() async throws {
@@ -58,23 +58,23 @@ import TestSupport
     #expect(await h.app.dupe() == false)
 }
 
-// Bod 4: Super Check Partial – části značky a „blízké“ značky (oprava chybně přijaté)
+// Item 4: Super Check Partial – parts of a call and "close" calls (fixing a misread one)
 @Test func superCheckPartial() {
     let scp = SuperCheck(calls: ["DL1ABC", "DL1ABD", "OK1XOE", "W1AW", "K1ABC", "dl1abc", "UA9ABC"])
     #expect(scp.count == 6)
     #expect(scp.partial("1AB") == ["DL1ABC", "DL1ABD", "K1ABC"])
-    #expect(scp.partial("AB").isEmpty)                         // méně než 3 znaky
+    #expect(scp.partial("AB").isEmpty)                         // fewer than 3 characters
     #expect(scp.partial("DL1ABC") == ["DL1ABC"])
-    #expect(scp.near("DL1ABX") == ["DL1ABC", "DL1ABD"])         // jedna záměna
-    #expect(scp.near("W1AAW") == ["W1AW"])                       // jeden znak navíc
-    #expect(scp.near("OK1XO") == ["OK1XOE"])                     // jeden chybí
+    #expect(scp.near("DL1ABX") == ["DL1ABC", "DL1ABD"])         // one substitution
+    #expect(scp.near("W1AAW") == ["W1AW"])                       // one extra character
+    #expect(scp.near("OK1XO") == ["OK1XOE"])                     // one missing
     #expect(scp.near("DL1ABC").contains("DL1ABD") && !scp.near("DL1ABC").contains("DL1ABC"))
-    #expect(scp.partial("1?B").contains("K1ABC"))                // ? = libovolný znak
+    #expect(scp.partial("1?B").contains("K1ABC"))                // ? = any character
     let parsed = SuperCheck.parse("# MASTER.SCP\n# comment\nDL1ABC\nOK1XOE\n\n")
     #expect(parsed == ["DL1ABC", "OK1XOE"])
 }
 
-// Review Important 3: s nastaveným rigem, který neodpovídá, se nezapíše stará uložená ruční frekvence
+// Review Important 3: with a rig configured but not responding, the old stored manual frequency is not logged
 @Test func staleManualFrequencyNotUsedWithRigConfigured() async throws {
     var s = AppSettings(); s.station.call = "OK1XOE"; s.ptt.method = .none
     s.rig.type = .cat; s.log.manualFrequency = 14_080_000
@@ -83,8 +83,8 @@ import TestSupport
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("stale-\(UUID())")
     let app = AppController(settings: s, engine: engine, log: try QSOLogStore(directory: dir), profiles: nil)
     try await app.setQSOField("call", "DL1ABC")
-    #expect(try await app.logQSO().frequency == nil)            // rig offline, stará frekvence se nepoužije
-    try await app.setQSOField("freq", "7040")                    // zadaná teď → použije se
+    #expect(try await app.logQSO().frequency == nil)            // rig offline, the old frequency is not used
+    try await app.setQSOField("freq", "7040")                    // entered now → it is used
     try await app.setQSOField("call", "DL2ABC")
     #expect(try await app.logQSO().frequency == 7_040_000)
 }

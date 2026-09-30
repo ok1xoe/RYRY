@@ -4,16 +4,16 @@ import AppUI
 import Settings
 import SwiftUI
 
-/// Okno přijatého textu: NSTextView s inkrementálním přidáváním, echo jinou barvou, klik na slovo → QSO pole.
+/// The received text window: an NSTextView with incremental appending, echo in a different color, click a word → QSO field.
 struct RxTextView: NSViewRepresentable {
     @Bindable var model: AppModel
 
     final class ClickTextView: NSTextView {
         var onWord: ((String) -> Void)?
-        /// Slovo se vloží jen po jednoduchém kliknutí bez tažení (výběr textu pole nepřepisuje).
+        /// A word is only inserted on a simple click without dragging (selecting text does not overwrite the field).
         override func mouseDown(with event: NSEvent) {
             let down = event.locationInWindow
-            super.mouseDown(with: event)             // sleduje tažení až do uvolnění tlačítka
+            super.mouseDown(with: event)             // tracks the drag until the button is released
             guard event.clickCount == 1, selectedRange().length == 0 else { return }
             let up = window?.mouseLocationOutsideOfEventStream ?? down
             guard hypot(up.x - down.x, up.y - down.y) < 4 else { return }
@@ -35,19 +35,19 @@ struct RxTextView: NSViewRepresentable {
         var highlightVersion = -1
     }
 
-    /// Značka v textu vysílání (echo) – zvýraznění ji přeskakuje.
+    /// A callsign in the transmitted text (echo) - highlighting skips it.
     nonisolated static let echoKey = NSAttributedString.Key("cz.ok1xoe.mmtty4mac.echo")
-    /// Kolik posledních znaků se přestyluje při změně stavu (zalogování, změna pásma).
+    /// How many trailing characters are restyled when the state changes (logging a QSO, a band change).
     static let restyleTail = 5000
 
-    /// Vzhled okna příjmu (písmo, barvy) – změna vede k přestylování celého obsahu.
+    /// Appearance of the receive window (font, colors) - a change restyles the whole content.
     struct Style: Equatable {
         var size: Double, font: String, text: String?, echo: String?, background: String?, highlight: Bool
         init(_ d: DisplaySettings) {
             size = d.fontSize; font = d.rxFont; text = d.rxTextColor; echo = d.rxEchoColor; background = d.rxBackground
             highlight = d.highlightCalls
         }
-        /// Atributy zvýrazněné značky: vlastní červeně tučně, duplicita šedě přeškrtnutě, v logu modře, nová tučně.
+        /// Attributes of a highlighted call: own call red and bold, a dupe gray and struck through, in the log blue, a new one bold.
         func decorate(_ a: inout [NSAttributedString.Key: Any], _ s: CallStyle, bold: NSFont) {
             switch s {
             case .own: a[.foregroundColor] = NSColor.systemRed; a[.font] = bold
@@ -87,8 +87,8 @@ struct RxTextView: NSViewRepresentable {
         return scroll
     }
 
-    /// Obarví značky ve slovech od pozice `from` (mimo echo). Ostatní slova dostanou základní styl,
-    /// takže se dřívější zvýraznění při změně stavu správně vrátí.
+    /// Colors the calls in the words from position `from` on (excluding echo). All other words get the base style,
+    /// so that earlier highlighting is correctly reverted when the state changes.
     func applyHighlight(_ storage: NSTextStorage, from: Int, style: Style) {
         let ns = storage.mutableString
         guard from < ns.length else { return }
@@ -114,13 +114,13 @@ struct RxTextView: NSViewRepresentable {
         storage.beginEditing()
         if newChars >= model.rxCharCount || newChars < 0 || cut < 0 || style != c.style {
             c.style = style
-            // velká změna (start, clear) → celé znovu
+            // a big change (start, clear) → redo everything
             let s = NSMutableAttributedString()
             for r in model.rxRuns { s.append(NSAttributedString(string: r.text, attributes: style.attrs(echo: r.echo))) }
             storage.setAttributedString(s)
             restyleFrom = max(0, storage.length - Self.restyleTail)
         } else {
-            if cut > 0 {       // ořez zepředu (limit 200 000 znaků)
+            if cut > 0 {       // trim from the front (limit 200 000 characters)
                 let n = (storage.string.utf16.count > 0) ? NSRange(storage.string.startIndex..<storage.string.index(storage.string.startIndex, offsetBy: min(cut, storage.string.count)), in: storage.string) : NSRange(location: 0, length: 0)
                 storage.deleteCharacters(in: n)
             }
@@ -128,9 +128,9 @@ struct RxTextView: NSViewRepresentable {
             for r in model.rxTail(newChars) {
                 storage.append(NSAttributedString(string: r.text, attributes: style.attrs(echo: r.echo)))
             }
-            // navazuje-li přidaný text na neúplné slovo, přestylovat i to (slovo rozdělené mezi dvě přidání)
+            // if the appended text continues an incomplete word, restyle that too (a word split across two appends)
             if newChars > 0 { restyleFrom = CallHighlight.restyleStart(in: storage.mutableString, appendedAt: oldLength) }
-            if hv != c.highlightVersion {         // změna stavu (log, pásmo) → přestylovat konec textu
+            if hv != c.highlightVersion {         // a state change (log, band) → restyle the end of the text
                 restyleFrom = min(restyleFrom ?? Int.max, max(0, storage.length - Self.restyleTail))
             }
         }

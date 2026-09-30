@@ -3,7 +3,7 @@ import Foundation
 import Localization
 import Settings
 
-/// Výsledek vyhledání v callbooku.
+/// Result of a callbook lookup.
 public struct CallbookEntry: Equatable, Sendable {
     public var call: String, name: String, qth: String, grid: String, country: String
     public init(call: String, name: String, qth: String, grid: String, country: String) {
@@ -24,13 +24,13 @@ public enum CallbookError: Error, Equatable, Sendable, LocalizedError {
     }
 }
 
-/// Síť pro callbook (v testech mock).
+/// Network for the callbook (a mock in tests).
 public typealias HTTPFetcher = @Sendable (URL) async throws -> Data
 
 public protocol CallbookService: Sendable {
-    /// Zobrazovaný název služby („QRZ.com“).
+    /// The displayed name of the service ("QRZ.com").
     var name: String { get }
-    /// nil = značka nenalezena.
+    /// nil = the call was not found.
     func lookup(_ call: String) async throws -> CallbookEntry?
 }
 
@@ -44,7 +44,7 @@ public enum CallbookFactory {
         }
     }
 
-    /// Skutečná síť: HTTPS s časovým limitem, jen odpověď 200.
+    /// The real network: HTTPS with a time limit, only a 200 response.
     public static let liveFetcher: HTTPFetcher = { url in
         let cfg = URLSessionConfiguration.ephemeral
         cfg.timeoutIntervalForRequest = 10; cfg.timeoutIntervalForResource = 15
@@ -62,7 +62,7 @@ public enum CallbookFactory {
 
 // MARK: XML
 
-/// Zploštění XML na „list → text“ (jména malými písmeny, bez jmenných prostorů); stačí pro odpovědi callbooků.
+/// Flattening of XML to "leaf → text" (names in lower case, without namespaces); enough for callbook responses.
 enum FlatXML {
     static func parse(_ data: Data) throws -> [String: String] {
         let d = Delegate()
@@ -86,14 +86,14 @@ enum FlatXML {
     }
 }
 
-/// Procentní kódování hodnoty parametru (jen nechráněné znaky zůstanou).
+/// Percent-encoding of a parameter value (only unreserved characters stay).
 func callbookEncode(_ s: String) -> String {
     s.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")) ?? s
 }
 
 private func normalize(_ call: String) -> String { call.trimmingCharacters(in: .whitespaces).uppercased() }
 
-/// Sdílená relace: jedno přihlášení i při souběžných dotazech.
+/// Shared session: a single login even with concurrent queries.
 private actor SessionHolder {
     private var value: String?
     private var pending: Task<String, Error>?
@@ -205,7 +205,7 @@ public struct HamQTHCallbook: CallbookService {
     }
 }
 
-// MARK: Cache a limit souběžnosti
+// MARK: Cache and concurrency limit
 
 private actor Limiter {
     private var free: Int
@@ -220,7 +220,7 @@ private actor Limiter {
     }
 }
 
-/// Paměťová cache výsledků (i „nenalezeno“) + limit souběžných dotazů; chyby se neukládají.
+/// In-memory cache of the results (including "not found") + a limit of concurrent queries; errors are not cached.
 public actor CachingCallbook: CallbookService {
     public nonisolated let name: String
     private let base: any CallbookService

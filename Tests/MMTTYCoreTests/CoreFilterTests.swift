@@ -3,11 +3,11 @@ import Foundation
 import MMTTYCore
 import RTTYSignalKit
 
-/// Plán 7 / T1: filtry AA6YQ a notch/LMS, parametry PLL a TX.
+/// Plan 7 / T1: the AA6YQ and notch/LMS filters, the PLL and TX parameters.
 
 private let filterText = "CQ CQ DE OK1XOE OK1XOE PSE K\r\n599 001 TU 73 DE OK1XOE\r\n"
 
-/// Signál RTTY (2125/2295 Hz) + silný rušivý nosný tón.
+/// An RTTY signal (2125/2295 Hz) plus a strong interfering carrier tone.
 private func jammed(toneHz: Double, toneAmp: Float) -> [Float] {
     var s = RTTYSignalGenerator(amplitude: 0.2).generate(text: filterText)
     for i in s.indices { s[i] += toneAmp * Float(sin(2 * Double.pi * toneHz * Double(i) / 11025)) }
@@ -51,7 +51,7 @@ private func errors(_ got: String, _ want: String) -> Int {
     #expect(eNotch <= 2, "s notch chyb: \(eNotch)")
 }
 
-/// MMTTY TMmttyWd::PBoxFFTINMouseDown (pravé tlačítko, typ notch).
+/// MMTTY TMmttyWd::PBoxFFTINMouseDown (right button, notch type).
 @Test func notchClickFollowsMMTTY() throws {
     let core = try #require(makeCore())
     defer { rttycore_destroy(core) }
@@ -63,7 +63,7 @@ private func errors(_ got: String, _ want: String) -> Int {
     rttycore_notch_click(core, 2500)
     #expect(rttycore_get_param(core, RC_NOTCH_FREQ) == 2500)
     #expect(rttycore_get_param(core, RC_NOTCH2_FREQ) == 1800)
-    // typ LMS: klik nic nemění
+    // LMS type: the click changes nothing
     #expect(rttycore_set_param(core, RC_LMS_TYPE, 0) == RC_OK)
     rttycore_notch_click(core, 1000)
     #expect(rttycore_get_param(core, RC_NOTCH_FREQ) == 2500)
@@ -110,7 +110,7 @@ private func errors(_ got: String, _ want: String) -> Int {
     #expect(decode(rx, slow).contains("RYRYRYRYRY"))
 }
 
-// Review I-3: lichý počet odboček by nechal neinicializovaný koeficient → zaokrouhlit na sudé
+// Review I-3: an odd number of taps would leave a coefficient uninitialised → round up to an even number
 @Test func oddTapCountsRoundedToEven() throws {
     let core = try #require(makeCore())
     defer { rttycore_destroy(core) }

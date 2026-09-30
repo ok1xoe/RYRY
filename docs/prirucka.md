@@ -89,7 +89,7 @@ Správa logu (menu Soubor): **Nový log…** (⌘N; pořadová čísla závodu o
 
 Nastavení → Závod: zapněte **Závodní režim** a vyberte **Předvolbu** (ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE, OK DX RTTY). Předvolba nastaví název pro Cabrillo, formát výměny a nejbližší termín – termín vždy ověřte v pravidlech závodu.
 
-Formáty výměny: RST + pořadové číslo (případně pevná výměna), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Pořadová čísla se po zalogování zvyšují sama. Body a násobiče aplikace nepočítá.
+Formáty výměny: RST + pořadové číslo (případně pevná výměna), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Pořadová čísla se po zalogování zvyšují sama. U zvolené předvolby závodu počítá aplikace násobiče (Okno → Násobiče) a body a skóre (Okno → Skóre: po pásmech QSO, duplicity, body, násobiče, u WAE QTC; výsledné skóre se vzorcem, souhrn „Skóre N“ ve stavovém řádku). Jde o odhad – vyhodnocení odečte chybná spojení.
 
 **WAE a QTC:** v QSO okně je panel QTC – **QTC?** se zeptá protistanice, **QRV – přijmout** otevře příjem série, **Poslat…** připraví a odvysílá sérii z vašeho logu (max. 10 QTC na dvojici stanic, jen mezi kontinenty, každé QSO jen jednou). Přijaté řádky se plní klikem na slova v příjmu nebo tlačítkem **Načíst z příjmu**. Série jsou v okně Log na záložce QTC a v Cabrillu.
 

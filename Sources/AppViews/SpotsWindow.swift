@@ -6,7 +6,7 @@ import Settings
 import Spots
 import SwiftUI
 
-/// Okno „Spoty“: DX cluster a RBN. Dvojklik na spot nastaví rig a vloží značku do QSO okna.
+/// The "Spots" window: DX cluster and RBN. Double-clicking a spot tunes the rig and puts the call into the QSO window.
 public struct SpotsWindow: View {
     @Bindable var model: AppModel
     @State private var selection: Set<Spot.ID> = []
@@ -52,18 +52,14 @@ public struct SpotsWindow: View {
                 status("DX cluster", feed.clusterState, enabled: model.settings.spots.clusterEnabled)
                 status("RBN", feed.rbnState, enabled: model.settings.spots.rbnEnabled)
                 Spacer()
-                Toggle(L("Jen RTTY"), isOn: Binding(get: { model.settings.spots.rttyOnly },
-                                                    set: { v in model.setSpots { $0.rttyOnly = v } }))
-                Picker(L("Pásmo"), selection: Bindable(feed).bandFilter) {
-                    Text(L("všechna")).tag(String?.none)
-                    ForEach(feed.bands, id: \.self) { Text($0).tag(String?.some($0)) }
-                }.fixedSize()
+                Text(L("%ld z %ld spotů", rows.count, feed.book.count)).font(.caption).foregroundStyle(.secondary)
                 LabeledContent(L("Posun (Hz)")) {
                     TextField("", value: Binding(get: { model.settings.spots.offsetHz },
                                                  set: { v in model.setSpots { $0.offsetHz = min(max(v, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound) } }),
                               format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 64)
                 }.fixedSize()
             }
+            SpotFilterBar(model: model)
             if !model.settings.spots.clusterEnabled && !model.settings.spots.rbnEnabled {
                 Text(L("Spoty jsou vypnuté – zapněte DX cluster nebo RBN v Nastavení → Spoty."))
                     .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
@@ -98,8 +94,10 @@ public struct SpotsWindow: View {
             }
             Text(L("Dvojklik: nastaví rig na frekvenci spotu + posun a vloží značku do QSO okna. Rádio v režimu LSB/AFSK s mark 2125 Hz potřebuje posun +2125 Hz. „✓ pásmo“ = značka je už v logu na tomto pásmu."))
                 .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+            Divider()
+            ClusterPanel(model: model)
         }
         .padding(8)
-        .frame(minWidth: 720, minHeight: 320)
+        .frame(minWidth: 720, minHeight: 440)
     }
 }

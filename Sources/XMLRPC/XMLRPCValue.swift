@@ -17,7 +17,7 @@ public enum XMLRPCCodecError: Error, Equatable, Sendable {
 }
 
 public extension XMLRPCValue {
-    /// Pohodlné převody (fldigi/flrig často posílají čísla jako string).
+    /// Convenience conversions (fldigi/flrig often send numbers as strings).
     var stringValue: String? {
         switch self {
         case .string(let s): return s

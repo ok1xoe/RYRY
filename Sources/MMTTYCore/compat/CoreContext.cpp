@@ -1,8 +1,8 @@
-// Kontext jádra (bývalé globály z ComLib.cpp).
+// The core context (the former globals from ComLib.cpp).
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba; Modifications Copyright 2026 OK1XOE, LGPL v3
 #include "MMTTYCompat.h"
 
-static CoreContext g_defaultCtx;                 // pro volání mimo C API (statická inicializace)
+static CoreContext g_defaultCtx;                 // for calls outside the C API (static initialization)
 thread_local CoreContext* g_ctx = &g_defaultCtx;
 
 void InitSampType(void)

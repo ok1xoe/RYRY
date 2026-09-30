@@ -17,12 +17,12 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
 }
 
 @Test func maidenheadSixAndEightChars() throws {
-    let c6 = try #require(Geo.maidenhead("jo70fc"))                  // malá písmena a Praha
+    let c6 = try #require(Geo.maidenhead("jo70fc"))                  // lower case and Prague
     #expect(near(c6.lat, 50.1042, 1e-3) && near(c6.lon, 14.4583, 1e-3))
     let c8 = try #require(Geo.maidenhead("JO70FC55"))
     #expect(near(c8.lat, 50.0 + 2 * 2.5 / 60 + 5.5 * 0.25 / 60, 1e-6))
     #expect(near(c8.lon, 14 + 5 * 5.0 / 60 + 5.5 * 0.5 / 60, 1e-6))
-    #expect(Geo.distanceKm(c6, c8) < 1)                              // osmiznaková je jen zpřesnění
+    #expect(Geo.distanceKm(c6, c8) < 1)                              // the eight-character form only refines the position
 }
 
 @Test func maidenheadInvalid() {
@@ -30,7 +30,7 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
                 "JO70YA", "JO70FC5A", "JO 70", "ÁO70", "JO70fc55x"] {
         #expect(Geo.maidenhead(bad) == nil, "\(bad)")
     }
-    #expect(Geo.maidenhead("  jo70  ") != nil)                       // okolní mezery se ignorují
+    #expect(Geo.maidenhead("  jo70  ") != nil)                       // surrounding spaces are ignored
 }
 
 @Test func distanceAndBearingPragueNewYork() throws {
@@ -82,10 +82,10 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
     #expect(loc.source == .locator && near(loc.coordinate.lon, 14.4583, 1e-3))
     let cnt = try #require(Geo.position(locator: "", country: ok))
     #expect(cnt.source == .country && cnt.coordinate == Geo.Coordinate(lat: 50, lon: 15))
-    let bad = try #require(Geo.position(locator: "ZZ99", country: ok))          // neplatný lokátor → země
+    let bad = try #require(Geo.position(locator: "ZZ99", country: ok))          // an invalid locator → the entity
     #expect(bad.source == .country)
     #expect(Geo.position(locator: "", country: nil) == nil)
-    // cty.dat: západní délka je kladná → USA musí být západně (záporně)
+    // cty.dat: west longitude is positive → the USA must be to the west (negative)
     let usp = try #require(Geo.position(locator: "", country: us))
     #expect(usp.coordinate.lon < 0 && near(usp.coordinate.lon, -91.67, 1e-9))
 }
@@ -107,7 +107,7 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
 @Test func realCtyDatLongitudeSign() throws {
     let db = try #require(CountryDB.shared)
     let us = try #require(db.lookup("W2AB"))
-    #expect(us.longitude < -60 && us.longitude > -125)              // USA je na západní polokouli
+    #expect(us.longitude < -60 && us.longitude > -125)              // the USA is in the western hemisphere
     let jp = try #require(db.lookup("JA1ABC"))
     #expect(jp.longitude > 120 && jp.longitude < 150)
     let ok = try #require(db.lookup("OK1XOE"))
@@ -121,8 +121,8 @@ private func near(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) 
     #expect(FrequencyInput.parseKHz("7040 kHz") == 7040)
     #expect(FrequencyInput.parseKHz("7040khz") == 7040)
     #expect(FrequencyInput.parseKHz("14.08 MHz") == 14080)
-    #expect(FrequencyInput.parseKHz("100") == 100)                 // spodní mez
-    #expect(FrequencyInput.parseKHz("500000") == 500_000)          // horní mez
+    #expect(FrequencyInput.parseKHz("100") == 100)                 // lower bound
+    #expect(FrequencyInput.parseKHz("500000") == 500_000)          // upper bound
     for bad in ["", "abc", "99.9", "500001", "-14080", "0", "1e3", "nan", "inf", "14,080,5", "14 080", "kHz", "1.2.3"] {
         #expect(FrequencyInput.parseKHz(bad) == nil, "\(bad)")
     }

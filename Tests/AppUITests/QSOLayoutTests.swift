@@ -45,5 +45,5 @@ private func layout(_ enabled: Bool, _ f: ContestFormat = .serial, exchange: Str
     #expect(f("59914") == ["exchangeRcvd=14"])
     #expect(f("599") == ["rstRcvd=599"])
     #expect(f("TEST") == [])
-    #expect(f("41") == [])                                                // CQ zóna je 1–40
+    #expect(f("41") == [])                                                // the CQ zone is 1–40
 }

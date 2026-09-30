@@ -1,37 +1,109 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
+import Spots
 
-/// Spoty z DX clusteru a Reverse Beacon Network (telnet). Přihlašovací značka = značka ze Stanice.
-/// Výchozí stav je vypnuto – síť se použije jen na výslovné zapnutí.
+/// Spots from a DX cluster and the Reverse Beacon Network (telnet). The login call = the call from Station.
+/// The default state is off – the network is used only on an explicit enable.
 public struct SpotSettings: Codable, Sendable, Equatable {
     public var clusterEnabled = false
     public var clusterHost = "dxc.ve7cc.net"
     public var clusterPort = 23
-    /// Příkazy po přihlášení, jeden na řádek (např. `set/skimmer`, `sh/dx 30`).
+    /// Commands after login, one per line (e.g. `set/skimmer`, `sh/dx 30`).
     public var clusterCommands: [String] = ["sh/dx 30"]
+    /// Macros of the DX cluster command buttons (always 10 items); text = command(s), one per line, variables as in transmit macros.
+    public var clusterMacros: [Macro] = SpotSettings.defaultClusterMacros
     public var rbnEnabled = false
     public var rbnHost = "telnet.reversebeacon.net"
     public var rbnPort = 7000
-    /// Jen spoty RTTY.
-    public var rttyOnly = true
-    /// Stáří spotů v minutách (1…240).
+    /// Display filter – checked bands (the fixed list `SpotFilter.allBands`). Default: all.
+    public var filterBands = SpotFilter.allBandsSet
+    /// Display filter – the "other" checkbox for bands (spots outside the fixed list). Default: checked.
+    public var filterOtherBands = true
+    /// Display filter – checked mode groups. Default only RTTY (like the former "RTTY only").
+    public var filterModes: Set<SpotModeGroup> = [.rtty]
+    /// The mode selection before turning on "RTTY only" – only for restoring after unchecking; source of truth `filterModes`.
+    public var previousFilterModes = SpotFilter.allModes
+    /// Spot age in minutes (1…240).
     public var maxAgeMinutes = 30
-    /// Posun frekvence rigu proti frekvenci spotu (Hz): rádio v LSB/AFSK s mark 2125 Hz potřebuje +2125.
+    /// Offset of the rig frequency against the spot frequency (Hz): a radio in LSB/AFSK with mark 2125 Hz needs +2125.
     public var offsetHz = 0.0
-    /// Štítky spotů (band map) ve vodopádu a spektru.
+    /// Spot labels (band map) in the waterfall and the spectrum.
     public var showInWaterfall = true
+
+    /// Display filter for the spot list, the band map and the waterfall labels.
+    public var filter: SpotFilter { SpotFilter(bands: filterBands, modes: filterModes, otherBands: filterOtherBands) }
+
+    /// The All / None buttons in the "Band filter" window – the "other" checkbox is toggled together with the fixed list,
+    /// so that "None" really empties the table and "All" brings back all spots.
+    public mutating func setAllBands(_ on: Bool) {
+        filterBands = on ? SpotFilter.allBandsSet : []
+        filterOtherBands = on
+    }
+
+    /// The "RTTY only" checkbox: exactly the RTTY group is displayed. It is computed from `filterModes` (it has no own key),
+    /// so it also gets checked after checking RTTY alone in the "Mode filter" window and unchecked after any further group.
+    public var rttyOnly: Bool { filterModes == [.rtty] }
+
+    /// Sets the mode filter (checkboxes in the "Mode filter" window, the All / None buttons) and remembers the selection
+    /// the user is leaving because of "RTTY only" – unchecking then brings it back.
+    public mutating func setFilterModes(_ v: Set<SpotModeGroup>) {
+        if v == [.rtty], !rttyOnly { previousFilterModes = filterModes }
+        filterModes = v
+    }
+
+    /// Checking "RTTY only" leaves just the RTTY group, unchecking brings back the previous mode selection;
+    /// when there is nothing to bring back (an empty selection or again only RTTY), all groups get checked.
+    public mutating func setRTTYOnly(_ on: Bool) {
+        if on { setFilterModes([.rtty]) }
+        else if rttyOnly {
+            let p = previousFilterModes
+            filterModes = (p.isEmpty || p == [.rtty]) ? SpotFilter.allModes : p
+        }
+    }
 
     public static let ageRange = 1...240
     public static let offsetRange = -10_000.0...10_000.0
     public static let maxCommands = 10
+    public static let clusterMacroCount = 10
+    /// Default DXSpider / CC Cluster commands (language-neutral names, like the commands). "RTTY" (`sh/dx 30 info rtty`) – the `info` qualifier searches the comment.
+    public static let defaultClusterMacros: [Macro] = [
+        Macro(name: "SH/DX", text: "sh/dx 30"),
+        Macro(name: "RTTY", text: "sh/dx 30 info rtty"),
+        Macro(name: "20 m", text: "sh/dx on 20m"),
+        Macro(name: "40 m", text: "sh/dx on 40m"),
+        Macro(name: "WWV", text: "sh/wwv"),
+        Macro(name: "SUN", text: "sh/sun"),
+        Macro(name: "Skimmer ON", text: "set/skimmer"),
+        Macro(name: "Skimmer OFF", text: "unset/skimmer"),
+        Macro(name: "USERS", text: "sh/users"),
+        Macro(name: "Spot", text: "dx %k %c RTTY"),
+    ]
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case clusterEnabled, clusterHost, clusterPort, clusterCommands, rbnEnabled, rbnHost, rbnPort, rttyOnly, maxAgeMinutes, offsetHz, showInWaterfall
+        case clusterEnabled, clusterHost, clusterPort, clusterCommands, clusterMacros, rbnEnabled, rbnHost, rbnPort
+        case filterBands, filterOtherBands, filterModes, previousFilterModes, maxAgeMinutes, offsetHz, showInWaterfall
     }
+
+    /// The dropped "RTTY only" setting – it is read only for the migration to `filterModes` (it is no longer saved).
+    enum LegacyKeys: String, CodingKey { case rttyOnly }
 
     static func validHost(_ h: String) -> Bool {
         !h.isEmpty && h.count <= 253 && !h.contains(where: { $0.isWhitespace || $0 == "/" })
+    }
+
+    /// Names of bands / mode groups from settings.json: an unknown name is dropped and named in a warning, so a filter
+    /// does not end up silently unchecked (an invalid type on the key is already reported by `tolerant`).
+    static func knownNames<T: Hashable>(_ items: [String], _ key: CodingKeys, _ w: WarningSink?, _ section: String,
+                                        _ map: (String) -> T?) -> Set<T> {
+        var out = Set<T>(), dropped: [String] = []
+        for n in items {
+            if let v = map(n) { out.insert(v) } else { dropped.append(n) }
+        }
+        if !dropped.isEmpty {
+            w?.add("\(section).\(key.stringValue): neznámé názvy vynechány: \(dropped.joined(separator: ", "))")
+        }
+        return out
     }
 
     public init(from d: Decoder) throws {
@@ -44,11 +116,39 @@ public struct SpotSettings: Codable, Sendable, Equatable {
             ? Array(c.tolerant(.clusterCommands, TolerantArray<String>(), w, s).items
                 .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.prefix(Self.maxCommands))
             : x.clusterCommands
+        var cm = c.contains(.clusterMacros)
+            ? Array(c.tolerant(.clusterMacros, TolerantArray<Macro>(), w, s).items.prefix(Self.clusterMacroCount))
+            : x.clusterMacros
+        while cm.count < Self.clusterMacroCount { cm.append(Macro(name: "", text: "")) }
+        // earlier default Czech names → language-neutral (only unchanged default macros)
+        for (i, m) in cm.enumerated() {
+            if m == Macro(name: "Slunce", text: "sh/sun") { cm[i].name = "SUN" }
+            if m == Macro(name: "Uživatelé", text: "sh/users") { cm[i].name = "USERS" }
+        }
+        clusterMacros = cm
         rbnEnabled = c.tolerant(.rbnEnabled, x.rbnEnabled, w, s)
         let rh = c.tolerant(.rbnHost, x.rbnHost, w, s).trimmingCharacters(in: .whitespaces)
         rbnHost = Self.validHost(rh) ? rh : x.rbnHost
         let rp = c.tolerant(.rbnPort, x.rbnPort, w, s); rbnPort = (1...65535).contains(rp) ? rp : x.rbnPort
-        rttyOnly = c.tolerant(.rttyOnly, x.rttyOnly, w, s)
+        // bands: unknown names are dropped with a warning, an empty list is valid ("None"), an invalid value = the default
+        let fb: TolerantArray<String>? = c.tolerant(.filterBands, nil, w, s)
+        filterBands = fb.map {
+            Self.knownNames($0.items, .filterBands, w, s) { SpotFilter.allBandsSet.contains($0) ? $0 : nil }
+        } ?? x.filterBands
+        // "other" (spots outside the fixed band list): a missing as well as an invalid value = the default, checked
+        filterOtherBands = c.tolerant(.filterOtherBands, x.filterOtherBands, w, s)
+        // migration: an older settings.json has only "rttyOnly" (true = only RTTY, false = all modes)
+        // mode groups: an unknown group name is dropped with a warning (the names are decoded as strings just for that)
+        let fm: TolerantArray<String>? = c.tolerant(.filterModes, nil, w, s)
+        let legacy = try? d.container(keyedBy: LegacyKeys.self)
+        if let fm { filterModes = Self.knownNames(fm.items, .filterModes, w, s, SpotModeGroup.init(rawValue:)) }
+        else if let legacy, legacy.contains(.rttyOnly) {
+            filterModes = legacy.tolerant(.rttyOnly, true, w, s) ? [.rtty] : SpotFilter.allModes
+        } else { filterModes = x.filterModes }
+        // the remembered selection for unchecking "RTTY only" (an invalid value = the default, an empty list is valid)
+        let pm: TolerantArray<String>? = c.tolerant(.previousFilterModes, nil, w, s)
+        previousFilterModes = pm.map { Self.knownNames($0.items, .previousFilterModes, w, s, SpotModeGroup.init(rawValue:)) }
+            ?? x.previousFilterModes
         let a = c.tolerant(.maxAgeMinutes, x.maxAgeMinutes, w, s); maxAgeMinutes = Self.ageRange.contains(a) ? a : x.maxAgeMinutes
         let o = c.tolerant(.offsetHz, x.offsetHz, w, s); offsetHz = Self.offsetRange.contains(o) ? o : x.offsetHz
         showInWaterfall = c.tolerant(.showInWaterfall, x.showInWaterfall, w, s)

@@ -7,7 +7,7 @@ import Upload
 import UniformTypeIdentifiers
 import Localization
 
-/// Uloží log ve formátu Cabrillo: dialog s rozsahem (UTC, výchozí posledních 48 h) a volbou „jen závodní spojení“.
+/// Saves the log in Cabrillo format: a dialog with a range (UTC, last 48 h by default) and a "contest QSOs only" option.
 @MainActor public func exportCabrillo(_ model: AppModel) {
     let p = NSSavePanel()
     let base = model.settings.contest.name.isEmpty ? "log" : model.settings.contest.name
@@ -55,7 +55,7 @@ public struct LogWindow: View {
         }
     }
 
-    /// QTC vyměněná se stanicí (WAE): ↓ přijato, ↑ odesláno.
+    /// QTCs exchanged with the station (WAE): ↓ received, ↑ sent.
     var qtcByCall: [String: (rx: Int, tx: Int)] {
         var d: [String: (rx: Int, tx: Int)] = [:]
         for s in model.qtcSeries {
@@ -74,7 +74,7 @@ public struct LogWindow: View {
         let v = r.serialRcvd.map { String(format: "%03d", $0) } ?? r.exchangeRcvd ?? ""
         return s + "/" + v
     }
-    /// Stav nahrání: L = LoTW, e = eQSL, C = Club Log (zelená = nahráno).
+    /// Upload status: L = LoTW, e = eQSL, C = Club Log (green = uploaded).
     @ViewBuilder static func uploadBadges(_ r: QSORecord) -> some View {
         HStack(spacing: 4) {
             ForEach([(UploadTarget.lotw, "L"), (.eqsl, "e"), (.clublog, "C")], id: \.0) { t, letter in
@@ -196,7 +196,7 @@ struct QSOEditor: View {
     }
 }
 
-/// Série QTC (WAE): přehled, rozbalení řádků, oprava a smazání; souhrn bodů.
+/// QTC series (WAE): overview, expanding the rows, editing and deleting; points summary.
 struct QTCLogView: View {
     @Bindable var model: AppModel
     @State private var editing: QTCSeries?
@@ -254,7 +254,7 @@ struct QTCLogView: View {
     }
 }
 
-/// Oprava série: protistanice, číslo série a řádky (jeden řádek „HHMM ZNAČKA NNN“ na řádek).
+/// Editing a series: the other station, the series number and the rows (one "HHMM CALL NNN" entry per line).
 struct QTCSeriesEditor: View {
     @State var series: QTCSeries
     let onSave: (QTCSeries) -> Void

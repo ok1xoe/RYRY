@@ -27,7 +27,7 @@ public struct RxRun: Equatable, Sendable, Identifiable {
 
 public enum SendMode: String, CaseIterable, Sendable { case char, word, line }
 
-/// Kanál vícekanálového dekodéru v GUI: kmitočet mark (sleduje AFC) a posledních ~80 znaků.
+/// A channel of the multi-channel decoder in the GUI: the mark frequency (tracks AFC) and the last ~80 characters.
 public struct DecoderChannel: Equatable, Sendable, Identifiable {
     public let id: Int
     public var mark: Double
@@ -36,7 +36,7 @@ public struct DecoderChannel: Equatable, Sendable, Identifiable {
 }
 
 public extension AppSettings {
-    /// Konfigurace jádra RTTY (vyžaduje nový modem, tj. restart Engine).
+    /// Configuration of the RTTY core (needs a new modem, i.e. an Engine restart).
     func modemConfig() -> RTTYModem.Config {
         var c = RTTYModem.Config()
         c.codeSet = rttyCore.japanese ? .japanese : .us
@@ -48,7 +48,7 @@ public extension AppSettings {
     }
 }
 
-/// Výchozí parametry modemu (pro rozhodnutí, co ukládat do nastavení).
+/// The default modem parameters (used to decide what to store in the settings).
 enum AppDefaults {
     static let rtty: [String: ParameterValue] = {
         guard let m = try? RTTYModem() else { return [:] }
@@ -58,7 +58,7 @@ enum AppDefaults {
     }()
 }
 
-/// Stav a akce pro GUI. Veškerá logika je v AppController/Engine, tady jen propojení a odvozený stav.
+/// State and actions for the GUI. All the logic lives in AppController/Engine; this is only the wiring and the derived state.
 @MainActor @Observable
 public final class AppModel {
     public static let rxLimit = 200_000
@@ -73,15 +73,16 @@ public final class AppModel {
     public private(set) var settings: AppSettings {
         didSet {
             if multiplierKey != multiplierKeyApplied { refreshMultipliers() }
-            if oldValue.contest.enabled != settings.contest.enabled || oldValue.contest.start != settings.contest.start {
-                rebuildLogIndex()                                              // duplicity: závod zapnut/vypnut, jiný začátek
+            if oldValue.contest.enabled != settings.contest.enabled || oldValue.contest.start != settings.contest.start
+                || oldValue.contest.selectedPreset != settings.contest.selectedPreset {
+                rebuildLogIndex()                                              // dupes: contest turned on/off, a different start or different rules
             }
         }
     }
     public private(set) var state: EngineState = .stopped
     public private(set) var rxRuns: [RxRun] = []
     public private(set) var rxCharCount = 0
-    /// Absolutní počitadla pro inkrementální zobrazení (co přibylo na konec / co se ořízlo zepředu).
+    /// Absolute counters for the incremental display (what was appended at the end / what was trimmed from the front).
     public private(set) var rxAppendedTotal = 0
     public private(set) var rxTrimmedTotal = 0
     private var nextRunId = 0
@@ -95,23 +96,23 @@ public final class AppModel {
     public internal(set) var rig: RigStatus? { didSet { if currentBand != Self.band(oldValue, qso) { refreshNewMultiplier() } } }
     public private(set) var qso = QSOFields() { didSet { refreshNewMultiplier() } }
     public private(set) var previousQSOs: [QSORecord] = []
-    /// Změna logu přepočte násobiče celé; zalogování jednoho spojení je jen přičte (`addLoggedRecord`).
+    /// A change of log recomputes the multipliers from scratch; logging a single QSO only adds to them (`addLoggedRecord`).
     public private(set) var logRecords: [QSORecord] = [] { didSet { if !logRecordsIncremental { refreshMultipliers() } } }
     private var logRecordsIncremental = false
-    /// Index logu pro zvýrazňování značek, hlídání a band mapu (viz RxAlerts.swift, AppModel+Alerts.swift).
+    /// The log index for callsign highlighting, watching and the band map (see RxAlerts.swift, AppModel+Alerts.swift).
     public internal(set) var logIndex = LogIndex()
-    /// Začátek závodu, se kterým je `logIndex` sestavený (duplicity).
+    /// The contest start `logIndex` was built with (dupes).
     var logIndexSince: Date?
-    /// Index „v logu / na pásmu“ pro okno Spoty (udržovaný spolu s `logIndex`, ne při každém překreslení).
+    /// The "in the log / on the band" index for the Spots window (maintained together with `logIndex`, not on every redraw).
     public internal(set) var spotLogIndex = SpotLogIndex()
-    /// Výskyty značek v příjmu (potvrzení „potřebné“ ze šumu) a předchozí slovo příjmu (DE/CQ před značkou).
+    /// Occurrences of callsigns in the receive text (confirming "needed" against noise) and the previous received word (DE/CQ before a call).
     var rxCallSightings = RxCallSightings()
     var rxPrevWord = ""
-    /// Souhrn upozornění ze spotů (dávka po připojení ke clusteru = jeden řádek).
+    /// A summary of the alerts from spots (a burst after connecting to the cluster becomes a single line).
     var neededPending: [String] = []
     var neededLastLine: Date?
     var neededFlushTask: Task<Void, Never>?
-    /// Zvýšení znamená změnu stavu ovlivňující styl značek (log, pásmo, nastavení) – okno příjmu přestyluje konec textu.
+    /// An increment means a state change that affects callsign styling (log, band, settings) - the receive window restyles the end of the text.
     public internal(set) var highlightVersion = 0
     var highlightBand: String?
     public var alertSink: AlertSink
@@ -120,9 +121,9 @@ public final class AppModel {
     var rxScanner = RxWordScanner()
     public private(set) var messages: [String] = []
     public private(set) var apiStatus = ""
-    /// Nenápadná informace pro QSO panel: „callbook: QRZ.com“ nebo chyba (prázdné = nic).
+    /// A discreet piece of information for the QSO panel: "callbook: QRZ.com" or an error (empty = nothing).
     public private(set) var callbookStatus = ""
-    /// Historie značek: počet načtených značek a stav načítání (prázdné = nic k hlášení).
+    /// Call history: the number of calls loaded and the loading status (empty = nothing to report).
     public private(set) var callHistoryCount = 0
     public private(set) var callHistoryStatus = ""
     private var callHistory: CallHistory?
@@ -139,25 +140,25 @@ public final class AppModel {
     public private(set) var profileNames: [String?] = []
     public private(set) var xyPoints: [XYPoint] = []
     public private(set) var xyEnabled = false
-    /// Scope demodulátoru (okno „Scope“): poslední dávka, zdroj 0–3, zmrazení (jednorázový záznam).
+    /// The demodulator scope (the "Scope" window): the last batch, source 0–3, freeze (a single-shot capture).
     public private(set) var demodScope: DemodScope?
     public private(set) var demodScopeEnabled = false
     public var scopeSource = 2
     public var scopeFrozen = false
-    /// Nahrávání na online služby (vyměnitelné v testech).
+    /// Uploading to the online services (replaceable in tests).
     public var uploader = UploadCoordinator()
     public private(set) var uploadsRunning: Set<UploadTarget> = []
     private var sqTarget: Double?
     private var sqChain: Task<Void, Never>?
     var lastSentForTesting = ""
-    /// Sloupec odvysílaného textu v aktuálním řádku (pro zalamování během TX); po přechodu na RX 0.
+    /// The column of the transmitted text within the current line (for wrapping during TX); 0 after switching to RX.
     public private(set) var txSentColumn = 0
     private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
     static var micWaitMessage: String { L("Čekám na povolení přístupu k mikrofonu (systémový dialog)…") }
     public var waterfallFromHz: Double { settings.display.fromHz }
     public var waterfallToHz: Double { settings.display.toHz }
 
-    /// Zobrazení (rozsah, zesílení, písmo, časové značky) – bez restartu, hned uloží.
+    /// Display (range, gain, font, timestamps) - no restart, saved immediately.
     public func setDisplay(_ change: (inout DisplaySettings) -> Void) async {
         var d = settings.display
         change(&d)
@@ -176,13 +177,17 @@ public final class AppModel {
     }
 
     public private(set) var app: AppController?
-    /// Spoty z DX clusteru a RBN (síť běží mimo hlavní vlákno, jen když je uživatel zapnul).
+    /// Spots from the DX cluster and RBN (the networking runs off the main thread, and only when the user enabled it).
     public let spotFeed = SpotFeed()
+    /// The most recently hand-sent DX cluster commands (newest last; at most 30) - the up arrow in the Spots window.
+    public internal(set) var clusterHistory: [String] = []
+    /// The message about the last cluster command (an error); nil = all good.
+    public internal(set) var clusterMessage: String?
     private var fldigi: FldigiXMLRPCServer?
     private var json: JSONRPCServer?
     private var eventTask: Task<Void, Never>?
     private var spectrumTask: Task<Void, Never>?
-    /// Start/stop/applySettings běží postupně (jinak by vznikaly osiřelé enginy s otevřeným PTT portem).
+    /// start/stop/applySettings run one after another (otherwise orphaned engines with an open PTT port would appear).
     private var lifecycle: Task<Void, Never>?
 
     private func serialized(_ op: @escaping @MainActor () async -> Void) async {
@@ -206,10 +211,11 @@ public final class AppModel {
         settings = s
         messages = w
         syncDisplay()
+        spotFeed.filter = s.spots.filter          // the feed only mirrors the filter from the settings (source of truth `settings.spots.filter`)
         spotFeed.onNewSpot = { [weak self] spot in self?.checkSpotNeeded(spot) }
     }
 
-    /// Stav oprávnění k mikrofonu; při prvním spuštění se zeptá (asynchronně).
+    /// The microphone permission status; on the first run it asks for it (asynchronously).
     nonisolated static func microphoneAccess() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: return true
@@ -221,12 +227,12 @@ public final class AppModel {
     public static func makeRig(_ r: RigSettings) -> Rig { RigFactory.make(r) }
 
     public static let realEngine: EngineFactory = { s, rig in
-        // RTTYModem na 11025 Hz (± 2 % korekce hodin) nemůže selhat
+        // RTTYModem at 11025 Hz (± 2 % clock correction) cannot fail
         Engine(modem: try! RTTYModem(config: s.modemConfig()), rig: rig, audio: CoreAudioBackend(), config: s.engineConfig(),
                auxModemFactory: auxModemFactory(s))
     }
 
-    /// Výroba modemů pro druhý dekodér a kanály (stejná konfigurace jádra jako hlavní, jen příjem).
+    /// Creates the modems for the second decoder and the channels (the same core configuration as the main one, receive only).
     public static func auxModemFactory(_ s: AppSettings) -> @Sendable () -> (any Modem)? {
         let cfg = s.modemConfig()
         return { try? RTTYModem(config: cfg) }
@@ -245,7 +251,7 @@ public final class AppModel {
     public func start() async { await serialized { [weak self] in await self?.startNow() } }
 
     private func startNow() async {
-        guard app == nil else { return }                 // už běží
+        guard app == nil else { return }                 // already running
         syncRxLog()
         let rig = Self.makeRig(settings.rig)
         let engine = engineFactory(settings, rig)
@@ -263,12 +269,12 @@ public final class AppModel {
             for await e in events { self?.handle(e) }
         }
         await refreshParams()
-        // Oprávnění k mikrofonu vyžádat předem (jinak spuštění zvukového vstupu čeká na dialog).
+        // Ask for microphone permission up front (otherwise starting the audio input waits on the dialog).
         if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
             note(Self.micWaitMessage)
         }
         let micOK = await Self.microphoneAccess()
-        messages.removeAll { $0 == Self.micWaitMessage }       // dialog vyřízen
+        messages.removeAll { $0 == Self.micWaitMessage }       // the dialog is done
         if !micOK {
             note(L("Přístup k mikrofonu zamítnut – povolte ho v Nastavení systému → Soukromí → Mikrofon. Příjem nefunguje."))
         }
@@ -276,7 +282,7 @@ public final class AppModel {
         do { try await app.start() }
         catch EngineError.audio(let m) { note(L("Zvuk nefunguje: %@ – zkontrolujte zařízení a oprávnění k mikrofonu", m)) }
         catch { note(L("Start selhal: %@", "\(error)")) }
-        qso = await app.qso                              // např. odesílané číslo závodu
+        qso = await app.qso                              // e.g. the sent contest number
         await refreshQTCSeries()
         state = await engine.state
         await refreshParams()
@@ -328,7 +334,7 @@ public final class AppModel {
 
     public func stop() async { await serialized { [weak self] in await self?.stopNow() } }
 
-    /// Ukončení aplikace: okamžitě RX (PTT off), pak stop s časovým limitem – ⌘Q nesmí viset.
+    /// Quitting the app: RX immediately (PTT off), then a stop with a timeout - ⌘Q must not hang.
     public func shutdown(timeout: Duration = .seconds(3)) async {
         await app?.rxNow()
         let stopper = Task { @MainActor in await self.stop() }
@@ -353,11 +359,11 @@ public final class AppModel {
         decoderChannels = []
     }
 
-    /// Uloží nastavení a restartuje (Engine je jednorázový). Během vysílání nejdřív bezpečně RX.
-    /// Sekce z dialogu Nastavení se sloučí do aktuálního nastavení; parametry modemu a makra
-    /// (mění se jinde, okamžitě) se nepřepisují starou kopií z dialogu.
-    /// Použije nastavení z dialogu. `baseline` = stav, ze kterého dialog vyšel: pořadové číslo závodu
-    /// a zobrazení se mění i jinde (log, rychlé menu), proto se převezmou jen pole, která uživatel změnil.
+    /// Saves the settings and restarts (an Engine is single-use). While transmitting it first switches safely to RX.
+    /// The sections from the Settings dialog are merged into the current settings; the modem parameters and the macros
+    /// (changed elsewhere, immediately) are not overwritten by the dialog's stale copy.
+    /// Applies the settings from the dialog. `baseline` = the state the dialog started from: the contest serial number
+    /// and the display also change elsewhere (the log, the quick menu), so only the fields the user changed are taken over.
     public func applySettings(_ s: AppSettings, baseline: AppSettings? = nil) async {
         await serialized { [weak self] in
             guard let self else { return }
@@ -375,6 +381,10 @@ public final class AppModel {
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
                 take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
                 take(\.log.directory)
+                m.spots.clusterMacros = cur.spots.clusterMacros   // the dialog does not edit the cluster macros (the Spots window does)
+                // the display filter is changed immediately by the "Band filter" / "Mode filter" windows and "RTTY only" - the dialog does not overwrite it
+                m.spots.filterBands = cur.spots.filterBands; m.spots.filterModes = cur.spots.filterModes
+                m.spots.filterOtherBands = cur.spots.filterOtherBands; m.spots.previousFilterModes = cur.spots.previousFilterModes
                 take(\.contest.enabled); take(\.contest.format); take(\.contest.name); take(\.contest.category); take(\.contest.exchange)
                 take(\.contest.nextSerial); take(\.contest.start); take(\.contest.preset)
                 take(\.decoders.secondEnabled); take(\.decoders.secondDemod); take(\.decoders.channelsEnabled)
@@ -386,7 +396,7 @@ public final class AppModel {
             do { try self.settingsStore.save(merge(self.settings)) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
             if let app = self.app, await app.engine.state != .rx { await app.rxNow() }
             await self.stopNow()
-            // znovu sloučit: během zastavování mohl přijít .contestSerial (makro s %l)
+            // merge again: a .contestSerial may have arrived while stopping (a macro with %l)
             let merged = merge(self.settings)
             do { try self.settingsStore.save(merged) } catch { self.note(L("Nastavení nelze uložit: %@", "\(error)")) }
             let wasNotifying = self.settings.alerts.wantsNotifications
@@ -399,7 +409,7 @@ public final class AppModel {
         }
     }
 
-    // MARK: Události
+    // MARK: Events
 
     private func handle(_ e: AppEvent) {
         switch e {
@@ -407,12 +417,12 @@ public final class AppModel {
             let prev = state
             state = s
             if s == .rx { txSentColumn = 0 }
-            // MMTTY „Time stamp“: UTC čas při přepnutí na TX a zpět
+            // MMTTY "Time stamp": the UTC time when switching to TX and back
             if settings.display.timestamps, prev != s {
                 if prev == .rx, s != .stopped { appendRx("\r\n[\(Self.stampFmt.string(from: Date())) UTC TX]\r\n", echo: true) }
                 else if s == .rx, prev != .stopped { appendRx("\r\n[\(Self.stampFmt.string(from: Date())) UTC RX]\r\n", echo: false) }
             }
-            if s == .tx, !txDraft.isEmpty { Task { await self.sendDraft(mode: self.sendMode) } }   // rozepsaný text hned vysílat
+            if s == .tx, !txDraft.isEmpty { Task { await self.sendDraft(mode: self.sendMode) } }   // transmit the text in progress right away
         case .engine(.modem(.rxText(let c, let echo))): appendRx(String(c), echo: echo)
         case .engine(.aux(let a)): handleAux(a)
         case .engine(.modem(.signal(let l, let sq))): signalLevel = l; squelchOpen = sq
@@ -422,7 +432,7 @@ public final class AppModel {
             let bandChanged = Bands.band(forHz: r.frequency) != Bands.band(forHz: rig?.frequency)
             rig = r
             updateHighlightBand()
-            if bandChanged, !qso.call.isEmpty { Task { await self.refreshDupe() } }   // QSY na jiné pásmo
+            if bandChanged, !qso.call.isEmpty { Task { await self.refreshDupe() } }   // QSY to a different band
         case .engine(.error(let err)): note("\(err)")
         case .engine(.pttTimeout): note(L("PTT časovač vypnul vysílání"))
         case .error(let m): note(m)
@@ -430,7 +440,7 @@ public final class AppModel {
             let callChanged = q.call != qso.call, freqChanged = q.frequency != qso.frequency
             qso = q
             if freqChanged { updateHighlightBand() }
-            if q.call.isEmpty { esmProgress = ESM.Progress() }     // nové spojení (Clear, zalogováno)
+            if q.call.isEmpty { esmProgress = ESM.Progress() }     // a new QSO (Clear, logged)
             if callChanged { updateSuperCheck(); Task { await self.refreshPrevious(); await self.refreshQTC() }; scheduleCallbook() }
             if callChanged || freqChanged { Task { await self.refreshDupe() } }
             if q.frequency != settings.log.manualFrequency {
@@ -455,7 +465,7 @@ public final class AppModel {
             params = p
             if case .double(let m)? = p["mark"] { mark = m }
             if case .double(let sh)? = p["shift"] { space = mark + sh }
-            // uložit jen parametry, které uživatel mění (stejné klíče jako dosud v nastavení + změněné)
+            // store only the parameters the user changes (the keys already in the settings plus the changed ones)
             var r = settings.rtty
             for (k, v) in p where r[k] != nil || AppDefaults.rtty[k] != v { r[k] = v }
             if r != settings.rtty { settings.rtty = r; try? settingsStore.save(settings) }
@@ -467,7 +477,7 @@ public final class AppModel {
         if let rxLog {
             do { try rxLog.append(s) } catch {
                 self.rxLog = nil
-                settings.log.rxText = false                      // přepínač v menu nesmí lhát
+                settings.log.rxText = false                      // the menu toggle must not lie
                 try? settingsStore.save(settings)
                 note(L("Záznam příjmu do souboru selhal: %@", "\(error)"))
             }
@@ -491,22 +501,22 @@ public final class AppModel {
         }
     }
 
-    // MARK: Druhý dekodér a kanály
+    // MARK: Second decoder and channels
 
     public static let rx2Limit = 20_000
     public static let channelTextLimit = 80
-    /// Text druhého dekodéru a počitadla pro inkrementální zobrazení.
+    /// The second decoder's text and the counters for the incremental display.
     public private(set) var rx2Text = ""
     public private(set) var rx2AppendedTotal = 0
     public private(set) var rx2TrimmedTotal = 0
-    /// Kanály vícekanálového dekodéru (pořadí vzniku).
+    /// The channels of the multi-channel decoder (in order of creation).
     public private(set) var decoderChannels: [DecoderChannel] = []
 
     func handleAux(_ a: AuxEvent) {
         switch a {
         case .secondText(let c): appendRx2(String(c))
         case .channelText(let id, let c):
-            guard let i = decoderChannels.firstIndex(where: { $0.id == id }) else { return }   // kanál už zanikl
+            guard let i = decoderChannels.firstIndex(where: { $0.id == id }) else { return }   // the channel is already gone
             var t = decoderChannels[i].text
             t.append(c)
             if t.count > Self.channelTextLimit { t.removeFirst(t.count - Self.channelTextLimit) }
@@ -528,7 +538,7 @@ public final class AppModel {
 
     public func clearRx2() { rx2TrimmedTotal += rx2Text.count; rx2Text = "" }
 
-    /// Změna nastavení doplňkových dekodérů – hned se projeví (bez restartu) a uloží.
+    /// A change to the additional decoders' settings - it takes effect immediately (no restart) and is saved.
     public func updateDecoders(_ change: (inout DecoderSettings) -> Void) async {
         var d = settings.decoders
         change(&d)
@@ -541,20 +551,20 @@ public final class AppModel {
     public func setSecondDecoder(_ on: Bool) async { await updateDecoders { $0.secondEnabled = on } }
     public func setChannelDecoding(_ on: Bool) async { await updateDecoders { $0.channelsEnabled = on } }
 
-    /// Demodulátor, který druhý dekodér právě používá (automaticky jiný než hlavní).
+    /// The demodulator the second decoder is currently using (automatically different from the main one).
     public var secondDemodEffective: String {
         let main: String
         if case .string(let m)? = params["demodType"] { main = m } else { main = "iir" }
         return settings.decoders.auxConfig().resolvedSecondDemod(main: main)
     }
 
-    /// „Naladit“: hlavní dekodér na mark kanálu.
+    /// "Tune": point the main decoder at the channel's mark.
     public func tuneChannel(_ id: Int) async {
         guard let ch = decoderChannels.first(where: { $0.id == id }) else { return }
         await tune(toMarkHz: ch.mark)
     }
 
-    /// Posledních `n` znaků jako úseky (text, echo) – pro doplnění konce zobrazení.
+    /// The last `n` characters as runs (text, echo) - to fill in the end of the display.
     public func rxTail(_ n: Int) -> [RxRun] {
         var need = max(0, n)
         var out: [RxRun] = []
@@ -568,12 +578,12 @@ public final class AppModel {
 
     public var rxPlainText: String { rxRuns.map(\.text).joined() }
 
-    // MARK: Záznam příjmu do souboru (MMTTY „Log Rx file“)
+    // MARK: Logging the receive text to a file (MMTTY "Log Rx file")
 
     private var rxLog: RxTextLog?
     public var rxLogActive: Bool { rxLog != nil }
 
-    /// Otevře/zavře záznam podle nastavení (po startu a po změně nastavení).
+    /// Opens/closes the log according to the settings (after startup and after a settings change).
     func syncRxLog() {
         let l = settings.log
         guard l.rxText else { rxLog?.close(); rxLog = nil; return }
@@ -582,25 +592,25 @@ public final class AppModel {
         rxLog = RxTextLog(directory: l.rxDirectory, timestamps: l.rxTimestamps)
     }
 
-    /// Přepínač v menu – ukládá se do nastavení.
+    /// The menu toggle - it is stored in the settings.
     public func setRxTextLog(_ on: Bool) {
         settings.log.rxText = on
         do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
         syncRxLog()
     }
 
-    /// Uloží obsah okna příjmu do souboru (MMTTY „RxWindow to file“).
+    /// Saves the contents of the receive window into a file (MMTTY "RxWindow to file").
     public func saveRxText(to url: URL) throws {
         try Data(rxPlainText.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "").utf8)
             .write(to: url, options: .atomic)
     }
     public func clearRx() { rxTrimmedTotal += rxCharCount; rxRuns.removeAll(); rxCharCount = 0 }
 
-    // MARK: Duplicita a Super Check Partial
+    // MARK: Dupes and Super Check Partial
 
-    /// Značka v QSO okně je v závodě duplicita (stejné pásmo a mód).
+    /// The call in the QSO window is a dupe in the contest (same band; the mode only for a custom contest - `DupeCheck`).
     public private(set) var isDupe = false
-    /// Návrhy pod polem Call: značky obsahující zadanou část a značky lišící se o jeden znak.
+    /// Suggestions below the Call field: calls containing the entered fragment and calls differing by one character.
     public private(set) var scpPartial: [String] = []
     public private(set) var scpNear: [String] = []
     public private(set) var scpCount = 0
@@ -610,41 +620,47 @@ public final class AppModel {
 
     func refreshDupe() async { isDupe = await app?.dupe() ?? false }
 
-    // MARK: Násobiče
+    // MARK: Multipliers
 
-    /// Odpracované násobiče závodu (přepočet jen při změně logu nebo závodu); nil = mimo závod / vlastní závod.
-    public private(set) var multipliers: MultiplierTally?
-    /// Pravidla násobičů zvoleného závodu (i Makrothen bez násobičů); nil = mimo závod.
+    /// The contest multipliers worked (part of the score; recomputed only when the log or the contest changes); nil = no contest / a custom contest.
+    public var multipliers: MultiplierTally? { score?.multipliers }
+    /// The contest score: QSOs, dupes, points, multipliers and QTC (WAE) per band; nil = no contest / a custom contest.
+    public private(set) var score: ScoreTally?
+    /// The multiplier rules of the selected contest (including Makrothen, which has none); nil = no contest.
     public private(set) var multiplierRule: MultiplierRule?
-    /// Násobiče, které by přineslo spojení se značkou v QSO okně (štítek NEW MULT).
+    /// The multipliers a QSO with the call in the QSO window would bring (the NEW MULT label).
     public private(set) var newMultiplier = NewMultiplier(hits: [], band: nil)
-    private var multiplierCalculator: MultiplierCalculator?
+    private var scoreCalculator: ScoreCalculator?
     private var multiplierKeyApplied: MultiplierKey?
 
-    private struct MultiplierKey: Equatable { var contest: ContestSettings; var call: String }
+    private struct MultiplierKey: Equatable { var contest: ContestSettings; var call: String; var locator: String }
     private var multiplierKey: MultiplierKey {
-        var c = settings.contest; c.nextSerial = 0                     // číslo spojení násobiče nemění
-        return MultiplierKey(contest: c, call: settings.station.call.uppercased())
+        var c = settings.contest; c.nextSerial = 0                     // the QSO number changes neither the multipliers nor the points
+        return MultiplierKey(contest: c, call: settings.station.call.uppercased(), locator: ownLocator)
+    }
+    /// Our own locator for the Makrothen points (Settings → Station, otherwise the contest's sent exchange).
+    private var ownLocator: String {
+        settings.station.locator.isEmpty ? settings.contest.exchange.uppercased() : settings.station.locator.uppercased()
     }
     private var countryDB: CountryDB? { app?.countries ?? CountryDB.shared }
 
-    /// Pásmo aktuálního spojení: rig online, jinak ručně zadaná frekvence.
+    /// The band of the current QSO: the rig when it is online, otherwise the manually entered frequency.
     public var currentBand: String? { Self.band(rig, qso) }
     private static func band(_ rig: RigStatus?, _ qso: QSOFields) -> String? {
         Bands.band(forHz: rig?.online == true ? rig?.frequency : qso.frequency)
     }
 
-    /// Počet úplných přepočtů násobičů (test: zalogování nepřepočítává celý log).
+    /// The number of full multiplier recomputations (a test: logging a QSO does not recompute the whole log).
     private(set) var multiplierFullRecomputes = 0
 
-    /// Zalogované spojení: do logu a průběžně do násobičů (bez přepočtu celého logu).
+    /// A logged QSO: into the log and incrementally into the score and the multipliers (without recomputing the whole log).
     private func addLoggedRecord(_ r: QSORecord) {
         logRecordsIncremental = true
         logRecords.insert(r, at: 0)
         logRecordsIncremental = false
-        guard let calc = multiplierCalculator, var t = multipliers else { return }
-        calc.add(r, to: &t, since: settings.contest.effectiveStart)
-        multipliers = t
+        guard let calc = scoreCalculator, var t = score else { return }
+        calc.add(r, to: &t)                                              // the contest window is pinned in the tally
+        score = t
         refreshNewMultiplier()
     }
 
@@ -653,27 +669,30 @@ public final class AppModel {
         multiplierKeyApplied = multiplierKey
         let db = countryDB
         let own = db?.lookup(settings.station.call)?.primaryPrefix
-        guard let rule = MultiplierRule.rule(for: settings.contest, ownCountry: own) else {
-            multiplierRule = nil; multipliers = nil; multiplierCalculator = nil; refreshNewMultiplier(); return
+        guard let rule = MultiplierRule.rule(for: settings.contest, ownCountry: own),
+              let sRule = ScoreRule.rule(for: settings.contest) else {
+            multiplierRule = nil; score = nil; scoreCalculator = nil; refreshNewMultiplier(); return
         }
-        let calc = MultiplierCalculator(rule: rule, countries: db)
-        multiplierRule = rule; multiplierCalculator = calc
-        multipliers = calc.tally(records: logRecords, since: settings.contest.effectiveStart)
+        let calc = ScoreCalculator(rule: sRule, multiplierRule: rule, ownCall: settings.station.call, ownLocator: ownLocator) {
+            call, wae in db?.lookup(call, wae: wae)
+        }
+        multiplierRule = rule; scoreCalculator = calc
+        score = calc.tally(records: logRecords, qtc: qtcSeries, since: settings.contest.effectiveStart, until: settings.contest.end)
         refreshNewMultiplier()
     }
 
     private func refreshNewMultiplier() {
         var n = NewMultiplier(hits: [], band: nil)
-        if let calc = multiplierCalculator, let t = multipliers, !qso.call.isEmpty {
+        if let calc = scoreCalculator?.multipliers, let t = multipliers, !qso.call.isEmpty {
             n = t.newHits(calc.hits(call: qso.call, exchange: qso.exchangeRcvd), band: currentBand)
         }
         if n != newMultiplier { newMultiplier = n }
     }
 
-    /// Soubor MASTER.SCP – ve složce nastavení (v aplikaci Application Support/mmtty4mac; testy mají vlastní složku).
+    /// The MASTER.SCP file - in the settings folder (Application Support/mmtty4mac in the app; the tests have their own folder).
     public var scpURL: URL { settingsStore.url.deletingLastPathComponent().appendingPathComponent("MASTER.SCP") }
 
-    /// Načte MASTER.SCP a značky z logu (po startu a po přepnutí logu).
+    /// Loads MASTER.SCP and the calls from the log (after startup and after switching logs).
     func loadSuperCheck() async {
         let url = scpURL
         scpMaster = await Task.detached { (try? String(contentsOf: url, encoding: .utf8)).map(SuperCheck.parse) ?? [] }.value
@@ -689,7 +708,7 @@ public final class AppModel {
 
     private func updateSuperCheck() { superCheckPreview(qso.call) }
 
-    /// Návrhy pro rozepsanou značku (volá se při psaní, ještě před potvrzením pole).
+    /// Suggestions for a partially typed call (called while typing, before the field is committed).
     public func superCheckPreview(_ text: String) {
         guard settings.log.superCheck else { scpPartial = []; scpNear = []; return }
         let t = text.trimmingCharacters(in: .whitespaces).uppercased()
@@ -697,11 +716,11 @@ public final class AppModel {
         scpNear = superCheck.near(t)
     }
 
-    /// Běžné RTTY kmitočty pásem (kHz) pro ruční volbu bez rigu.
+    /// The usual RTTY frequencies of the bands (kHz) for a manual choice without a rig.
     public static let bandPresets: [(String, Double)] = [("160m", 1838), ("80m", 3590), ("40m", 7040), ("30m", 10140),
         ("20m", 14080), ("17m", 18100), ("15m", 21080), ("12m", 24920), ("10m", 28080), ("6m", 50300)]
 
-    /// Stáhne aktuální MASTER.SCP (supercheckpartial.com) – jen na pokyn uživatele.
+    /// Downloads the current MASTER.SCP (supercheckpartial.com) - only when the user asks for it.
     public func downloadSuperCheck() async throws -> Int {
         let src = URL(string: "https://www.supercheckpartial.com/MASTER.SCP")!
         let (data, resp) = try await URLSession.shared.data(from: src)
@@ -726,12 +745,12 @@ public final class AppModel {
         f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "HH:mm:ss"; return f
     }()
 
-    // MARK: Přehrání WAV do příjmu (MMTTY „Play“)
+    // MARK: Playing a WAV into the receiver (MMTTY "Play")
 
     public private(set) var wavPlaying = false
     private var wavTask: Task<Void, Never>?
     private var wavToken = UUID()
-    /// Max. délka souboru (vzorky po převzorkování na 11025 Hz ≈ 2 h).
+    /// Maximum file length (samples after resampling to 11025 Hz ≈ 2 h).
     nonisolated static let wavMaxSamples = 11025 * 7200
 
     public enum WAVError: Error, LocalizedError {
@@ -739,8 +758,8 @@ public final class AppModel {
         public var errorDescription: String? { L("Soubor je delší než 2 hodiny.") }
     }
 
-    /// Přehraje WAV (libovolná frekvence, převzorkuje se na 11025 Hz) místo vstupu zvukovky (MMTTY „Play“).
-    /// `speed` 1 = reálný čas, 2–10 = rychleji, 0 = co nejrychleji. Během TX se pozastaví.
+    /// Plays a WAV file (any sample rate, it is resampled to 11025 Hz) instead of the sound card input (MMTTY "Play").
+    /// `speed` 1 = real time, 2–10 = faster, 0 = as fast as possible. It pauses during TX.
     public func playWAV(_ url: URL, speed: Double = 1) async throws {
         await stopWAV()
         guard let engine = app?.engine else { return }
@@ -770,7 +789,7 @@ public final class AppModel {
         await app?.engine.stopPlayback()
     }
 
-    /// Stav přehrávání pro ovládací lištu (pauza, pozice 0…1, délka v s).
+    /// The playback state for the control bar (pause, position 0…1, length in s).
     public private(set) var wavPaused = false
     public private(set) var wavProgress = 0.0
     public private(set) var wavDuration = 0.0
@@ -781,7 +800,7 @@ public final class AppModel {
         wavPaused = await engine.playbackPaused
     }
 
-    /// Posun na část souboru 0…1 (0 = převinout na začátek).
+    /// Seek to a fraction 0…1 of the file (0 = rewind to the start).
     public func seekWAV(_ fraction: Double) async {
         guard let engine = app?.engine else { return }
         await engine.seekPlayback(toFraction: fraction)
@@ -795,14 +814,14 @@ public final class AppModel {
         wavDuration = Double(total) / 11025
     }
 
-    // MARK: Nahrávání příjmu do WAV (MMTTY „Record WAVE“)
+    // MARK: Recording the receive audio into a WAV file (MMTTY "Record WAVE")
 
     public private(set) var recordingURL: URL?
     public private(set) var recordingSeconds = 0.0
     private var recorder: WaveWriter?
     private var recordTask: Task<Void, Never>?
 
-    /// Nahrává vstup zvukovky (po převzorkování na 11025 Hz, mono 16 bit) do souboru.
+    /// Records the sound card input (after resampling to 11025 Hz, mono 16 bit) into a file.
     public func startRecordingWAV(to url: URL) async throws {
         await stopRecordingWAV()
         guard let engine = app?.engine else { return }
@@ -844,7 +863,7 @@ public final class AppModel {
 
     // MARK: QTC (WAE DX Contest)
 
-    /// Stav QTC pro stanici v QSO okně (jen ve formátu WAE).
+    /// The QTC status for the station in the QSO window (only in the WAE format).
     public private(set) var qtcStatus: AppController.QTCStatus?
     public var qtcEnabled: Bool { settings.contest.enabled && settings.contest.format == .wae }
 
@@ -853,8 +872,10 @@ public final class AppModel {
         qtcStatus = await app.qtcStatus(for: qso.call)
     }
 
-    /// Všechny uložené série (okno Log → QTC), nejnovější první.
-    public private(set) var qtcSeries: [QTCSeries] = []
+    /// All the stored series (Log window → QTC), newest first.
+    public private(set) var qtcSeries: [QTCSeries] = [] {
+        didSet { if score != nil { score?.setQTC(qtcSeries) } }   // the QTC points (WAE) within the contest window pinned in the tally
+    }
     public struct QTCSummary: Equatable, Sendable { public var sent = 0, received = 0, seriesCount = 0; public var points: Int { sent + received } }
     public var qtcSummary: QTCSummary {
         var r = QTCSummary()
@@ -893,10 +914,10 @@ public final class AppModel {
     public func qtcCancelSent() async { await app?.cancelSentQTC(); qtcPendingCache = nil }
     public func qtcPhrase(_ p: AppController.QTCPhrase) async { guard let app else { return }; await run("QTC") { try await app.sendQTCPhrase(p) } }
 
-    /// Rozepsaná přijímaná série: hlavička n/k a řádky; `cursor` = další vyplňovaný řádek a pole (0 čas, 1 značka, 2 číslo).
+    /// The series being received: the n/k header and the rows; `cursor` = the next row and field to fill in (0 time, 1 call, 2 number).
     public struct QTCReceiveDraft: Equatable, Sendable {
         public var number: Int?, count: Int?
-        /// Od koho se přijímá (značka v QSO okně při „Přijmout…“ – okno se mezitím může vyčistit).
+        /// Who the series is being received from (the call in the QSO window at "Receive…" - the window may be cleared in the meantime).
         public var counterpart = ""
         public var lines: [QTCLine?] = Array(repeating: nil, count: 10)
         public var row = 0, field = 0
@@ -914,8 +935,8 @@ public final class AppModel {
         var d = QTCReceiveDraft(); d.counterpart = qso.call
         qtcReceive = d
         qtcRxStart = rxAppendedTotal
-        // série mohla přijít dřív, než operátor příjem otevřel: začít od poslední zmínky protistanice
-        // (např. „OK1XOE DE K3LR YES QTC 9/5 QRV?“) v posledních 3000 znacích příjmu
+        // the series may have arrived before the operator opened the receive view: start from the last mention of the other station
+        // (e.g. "OK1XOE DE K3LR YES QTC 9/5 QRV?") within the last 3000 received characters
         let back = min(3000, rxAppendedTotal - rxTrimmedTotal)
         let tail = rxTail(back).filter { !$0.echo }.map(\.text).joined()
         let all = rxTail(back).map(\.text).joined()
@@ -925,13 +946,13 @@ public final class AppModel {
         }
     }
 
-    /// „QRV – přijmout“: otevře příjem QTC a odvysílá QRV (protistanice pak posílá sérii).
+    /// "QRV - receive": opens QTC reception and transmits QRV (the other station then sends the series).
     public func qtcQRVReceive() async {
         if qtcReceive == nil { startQTCReceive() }
         await qtcPhrase(.qrv)
     }
     public func cancelQTCReceive() { qtcReceive = nil }
-    /// Ruční úprava přijímané série (hlavička „n/k“, řádek „HHMM ZNAČKA NNN“; prázdné = smazat).
+    /// Manual editing of the series being received (the "n/k" header, a "HHMM CALL NNN" row; empty = delete).
     public func qtcSetHeader(_ text: String) {
         guard var d = qtcReceive else { return }
         if let (n, k) = QTCText.parseHeader(text) { d.number = n; d.count = k } else if text.isEmpty { d.number = nil; d.count = nil }
@@ -943,12 +964,12 @@ public final class AppModel {
         qtcReceive = d
     }
 
-    /// Rozebere text přijatý od začátku příjmu QTC: hlavička n/k, řádky „HHMM ZNAČKA NNN“ v pořadí
-    /// (nečitelný řádek nechá prázdné místo, aby AGN N žádalo správný řádek) a opakování „N HHMM ZNAČKA NNN …“ na pozici N.
+    /// Parses the text received since QTC reception started: the n/k header, the "HHMM CALL NNN" rows in order
+    /// (an unreadable row leaves an empty slot, so that AGN N asks for the right row) and a repeat "N HHMM CALL NNN …" at position N.
     public func qtcFillFromRx() {
         guard var d = qtcReceive else { return }
-        // vlastní vysílání (echo) vynechat, ale jeho místo je konec řádku: protistanice po mém „AGN 8“
-        // často začne bez CR/LF a text by se slepil s koncem série („BKKA8 0803 …“)
+        // skip our own transmission (echo), but treat its place as an end of line: after my "AGN 8" the other station
+        // often starts without a CR/LF and the text would run into the end of the series ("BKKA8 0803 …")
         let text = rxTail(rxAppendedTotal - qtcRxStart).map { $0.echo ? "\n" : $0.text }.joined()
         var lines: [QTCLine?] = Array(repeating: nil, count: 10)
         var next = 0
@@ -956,7 +977,7 @@ public final class AppModel {
             var rest = raw
             if raw.uppercased().contains("QTC"), let (n, k) = QTCText.parseHeader(raw) {
                 d.number = n; d.count = k
-                // řádek QTC přilepený za hlavičkou (ztracené CR/LF)
+                // a QTC row stuck right after the header (a lost CR/LF)
                 let tok = raw.uppercased().split(separator: " ")
                 guard let last = tok.lastIndex(where: { $0.contains("/") }) else { continue }
                 rest = tok[(last + 1)...].joined(separator: " ")
@@ -966,7 +987,7 @@ public final class AppModel {
             if let l = QTCText.parseLine(rest) {
                 if next < lines.count, !lines.contains(l) { lines[next] = l; next += 1 }
             } else if QTCText.looksLikeLine(rest), next < lines.count {
-                next += 1                                                  // poškozený řádek: místo zůstane prázdné
+                next += 1                                                  // a corrupted row: the slot stays empty
             }
         }
         d.lines = lines
@@ -975,7 +996,7 @@ public final class AppModel {
         qtcReceive = d
     }
 
-    /// Klik na slovo během příjmu QTC: hlavička n/k, pak postupně čas, značka, číslo.
+    /// Clicking a word during QTC reception: the n/k header, then in turn the time, the call and the number.
     func qtcInsertWord(_ w: String) {
         guard var d = qtcReceive else { return }
         let u = w.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -997,7 +1018,7 @@ public final class AppModel {
         qtcReceive = d
     }
 
-    /// Uloží přijatou sérii (jen prvních k řádků); vrací true při úspěchu – teprve pak potvrdit R R ALL OK.
+    /// Stores the received series (only the first k rows); returns true on success - only then confirm with R R ALL OK.
     @discardableResult
     public func qtcSaveReceived() async -> Bool {
         guard let app, let d = qtcReceive, let n = d.number else { note(L("QTC: chybí hlavička série (n/k)")); return false }
@@ -1008,18 +1029,18 @@ public final class AppModel {
         return ok
     }
 
-    /// Země DXCC aktuální značky v QSO okně (nil = neznámá).
+    /// The DXCC entity of the current call in the QSO window (nil = unknown).
     public var dxcc: CountryInfo? { qso.call.isEmpty ? nil : app?.country(for: qso.call) }
 
-    /// Log (volitelně za období) ve formátu Cabrillo s hlavičkou z nastavení stanice a závodu.
+    /// The log (optionally for a period) in Cabrillo format, with a header from the station and contest settings.
     public func cabrilloText(from: Date? = nil, to: Date? = nil, contestOnly: Bool = false) async -> String {
         await app?.cabrillo(from: from, to: to, contestOnly: contestOnly) ?? ""
     }
 
-    // MARK: Zálohy a statistika logu
+    // MARK: Backups and log statistics
 
-    /// Denní záloha (při startu a po zalogování, když od poslední uběhlo 24 h) – na pozadí.
-    /// Nejvýše jedna najednou; selhání se hlásí jen jednou za relaci (jinak by se hláška opakovala po každém QSO).
+    /// A daily backup (at startup and after logging a QSO, once 24 h have passed since the last one) - in the background.
+    /// At most one at a time; a failure is reported only once per session (otherwise the message would repeat after every QSO).
     @discardableResult
     func backupLogIfDue() -> Task<Void, Never>? {
         guard settings.log.backup, !autoBackupRunning else { return nil }
@@ -1043,7 +1064,7 @@ public final class AppModel {
     @ObservationIgnored private var autoBackupRunning = false
     @ObservationIgnored private var autoBackupFailureReported = false
 
-    /// Ruční záloha (menu Soubor) – kopírování mimo hlavní vlákno; vrací složku zálohy.
+    /// A manual backup (File menu) - the copying happens off the main thread; returns the backup folder.
     @discardableResult
     public func backupLogNow() async throws -> URL {
         let loc = logLocation, keep = settings.log.backupKeep
@@ -1052,13 +1073,13 @@ public final class AppModel {
 
     public var backupDirectory: URL { LogBackup.directory(for: logLocation) }
 
-    /// Statistika logu; v závodě jen od začátku závodu.
+    /// Log statistics; during a contest only since the contest started.
     public var logStats: LogStats { logStats(now: Date()) }
     public func logStats(now: Date) -> LogStats {
         LogStats(records: logRecords, now: now, since: settings.contest.enabled ? settings.contest.effectiveStart : nil)
     }
 
-    // MARK: Správa logu (nový, otevřít, uložit jako)
+    // MARK: Log management (new, open, save as)
 
     public var logLocation: LogLocation {
         LogLocation(directory: URL(fileURLWithPath: settings.log.directory), name: settings.log.name)
@@ -1074,7 +1095,7 @@ public final class AppModel {
         }
     }
 
-    /// Přepne na jiný log (restart jako po Použít – během vysílání nejdřív RX).
+    /// Switches to a different log (a restart as after Apply - while transmitting it first switches to RX).
     private func switchLog(to loc: LogLocation, resetSerial: Bool) async {
         await serialized { [weak self] in
             guard let self else { return }
@@ -1090,7 +1111,7 @@ public final class AppModel {
         }
     }
 
-    /// Nový prázdný log (pořadová čísla závodu začnou od 1).
+    /// A new empty log (the contest serial numbers start from 1).
     public func newLog(file: URL) async throws {
         let loc = LogLocation(file: file)
         let fm = FileManager.default
@@ -1099,7 +1120,7 @@ public final class AppModel {
         await switchLog(to: loc, resetSerial: true)
     }
 
-    /// Otevře existující log; ADIF z jiného programu se převede (originál zůstane jako .orig). Vrací text pro uživatele.
+    /// Opens an existing log; an ADIF file from another program is converted (the original is kept as .orig). Returns a text for the user.
     @discardableResult
     public func openLog(file: URL) async throws -> String {
         let loc = LogLocation(file: file)
@@ -1116,7 +1137,7 @@ public final class AppModel {
         return L("Otevřen log „%@“ (%ld spojení).", loc.name, logRecords.count)
     }
 
-    /// Uloží kopii logu pod jiným názvem a dál pracuje v ní.
+    /// Saves a copy of the log under a different name and keeps working in that copy.
     public func saveLogAs(file: URL) async throws {
         let dst = LogLocation(file: file)
         if let log = app?.log, !(await log.isADIFConsistent()) { try await log.rebuildADIF() }
@@ -1124,7 +1145,7 @@ public final class AppModel {
         await switchLog(to: dst, resetSerial: false)
     }
 
-    /// Kopie ADIF logu jinam (log zůstává otevřený).
+    /// A copy of the ADIF log elsewhere (the log stays open).
     public func exportADIF(to url: URL) async throws {
         guard let log = app?.log else { throw QSOLogError.io(L("Log není k dispozici.")) }
         if !(await log.isADIFConsistent()) { try await log.rebuildADIF() }
@@ -1134,7 +1155,7 @@ public final class AppModel {
         try FileManager.default.copyItem(at: src, to: url)
     }
 
-    /// Import ADIF (např. log převedený z MMTTY); vrací text pro uživatele.
+    /// ADIF import (e.g. a log converted from MMTTY); returns a text for the user.
     public func importADIF(_ url: URL) async throws -> String {
         guard let log = app?.log else { throw QSOLogError.io(L("Log není k dispozici.")) }
         let data = try Data(contentsOf: url)
@@ -1145,10 +1166,10 @@ public final class AppModel {
         return L("Importováno %ld spojení, duplicit %ld, neplatných záznamů %ld.", r.added, r.duplicates, parsed.skipped)
     }
 
-    // MARK: Nahrávání (LoTW / eQSL / Club Log)
+    // MARK: Uploading (LoTW / eQSL / Club Log)
 
-    /// Nahraje dosud nenahraná spojení na službu. Ruční volání vrací zprávu pro alert; automatické (po zalogování)
-    /// běží na pozadí, chybu hlásí do stavového řádku (`note`) a vrací nil.
+    /// Uploads the QSOs not uploaded yet to the service. A manual call returns a message for the alert; an automatic one (after logging)
+    /// runs in the background, reports an error into the status bar (`note`) and returns nil.
     @discardableResult
     public func uploadPending(_ t: UploadTarget, automatic: Bool = false) async -> String? {
         guard let log = app?.log else { return automatic ? nil : L("Log není dostupný.") }
@@ -1181,7 +1202,7 @@ public final class AppModel {
         if case .double(let sh)? = params["shift"] { space = mark + sh }
     }
 
-    // MARK: Akce
+    // MARK: Actions
 
     private func run(_ what: String, _ f: () async throws -> Void) async {
         do { try await f() } catch { note("\(what): \(error)") }
@@ -1199,7 +1220,7 @@ public final class AppModel {
 
     public func rxNow() async { await app?.rxNow() }
     public func tune() async { guard let app else { return }; await run("Tune") { try await app.tune() } }
-    /// Spustí makro; true = odesláno. Výměna / moje značka se počítá jako odeslaná i pro ESM.
+    /// Runs a macro; true = sent. The exchange / my own call also counts as sent for ESM.
     @discardableResult
     public func runMacro(_ i: Int) async -> Bool {
         guard let app else { return false }
@@ -1216,31 +1237,31 @@ public final class AppModel {
 
     // MARK: ESM (Enter Sends Message)
 
-    /// Co už v aktuálním spojení odešlo (výměna, moje značka).
+    /// What has already been sent in the current QSO (the exchange, my own call).
     public private(set) var esmProgress = ESM.Progress()
-    /// Požadavek na přesun fokusu v QSO panelu (název pole); pohled ho po provedení vynuluje.
+    /// A request to move the focus in the QSO panel (the field's name); the view clears it once done.
     public var esmFocusField: String?
     var lastESMMacroForTesting: Int?
     var esmSendCountForTesting = 0
-    /// Právě běží esmEnter – další Enter (podržený, rychlý) se ignoruje.
+    /// esmEnter is currently running - a further Enter (held down, or a fast one) is ignored.
     public private(set) var esmBusy = false
 
-    /// Makro pro ESM chybí nebo je prázdné (jen bílé znaky) – Enter by zaklíčoval bez textu.
+    /// The macro for ESM is missing or empty (whitespace only) - Enter would key the transmitter with no text.
     public func esmMacroIsEmpty(_ i: Int) -> Bool {
         !settings.macros.indices.contains(i) || settings.macros[i].isBlank
     }
 
-    /// ESM je v provozu (zapnuté a závod zapnutý).
+    /// ESM is in operation (enabled, with a contest turned on).
     public var esmActive: Bool { settings.esm.enabled && settings.contest.enabled }
 
-    /// Co by teď poslal Enter (pro nápovědu v QSO panelu).
+    /// What Enter would send right now (for the hint in the QSO panel).
     public var esmStep: ESM.Step {
         guard settings.esm.enabled else { return .none }
         return ESM.step(mode: settings.esm.mode, contest: settings.contest, qso: qso, progress: esmProgress,
                         transmitting: state != .rx)
     }
 
-    /// Přepnutí Run / S&P (QSO panel, zkratka) – uloží se hned.
+    /// Switching Run / S&P (the QSO panel, a shortcut) - saved immediately.
     public func setESMMode(_ m: ESMMode) {
         guard settings.esm.mode != m else { return }
         settings.esm.mode = m
@@ -1248,12 +1269,12 @@ public final class AppModel {
     }
     public func toggleESMMode() { setESMMode(settings.esm.mode == .run ? .sp : .run) }
 
-    /// Enter v QSO okně: pošle makro podle režimu a stavu spojení (během TX nic – makro by se přidalo
-    /// do právě vysílaného textu). Vrací pole, kam přesunout fokus (nil = ESM neaktivní nebo TX).
+    /// Enter in the QSO window: sends the macro according to the mode and the state of the QSO (nothing during TX - the macro would be appended
+    /// to the text being transmitted). Returns the field to move the focus to (nil = ESM inactive or TX).
     @discardableResult
     public func esmEnter() async -> String? {
         guard esmActive, !esmBusy, let app, state == .rx else { return nil }
-        esmBusy = true                              // před prvním await – druhý Enter se sem nedostane
+        esmBusy = true                              // before the first await - a second Enter cannot get in here
         defer { esmBusy = false }
         let step = esmStep
         guard let i = ESM.macro(for: step, settings.esm) else {
@@ -1270,10 +1291,10 @@ public final class AppModel {
         lastESMMacroForTesting = i
         esmSendCountForTesting += 1
         if ESM.needsExplicitLog(step, macroText: text) {
-            await logQSO()                          // makro je už rozvinuté – značka a výměna jsou odeslané
+            await logQSO()                          // the macro is already expanded - the call and the exchange have been sent
         } else if logsItself {
-            // %l zaloguje controller asynchronně (.logRequested) – počkat, ať se stará značka / výměna
-            // nepřenese do dalšího QSO (pole v panelu převezmou hodnotu až po návratu)
+            // %l makes the controller log asynchronously (.logRequested) - wait, so that the old call / exchange
+            // does not carry over into the next QSO (the panel's fields only pick up the value after the return)
             let deadline = ContinuousClock.now + .seconds(3)
             while await app.logRequestsHandled == handled, ContinuousClock.now < deadline {
                 try? await Task.sleep(for: .milliseconds(5))
@@ -1292,7 +1313,7 @@ public final class AppModel {
         await run(L("Zpráva %@", name)) { try await app.runMessage(index: i) }
     }
 
-    /// Odešle z editoru část podle režimu (znak = vše, slovo = do poslední mezery, řádek = do posledního konce řádku).
+    /// Sends a part of the editor's content according to the mode (character = everything, word = up to the last space, line = up to the last line break).
     public func sendDraft(mode: SendMode) async {
         guard let app else { return }
         if txDraft.unicodeScalars.contains("\r") { txDraft = txDraft.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n") }
@@ -1311,7 +1332,7 @@ public final class AppModel {
         await app.send(text: out)
     }
 
-    /// Vyšle obsah textového souboru (MMTTY „Send Text…“).
+    /// Transmits the contents of a text file (MMTTY "Send Text…").
     public func sendTextFile(_ url: URL) async {
         guard let app else { return }
         await run(L("Odeslat soubor")) {
@@ -1330,14 +1351,14 @@ public final class AppModel {
         try? settingsStore.save(settings)
     }
 
-    /// Zdroj nominální a skutečné frekvence zařízení (UID, vstup?) – v testech náhrada.
+    /// The source of a device's nominal and actual sample rate (UID, input?) - replaced in tests.
     public var clockRates: (String?, Bool) -> (nominal: Double, actual: Double)? = { uid, input in
         ClockCalibration.rates(deviceUID: uid, input: input)
     }
 
-    /// Změří odchylku hodin vstupního a výstupního zařízení (ppm) – náhrada ClockAdj z MMTTY.
-    /// Zařízení musí běžet (aplikace přijímá); vzorkuje se 2× za sekundu, výsledkem je medián.
-    /// `inputUID`/`outputUID`: zařízení zvolená v dialogu (výchozí = uložené nastavení).
+    /// Measures the clock deviation of the input and output devices (ppm) - the replacement for MMTTY's ClockAdj.
+    /// The devices have to be running (the app is receiving); sampling happens twice a second and the result is the median.
+    /// `inputUID`/`outputUID`: the devices selected in the dialog (the default is the stored setting).
     public func measureClock(seconds: Double, inputUID: String?? = nil, outputUID: String?? = nil) async -> (rx: Double?, tx: Double?) {
         var rx: [Double] = [], tx: [Double] = [], nomRx = 0.0, nomTx = 0.0
         let steps = max(1, Int(seconds / 0.5))
@@ -1350,14 +1371,14 @@ public final class AppModel {
         return (ClockCalibration.ppm(actual: rx, nominal: nomRx), ClockCalibration.ppm(actual: tx, nominal: nomTx))
     }
 
-    /// Pravé tlačítko ve spektru: zářez (notch) jako MMTTY.
+    /// The right button in the spectrum: a notch, as in MMTTY.
     public func notchClick(hz: Double) async {
         guard let app else { return }
         await app.notchClick(hz: hz)
         await refreshParams()
     }
 
-    /// Kmitočty aktivních zářezů pro vykreslení (prázdné, když je LMS/notch vypnutý).
+    /// The frequencies of the active notches for drawing (empty when LMS/notch is off).
     public var notchMarkers: [Double] {
         guard params["lms"] == .bool(true), params["lmsType"] == .string("notch") else { return [] }
         var r: [Double] = []
@@ -1366,13 +1387,13 @@ public final class AppModel {
         return r
     }
 
-    // MARK: Spoty (DX cluster, RBN)
+    // MARK: Spots (DX cluster, RBN)
 
-    /// Konfigurace spotů z nastavení; nil, když je vše vypnuto.
+    /// The spot configuration from the settings; nil when everything is off.
     func spotFeedConfig() -> SpotFeedConfig? {
         let p = settings.spots
         guard p.clusterEnabled || p.rbnEnabled else { return nil }
-        var c = SpotFeedConfig(call: settings.station.call, rttyOnly: p.rttyOnly, maxAgeMinutes: p.maxAgeMinutes)
+        var c = SpotFeedConfig(call: settings.station.call, filter: p.filter, maxAgeMinutes: p.maxAgeMinutes)
         if p.clusterEnabled { c.cluster = SpotEndpoint(host: p.clusterHost, port: UInt16(clamping: p.clusterPort), commands: p.clusterCommands) }
         if p.rbnEnabled { c.rbn = SpotEndpoint(host: p.rbnHost, port: UInt16(clamping: p.rbnPort)) }
         return c
@@ -1384,7 +1405,8 @@ public final class AppModel {
         spotFeed.start(c)
     }
 
-    /// Změna nastavení spotů z okna (filtr RTTY) – hned uloží; spojení se přenastaví.
+    /// A change to the spot settings from the window - saved immediately. The band and mode filter, the waterfall labels and the cluster macros do not
+    /// change the connection (the filter is display only, spots of all bands and modes are stored); other changes (server, enabling…) reconnect.
     public func setSpots(_ change: (inout SpotSettings) -> Void) {
         var p = settings.spots
         change(&p)
@@ -1392,49 +1414,51 @@ public final class AppModel {
         let old = settings.spots
         settings.spots = p
         do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        spotFeed.filter = p.filter                                       // the display filter takes effect immediately (both directions)
         guard app != nil else { return }
-        var noReconnect = old; noReconnect.showInWaterfall = p.showInWaterfall
-        if noReconnect == p { return }                                   // jen zobrazení štítků, spojení se nemění
-        var onlyFilter = old; onlyFilter.rttyOnly = p.rttyOnly; onlyFilter.showInWaterfall = p.showInWaterfall
-        if onlyFilter == p, p.rttyOnly { spotFeed.rttyOnly = true }      // jen zúžení zobrazení, spojení se nemění
-        else { startSpots() }                                            // rozšíření na všechny módy: nová data ze serveru
+        var noReconnect = old
+        noReconnect.showInWaterfall = p.showInWaterfall; noReconnect.clusterMacros = p.clusterMacros
+        noReconnect.filterBands = p.filterBands; noReconnect.filterModes = p.filterModes
+        noReconnect.filterOtherBands = p.filterOtherBands; noReconnect.previousFilterModes = p.previousFilterModes
+        if noReconnect == p { return }                                   // display only, the connection does not change
+        startSpots()
     }
 
-    /// Dvojklik na spot: nastaví rig na frekvenci spotu (+ posun) a vloží značku do QSO okna.
-    /// Bez rigu (nebo při chybě rigu) se jen vloží značka.
+    /// Double-clicking a spot: tunes the rig to the spot's frequency (plus the offset) and puts the call into the QSO window.
+    /// Without a rig (or on a rig error) only the call is inserted.
     public func useSpot(_ spot: Spot) async {
         let off = min(max(settings.spots.offsetHz, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound)
         let hz = spot.frequencyHz + off
         if let app, settings.rig.type != .none {
-            // nikdy nepřelaďovat zaklíčovaný vysílač (jiné pásmo pod zátěží, cizí kmitočet) – hlídá AppController
+            // never retune a keyed transmitter (a different band under load, someone else's frequency) - AppController guards this
             do { try await app.setFrequency(hz) }
             catch AppError.transmitting { note(L("Během vysílání se rig nepřelaďuje – spot použijte po přechodu na RX.")) }
             catch AppError.engineStopped { note(Self.engineStoppedMessage) }
             catch { note(L("Rig: frekvenci %@ kHz nelze nastavit: %@", String(format: "%.1f", hz / 1000), "\(error)")) }
         } else {
-            await setQSOField("freq", String(format: "%.1f", spot.frequencyHz / 1000))   // bez rigu: frekvence spotu do logu
+            await setQSOField("freq", String(format: "%.1f", spot.frequencyHz / 1000))   // without a rig: the spot's frequency goes into the log
         }
         await setQSOField("call", spot.call)
     }
 
-    // MARK: Frekvence a pásma (horní lišta)
+    // MARK: Frequencies and bands (top bar)
 
-    /// Výsledek zadání frekvence.
+    /// The result of entering a frequency.
     public enum TuneOutcome: Equatable, Sendable {
-        case rig            // rig přeladěn
-        case manual         // bez rigu: ruční frekvence QSO
-        case rejectedTX     // během vysílání se rig nepřelaďuje
-        case notRunning     // engine neběží (zvuk nespuštěn) – rig není připojený
-        case invalid        // neplatný vstup
-        case failed         // rig frekvenci nepřijal
+        case rig            // the rig was retuned
+        case manual         // without a rig: the manual QSO frequency
+        case rejectedTX     // the rig is not retuned while transmitting
+        case notRunning     // the engine is not running (audio not started) - the rig is not connected
+        case invalid        // invalid input
+        case failed         // the rig did not accept the frequency
     }
 
     static var engineStoppedMessage: String { L("Engine neběží (zvuk nespuštěn?) – rig nelze přeladit.") }
 
-    /// Požadavek na otevření zadání frekvence (zkratka / menu); horní lišta ho zobrazí a shodí.
+    /// A request to open the frequency entry (a shortcut / the menu); the top bar shows it and clears the request.
     public var showFrequencyEntry = false
 
-    /// Nastaví frekvenci v kHz: s rigem přeladí rig (jen v RX, stejně jako `useSpot`), bez rigu zapíše ruční frekvenci QSO.
+    /// Sets the frequency in kHz: with a rig it retunes the rig (in RX only, just like `useSpot`), without a rig it writes the manual QSO frequency.
     @discardableResult
     public func setFrequency(kHz: Double) async -> TuneOutcome {
         guard FrequencyInput.rangeKHz.contains(kHz) else {
@@ -1458,7 +1482,7 @@ public final class AppModel {
         return .manual
     }
 
-    /// Zadání z textového pole (kHz, čárka i tečka, volitelně „kHz“ / „MHz“).
+    /// Input from a text field (kHz, both comma and period, optionally "kHz" / "MHz").
     @discardableResult
     public func setFrequency(text: String) async -> TuneOutcome {
         guard let k = FrequencyInput.parseKHz(text) else {
@@ -1468,14 +1492,14 @@ public final class AppModel {
         return await setFrequency(kHz: k)
     }
 
-    // MARK: Směr a vzdálenost
+    // MARK: Bearing and distance
 
-    /// Vlastní poloha: lokátor ze Stanice, jinak střed země DXCC vlastní značky.
+    /// Our own position: the locator from Station, otherwise the center of our own call's DXCC entity.
     public var ownPosition: Geo.Position? {
         Geo.position(locator: settings.station.locator, country: app?.country(for: settings.station.call))
     }
 
-    /// Směr a vzdálenost k protistanici: lokátor z QSO okna, jinak střed země její značky.
+    /// Bearing and distance to the other station: the locator from the QSO window, otherwise the center of its call's entity.
     public func beam(call: String, locator: String) -> Geo.Beam? {
         guard let own = ownPosition else { return nil }
         let c = call.trimmingCharacters(in: .whitespaces)
@@ -1485,7 +1509,7 @@ public final class AppModel {
 
     public var beamToRemote: Geo.Beam? { beam(call: qso.call, locator: qso.locator) }
 
-    /// Klik na štítek band map: mark na audio pozici spotu a značka do QSO okna (rig se nepřelaďuje).
+    /// Clicking a band map label: the mark goes to the spot's audio position and the call into the QSO window (the rig is not retuned).
     public func bandMapClick(_ marker: BandMapMarker) async {
         await tune(toMarkHz: marker.audioHz)
         await setQSOField("call", marker.spot.call)
@@ -1502,12 +1526,12 @@ public final class AppModel {
         if name == "call" { await refreshPrevious(); scheduleCallbook() }
     }
 
-    // MARK: Historie značek
+    // MARK: Call history
 
-    /// Znovu načte soubor historie značek (po úpravě souboru na disku).
+    /// Reloads the call history file (after the file on disk was edited).
     public func reloadCallHistory() { callHistoryPath = ""; callHistory = nil; syncCallHistory() }
 
-    /// Předá řadiči načtenou historii; při novém souboru ho načte na pozadí (desítky tisíc řádků neblokují GUI).
+    /// Hands the loaded history to the controller; for a new file it loads it in the background (tens of thousands of lines must not block the GUI).
     private func syncCallHistory() {
         callHistoryTask?.cancel(); callHistoryTask = nil
         let cfg = settings.callHistory
@@ -1552,7 +1576,7 @@ public final class AppModel {
         callbookCache = nil
     }
 
-    /// Po krátké prodlevě dohledá aktuální značku (další změna dotaz zruší).
+    /// After a short delay it looks up the current call (a further change cancels the query).
     private func scheduleCallbook() {
         callbookTask?.cancel(); callbookTask = nil
         let cb = settings.callbook
@@ -1596,7 +1620,7 @@ public final class AppModel {
         }
     }
 
-    /// Tlačítko „Vyzkoušet“: přihlášení a vyhledání vlastní značky s hodnotami z dialogu (bez cache).
+    /// The "Test" button: logging in and looking up our own call using the values from the dialog (no cache).
     public func testCallbook(kind: CallbookKind, username: String, password: String, call: String) async -> String {
         guard let svc = CallbookFactory.make(kind, username: username, password: password, fetcher: callbookFetcher),
               !username.isEmpty, !password.isEmpty else { return L("Vyberte službu a zadejte uživatele a heslo.") }
@@ -1611,11 +1635,11 @@ public final class AppModel {
     }
 
     public func insertWord(_ w: String) async {
-        if qtcReceive != nil, qtcEnabled { qtcInsertWord(w); return }    // příjem QTC má přednost před QSO oknem
+        if qtcReceive != nil, qtcEnabled { qtcInsertWord(w); return }    // QTC reception takes precedence over the QSO window
         let word = w.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters.subtracting(CharacterSet(charactersIn: "/"))))
         let kind = WordClassifier.classify(word)
-        // závod: po zadání značky jdou čísla a výměna do přijatých polí (MMTTY TMmttyWd::PBoxRxMouseDown)
-        // PED: každé kliknuté slovo je značka protistanice
+        // contest: once the call is entered, numbers and the exchange go into the received fields (MMTTY TMmttyWd::PBoxRxMouseDown)
+        // PED: every clicked word is the other station's call
         if settings.contest.enabled, settings.contest.format == .ped {
             if !word.isEmpty { await setQSOField("call", String(word.uppercased().prefix(16))) }
             return
@@ -1648,15 +1672,23 @@ public final class AppModel {
         do { try settingsStore.save(s) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
     }
 
+    /// Saves the cluster macros (10 items) - the connection does not change.
+    public func saveClusterMacros(_ m: [Macro]) {
+        var list = Array(m.prefix(SpotSettings.clusterMacroCount))
+        while list.count < SpotSettings.clusterMacroCount { list.append(Macro(name: "", text: "")) }
+        settings.spots.clusterMacros = list
+        do { try settingsStore.save(settings) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
+    }
+
     public func saveMessages(_ m: [Macro]) async {
         var s = settings; s.messages = m; settings = s
         await app?.setMessages(m)
         do { try settingsStore.save(s) } catch { note(L("Zprávy nelze uložit: %@", "\(error)")) }
     }
 
-    // MARK: Import z MMTTY
+    // MARK: Import from MMTTY
 
-    /// Načte Mmtty.ini (nic nemění); parametry se ověřují proti popisům modemu.
+    /// Reads Mmtty.ini (changes nothing); the parameters are validated against the modem's descriptions.
     public func previewMMTTYImport(_ url: URL) throws -> MMTTYImportResult {
         let size = (try url.resourceValues(forKeys: [.fileSizeKey])).fileSize ?? 0
         guard size <= MMTTYImport.maxFileSize else { throw MMTTYImportError.tooLarge }
@@ -1665,23 +1697,23 @@ public final class AppModel {
         return MMTTYImport.parse(data: data, descriptors: descs)
     }
 
-    /// Uloží vybrané části importu stejnou cestou jako dialogy: makra/zprávy (`saveMacros`/`saveMessages`),
-    /// parametry (`setParam`), stanice a zkratky (`applySettings` – restartuje zvuk).
+    /// Saves the selected parts of the import the same way the dialogs do: macros/messages (`saveMacros`/`saveMessages`),
+    /// parameters (`setParam`), station and shortcuts (`applySettings` - which restarts the audio).
     public enum MMTTYImportError: Error, LocalizedError {
         case tooLarge
         public var errorDescription: String? { L("Soubor je větší než 1 MB – nejde o Mmtty.ini; nic se neimportuje.") }
     }
 
-    /// Import přepíše makra, na která ESM odkazuje indexy – náhled na to upozorní (a nabídne vypnutí ESM).
+    /// The import overwrites the macros ESM refers to by index - the preview warns about that (and offers to turn ESM off).
     public func mmttyImportAffectsESM(_ r: MMTTYImportResult, options: MMTTYImportOptions) -> Bool {
         settings.esm.enabled && options.contains(.macros) && r.macros != nil
     }
 
-    /// `disableESM`: po importu maker vypnout ESM (přiřazení maker podle indexů je třeba zkontrolovat).
+    /// `disableESM`: turn ESM off after importing the macros (the index-based macro assignment needs checking).
     public func applyMMTTYImport(_ r: MMTTYImportResult, options: MMTTYImportOptions, disableESM: Bool = false) async {
-        // parametry ani makra se nesmí měnit uprostřed vysílání / CQ smyčky
+        // neither the parameters nor the macros may change in the middle of a transmission / CQ loop
         await stopMacro()
-        await rxNow()                                   // v RX nic nedělá
+        await rxNow()                                   // does nothing in RX
         if disableESM, mmttyImportAffectsESM(r, options: options) {
             settings.esm.enabled = false
             do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
@@ -1689,7 +1721,7 @@ public final class AppModel {
         if options.contains(.macros), let m = r.macros { await saveMacros(m) }
         if options.contains(.messages), let m = r.messages { await saveMessages(m) }
         if options.contains(.modem) {
-            // mark před shiftem: setParam(mark) zachovává shift, setParam(shift) pak nastaví space
+            // mark before shift: setParam(mark) preserves the shift, setParam(shift) then sets space
             for id in r.rtty.keys.sorted(by: { ($0 == "mark" ? 0 : $0 == "shift" ? 1 : 2, $0) < ($1 == "mark" ? 0 : $1 == "shift" ? 1 : 2, $1) }) {
                 guard let v = r.rtty[id] else { continue }
                 if app != nil { await setParam(id, v) } else {
@@ -1713,7 +1745,7 @@ public final class AppModel {
         var ok = false
         await run(L("Profil")) { try await app.loadProfile(slot); ok = true }
         await refreshParams()
-        guard ok else { return }                    // nenačtený profil nastavení nemění
+        guard ok else { return }                    // a profile that was not loaded does not change the settings
         settings.rtty = params
         try? settingsStore.save(settings)
     }
@@ -1723,13 +1755,13 @@ public final class AppModel {
         profileNames = profileStore.load().map { $0?.name }
     }
 
-    /// Tlačítko HAM: standardní shift 170 Hz.
+    /// The HAM button: the standard 170 Hz shift.
     public func hamShift() async { await setParam("shift", .double(170)) }
 
-    /// Kolečko myši ve vodopádu: squelch level po krocích 16 (MMTTY 0–1024).
+    /// The mouse wheel in the waterfall: the squelch level in steps of 16 (MMTTY 0–1024).
     public func adjustSquelch(steps: Int) async {
         guard case .double(let v)? = param("squelchLevel") else { return }
-        // cíl se počítá synchronně (rychlé události kolečka se sčítají) a zapisuje postupně
+        // the target is computed synchronously (fast wheel events accumulate) and written out gradually
         let target = min(1024, max(0, (sqTarget ?? v) + Double(steps) * 16))
         sqTarget = target
         let prev = sqChain
@@ -1754,13 +1786,13 @@ public final class AppModel {
         await app?.engine.setDemodScope(on)
     }
 
-    /// Jedno načtení dávky scope (volá smyčka spektra; pro testy ručně). Zmrazený scope se nepřepisuje.
+    /// A single read of a scope batch (called by the spectrum loop; manually in tests). A frozen scope is not overwritten.
     public func pollDemodScope() async {
         guard demodScopeEnabled, !scopeFrozen, let d = await app?.engine.demodScope() else { return }
         demodScope = d
     }
 
-    /// Jedno načtení XY bodů (volá smyčka spektra; pro testy ručně).
+    /// A single read of the XY points (called by the spectrum loop; manually in tests).
     public func pollXY() async {
         guard xyEnabled, let pts = await app?.engine.xyScope() else { return }
         xyPoints = pts

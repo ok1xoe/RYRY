@@ -1,4 +1,4 @@
-// MMTTYCompat.h – typy z Windows/VCL + přesměrování bývalých globálů MMTTY na CoreContext.
+// MMTTYCompat.h – Windows/VCL types + redirection of the former MMTTY globals to CoreContext.
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 #pragma once
 #include "MMTTYTypes.h"

@@ -12,16 +12,16 @@ import Testing
 
 @Test func generatorProducesExpectedLength() {
     let g = RTTYSignalGenerator()
-    // 1 znak = 1 start + 5 dat + 1,5 stop = 7,5 bitu
-    let samples = g.generate(text: "E", leadIn: 0, tail: 0)   // LTRS + E = 2 znaky
+    // 1 character = 1 start + 5 data + 1.5 stop = 7.5 bits
+    let samples = g.generate(text: "E", leadIn: 0, tail: 0)   // LTRS + E = 2 characters
     let expected = Int((2 * 7.5 / 45.45 * 11025).rounded())
     #expect(abs(samples.count - expected) <= 2)
 }
 
 @Test func generatorToneFrequencyIsMarkWhenIdle() {
     let g = RTTYSignalGenerator()
-    let s = g.generate(codes: [], leadIn: 1.0, tail: 0)   // bez znaků (text: "" by poslal LTRS)
-    // počet průchodů nulou za 1 s ≈ 2 × 2125
+    let s = g.generate(codes: [], leadIn: 1.0, tail: 0)   // no characters (text: "" would send LTRS)
+    // the number of zero crossings per 1 s ≈ 2 × 2125
     var crossings = 0
     for i in 1..<s.count where (s[i - 1] < 0) != (s[i] < 0) { crossings += 1 }
     #expect(abs(crossings - 4250) < 10)

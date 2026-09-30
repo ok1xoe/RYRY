@@ -39,7 +39,7 @@ func withFake(_ body: (FakeRigctld, HamlibClient) async throws -> Void) async th
         fake.mode = .garbageFreq
         await #expect(throws: RigError.self) { _ = try await rig.frequency() }
         fake.mode = .normal
-        let f = try await rig.frequency()                     // klient zůstal použitelný
+        let f = try await rig.frequency()                     // the client is still usable
         #expect(f == 14_080_000)
     }
 }
@@ -56,7 +56,7 @@ func withFake(_ body: (FakeRigctld, HamlibClient) async throws -> Void) async th
         #expect(try await rig.frequency() == 14_080_000)
         fake.dropConnections()
         try await Task.sleep(for: .milliseconds(50))
-        // první pokus po výpadku může selhat jako offline, další se musí připojit znovu
+        // the first attempt after an outage may fail as offline, the next one must reconnect
         var ok = false
         for _ in 0..<3 {
             if (try? await rig.frequency()) == 14_080_000 { ok = true; break }
@@ -76,7 +76,7 @@ func withFake(_ body: (FakeRigctld, HamlibClient) async throws -> Void) async th
     await #expect(throws: RigError.offline) { try await rig.setPTT(true) }
 }
 
-/// Review (critical): souběžné požadavky (poll frekvence + PTT) nesmí rozhodit proud odpovědí.
+/// Review (critical): concurrent requests (a frequency poll + PTT) must not scramble the response stream.
 @Test func concurrentRequestsStayInSync() async throws {
     try await withFake { fake, rig in
         fake.replyDelayMs = 5

@@ -5,7 +5,7 @@ import Localization
 import Settings
 import SwiftUI
 
-/// Náhled importu z Mmtty.ini: co se našlo, co přepsat, varování.
+/// Preview of the import from Mmtty.ini: what was found, what will be overwritten, warnings.
 struct MMTTYImportView: View {
     let model: AppModel
     let result: MMTTYImportResult
@@ -14,7 +14,7 @@ struct MMTTYImportView: View {
 
     @State private var options: MMTTYImportOptions = .all
     @State private var working = false
-    /// Po importu maker vypnout ESM (makra kroků jsou indexy – po přepsání maker mohou ukazovat jinam).
+    /// Turn ESM off after importing macros (the step macros are indices - once the macros are overwritten they may point elsewhere).
     @State private var disableESM = true
 
     private func binding(_ o: MMTTYImportOptions) -> Binding<Bool> {

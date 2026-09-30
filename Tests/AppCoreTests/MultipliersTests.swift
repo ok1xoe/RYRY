@@ -43,7 +43,7 @@ func wpxPrefix(call: String, prefix: String) {
     #expect(WPX.prefix("??") == nil)
 }
 
-// MARK: Pravidla
+// MARK: Rules
 
 @Test func everyPresetHasRuleAndSource() {
     for p in ContestPreset.allCases {
@@ -62,7 +62,7 @@ func wpxPrefix(call: String, prefix: String) {
     #expect(MultiplierRule.rule(for: custom, ownCountry: "OK") == nil)
 }
 
-// MARK: Výpočet pro jednotlivé závody
+// MARK: Computation for the individual contests
 
 @Test func arrlRoundupOncePerContestWithoutUSVE() {
     let c = calc(.arrlRoundup)
@@ -70,8 +70,8 @@ func wpxPrefix(call: String, prefix: String) {
                rec("VE3ABC", 14080, exch: "ON"), rec("VO1AA", 7040, exch: "NF"), rec("DL1ABC", 14080, exch: "001"),
                rec("DL2XYZ", 7040, exch: "005"), rec("KH6ABC", 14080, exch: "HI"), rec("KL7ABC", 14080, exch: "AK")]
     let t = c.tally(records: log, since: t0)
-    #expect(values(t, .dxcc) == ["DL", "KH6", "KL"])             // bez K a VE (Aljaška = KL v cty.dat)
-    #expect(values(t, .usState) == ["CT", "NY"])                   // HI/AK ne
+    #expect(values(t, .dxcc) == ["DL", "KH6", "KL"])             // without K and VE (Alaska = KL in cty.dat)
+    #expect(values(t, .usState) == ["CT", "NY"])                   // not HI/AK
     #expect(values(t, .veProvince) == ["NL", "ON"])
     #expect(t.total == 7 && t.bands.isEmpty)
     #expect(t.missing(.usState, band: nil)?.count == 47)
@@ -120,15 +120,15 @@ func wpxPrefix(call: String, prefix: String) {
                rec("W1AW", 7040, exch: "05 CT")]
     let t = c.tally(records: log, since: t0)
     #expect(values(t, .cqZone, "20m") == ["15", "3", "31", "5"])
-    #expect(values(t, .dxcc, "20m") == ["I", "IT9", "K", "KH6"])      // WAE seznam: Sicílie zvlášť; USA je země
-    #expect(values(t, .usState, "20m") == ["CA", "CT"])                 // HI jen země
+    #expect(values(t, .dxcc, "20m") == ["I", "IT9", "K", "KH6"])      // WAE list: Sicily counts separately; the USA is an entity
+    #expect(values(t, .usState, "20m") == ["CA", "CT"])                 // HI only as an entity
     #expect(values(t, .veProvince, "40m") == ["ON"])
     #expect(values(t, .usState, "40m") == ["CT"])
     #expect(t.missing(.cqZone, band: "20m")?.count == 36)
     let n = t.newHits(c.hits(call: "DL1ABC", exchange: "14"), band: "20m")
     #expect(n.hits == [MultiplierHit(.cqZone, "14"), MultiplierHit(.dxcc, "DL")])
     #expect(n.text == "20m: Z14, DL")
-    // zóna bez výměny z DXCC
+    // zone without an exchange, from DXCC
     #expect(c.hits(call: "DL1ABC", exchange: nil).contains(MultiplierHit(.cqZone, "14")))
 }
 
@@ -155,7 +155,7 @@ func wpxPrefix(call: String, prefix: String) {
                rec("IT9ABC", 7040), rec("VE1ABC", 14080), rec("VO1ABC", 14080), rec("ZL2ABC", 14080), rec("ZL6ABC", 14080),
                rec("RA9ABC", 14080), rec("UA0ABC", 14080), rec("JA1ABC", 21080)]
     let t = c.tally(records: log, since: t0)
-    #expect(values(t, .waeCountry, "80m") == ["DL", "W1", "W6"])        // EU i mimo-EU počítají všichni (RTTY §12)
+    #expect(values(t, .waeCountry, "80m") == ["DL", "W1", "W6"])        // everyone counts both EU and non-EU (RTTY §12)
     #expect(values(t, .waeCountry, "40m") == ["IT9", "OK"])
     #expect(values(t, .waeCountry, "20m") == ["RA0", "RA9", "VE1", "ZL2", "ZL6"])
     #expect(values(t, .waeCountry, "15m") == ["JA1"])
@@ -188,5 +188,5 @@ func wpxPrefix(call: String, prefix: String) {
     let t = c.tally(records: [rec("DL1ABC", 14080, exch: "14")], since: t0)
     #expect(t.newHits(c.hits(call: "DL2ABC", exchange: "14"), band: "20m").isEmpty)
     #expect(t.newHits(c.hits(call: "DL2ABC", exchange: "14"), band: "40m").hits.count == 2)
-    #expect(t.newHits(c.hits(call: "DL2ABC", exchange: "14"), band: nil).isEmpty)   // pásmo neznámé
+    #expect(t.newHits(c.hits(call: "DL2ABC", exchange: "14"), band: nil).isEmpty)   // unknown band
 }

@@ -2,13 +2,13 @@ import Testing
 import MMTTYCore
 import RTTYSignalKit
 
-/// Vygeneruje TX signál z jádra (instance A); dekóduje se nezávislou instancí B.
+/// Generates the TX signal from the core (instance A); it is decoded by an independent instance B.
 func transmit(_ text: String, configure: (OpaquePointer) -> Void = { _ in }) throws -> [Float] {
     let tx = try #require(makeCore())
     defer { rttycore_destroy(tx) }
     configure(tx)
     rttycore_tx_begin(tx, 0)
-    var remaining = Array(text.utf8CString.dropLast())   // bez koncové 0
+    var remaining = Array(text.utf8CString.dropLast())   // without the trailing 0
     var out: [Float] = []
     var buf = [Float](repeating: 0, count: 1024)
     var stopRequested = false
@@ -24,7 +24,7 @@ func transmit(_ text: String, configure: (OpaquePointer) -> Void = { _ in }) thr
         out += buf[0..<n]
         if n < buf.count { break }
     }
-    // Za posledním znakem pauza (jako doběh PTT), aby přijímač dokončil poslední znak.
+    // A pause after the last character (like the PTT tail) so that the receiver finishes the last character.
     return out + [Float](repeating: 0, count: 2000)
 }
 
@@ -47,7 +47,7 @@ func transmit(_ text: String, configure: (OpaquePointer) -> Void = { _ in }) thr
 
 @Test func transmittedToneIsWithinMarkSpaceBand() throws {
     let all = try transmit("RYRYRYRY")
-    // MMTTY začíná ~3×1024 vzorky ticha (SetCount(m_BuffSize*3)) – počítáme jen úsek s nosnou.
+    // MMTTY starts with ~3×1024 samples of silence (SetCount(m_BuffSize*3)) – we only count the part with the carrier.
     let first = try #require(all.firstIndex { $0 != 0 })
     let last = try #require(all.lastIndex { $0 != 0 })
     #expect(first >= 3000 && first <= 3200)
@@ -74,7 +74,7 @@ func transmit(_ text: String, configure: (OpaquePointer) -> Void = { _ in }) thr
         if n < buf.count { break }
     }
     #expect(rttycore_is_tx(tx) == 0)
-    #expect(total < 11025)            // ukončeno do 1 s
+    #expect(total < 11025)            // finished within 1 s
 }
 
 @Test func abortStopsImmediately() throws {
@@ -101,7 +101,7 @@ func transmit(_ text: String, configure: (OpaquePointer) -> Void = { _ in }) thr
     let tx = try #require(makeCore())
     defer { rttycore_destroy(tx) }
     rttycore_tx_begin(tx, 0)
-    let long = String(repeating: "RYRYRYRYRY", count: 500)     // 5000 znaků > 2048 kódů
+    let long = String(repeating: "RYRYRYRYRY", count: 500)     // 5000 characters > 2048 codes
     let used = rttycore_queue_tx(tx, long)
     #expect(used > 0 && used < 5000)
     #expect(rttycore_tx_space(tx) < 3)

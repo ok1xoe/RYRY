@@ -52,7 +52,7 @@ final class Fixture {
     func settle() async { for _ in 0..<5 { await Task.yield(); try? await Task.sleep(for: .milliseconds(10)) } }
 }
 
-// Review Focus 1: bez zvuku aplikace běží a hlásí problém
+// Review Focus 1: with no audio the application still runs and reports the problem
 @Test @MainActor func startWithoutAudioShowsMessage() async throws {
     let f = Fixture()
     f.audio.failStart = true
@@ -82,7 +82,7 @@ final class Fixture {
     #expect(f.model.rxRuns.last?.echo == true)
 }
 
-// Review Focus 2: změna nastavení během TX → RX + restart s novou konfigurací
+// Review Focus 2: a settings change during TX → RX plus a restart with the new configuration
 @Test @MainActor func applySettingsDuringTxRestarts() async throws {
     let f = Fixture()
     await f.model.start()
@@ -121,7 +121,7 @@ final class Fixture {
     #expect(await f.engine.modemParam("mark") == .double(1500))
     f.model.txDraft = "CQ CQ DE OK1X"
     await f.model.sendDraft(mode: .word)
-    #expect(f.model.txDraft == "OK1X")                 // nedokončené slovo zůstane
+    #expect(f.model.txDraft == "OK1X")                 // an unfinished word stays
     #expect(await f.engine.txPending > 0)
     f.model.txDraft = "LINE ONE\nLINE T"
     await f.model.sendDraft(mode: .line)
@@ -160,11 +160,11 @@ final class Fixture {
     let peak = row.enumerated().max { $0.element.brightness < $1.element.brightness }!.offset
     #expect(abs(peak - 50) <= 1)
     w.push(SpectrumFrame(binHz: 5, magnitudes: [Float](repeating: 0, count: 600)), fromHz: 0, toHz: 3000)
-    #expect(w.row(1)[peak].brightness > w.row(0)[peak].brightness)   // řádek se posunul dolů
+    #expect(w.row(1)[peak].brightness > w.row(0)[peak].brightness)   // the line moved down
     #expect(w.image != nil)
 }
 
-/// Vykreslený CGImage musí být neprůhledný: prázdné místo černé, špička světlá.
+/// The rendered CGImage must be opaque: empty space black, a peak light.
 @Test func waterfallImageIsOpaqueWithCorrectColors() throws {
     var w = WaterfallRenderer(width: 100, height: 4)
     var mags = [Float](repeating: 0, count: 600)
@@ -175,9 +175,9 @@ final class Fixture {
     let ctx = try #require(CGContext(data: &px, width: 100, height: 4, bitsPerComponent: 8, bytesPerRow: 400,
                                      space: CGColorSpaceCreateDeviceRGB(),
                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
-    ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 100, height: 4))  // bílé pozadí
+    ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 100, height: 4))  // white background
     ctx.draw(img, in: CGRect(x: 0, y: 0, width: 100, height: 4))
-    // horní řádek obrázku = první řádek paměti bitmapového kontextu
+    // the top row of the image = the first row of memory in the bitmap context
     let row = 0
     func rgb(_ x: Int) -> (Int, Int, Int) { (Int(px[row + x * 4]), Int(px[row + x * 4 + 1]), Int(px[row + x * 4 + 2])) }
     let empty = rgb(10), peak = rgb(50)

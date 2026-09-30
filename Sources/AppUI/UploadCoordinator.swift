@@ -5,7 +5,7 @@ import QSOLog
 import Settings
 import Upload
 
-/// Propojení nastavení, Klíčenky a služeb: vybere dosud nenahraná spojení, nahraje je a zapíše stav do logu.
+/// Ties settings, the Keychain and the services together: picks the QSOs not uploaded yet, uploads them and writes the status into the log.
 public struct UploadCoordinator: Sendable {
     public var http: any HTTPClient
     public var runner: any ProcessRunner
@@ -32,7 +32,7 @@ public struct UploadCoordinator: Sendable {
         return v
     }
 
-    /// Nahraje nenahraná spojení z logu; vrací zprávu pro uživatele. Chyba = nic se neoznačí.
+    /// Uploads the not-yet-uploaded QSOs from the log; returns a message for the user. On error nothing is marked.
     public func uploadPending(_ t: UploadTarget, settings: AppSettings, log: QSOLogStore) async throws -> String {
         let u = settings.upload
         guard Self.isEnabled(t, u) else { throw UploadError.notConfigured(L("%@ není v Nastavení → Online zapnuto", t.title)) }

@@ -9,7 +9,7 @@ import Testing
     t.clear()
     #expect(t.totalLength == 0)
     t.append("AB")
-    #expect(t.takeNew(cursor: &cur) == "AB")          // kurzor za koncem se srovná
+    #expect(t.takeNew(cursor: &cur) == "AB")          // a cursor past the end is clamped
 }
 
 @Test func textHistoryTrimIsChunked() {
@@ -26,5 +26,5 @@ import Testing
     let mark = t.absoluteEnd
     t.clear()
     t.append("R")
-    #expect(t.absoluteEnd > mark)                     // odpověď po clear se pozná
+    #expect(t.absoluteEnd > mark)                     // a reply after clear is recognised
 }

@@ -5,7 +5,7 @@ import ModemKit
 import SwiftUI
 import Localization
 
-/// Zářezy (notch) – červené čárkované čáry.
+/// Notches - red dashed lines.
 @MainActor func drawNotches(_ ctx: GraphicsContext, _ size: CGSize, _ model: AppModel) {
     for hz in model.notchMarkers {
         let xx = CGFloat((hz - model.waterfallFromHz) / (model.waterfallToHz - model.waterfallFromHz)) * size.width
@@ -44,7 +44,7 @@ struct WaterfallView: View {
                     }
                     drawNotches(ctx, size, model)
                     drawChannelMarks(ctx, size, model)
-                    // stupnice po 500 Hz
+                    // scale every 500 Hz
                     var hz = (model.waterfallFromHz / 500).rounded(.up) * 500
                     while hz < model.waterfallToHz {
                         let xx = x(hz, size.width)
@@ -80,10 +80,10 @@ struct WaterfallView: View {
     }
 }
 
-/// Zachytí kolečko myši (SwiftUI na macOS 14 nemá onScrollWheel); kliky propouští.
+/// Captures the mouse wheel (SwiftUI on macOS 14 has no onScrollWheel); clicks are passed through.
 struct ScrollWheelCatcher: NSViewRepresentable {
     let onScroll: (CGFloat) -> Void
-    /// Pravé tlačítko: poměr x (0…1) v šířce pohledu.
+    /// Right button: the x ratio (0…1) across the view's width.
     var onRightClick: ((Double) -> Void)? = nil
     final class V: NSView {
         var onScroll: ((CGFloat) -> Void)?
@@ -94,16 +94,16 @@ struct ScrollWheelCatcher: NSViewRepresentable {
         }
         private var acc: CGFloat = 0
         override func scrollWheel(with e: NSEvent) {
-            if !e.momentumPhase.isEmpty { return }                 // setrvačnost trackpadu ignorovat
-            if e.hasPreciseScrollingDeltas {                        // trackpad: krok po 12 bodech
+            if !e.momentumPhase.isEmpty { return }                 // ignore trackpad momentum
+            if e.hasPreciseScrollingDeltas {                        // trackpad: one step per 12 points
                 acc += e.scrollingDeltaY
                 while abs(acc) >= 12 { onScroll?(acc > 0 ? 1 : -1); acc -= acc > 0 ? 12 : -12 }
-            } else if abs(e.scrollingDeltaY) > 0.1 {               // kolečko myši: krok za událost
+            } else if abs(e.scrollingDeltaY) > 0.1 {               // mouse wheel: one step per event
                 onScroll?(e.scrollingDeltaY)
             }
         }
         override func hitTest(_ p: NSPoint) -> NSView? {
-            // kliky nechat projít do SwiftUI, kolečko zachytit
+            // let clicks through to SwiftUI, capture the wheel
             if let e = NSApp.currentEvent, e.type == .scrollWheel || (e.type == .rightMouseDown && onRightClick != nil) { return self }
             return nil
         }
@@ -112,7 +112,7 @@ struct ScrollWheelCatcher: NSViewRepresentable {
     func updateNSView(_ v: V, context: Context) { v.onScroll = onScroll; v.onRightClick = onRightClick }
 }
 
-/// XY scope: mark na ose X, space na ose Y (správně naladěný signál = kříž).
+/// XY scope: mark on the X axis, space on the Y axis (a correctly tuned signal = a cross).
 struct XYScopeView: View {
     let points: [XYPoint]
     var dot: CGFloat = 1.6
@@ -132,7 +132,7 @@ struct XYScopeView: View {
     }
 }
 
-/// Čárové spektrum (FFT) nad vodopádem s kurzory mark/space; klik = naladit, kolečko = squelch.
+/// Line spectrum (FFT) above the waterfall with mark/space cursors; click = tune, wheel = squelch.
 struct SpectrumView: View {
     @Bindable var model: AppModel
 
@@ -144,7 +144,7 @@ struct SpectrumView: View {
         GeometryReader { g in
             Canvas { ctx, size in
                 ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(white: 0.08)))
-                // mřížka po 500 Hz
+                // grid every 500 Hz
                 var hz = (model.waterfallFromHz / 500).rounded(.up) * 500
                 while hz < model.waterfallToHz {
                     var p = Path(); let xx = x(hz, size.width)
@@ -190,7 +190,7 @@ struct SpectrumView: View {
     }
 }
 
-/// Rychlá volba rozsahu a zesílení spektra/vodopádu (jako tlačítka šířky FFT v MMTTY).
+/// Quick choice of the spectrum/waterfall range and gain (like the FFT width buttons in MMTTY).
 struct SpectrumMenu: View {
     @Bindable var model: AppModel
     var body: some View {
@@ -228,6 +228,6 @@ struct SpectrumMenu: View {
 }
 
 extension WaterfallView {
-    /// Nízká kvalita XY scope: každý druhý bod (MMTTY „XYScope Quality“).
+    /// Low XY scope quality: every other point (MMTTY "XYScope Quality").
     static func decimate(_ p: [XYPoint]) -> [XYPoint] { p.enumerated().compactMap { $0.offset % 2 == 0 ? $0.element : nil } }
 }

@@ -6,22 +6,26 @@ import QSOLog
 import Spots
 import SwiftUI
 
-/// Okno „Band mapa“: svislá stupnice RTTY části pásma (jako Bandmap v N1MM Logger+) se spoty z DX clusteru / RBN,
-/// odpracovanými stanicemi z logu a značkou frekvence rigu. Klik na spot = stejné jako dvojklik ve Spotech.
+/// The "Band map" window: a vertical scale of the RTTY part of the band (like the Bandmap in N1MM Logger+) with spots from the DX cluster / RBN,
+/// worked stations from the log and a marker for the rig's frequency. Clicking a spot does the same as a double-click in Spots.
 public struct BandMapWindow: View {
     @Bindable var model: AppModel
-    /// Ruční volba pásma (nil = automaticky podle rigu / ruční frekvence QSO).
+    /// Manual band choice (nil = automatic, from the rig / the manual QSO frequency).
     @State private var bandChoice: String?
     @State private var scales: [String: BandScale] = [:]
     @State private var showLogged = true
     @State private var loggedMinutes = 60
+    /// The band picked from the spots. It is remembered so that the map does not jump whenever the per-band spot counts change.
+    @State private var latchedBand: String?
+    /// The bottom edge of the scale when the drag started; `@GestureState` resets itself even when the gesture is cancelled.
+    @GestureState private var panStartLow: Double?
     public init(model: AppModel) { self.model = model }
 
     static let rowHeight: CGFloat = 16
     static let rulerWidth: CGFloat = 64
     static let labelWidth: CGFloat = 118
 
-    /// Krok popisků stupnice v kHz podle viditelného rozsahu.
+    /// Step of the scale labels in kHz, based on the visible range.
     static func tickStep(span: Double) -> Double {
         for s in [0.1, 0.2, 0.5, 1, 2, 5, 10] where span / s <= 14 { return s }
         return 10
@@ -41,10 +45,32 @@ public struct BandMapWindow: View {
         return f / 1000
     }
 
-    var band: String? {
-        // ruční frekvenci QSO číst jen když ruční volba ani rig pásmo neurčí (jinak by každá změna QSO okna překreslovala mapu)
+    /// Bands with spots, the busiest first - a fallback when neither the rig nor the QSO window determines the band.
+    /// On a tie the band plan order decides, not the alphabet.
+    var spotBands: [String] {
+        var n: [String: Int] = [:]
+        for s in model.spotFeed.book.byID.values where model.spotFeed.filter.matchesMode(s) {
+            if let b = s.band { n[b, default: 0] += 1 }
+        }
+        func order(_ b: String) -> Int { RTTYBandPlan.bands.firstIndex(of: b) ?? RTTYBandPlan.bands.count }
+        return n.sorted { $0.value != $1.value ? $0.value > $1.value : order($0.key) < order($1.key) }.map(\.key)
+    }
+
+    /// The band from the manual choice, the rig or the frequency in the QSO window; nil = none of those determines a band.
+    var chosenBand: String? {
+        // read the manual QSO frequency only when neither the manual choice nor the rig gives a band (otherwise every change in the QSO window would redraw the map)
         RTTYBandPlan.selectBand(choice: bandChoice, rigHz: rigKHz.map { $0 * 1000 }, manualHz: nil)
             ?? RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: model.qso.frequency)
+    }
+
+    /// Never nil: with no rig and no frequency in the QSO window the remembered band with spots is shown, otherwise the default band.
+    var band: String { chosenBand ?? latchedBand ?? RTTYBandPlan.defaultBand }
+
+    /// Remembers the band with spots as long as neither the rig nor the QSO window determines a band. It is not overwritten with every new spot,
+    /// so that the map does not jump under the user's hand (and so that a drag does not end on a different band than it started on).
+    func latchBandIfNeeded() {
+        guard chosenBand == nil, latchedBand == nil, let b = spotBands.first else { return }
+        latchedBand = b
     }
 
     func scale(for band: String) -> BandScale {
@@ -58,11 +84,11 @@ public struct BandMapWindow: View {
 
     func entries(band: String, scale: BandScale, now: Date) -> [Entry] {
         let feed = model.spotFeed
-        let spots = BandMapFilter.spots(feed.book.byID.values.map { $0 }, band: band, rttyOnly: feed.rttyOnly,
+        let spots = BandMapFilter.spots(feed.book.byID.values.map { $0 }, band: band, filter: feed.filter,
                                         maxAgeMinutes: max(1, feed.config.maxAgeMinutes), now: now)
         var out: [Entry] = []
         for s in spots where scale.contains(kHz: s.frequencyKHz) {
-            let st = model.spotStatus(s)                         // index logu v AppModel: O(1) na spot
+            let st = model.spotStatus(s)                         // the log index in AppModel: O(1) per spot
             let age = BandMapFilter.ageMinutes(of: s, now: now)
             out.append(Entry(id: "s|" + s.id, kHz: s.frequencyKHz, text: "\(s.call)  \(L("%ld min", age))", color: st.color, spot: s,
                              tip: String(format: "%@ · %.1f kHz · %@ · %@", s.call, s.frequencyKHz, st.legend,
@@ -81,40 +107,60 @@ public struct BandMapWindow: View {
     public var body: some View {
         VStack(spacing: 6) {
             controls
-            if let band {
-                TimelineView(.periodic(from: .now, by: 30)) { ctx in
-                    mapView(band: band, now: ctx.date)
-                }
-            } else {
-                Spacer()
-                Text(L("Zvolte pásmo (rig ani ruční frekvence nejsou na pásmu s RTTY částí)."))
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
+            TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                mapView(band: band, now: ctx.date)
             }
         }
         .padding(8)
         .frame(minWidth: 280, minHeight: 360)
+        .onAppear { latchBandIfNeeded() }
+        .onChange(of: model.spotFeed.book.count) { latchBandIfNeeded() }
     }
 
-    var controls: some View {
+    /// Band selection; "auto" = from the rig, the frequency in the QSO window or the spots.
+    var bandPicker: some View {
+        Picker(L("Pásmo"), selection: $bandChoice) {
+            Text(L("auto (%@)", band)).tag(String?.none)
+            ForEach(RTTYBandPlan.bands, id: \.self) { Text($0).tag(String?.some($0)) }
+        }
+        .labelsHidden().fixedSize()
+        .hint(L("Pásmo mapy; auto = podle rigu, frekvence v QSO okně nebo spotů"))
+    }
+
+    var zoomButtons: some View {
         HStack(spacing: 8) {
-            Picker(L("Pásmo"), selection: $bandChoice) {
-                Text(L("auto")).tag(String?.none)
-                ForEach(RTTYBandPlan.bands, id: \.self) { Text($0).tag(String?.some($0)) }
-            }.fixedSize()
-            Button { if let band { zoom(0.6, band: band) } } label: { Image(systemName: "plus.magnifyingglass") }
-                .hint(L("Přiblížit stupnici")).disabled(band == nil)
-            Button { if let band { zoom(1 / 0.6, band: band) } } label: { Image(systemName: "minus.magnifyingglass") }
-                .hint(L("Oddálit stupnici")).disabled(band == nil)
+            Button { zoom(0.6, band: band) } label: { Image(systemName: "plus.magnifyingglass") }
+                .hint(L("Přiblížit stupnici"))
+            Button { zoom(1 / 0.6, band: band) } label: { Image(systemName: "minus.magnifyingglass") }
+                .hint(L("Oddálit stupnici"))
+            Button { var s = scale(for: band); s.reset(); scales[band] = s } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+            }
+            .hint(L("Celý RTTY úsek pásma"))
             Button {
-                if let band, let f = rigKHz { var s = scale(for: band); s.center(on: f); scales[band] = s }
+                if let f = rigKHz { var s = scale(for: band); s.center(on: f); scales[band] = s }
             } label: { Image(systemName: "scope") }
-                .hint(L("Střed na rig")).disabled(band == nil || rigKHz == nil)
-            Spacer()
+                .hint(L("Střed na rig")).disabled(rigKHz == nil)
+        }
+    }
+
+    var logControls: some View {
+        HStack(spacing: 8) {
             Toggle(L("Můj log"), isOn: $showLogged).toggleStyle(.checkbox)
             if showLogged {
                 Stepper(value: $loggedMinutes, in: 5...1440, step: 15) { Text(L("%ld min", loggedMinutes)).monospacedDigit() }
                     .fixedSize()
+            }
+        }
+    }
+
+    /// In a narrow window the controls wrap onto two rows (otherwise the labels would be clipped).
+    var controls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { bandPicker; zoomButtons; Spacer(minLength: 8); logControls }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) { bandPicker; Spacer(minLength: 4); zoomButtons }
+                logControls
             }
         }
     }
@@ -186,6 +232,19 @@ public struct BandMapWindow: View {
                 }
                 .allowsHitTesting(false)
             }
+            // mouse drag = pan the scale (only when it is zoomed in); the spot labels stay clickable
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 3)
+                    .updating($panStartLow) { _, start, _ in if start == nil { start = sc.visibleLow } }
+                    .onChanged { g in
+                        guard h > 0 else { return }
+                        var s = scale(for: band)
+                        // pan relative to the position at the start of the gesture (not incrementally), so a cancelled gesture leaves nothing behind
+                        s.moveLow(to: (panStartLow ?? sc.visibleLow) + g.translation.height / h * s.span)
+                        scales[band] = s
+                    }
+            )
             .frame(width: g.size.width, height: h, alignment: .topLeading)
         }
         .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
@@ -193,8 +252,8 @@ public struct BandMapWindow: View {
     }
 }
 
-/// Kolečko myši nad oblastí: lokální monitor událostí (SwiftUI na macOS nemá pohled pro scrollWheel).
-/// Vrací počet kroků zoomu (> 0 = přiblížit; trackpad se sčítá, viz `ScrollZoomAccumulator`) a polohu kurzoru shora (0…1).
+/// The mouse wheel over the area: a local event monitor (SwiftUI on macOS has no view for scrollWheel).
+/// Returns the number of zoom steps (> 0 = zoom in; trackpad steps are accumulated, see `ScrollZoomAccumulator`) and the cursor position from the top (0…1).
 private struct ScrollWheelZoom: NSViewRepresentable {
     var onScroll: (Int, Double) -> Void
 

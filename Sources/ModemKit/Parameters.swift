@@ -1,4 +1,4 @@
-/// Druh parametru modemu – popis pro validaci, GUI i API.
+/// Kind of a modem parameter – a description for validation, the GUI and the API.
 public enum ParameterKind: Sendable, Hashable {
     case bool
     case int(ClosedRange<Int>)
@@ -24,7 +24,7 @@ public struct ParameterDescriptor: Sendable, Hashable {
         self.id = id; self.label = label; self.kind = kind; self.defaultValue = defaultValue
     }
 
-    /// Ověří hodnotu a vrátí ji v kanonickém typu (např. .int → .double u double parametru).
+    /// Validates the value and returns it in the canonical type (e.g. .int → .double for a double parameter).
     public func validate(_ v: ParameterValue) throws(ParameterError) -> ParameterValue {
         switch (kind, v) {
         case (.bool, .bool): return v

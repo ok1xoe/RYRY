@@ -17,7 +17,7 @@ public struct RigStatus: Sendable, Equatable {
     }
 }
 
-/// Ovládání transceiveru (hamlib rigctld, flrig, nebo nic).
+/// Transceiver control (hamlib rigctld, flrig, or none).
 public protocol Rig: AnyObject, Sendable {
     var name: String { get }
     func connect() async throws
@@ -27,7 +27,7 @@ public protocol Rig: AnyObject, Sendable {
     func mode() async throws -> String
     func setMode(_ mode: String) async throws
     func setPTT(_ on: Bool) async throws
-    /// Spojení s rádiem není otevřené (port zavřený, rigctld neběží) – příkaz by ho teprve otevíral.
+    /// The connection to the radio is not open (port closed, rigctld not running) – a command would have to open it.
     var isIdle: Bool { get }
 }
 
@@ -35,7 +35,7 @@ public extension Rig {
     var isIdle: Bool { false }
 }
 
-/// Bez ovládání rigu: vše hlásí offline.
+/// No rig control: everything reports offline.
 public final class NoRig: Rig {
     public init() {}
     public var name: String { "none" }

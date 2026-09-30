@@ -2,7 +2,7 @@
 import Foundation
 import QSOLog
 
-/// RTTY část pásma pro okno „Band mapa“ (orientačně, IARU pásmové plány; shodné se `SpotParser.rttySegments`).
+/// The RTTY part of a band for the "Band map" window (approximate, IARU band plans; same as `SpotParser.rttySegments`).
 public enum RTTYBandPlan {
     public struct Segment: Sendable, Equatable {
         public let band: String
@@ -17,15 +17,24 @@ public enum RTTYBandPlan {
     ]
     public static var bands: [String] { segments.map(\.band) }
     public static func segment(for band: String?) -> Segment? { segments.first { $0.band == band } }
+    /// The band when nothing else determines it (no rig, no frequency in the QSO and no spots).
+    public static let defaultBand = "20m"
 
-    /// Pásmo okna: ruční volba → pásmo z rigu → pásmo z ruční frekvence QSO. Pásmo bez RTTY segmentu se přeskočí.
+    /// Window band: manual choice → band from the rig → band from the manual QSO frequency → bands with spots (`spotBands`,
+    /// the most interesting first) → `defaultBand`. A band without an RTTY segment is skipped. Never nil, so the map is never empty.
+    public static func selectBand(choice: String?, rigHz: Double?, manualHz: Double?, spotBands: [String]) -> String {
+        let candidates = [choice, Bands.band(forHz: rigHz), Bands.band(forHz: manualHz)] + spotBands.map { Optional($0) }
+        return candidates.compactMap { $0 }.first { segment(for: $0) != nil } ?? defaultBand
+    }
+
+    /// Without `spotBands`: returns nil when neither the choice, the rig nor the manual frequency determines the band.
     public static func selectBand(choice: String?, rigHz: Double?, manualHz: Double?) -> String? {
         let candidates = [choice, Bands.band(forHz: rigHz), Bands.band(forHz: manualHz)]
         return candidates.compactMap { $0 }.first { segment(for: $0) != nil }
     }
 }
 
-/// Svislá frekvenční stupnice (vysoká frekvence nahoře): viditelný rozsah v kHz uvnitř RTTY části pásma.
+/// Vertical frequency scale (high frequency at the top): the visible range in kHz inside the RTTY part of the band.
 public struct BandScale: Sendable, Equatable {
     public static let minSpanKHz = 1.0
     public let fullLow: Double, fullHigh: Double
@@ -42,7 +51,7 @@ public struct BandScale: Sendable, Equatable {
     public func y(forKHz f: Double, height: Double) -> Double { (visibleHigh - f) / span * height }
     public func kHz(forY y: Double, height: Double) -> Double { visibleHigh - y / height * span }
 
-    /// `factor` < 1 přiblíží, > 1 oddálí; bod `around` (kHz) zůstane na stejném relativním místě. Rozsah zůstane v pásmu.
+    /// `factor` < 1 zooms in, > 1 zooms out; the point `around` (kHz) keeps its relative place. The range stays in the band.
     public mutating func zoom(by factor: Double, around f: Double? = nil) {
         guard factor.isFinite, factor > 0 else { return }
         let newSpan = min(max(span * factor, Self.minSpanKHz), fullHigh - fullLow)
@@ -51,8 +60,23 @@ public struct BandScale: Sendable, Equatable {
         place(low: anchor - rel * newSpan, span: newSpan)
     }
 
-    /// Vystředí rozsah na frekvenci (šířka se nemění, posun se ořízne na pásmo).
+    /// Centers the range on a frequency (the width does not change, the shift is clamped to the band).
     public mutating func center(on f: Double) { place(low: f - span / 2, span: span) }
+
+    /// Back to the whole RTTY part of the band.
+    public mutating func reset() { visibleLow = fullLow; visibleHigh = fullHigh }
+
+    /// Shifts the scale by `kHz` (positive = towards higher frequencies); clamped to the band.
+    public mutating func pan(by kHz: Double) {
+        guard kHz.isFinite else { return }
+        place(low: visibleLow + kHz, span: span)
+    }
+
+    /// Sets the lower edge of the range (the width does not change, it is clamped to the band).
+    public mutating func moveLow(to low: Double) {
+        guard low.isFinite else { return }
+        place(low: low, span: span)
+    }
 
     private mutating func place(low: Double, span s: Double) {
         let lo = min(max(low, fullLow), fullHigh - s)
@@ -62,16 +86,16 @@ public struct BandScale: Sendable, Equatable {
     }
 }
 
-/// Rozmístění štítků na svislé ose s minimální roztečí.
+/// Placement of labels on the vertical axis with a minimum spacing.
 public enum BandMapLayout {
-    /// Vrací upravené polohy (ve stejném pořadí jako vstup) v 0…`height`; sousední štítky jsou nejméně `minGap` od sebe
-    /// (při nedostatku místa se rozteč zmenší). Pořadí štítků na ose se nemění; skupina se rozjede kolem původní polohy.
+    /// Returns adjusted positions (in the input order) within 0…`height`; adjacent labels are at least `minGap` apart
+    /// (with too little room the gap shrinks). The order on the axis is kept; a group spreads around its original position.
     public static func spread(_ ys: [Double], minGap: Double, height: Double) -> [Double] {
         let n = ys.count
         guard n > 0 else { return [] }
         let gap = n > 1 ? min(minGap, max(0, height) / Double(n - 1)) : 0
         let order = ys.indices.sorted { ys[$0] != ys[$1] ? ys[$0] < ys[$1] : $0 < $1 }
-        // Shlukování: sousední překrývající se štítky tvoří shluk, jehož střed je průměr původních poloh.
+        // Clustering: adjacent overlapping labels form a cluster whose center is the average of the original positions.
         struct Cluster { var first: Int; var count: Int; var sum: Double; var start = 0.0 }   // sum = Σ (y_j − j·gap)
         var clusters: [Cluster] = []
         func place(_ c: inout Cluster) {
@@ -96,19 +120,20 @@ public enum BandMapLayout {
     }
 }
 
-/// Výběr dat pro okno „Band mapa“.
+/// Data selection for the "Band map" window.
 public enum BandMapFilter {
-    /// Spoty pásma `band` mladší než `maxAgeMinutes`; nejnovější první. `rttyOnly` = jen RTTY spoty.
-    public static func spots(_ spots: [Spot], band: String, rttyOnly: Bool, maxAgeMinutes: Int, now: Date) -> [Spot] {
+    /// Spots of band `band` younger than `maxAgeMinutes`; newest first. Of the display filter only the mode groups
+    /// apply – the band map window picks the band itself, the band checkboxes would only empty the map of the chosen band.
+    public static func spots(_ spots: [Spot], band: String, filter: SpotFilter, maxAgeMinutes: Int, now: Date) -> [Spot] {
         let cutoff = now.addingTimeInterval(-Double(maxAgeMinutes) * 60)
-        return spots.filter { $0.band == band && (!rttyOnly || $0.isRTTY) && $0.time >= cutoff }
-            .sorted { $0.time != $1.time ? $0.time > $1.time : $0.frequencyKHz < $1.frequencyKHz }
+        return spots.filter { $0.band == band && filter.matchesMode($0) && $0.time >= cutoff }
+            .sorted(by: SpotFilter.newestFirst)
     }
 
-    /// Stáří spotu v celých minutách (nikdy záporné).
+    /// Age of a spot in whole minutes (never negative).
     public static func ageMinutes(of s: Spot, now: Date) -> Int { max(0, Int(now.timeIntervalSince(s.time) / 60)) }
 
-    /// Spojení z logu na pásmu `band` z posledních `minutes` minut (má frekvenci); nejnovější první.
+    /// QSOs from the log on band `band` from the last `minutes` minutes (with a frequency); newest first.
     public static func logged(_ records: [QSORecord], band: String, minutes: Int, now: Date) -> [QSORecord] {
         guard minutes > 0 else { return [] }
         let cutoff = now.addingTimeInterval(-Double(minutes) * 60)
@@ -117,25 +142,25 @@ public enum BandMapFilter {
     }
 }
 
-/// Zoom stupnice kolečkem myši / trackpadem. Trackpad posílá mnoho malých posunů (a setrvačnost), proto se posuny
-/// sčítají a zoomuje se po krocích (1 krok na `pointsPerStep` bodů); setrvačnost se ignoruje. Kolečko = krok na událost.
+/// Scale zoom with the mouse wheel / trackpad. The trackpad sends many small deltas (and momentum), so the deltas are
+/// summed up and zooming happens in steps (1 step per `pointsPerStep` points); momentum is ignored. Wheel = one step/event.
 public struct ScrollZoomAccumulator: Sendable, Equatable {
     public static let pointsPerStep = 20.0
     public private(set) var accumulated = 0.0
     public init() {}
 
-    /// `precise` = trackpad / Magic Mouse (posun v bodech), jinak kolečko (řádky). `momentum` = setrvačnost po gestu.
-    /// Vrací počet kroků (kladné = přiblížit, záporné = oddálit, 0 = zatím nic).
+    /// `precise` = trackpad / Magic Mouse (delta in points), otherwise the wheel (lines). `momentum` = inertia after the gesture.
+    /// Returns the number of steps (positive = zoom in, negative = zoom out, 0 = nothing yet).
     public mutating func feed(deltaY: Double, precise: Bool, momentum: Bool) -> Int {
         guard deltaY.isFinite, !momentum, deltaY != 0 else { return 0 }
         guard precise else { accumulated = 0; return deltaY > 0 ? 1 : -1 }
-        if accumulated != 0, (accumulated > 0) != (deltaY > 0) { accumulated = 0 }     // změna směru začíná znovu
+        if accumulated != 0, (accumulated > 0) != (deltaY > 0) { accumulated = 0 }     // a change of direction starts over
         accumulated += deltaY
         let steps = Int((accumulated / Self.pointsPerStep).rounded(.towardZero))
         accumulated -= Double(steps) * Self.pointsPerStep
         return steps
     }
 
-    /// Nové gesto (začátek dotyku) – zbytek z minula se zahodí.
+    /// A new gesture (start of touch) – the remainder from last time is discarded.
     public mutating func reset() { accumulated = 0 }
 }

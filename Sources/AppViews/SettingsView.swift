@@ -16,11 +16,11 @@ import QSOLog
 public struct SettingsView: View {
     @Bindable var model: AppModel
     @State private var draft = AppSettings()
-    @State private var baseline = AppSettings()       // stav, ze kterého koncept vyšel
+    @State private var baseline = AppSettings()       // the state the draft started from
     @State private var loaded = false
-    @State private var callbookPassword = ""          // heslo se ukládá do Klíčenky, ne do nastavení
+    @State private var callbookPassword = ""          // the password is stored in the Keychain, not in the settings
     @State private var callbookPasswordDirty = false
-    /// Vybraná záložka (spouštěcí parametr `-settingsTab N` pro snímky obrazovky).
+    /// The selected tab (the `-settingsTab N` launch argument, for screenshots).
     @State private var tab = UserDefaults.standard.integer(forKey: "settingsTab")
     public init(model: AppModel) { self.model = model }
 
@@ -37,7 +37,7 @@ public struct SettingsView: View {
                 APITab(s: $draft, model: model, callbookPassword: $callbookPassword, callbookPasswordDirty: $callbookPasswordDirty).tabItem { Label(L("API a log"), systemImage: "network") }.tag(7)
                 KeysTab(s: $draft).tabItem { Label(L("Klávesy"), systemImage: "keyboard") }.tag(8)
                 UploadTab(s: $draft, secrets: model.uploader.secrets).tabItem { Label("Online", systemImage: "icloud.and.arrow.up") }.tag(9)
-                SpotsTab(s: $draft).tabItem { Label(L("Spoty"), systemImage: "dot.radiowaves.left.and.right") }.tag(10)
+                SpotsTab(s: $draft, model: model).tabItem { Label(L("Spoty"), systemImage: "dot.radiowaves.left.and.right") }.tag(10)
                 DecodersTab(s: $draft).tabItem { Label(L("Dekodéry"), systemImage: "square.stack.3d.down.right") }.tag(11)
             }
             Divider()
@@ -65,11 +65,11 @@ public struct SettingsView: View {
                 callbookPasswordDirty = false
             }
         }
-        .onDisappear { loaded = false }                  // příště načíst aktuální stav
+        .onDisappear { loaded = false }                  // load the current state next time
     }
 }
 
-/// Řádek s číslem, jednotkou a krokovačem (hodnota vidět v poli, ne v popisku).
+/// A row with a number, a unit and a stepper (the value is visible in the field, not in the label).
 struct NumberRow: View {
     let title: String
     @Binding var value: Int
@@ -459,9 +459,11 @@ struct APITab: View {
     }
 }
 
-/// Spoty: DX cluster a Reverse Beacon Network (telnet).
+/// Spots: DX cluster and Reverse Beacon Network (telnet).
 struct SpotsTab: View {
     @Binding var s: AppSettings
+    /// The display filter (the "Band filter" / "Mode filter" windows and "RTTY only") changes immediately, not through the dialog's draft.
+    @Bindable var model: AppModel
     var commands: Binding<String> {
         Binding(get: { s.spots.clusterCommands.joined(separator: "\n") },
                 set: { s.spots.clusterCommands = Array($0.split(separator: "\n", omittingEmptySubsequences: true)
@@ -489,10 +491,10 @@ struct SpotsTab: View {
                     TextField("", value: $s.spots.rbnPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
                 }.disabled(!s.spots.rbnEnabled)
             } header: { Text("RBN") } footer: {
-                Text(L("Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat „Jen RTTY“."))
+                Text(L("Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat ve filtru módů jen RTTY."))
             }
             Section {
-                Toggle(L("Jen RTTY"), isOn: $s.spots.rttyOnly)
+                SpotFilterBar(model: model)
                 Toggle(L("Spoty ve vodopádu"), isOn: $s.spots.showInWaterfall)
                 NumberRow(title: L("Stáří spotů"), value: $s.spots.maxAgeMinutes, range: SpotSettings.ageRange, unit: "min")
                 LabeledContent(L("Posun frekvence rigu")) {
@@ -523,9 +525,9 @@ struct SpotsTab: View {
     }
 }
 
-/// Parametry modemu generované z popisu (mění se hned, bez restartu) + nastavení jádra (po Použít).
+/// Modem parameters generated from a description (they change immediately, with no restart) + core settings (after Apply).
 extension APITab {
-    /// Při změně služby nebo uživatele načíst heslo z Klíčenky (pokud se právě nepíše nové).
+    /// When the service or the user changes, load the password from the Keychain (unless a new one is being typed).
     fileprivate func reloadPassword() {
         guard !callbookPasswordDirty else { return }
         callbookPassword = model.callbookPassword(kind: s.callbook.service, username: s.callbook.username)
@@ -563,7 +565,7 @@ struct ModemTab: View {
 
     func descriptors(_ f: (String) -> Bool) -> [ParameterDescriptor] { model.descriptors.filter { f($0.id) } }
 
-    /// České popisky parametrů (popisy z jádra jsou anglicky kvůli API); nil = použít popis z jádra.
+    /// Czech labels for the parameters (the core's descriptions are in English because of the API); nil = use the core's description.
     static func paramName(_ id: String) -> String? {
         switch id {
         case "baud": return L("Rychlost")
@@ -702,7 +704,7 @@ struct ContestTab: View {
     @State private var scpStatus: String?
     @State private var downloading = false
 
-    /// Vybraná předvolba; výběr závodu nastaví jeho nejbližší termín, „Vlastní“ nechá hodnoty k ruční úpravě.
+    /// The selected preset; picking a contest sets its nearest date, "Custom" leaves the values for manual editing.
     var presetBinding: Binding<ContestPreset?> {
         Binding(get: { s.contest.selectedPreset }, set: { p in
             guard let p else { s.contest.preset = nil; return }
@@ -793,7 +795,7 @@ struct ContestTab: View {
                 }
                 if let scpStatus { Text(scpStatus).font(.caption).foregroundStyle(.secondary) }
             } header: { Text("Super Check Partial") } footer: {
-                Text(L("Při psaní značky nabízí známé značky z MASTER.SCP (supercheckpartial.com) a z vašeho logu; „≈“ = značky lišící se o jeden znak (oprava chybně přijaté značky). V závodě červené DUPE upozorní na opakované spojení na stejném pásmu a módu."))
+                Text(L("Při psaní značky nabízí známé značky z MASTER.SCP (supercheckpartial.com) a z vašeho logu; „≈“ = značky lišící se o jeden znak (oprava chybně přijaté značky). V závodě červené DUPE upozorní na opakované spojení na stejném pásmu (u vlastního závodu i módu)."))
             }
         }
         .formStyle(.grouped)
@@ -893,7 +895,7 @@ struct DisplayTab: View {
         }
     }
 
-    /// Rodiny neproporcionálních písem nainstalované v systému.
+    /// The monospaced font families installed on the system.
     static let monospacedFamilies: [String] = {
         let names = NSFontManager.shared.availableFontNames(with: .fixedPitchFontMask) ?? []
         return Array(Set(names.compactMap { NSFont(name: $0, size: 12)?.familyName }))
@@ -901,7 +903,7 @@ struct DisplayTab: View {
     }()
 }
 
-/// Výběr barvy s návratem na výchozí (systémovou) barvu.
+/// A color picker with a way back to the default (system) color.
 struct ColorRow: View {
     let title: String
     @Binding var hex: String?
@@ -917,7 +919,7 @@ struct ColorRow: View {
     }
 }
 
-/// Klávesové zkratky maker a příkazů (MMTTY „Assign ShortCut Keys“).
+/// Keyboard shortcuts for macros and commands (MMTTY "Assign ShortCut Keys").
 struct KeysTab: View {
     @Binding var s: AppSettings
     var body: some View {
@@ -966,7 +968,7 @@ struct KeysTab: View {
     }
 }
 
-/// Pole pro záznam zkratky: po kliknutí čeká na stisk kláves.
+/// A field for recording a shortcut: after a click it waits for a key press.
 struct KeyRecorder: View {
     @Binding var binding: KeyBinding
     @State private var recording = false
@@ -998,7 +1000,7 @@ struct KeyRecorder: View {
 }
 
 
-/// Heslo/API klíč uložený v Klíčence (mění se hned při psaní, ne přes Použít).
+/// A password/API key stored in the Keychain (it changes as you type, not through Apply).
 struct SecretField: View {
     let title: String
     let service: String
@@ -1022,7 +1024,7 @@ struct SecretField: View {
         }
     }
 
-    /// Uloží do Klíčenky při potvrzení nebo opuštění pole (ne po každém znaku); chybu ukáže.
+    /// Saves into the Keychain on commit or when the field is left (not after every character); an error is shown.
     private func save() {
         guard loaded, value != saved else { return }
         do { try store.set(value, service: service, account: SecretServices.account); saved = value; error = nil }
@@ -1030,7 +1032,7 @@ struct SecretField: View {
     }
 }
 
-/// Nahrávání na LoTW (TQSL), eQSL a Club Log.
+/// Uploading to LoTW (TQSL), eQSL and Club Log.
 struct UploadTab: View {
     @Binding var s: AppSettings
     let secrets: any UploadSecretStore
@@ -1071,7 +1073,7 @@ struct UploadTab: View {
 }
 
 
-/// ESM (Enter Sends Message): zapnutí, výchozí režim a makra pro jednotlivé kroky.
+/// ESM (Enter Sends Message): turning it on, the default mode and the macros for the individual steps.
 struct ESMSection: View {
     @Binding var s: AppSettings
 
@@ -1088,7 +1090,7 @@ struct ESMSection: View {
 
     func isEmpty(_ i: Int) -> Bool { !s.macros.indices.contains(i) || s.macros[i].isBlank }
 
-    /// Prázdná makra přiřazená krokům ESM (Enter by nic neodeslal).
+    /// Empty macros assigned to ESM steps (Enter would send nothing).
     var emptyAssigned: [String] {
         let e = s.esm
         return Set([e.runCQ, e.runExchange, e.runTU, e.spMyCall, e.spExchange, e.agn]).filter(isEmpty).sorted()
@@ -1122,7 +1124,7 @@ struct ESMSection: View {
     }
 }
 
-/// Nastavení → Závod → Historie značek (soubor ve formátu N1MM Call History).
+/// Settings → Contest → Call history (a file in the N1MM Call History format).
 struct CallHistorySection: View {
     @Binding var s: AppSettings
     @Bindable var model: AppModel

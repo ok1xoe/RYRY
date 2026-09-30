@@ -14,7 +14,7 @@ Export z MMTTY
 <CALL:5>OK1XX <MODE:4>RTTY <EOR>
 """
 
-// ADIF → záznamy: čas, frekvence, RST, jméno, čísla; bez data = neplatný záznam (přeskočí se)
+// ADIF → records: time, frequency, RST, name, numbers; with no date the record is invalid (it is skipped)
 @Test func adifImportRecords() throws {
     let r = ADIF.importRecords(adi)
     #expect(r.records.count == 2 && r.skipped == 1)
@@ -24,11 +24,11 @@ Export z MMTTY
     #expect(a.rstSent == "599" && a.rstRcvd == "579" && a.name == "Hans" && a.qth == "Berlin")
     #expect(a.serialRcvd == 15 && a.serialSent == 7 && a.comment == "tnx73")
     let b = r.records[1]
-    #expect(b.call == "W1AW" && b.mode == "SSB" && b.frequency == 7_000_000)   // jen pásmo → dolní okraj
+    #expect(b.call == "W1AW" && b.mode == "SSB" && b.frequency == 7_000_000)   // the band only → its lower edge
     #expect(b.timeOn == ISO8601DateFormatter().date(from: "2025-10-12T13:05:12Z"))
 }
 
-// Import do logu: duplicity (stejná značka, pásmo, mód, čas ±1 min) se přeskočí
+// Import into the log: dupes (the same call, band, mode and time ±1 min) are skipped
 @Test func logImportSkipsDuplicates() async throws {
     let s = try QSOLogStore(directory: tmp())
     let first = try await s.importRecords(ADIF.importRecords(adi).records)
@@ -39,7 +39,7 @@ Export z MMTTY
     #expect(again.added == 0 && again.duplicates == 2 && n == 2)
     let ok = await s.isADIFConsistent()
     #expect(ok)
-    // vlastní export se naimportuje zpět beze ztrát (APP_MMTTY4MAC_ID = stejné spojení)
+    // our own export is imported back without any loss (APP_MMTTY4MAC_ID = the same QSO)
     let t = try String(contentsOf: await s.adifURL, encoding: .utf8)
     let s2 = try QSOLogStore(directory: tmp())
     let back = try await s2.importRecords(ADIF.importRecords(t).records)

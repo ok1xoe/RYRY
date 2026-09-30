@@ -2,7 +2,7 @@
 import Foundation
 import QSOLog
 
-/// Seznam spotů: posledních N minut, nejvýše `maxCount`, deduplikace značka + pásmo (zůstává nejnovější).
+/// Spot list: the last N minutes, at most `maxCount`, deduplication by call + band (the newest one stays).
 public struct SpotBook: Sendable, Equatable {
     public static let absoluteMax = 500
     public private(set) var byID: [String: Spot] = [:]
@@ -12,7 +12,7 @@ public struct SpotBook: Sendable, Equatable {
 
     public var count: Int { byID.count }
 
-    /// Přidá spot; vrací false, když je starší než `maxAge` nebo starší než už uložený spot téže značky a pásma.
+    /// Adds a spot; returns false when it is older than `maxAge` or older than a stored spot of the same call and band.
     @discardableResult
     public mutating func add(_ s: Spot, now: Date, maxAge: TimeInterval) -> Bool {
         guard s.time >= now.addingTimeInterval(-maxAge) else { return false }
@@ -25,7 +25,7 @@ public struct SpotBook: Sendable, Equatable {
         return true
     }
 
-    /// Odstraní spoty starší než `maxAge`.
+    /// Removes spots older than `maxAge`.
     public mutating func prune(now: Date, maxAge: TimeInterval) {
         let cutoff = now.addingTimeInterval(-maxAge)
         byID = byID.filter { $0.value.time >= cutoff }
@@ -33,24 +33,23 @@ public struct SpotBook: Sendable, Equatable {
 
     public mutating func removeAll() { byID.removeAll() }
 
-    /// Spoty od nejnovějšího; filtr jen RTTY a pásmo (např. „20m“, nil = všechna).
-    public func visible(rttyOnly: Bool, band: String? = nil) -> [Spot] {
-        byID.values
-            .filter { (!rttyOnly || $0.isRTTY) && (band == nil || $0.band == band) }
-            .sorted { $0.time != $1.time ? $0.time > $1.time : $0.frequencyKHz < $1.frequencyKHz }
-    }
+    /// Spots from the newest, according to the display filter (checked bands and mode groups).
+    public func visible(_ filter: SpotFilter) -> [Spot] { filter.apply(to: byID.values) }
+
+    /// The same, but only by the mode filter – the band is determined by the band map window or the rig frequency.
+    public func visibleModes(_ filter: SpotFilter) -> [Spot] { filter.applyModes(to: byID.values) }
 }
 
-/// Zda je značka ze spotu už v logu (a na stejném pásmu). Duplicity v závodě nejsou k dispozici, jen „v logu“.
+/// Is the spot's call already in the log (and on the same band)? Contest dupes are not available, only "in the log".
 public struct SpotLogIndex: Sendable {
     public enum Status: Sendable, Equatable { case none, worked, workedOnBand }
-    private var bands: [String: Set<String>] = [:]      // základní značka → pásma ("" = neznámé)
+    private var bands: [String: Set<String>] = [:]      // base call → bands ("" = unknown)
 
     public init(_ records: [QSORecord] = []) {
         for r in records { add(r) }
     }
 
-    /// Doplní jedno spojení (po zalogování, bez přestavby).
+    /// Adds one QSO (after logging, without a rebuild).
     public mutating func add(_ r: QSORecord) { bands[QSORecord.baseCall(r.call), default: []].insert(r.band ?? "") }
 
     public func status(of s: Spot) -> Status {

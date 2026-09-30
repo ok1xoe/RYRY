@@ -7,7 +7,7 @@ import ModemKit
 import Settings
 @testable import AppUI
 
-// Echo vysílání v okně příjmu s nastavením uživatele (squelch, zářez, mark 1740).
+// The echo of the transmission in the receive window with the user's settings (squelch, notch, mark 1740).
 @Test(arguments: [0, 1, 2, 4, 5])
 @MainActor func macroEchoMatchesTextWithUserParams(index: Int) async throws {
     let f = Fixture()

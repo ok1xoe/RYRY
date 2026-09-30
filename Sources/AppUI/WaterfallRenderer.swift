@@ -9,25 +9,25 @@ public struct Pixel: Equatable, Sendable {
     public var brightness: Int { Int(r) + Int(g) + Int(b) }
 }
 
-/// Posuvný obrázek vodopádu (nejnovější řádek nahoře). Čistá logika, kreslí se hotový CGImage.
+/// The scrolling waterfall image (the newest row on top). Pure logic, a finished CGImage is drawn.
 public struct WaterfallRenderer: Sendable {
     public let width: Int, height: Int
-    private var pixels: [UInt32]           // bajty v paměti R,G,B,A (UInt32 little-endian 0xAABBGGRR)
+    private var pixels: [UInt32]           // bytes in memory R,G,B,A (UInt32 little-endian 0xAABBGGRR)
     private var peak: Float = 1
-    private var floor: Float?               // odhad šumového dna (20. percentil, vyhlazený)
-    /// Minimální dynamika automatického zesílení (jednotky FFT jádra, ≈ 3,4/dB → ~18 dB):
-    /// když špička po konci signálu klesne k šumu, šum se nesmí roztáhnout na plný jas.
+    private var floor: Float?               // noise floor estimate (20th percentile, smoothed)
+    /// Minimum dynamic range of the automatic gain (units of the FFT core, ≈ 3.4/dB → ~18 dB):
+    /// when the peak drops down to the noise after a signal ends, the noise must not be stretched to full brightness.
     static let minRange: Float = 60
-    public private(set) var lastRow: [Float] = []   // spektrum posledního řádku (0…1)
-    /// Vyhlazené čárové spektrum (0…1): rychlý náběh, pomalejší doznívání – jako FFT okno MMTTY.
+    public private(set) var lastRow: [Float] = []   // spectrum of the last row (0…1)
+    /// Smoothed line spectrum (0…1): fast attack, slower decay - like the MMTTY FFT window.
     public private(set) var spectrumLine: [Float] = []
-    /// Zesílení zobrazení v dB (násobí normovanou úroveň).
+    /// Display gain in dB (multiplies the normalized level).
     public var gainDB = 0.0
-    /// true = automatické (pomalu klesající špička), false = pevná reference (FFT MMTTY 0…256).
+    /// true = automatic (a slowly decaying peak), false = a fixed reference (MMTTY FFT 0…256).
     public var autoGain = true
     public static let fixedReference: Float = 256
     public var palette = WaterfallPalette.classic
-    /// Doznívání čárového spektra (váha předchozí hodnoty) – odezva FFT.
+    /// Decay of the line spectrum (the weight of the previous value) - the FFT response.
     public var decay: Float = 0.6
 
     public init(width: Int, height: Int) {
@@ -37,14 +37,14 @@ public struct WaterfallRenderer: Sendable {
 
     static func stops(_ p: WaterfallPalette) -> [(Float, (Float, Float, Float))] {
         switch p {
-        case .classic:  // černá → modrá → azurová → žlutá → bílá
+        case .classic:  // black → blue → cyan → yellow → white
             return [(0, (0, 0, 0)), (0.3, (0, 0, 0.8)), (0.55, (0, 0.8, 0.9)), (0.8, (1, 0.9, 0)), (1, (1, 1, 1))]
         case .gray: return [(0, (0, 0, 0)), (1, (1, 1, 1))]
-        case .heat:     // černá → červená → oranžová → žlutá → bílá
+        case .heat:     // black → red → orange → yellow → white
             return [(0, (0, 0, 0)), (0.35, (0.7, 0, 0)), (0.6, (1, 0.5, 0)), (0.85, (1, 1, 0.2)), (1, (1, 1, 1))]
-        case .green:    // „monitor“: černá → tmavě zelená → zelená → bílá
+        case .green:    // "monitor": black → dark green → green → white
             return [(0, (0, 0, 0)), (0.4, (0, 0.45, 0.1)), (0.8, (0.2, 1, 0.3)), (1, (0.9, 1, 0.9))]
-        case .blue:     // černá → tmavě modrá → modrá → světle modrá → bílá
+        case .blue:     // black → dark blue → blue → light blue → white
             return [(0, (0, 0, 0)), (0.35, (0, 0.1, 0.5)), (0.7, (0.2, 0.5, 1)), (0.9, (0.7, 0.9, 1)), (1, (1, 1, 1))]
         }
     }
@@ -63,7 +63,7 @@ public struct WaterfallRenderer: Sendable {
 
     public mutating func push(_ f: SpectrumFrame, fromHz: Double, toHz: Double) {
         guard f.binHz > 0, toHz > fromHz, !f.magnitudes.isEmpty else { return }
-        // posun o řádek dolů
+        // shift down by one row
         pixels.withUnsafeMutableBufferPointer { p in
             let base = p.baseAddress!
             (base + width).update(from: base, count: width * (height - 1))
@@ -84,7 +84,7 @@ public struct WaterfallRenderer: Sendable {
         let p20 = sorted[sorted.count / 5]
         floor = floor.map { $0 * 0.9 + p20 * 0.1 } ?? p20
         let fl = floor ?? 0
-        peak = max(frameMax, fl + (peak - fl) * 0.995, 1)   // pomalu klesající automatické zesílení
+        peak = max(frameMax, fl + (peak - fl) * 0.995, 1)   // slowly decaying automatic gain
         let g = Float(pow(10, gainDB / 20))
         if autoGain {
             let range = max(peak - fl, Self.minRange)

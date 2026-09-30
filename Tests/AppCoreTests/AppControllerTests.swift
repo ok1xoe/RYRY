@@ -115,7 +115,7 @@ func run(_ h: Harness, until: () async -> Bool) async {
     t.append("0123456789"); t.append("ABCDE")
     #expect(t.totalLength == 15)
     #expect(t.range(start: 10, length: 5) == "ABCDE")
-    #expect(t.range(start: 0, length: 5) == "")          // oříznuto
+    #expect(t.range(start: 0, length: 5) == "")          // truncated
     #expect(t.range(start: 5, length: 10) == "56789ABCDE")
 }
 
@@ -132,7 +132,7 @@ func run(_ h: Harness, until: () async -> Bool) async {
     await h.app.stop()
 }
 
-/// Makro s opakováním (CQ smyčka) se opakuje, dokud ho nezastaví stopMacroRepeat.
+/// A macro with repeat (the CQ loop) keeps repeating until stopMacroRepeat stops it.
 @Test func macroRepeatRunsUntilStopped() async throws {
     let h = try makeApp()
     var macros = AppSettings.defaultMacros

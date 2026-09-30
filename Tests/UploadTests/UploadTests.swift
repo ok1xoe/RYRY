@@ -37,7 +37,7 @@ func rec(_ call: String, hz: Double? = 14_080_000, t: TimeInterval = 1_790_000_0
     return r
 }
 
-// MARK: výběr
+// MARK: selection
 
 @Test func pendingSelectsOnlyNotUploadedWithBand() {
     var a = rec("OK1A"), b = rec("OK1B", t: 1_790_000_100), c = rec("OK1C", hz: nil, t: 1_790_000_200)
@@ -100,7 +100,7 @@ func rec(_ call: String, hz: Double? = 14_080_000, t: TimeInterval = 1_790_000_0
     await #expect(throws: UploadError.self) { _ = try await junk.upload([rec("OK1A")]) }
     let none = EQSLUploader(http: MockHTTP(status: 200, body: "Result: 0 out of 1 records added<li>Error: Bad record</li>"), user: "a", password: "b")
     await #expect(throws: UploadError.rejected("Error: Bad record")) { _ = try await none.upload([rec("OK1A")]) }
-    // duplicity nejsou chyba
+    // dupes are not an error
     let dup = EQSLUploader(http: MockHTTP(status: 200, body: "Result: 0 out of 1 records added<li>Warning: Duplicate</li>"), user: "a", password: "b")
     let o = try? await dup.upload([rec("OK1A")])
     #expect(o?.uploadedIDs.count == 1)
@@ -152,7 +152,7 @@ func clublog(_ http: MockHTTP) -> ClubLogUploader {
     #expect(Array(args.dropLast()) == ["-d", "-q", "-u", "-a", "compliant", "-l", "Doma OK1XOE", "-x"])
     #expect(args.last!.hasSuffix(".adi"))
     #expect(runner.fileContent?.contains("<CALL:4>OK1B") == true)
-    #expect(!FileManager.default.fileExists(atPath: args.last!))       // dočasný soubor smazán
+    #expect(!FileManager.default.fileExists(atPath: args.last!))       // the temporary file was deleted
 }
 
 @Test func tqslExitCodes() async throws {
@@ -196,7 +196,7 @@ func clublog(_ http: MockHTTP) -> ClubLogUploader {
     #expect(TQSLLocator.find(custom: nil, path: "", isExecutable: { _ in false }) == nil)
 }
 
-// MARK: Klíčenka
+// MARK: Keychain
 
 @Test func memorySecretStoreRoundTrip() throws {
     let s = UploadMemoryStore()

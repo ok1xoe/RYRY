@@ -35,14 +35,14 @@ struct TxEditor: View {
                 .scrollContentBackground(.hidden)
                 .background(Color(hex: d.txBackground) ?? Color(nsColor: .textBackgroundColor))
                 .onChange(of: model.txDraft) {
-                    // zalamování psaného textu (MMTTY „Word wrap on keyboard“)
+                    // wrapping of typed text (MMTTY "Word wrap on keyboard")
                     let col = model.settings.txWindow.wrapColumn
                     if col > 0 {
                         let sending = model.state != .rx && model.state != .stopped
                         let w = TxWrap.wrap(model.txDraft, column: col, startColumn: sending ? model.txSentColumn : 0)
                         if w != model.txDraft { model.txDraft = w; return }
                     }
-                    // při vysílání se text posílá průběžně podle režimu (jako MMTTY)
+                    // while transmitting, text is sent continuously according to the mode (like MMTTY)
                     if model.state != .rx && model.state != .stopped {
                         Task { await model.sendDraft(mode: model.sendMode) }
                     }

@@ -19,7 +19,7 @@ import Engine
         .write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     let o = SettingsStore(directory: dir).load().0.decoders
     #expect(o.secondEnabled && o.secondDemod == nil && o.maxChannels == 4 && o.channelTimeoutS == 15)
-    // starší nastavení bez sekce → výchozí
+    // older settings with no such section → the defaults
     try #"{"station":{"call":"OK1XOE"}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     #expect(SettingsStore(directory: dir).load().0.decoders == DecoderSettings())
 }

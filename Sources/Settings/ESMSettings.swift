@@ -1,21 +1,21 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Závodní provoz: Run (volám CQ) nebo S&P (Search & Pounce, odpovídám na CQ).
+/// Contest operating: Run (I call CQ) or S&P (Search & Pounce, I answer CQs).
 public enum ESMMode: String, Codable, Sendable, CaseIterable { case run, sp }
 
-/// „Enter Sends Message“ (jako N1MM Logger+): Enter v QSO okně pošle makro podle stavu spojení.
-/// Makra jsou indexy 0…15 (F1–F12, ⇧F1–⇧F4).
+/// "Enter Sends Message" (like N1MM Logger+): Enter in the QSO window sends a macro according to the QSO state.
+/// Macros are indexes 0…15 (F1–F12, ⇧F1–⇧F4).
 public struct ESMSettings: Codable, Sendable, Equatable {
     public var enabled = false
-    /// Aktuální (a po spuštění výchozí) režim; přepíná se i v QSO panelu a zkratkou.
+    /// The current (and, after startup, the default) mode; it is also switched in the QSO panel and by a shortcut.
     public var mode: ESMMode = .run
     public var runCQ = 0                  // F1 CQ
     public var runExchange = 3            // F4 Contest
-    public var runTU = 4                  // F5 TU (%l zaloguje)
+    public var runTU = 4                  // F5 TU (%l logs)
     public var spMyCall = 14              // ⇧F3 My call
     public var spExchange = 3             // F4 Contest
-    /// AGN? – jen část výměny přijata (oba režimy).
+    /// AGN? – only part of the exchange was received (both modes).
     public var agn = 10                   // F11 AGN
     public init() {}
 

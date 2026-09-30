@@ -5,7 +5,7 @@ import Network
 public struct HTTPRequest: Sendable {
     public let method: String
     public let path: String
-    public let headers: [String: String]     // klíče malými písmeny
+    public let headers: [String: String]     // keys in lowercase
     public let body: Data
     public let remote: String
 }
@@ -19,7 +19,7 @@ public struct HTTPResponse: Sendable {
 
 public enum APIServerError: Error, Equatable, Sendable { case bind(String) }
 
-/// Minimální HTTP/1.1 server (POST s Content-Length, keep-alive) nad Network.framework.
+/// A minimal HTTP/1.1 server (POST with Content-Length, keep-alive) on top of Network.framework.
 public final class HTTPServer: @unchecked Sendable {
     private let host: String
     private let port: UInt16
@@ -39,7 +39,7 @@ public final class HTTPServer: @unchecked Sendable {
         self.maxConnections = maxConnections; self.headerTimeout = headerTimeout; self.handler = handler
     }
 
-    /// Spustí server; vrací skutečný port (port 0 = náhodný).
+    /// Starts the server; returns the actual port (port 0 = random).
     public func start() async throws -> UInt16 {
         let l = try makeListener(host: host, port: port)
         listener = l
@@ -47,7 +47,7 @@ public final class HTTPServer: @unchecked Sendable {
         return try await startListener(l, queue: queue)
     }
 
-    /// Zastaví listener i všechna otevřená spojení.
+    /// Stops the listener and all open connections.
     public func stop() {
         listener?.cancel(); listener = nil
         let all = lock.withLock { () -> [HTTPConnection] in defer { connections.removeAll() }; return Array(connections.values) }
@@ -70,7 +70,7 @@ func makeListener(host: String, port: UInt16, ws: Bool = false) throws -> NWList
         let p = NWParameters.tcp
         let o = NWProtocolWebSocket.Options(); o.autoReplyPing = true
         o.maximumMessageSize = 1 << 20
-        // Prohlížeč posílá Origin – webová stránka nesmí ovládat vysílač (nativní klienti Origin neposílají).
+        // A browser sends Origin – a web page must not control the transmitter (native clients do not send Origin).
         o.setClientRequestHandler(DispatchQueue(label: "ws-handshake")) { _, headers in
             if headers.contains(where: { $0.name.lowercased() == "origin" }) {
                 return NWProtocolWebSocket.Response(status: .reject, subprotocol: nil)
@@ -106,7 +106,7 @@ func startListener(_ l: NWListener, queue: DispatchQueue) async throws -> UInt16
     }
 }
 
-/// Jedno HTTP spojení: inkrementální parser, keep-alive. Veškerý stav se mění na `queue`.
+/// A single HTTP connection: incremental parser, keep-alive. All state is mutated on `queue`.
 final class HTTPConnection: @unchecked Sendable {
     private let c: NWConnection
     private let maxBody: Int
@@ -135,7 +135,7 @@ final class HTTPConnection: @unchecked Sendable {
         receive()
     }
 
-    /// Server je plný – odpovědět 503 a zavřít.
+    /// The server is full – answer 503 and close.
     func rejectBusy() {
         c.start(queue: queue)
         let body = Data("too many connections".utf8)
@@ -152,7 +152,7 @@ final class HTTPConnection: @unchecked Sendable {
         onClose?()
     }
 
-    /// Časový limit na dokončení požadavku (hlavičky i tělo) a na nečinnost keep-alive.
+    /// The time limit for completing a request (headers and body) and for keep-alive idling.
     private func armTimer() {
         timer?.cancel()
         let w = DispatchWorkItem { [weak self] in self?.fail(408, "request timeout") }
@@ -192,7 +192,7 @@ final class HTTPConnection: @unchecked Sendable {
             guard let i = l.firstIndex(of: ":") else { continue }
             headers[l[..<i].lowercased()] = l[l.index(after: i)...].trimmingCharacters(in: .whitespaces)
         }
-        // Požadavek z prohlížeče (webová stránka) nesmí ovládat vysílač.
+        // A request from a browser (a web page) must not control the transmitter.
         if headers["origin"] != nil { fail(403, "browser requests are not allowed"); return }
         let method = String(reqLine[0])
         var length = 0

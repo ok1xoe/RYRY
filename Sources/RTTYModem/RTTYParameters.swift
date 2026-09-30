@@ -1,15 +1,15 @@
 import MMTTYCore
 import ModemKit
 
-/// Popis a převod RTTY parametrů mezi ModemKit (ID + ParameterValue) a C API jádra.
+/// Description and conversion of RTTY parameters between ModemKit (ID + ParameterValue) and the core C API.
 enum RTTYParameters {
     enum Map {
         case double(RTTYCoreParam)
         case int(RTTYCoreParam)
         case bool(RTTYCoreParam)
-        case choice(RTTYCoreParam, [String], [Double])   // názvy ↔ hodnoty jádra
+        case choice(RTTYCoreParam, [String], [Double])   // names ↔ core values
         case shift                                        // space − mark
-        case mark                                         // mark se zachováním shiftu
+        case mark                                         // mark, keeping the shift
     }
 
     static let table: [(ParameterDescriptor, Map)] = [
@@ -55,7 +55,7 @@ enum RTTYParameters {
         (.init(id: "bpfWidth", label: "RX BPF margin", kind: .double(20...500, unit: "Hz"), defaultValue: .double(100)), .double(RC_RX_BPF_WIDTH)),
         (.init(id: "lms", label: "RX LMS/notch", kind: .bool, defaultValue: .bool(false)), .bool(RC_RX_LMS)),
         (.init(id: "txGain", label: "TX output gain", kind: .double(0...32768, unit: nil), defaultValue: .double(24576)), .double(RC_TX_OUTPUT_GAIN)),
-        // Plán 7: filtry AA6YQ a notch/LMS, PLL, TX filtry a čekání (dialog Setup MMTTY)
+        // Plan 7: AA6YQ and notch/LMS filters, PLL, TX filters and waits (MMTTY Setup dialog)
         (.init(id: "aa6yq", label: "AA6YQ filter", kind: .bool, defaultValue: .bool(false)), .bool(RC_AA6YQ)),
         (.init(id: "aa6yqBpfTaps", label: "AA6YQ BPF taps", kind: .int(16...1024), defaultValue: .int(512)), .int(RC_AA6YQ_BPF_TAPS)),
         (.init(id: "aa6yqBpfWidth", label: "AA6YQ BPF margin", kind: .double(5...500, unit: "Hz"), defaultValue: .double(35)), .double(RC_AA6YQ_BPF_FW)),
@@ -93,7 +93,7 @@ enum RTTYParameters {
         table.first { $0.0.id == id }
     }
 
-    /// Zapíše již zvalidovanou hodnotu do jádra.
+    /// Writes an already validated value into the core.
     static func apply(id: String, value v: ParameterValue, core: OpaquePointer) throws(ParameterError) {
         guard let (_, map) = entry(id) else { throw .unknown(id) }
         func set(_ p: RTTYCoreParam, _ d: Double) throws(ParameterError) {
@@ -109,8 +109,8 @@ enum RTTYParameters {
         case (.shift, .double(let d)):
             try set(RC_SPACE, rttycore_get_param(core, RC_MARK) + d)
         case (.mark, .double(let d)):
-            // posun mark se zachováním shiftu; velké skoky po krocích ≤ 1500 Hz (shift musí zůstat 20..2000 Hz),
-            // při chybě obnovit původní stav
+            // moving mark while keeping the shift; large jumps in steps of ≤ 1500 Hz (the shift must stay 20..2000 Hz),
+            // on an error restore the original state
             let oldM = rttycore_get_param(core, RC_MARK), oldS = rttycore_get_param(core, RC_SPACE)
             let shift = oldS - oldM
             func move(_ t: Double) throws(ParameterError) {
@@ -143,7 +143,7 @@ enum RTTYParameters {
             let d = rttycore_get_param(core, p)
             guard let i = vals.firstIndex(of: d) else { return nil }
             return .string(names[i])
-        case .shift:   // space − mark bez chyby plovoucí čárky (jinak 169.99999… nesedí na volby v GUI)
+        case .shift:   // space − mark without floating-point error (otherwise 169.99999… misses the GUI choices)
             return .double(((rttycore_get_param(core, RC_SPACE) - rttycore_get_param(core, RC_MARK)) * 1e6).rounded() / 1e6)
         case .mark: return .double(rttycore_get_param(core, RC_MARK))
         }

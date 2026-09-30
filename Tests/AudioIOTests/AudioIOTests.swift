@@ -8,8 +8,8 @@ import Testing
     var out = [Float](repeating: 0, count: 3)
     #expect(r.read(into: &out, count: 3) == 3)
     #expect(out == [1, 2, 3])
-    #expect(r.write([6, 7, 8, 9, 10, 11]) == 6)       // přes konec bufferu
-    #expect(r.write([99]) == 0)                        // plný (8)
+    #expect(r.write([6, 7, 8, 9, 10, 11]) == 6)       // past the end of the buffer
+    #expect(r.write([99]) == 0)                        // full (8)
     var all = [Float](repeating: 0, count: 10)
     #expect(r.read(into: &all, count: 10) == 8)
     #expect(Array(all[0..<8]) == [4, 5, 6, 7, 8, 9, 10, 11])
@@ -57,7 +57,7 @@ func converterPreservesTone(from: Double, to: Double) throws {
     let n = Int(from)                                 // 1 s
     let tone = (0..<n).map { Float(0.5 * sin(2 * Double.pi * 2125 * Double($0) / from)) }
     var out: [Float] = []
-    for start in stride(from: 0, to: n, by: 480) {      // po blocích jako z audia
+    for start in stride(from: 0, to: n, by: 480) {      // in blocks, as they come from audio
         out += conv.process(Array(tone[start..<min(n, start + 480)]))
     }
     #expect(abs(Double(out.count) - to) / to < 0.02)

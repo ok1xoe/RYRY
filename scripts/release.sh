@@ -4,11 +4,16 @@
 #   2. .xcarchive + xcodebuild -exportArchive (developer-id, destination upload) → podpis Developer ID a odeslání k notarizaci
 #   3. čekání na notarizaci, xcodebuild -exportNotarizedApp → build/notarized/mmtty4mac.app (s lístkem)
 #   4. kontrola (stapler, spctl) a DMG build/mmtty4mac-<verze>.dmg
-# Bez hesel: používá účet v Xcode → Settings → Accounts. TEAM_ID lze přepsat proměnnou.
+# No passwords: uses the account from Xcode -> Settings -> Accounts.
+# Set your Apple Developer Team ID first:  export TEAM_ID=XXXXXXXXXX
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
-TEAM_ID="${TEAM_ID:-GN8G426WK4}"
+if [[ -z "${TEAM_ID:-}" ]]; then
+  echo "TEAM_ID is not set. Find it at https://developer.apple.com/account (Membership)," >&2
+  echo "then run:  TEAM_ID=XXXXXXXXXX ./scripts/release.sh" >&2
+  exit 1
+fi
 ./scripts/make-app.sh
 APP=build/mmtty4mac.app
 V=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")

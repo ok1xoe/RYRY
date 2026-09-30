@@ -3,7 +3,7 @@ import Foundation
 import QSOLog
 import Settings
 
-/// Záznam ze souboru historie značek (N1MM Logger+ „Call History“).
+/// A record from the call history file (N1MM Logger+ "Call History").
 public struct CallHistoryEntry: Equatable, Sendable {
     public var name = "", loc = "", exch = "", state = ""
     public var cqZone: Int?, ituZone: Int?
@@ -12,20 +12,20 @@ public struct CallHistoryEntry: Equatable, Sendable {
     }
 }
 
-/// Historie značek: slovník základní značka → záznam. Čistý parser bez závislosti na GUI.
+/// Call history: a dictionary base call → record. A pure parser without a dependency on the GUI.
 ///
-/// Formát N1MM: hlavička `!!Order!!,Call,Name,Loc1,Exch1,CqZone,ItuZone,State,…` určuje pořadí sloupců
-/// (názvy bez ohledu na velikost písmen, neznámé sloupce se přeskočí), `#` = komentář, hodnoty mohou být v uvozovkách.
-/// Bez hlavičky se čte jednoduché CSV `Call,Name,Exch1`. Duplicitní značka: poslední řádek vyhrává.
+/// N1MM format: the header `!!Order!!,Call,Name,Loc1,Exch1,CqZone,ItuZone,State,…` determines the column order
+/// (names regardless of case, unknown columns are skipped), `#` = comment, values may be in quotes.
+/// Without a header a simple CSV `Call,Name,Exch1` is read. Duplicate call: the last line wins.
 public struct CallHistory: Sendable, Equatable {
     public private(set) var entries: [String: CallHistoryEntry] = [:]
     public var count: Int { entries.count }
     public init() {}
 
-    /// Základní značka (bez /P, /M, prefixu země).
+    /// Base call (without /P, /M, a country prefix).
     public static func key(_ call: String) -> String { QSORecord.baseCall(call.trimmingCharacters(in: .whitespaces)) }
 
-    /// Záznam pro značku; `DL1ABC/P` i `DL1ABC` najdou stejný záznam (klíč je základní značka).
+    /// The record for a call; both `DL1ABC/P` and `DL1ABC` find the same record (the key is the base call).
     public func lookup(_ call: String) -> CallHistoryEntry? { entries[Self.key(call)] }
 
     // MARK: Parser
@@ -45,7 +45,7 @@ public struct CallHistory: Sendable, Equatable {
         }
     }
 
-    /// Rozdělí řádek CSV (uvozovky, zdvojená uvozovka = uvozovka).
+    /// Splits a CSV line (quotes, a doubled quote = a quote).
     static func splitCSV(_ line: String, delimiter: Character) -> [String] {
         var out: [String] = [], cur = "", inQuotes = false
         let chars = Array(line)
@@ -67,7 +67,7 @@ public struct CallHistory: Sendable, Equatable {
 
     public static func parse(_ text: String) -> CallHistory {
         var h = CallHistory()
-        var order: [Col?] = [.call, .name, .exch]          // bez hlavičky: Call,Name,Exch1
+        var order: [Col?] = [.call, .name, .exch]          // without a header: Call,Name,Exch1
         var delimiter: Character = ","
         for raw in text.split(omittingEmptySubsequences: true, whereSeparator: { $0.isNewline }) {
             let line = raw.trimmingCharacters(in: .whitespaces)
@@ -81,7 +81,7 @@ public struct CallHistory: Sendable, Equatable {
                 order = cols.map(column)
                 continue
             }
-            if line.hasPrefix("!") { continue }                  // jiné řídicí řádky
+            if line.hasPrefix("!") { continue }                  // other control lines
             let f = splitCSV(line, delimiter: delimiter)
             var e = CallHistoryEntry(), call = ""
             for (i, col) in order.enumerated() where i < f.count {
@@ -103,14 +103,14 @@ public struct CallHistory: Sendable, Equatable {
         return h
     }
 
-    /// Hlavička bez `!!Order!!`: první pole je přesně „Call“ / „Callsign“ (ne značka).
+    /// A header without `!!Order!!`: the first field is exactly "Call" / "Callsign" (not a callsign).
     private static func isPlainHeader(_ line: String) -> Bool {
         guard let first = line.split(whereSeparator: { ",;\t".contains($0) }).first else { return false }
         let f = first.lowercased()
         return f == "call" || f == "callsign"
     }
 
-    /// Načte soubor (UTF-8, jinak Latin-1) a zpracuje ho mimo volající vlákno.
+    /// Loads the file (UTF-8, otherwise Latin-1) and processes it off the calling thread.
     public static func load(url: URL) async throws -> CallHistory {
         try await Task.detached(priority: .utility) {
             let data = try Data(contentsOf: url)
@@ -119,13 +119,13 @@ public struct CallHistory: Sendable, Equatable {
         }.value
     }
 
-    // MARK: Mapování na pole QSO
+    // MARK: Mapping to QSO fields
 
-    /// Hodnoty pro pole QSO okna (jen neprázdné) podle formátu závodu. `isNorthAmerica` = W/VE (stát ve výměně CQ/RJ
-    /// a ARRL RU); nil = neznámá země, stát se přidá, pokud v historii je.
+    /// Values for the QSO window fields (only non-empty) by contest format. `isNorthAmerica` = W/VE (state in the CQ/RJ
+    /// and ARRL RU exchange); nil = unknown country, the state is added if it is in the history.
     ///
-    /// Loc1 jde do lokátoru jen jako platný Maidenhead lokátor; jinak (historie závodů W/VE) je to stát/provincie
-    /// a použije se ve výměně CQ/RJ a ARRL RU.
+    /// Loc1 goes into the locator only as a valid Maidenhead locator; otherwise (W/VE contest history) it is a state/province
+    /// and is used in the CQ/RJ and ARRL RU exchange.
     public func fields(for e: CallHistoryEntry, contest c: ContestSettings, isNorthAmerica: Bool?) -> [String: String] {
         var r: [String: String] = [:]
         if !e.name.isEmpty { r["name"] = e.name }
@@ -146,7 +146,7 @@ public struct CallHistory: Sendable, Equatable {
             }
         case .serial:
             if c.isRoundupStateExchange {
-                // W/VE posílají stát/provincii (ostatní pořadové číslo – to z historie nebereme)
+                // W/VE send a state/province (the others a serial number – we do not take that from the history)
                 if na, let st = [e.state, locState, e.exch].lazy.compactMap(Multipliers.stateOrProvince).first {
                     r["exchangeRcvd"] = st
                 }

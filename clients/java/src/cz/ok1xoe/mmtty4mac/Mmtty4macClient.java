@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 
 /**
- * Klient JSON-RPC 2.0 API programu mmtty4mac (ws://127.0.0.1:7363/v1) – jen JDK 21, bez závislostí.
+ * Client for the JSON-RPC 2.0 API of mmtty4mac (ws://127.0.0.1:7363/v1) – JDK 21 only, no dependencies.
  *
  * <pre>{@code
  * try (var c = Mmtty4macClient.connect()) {
@@ -32,12 +32,12 @@ import java.util.function.BiConsumer;
  * }
  * }</pre>
  *
- * Všechna volání jsou blokující s časovým limitem (výchozí 5 s); chyba API → {@link RpcException}.
- * Notifikace se doručují z vlákna WebSocketu – posluchač nesmí blokovat (přepošlete je do UI vlákna).
+ * All calls block with a timeout (5 s by default); an API error → {@link RpcException}.
+ * Notifications are delivered from the WebSocket thread – the listener must not block (forward them to the UI thread).
  */
 public final class Mmtty4macClient implements AutoCloseable {
 
-    /** Chyba vrácená API (kód podle docs/api.md: -32001 TX odmítnuto, -32002 rig, -32602 parametry…). */
+    /** Error returned by the API (code per docs/api.md: -32001 TX rejected, -32002 rig, -32602 parameters…). */
     public static final class RpcException extends IOException {
         public final int code;
         public RpcException(int code, String message) { super(message + " (" + code + ")"); this.code = code; }
@@ -56,7 +56,7 @@ public final class Mmtty4macClient implements AutoCloseable {
 
     public static Mmtty4macClient connect() throws IOException { return connect(DEFAULT_URI); }
 
-    /** Připojí se (bez hlavičky Origin – požadavky z prohlížeče server odmítá). */
+    /** Connects (without an Origin header – the server rejects requests from a browser). */
     public static Mmtty4macClient connect(URI uri) throws IOException {
         Holder h = new Holder();
         try {
@@ -68,19 +68,19 @@ public final class Mmtty4macClient implements AutoCloseable {
             h.client = c;
             return c;
         } catch (Exception e) {
-            throw new IOException("mmtty4mac: nelze se připojit k " + uri + ": " + e.getMessage(), e);
+            throw new IOException("mmtty4mac: cannot connect to " + uri + ": " + e.getMessage(), e);
         }
     }
 
     public void setTimeout(Duration d) { this.timeout = d; }
 
-    /** Posluchač notifikací (rx.char, engine.state, qso.logged, …); viz {@link #subscribe}. */
+    /** Notification listener (rx.char, engine.state, qso.logged, …); see {@link #subscribe}. */
     public void onNotification(BiConsumer<String, Map<String, Object>> l) { listeners.add(l); }
 
-    /** Dokončí se, když server spojení zavře (nebo spadne). */
+    /** Completes when the server closes the connection (or it drops). */
     public CompletableFuture<Void> closedFuture() { return closed; }
 
-    // ---- obecné volání ----
+    // ---- generic call ----
 
     public Object call(String method) throws IOException { return call(method, Map.of()); }
 
@@ -100,24 +100,24 @@ public final class Mmtty4macClient implements AutoCloseable {
             if (e.getCause() instanceof RpcException r) throw r;
             throw new IOException(method + ": " + e.getCause(), e.getCause());
         } catch (java.util.concurrent.TimeoutException e) {
-            throw new IOException(method + ": vypršel časový limit");
+            throw new IOException(method + ": timed out");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException(method + ": přerušeno");
+            throw new IOException(method + ": interrupted");
         } finally {
             pending.remove(id);
         }
     }
 
-    // ---- pohodlné metody (docs/api.md) ----
+    // ---- convenience methods (docs/api.md) ----
 
     @SuppressWarnings("unchecked")
     public Map<String, Object> status() throws IOException { return (Map<String, Object>) call("engine.status"); }
     public void subscribe(String... events) throws IOException { call("events.subscribe", Map.of("events", List.of(events))); }
     public void tx() throws IOException { call("engine.tx"); }
-    /** RX po dovysílání fronty. */
+    /** RX once the queue has been sent. */
     public void rx() throws IOException { call("engine.rx"); }
-    /** Okamžitě RX (přeruší vysílání). */
+    /** RX immediately (aborts the transmission). */
     public void rxNow() throws IOException { call("engine.rxNow"); }
     public void send(String text) throws IOException { call("tx.send", Map.of("text", text)); }
     public void clearTx() throws IOException { call("tx.clear"); }
@@ -143,10 +143,10 @@ public final class Mmtty4macClient implements AutoCloseable {
     @Override public void close() {
         try { ws.sendClose(WebSocket.NORMAL_CLOSURE, "bye").get(2, TimeUnit.SECONDS); } catch (Exception ignored) {}
         ws.abort();
-        fail(new IOException("spojení zavřeno"));
+        fail(new IOException("connection closed"));
     }
 
-    // ---- příjem ----
+    // ---- receive ----
 
     private void fail(Throwable t) {
         for (CompletableFuture<Object> f : pending.values()) f.completeExceptionally(t);
@@ -178,7 +178,7 @@ public final class Mmtty4macClient implements AutoCloseable {
         }
     }
 
-    /** WebSocket.Listener; zprávy mohou přijít po částech. */
+    /** WebSocket.Listener; messages may arrive in parts. */
     private static final class Holder implements WebSocket.Listener {
         volatile Mmtty4macClient client;
         private final StringBuilder buf = new StringBuilder();
@@ -201,7 +201,7 @@ public final class Mmtty4macClient implements AutoCloseable {
 
         @Override public CompletionStage<?> onClose(WebSocket w, int code, String reason) {
             Mmtty4macClient c = client;
-            if (c != null) c.fail(new IOException("server zavřel spojení: " + code + " " + reason));
+            if (c != null) c.fail(new IOException("the server closed the connection: " + code + " " + reason));
             return null;
         }
 

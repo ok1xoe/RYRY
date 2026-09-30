@@ -4,25 +4,28 @@ import Foundation
 import QSOLog
 import Settings
 
-/// Země pro kontrolu „potřebné“: klíč (hlavní prefix z cty.dat) a název pro zobrazení.
+/// An entity for the "needed" check: the key (the main prefix from cty.dat) and the display name.
 public struct CountryRef: Sendable, Equatable {
     public var key: String
     public var name: String
     public init(key: String, name: String) { self.key = key; self.name = name }
 }
 
-/// Index logu pro levné dotazy při zvýrazňování příjmu a hlídání: základní značky, země (celkem a po pásmech)
-/// a klíče duplicit v závodě. Přestavuje se při přepnutí logu / změně závodu, při zalogování se jen doplní.
+/// A log index for cheap lookups while highlighting the receive text and watching: base calls, entities (overall and per band)
+/// and the dupe keys of the contest. It is rebuilt when the log is switched / the contest changes; logging a QSO only adds to it.
 public struct LogIndex: Sendable, Equatable {
     public private(set) var calls: Set<String> = []
     public private(set) var countries: Set<String> = []
     public private(set) var countriesByBand: [String: Set<String>] = [:]
     private var dupes: Set<String> = []
+    /// Dupes distinguish the mode (for a custom contest); the presets do not - `DupeCheck.perMode`.
+    public private(set) var dupePerMode = true
 
     public init() {}
 
-    /// `contestSince` = začátek běžícího závodu (nil = žádný závod, duplicity se neevidují).
-    public init(records: [QSORecord], contestSince: Date?, country: (String) -> CountryRef?) {
+    /// `contestSince` = the start of the running contest (nil = no contest, dupes are not tracked).
+    public init(records: [QSORecord], contestSince: Date?, dupePerMode: Bool = true, country: (String) -> CountryRef?) {
+        self.dupePerMode = dupePerMode
         var cache: [String: CountryRef?] = [:]
         for r in records { add(r, contestSince: contestSince, country: country, cache: &cache) }
     }
@@ -43,38 +46,37 @@ public struct LogIndex: Sendable, Equatable {
             countriesByBand[r.band ?? "", default: []].insert(c.key)
         }
         if let since = contestSince, r.timeOn >= since {
-            let m = r.mode.uppercased()
-            dupes.insert("\(base)|*|\(m)")
-            dupes.insert("\(base)|\(r.band ?? "")|\(m)")
+            dupes.insert(DupeCheck.key(call: r.call, band: nil, mode: r.mode, perMode: dupePerMode))
+            dupes.insert(DupeCheck.key(call: r.call, band: r.band ?? "", mode: r.mode, perMode: dupePerMode))
         }
     }
 
-    /// Značka (základní) je někdy v logu.
+    /// The (base) callsign is in the log at some point.
     public func worked(_ call: String) -> Bool { calls.contains(QSORecord.baseCall(call)) }
 
-    /// Země je v logu (na daném pásmu; bez pásma kdykoli).
+    /// The entity is in the log (on the given band; without a band, at any time).
     public func countryWorked(_ key: String, band: String?) -> Bool {
         guard let band else { return countries.contains(key) }
         return countriesByBand[band]?.contains(key) ?? false
     }
 
-    /// Stejné pravidlo jako `DupeCheck.isDupe` (bez známého pásma se porovná jen značka a mód).
+    /// The same rule and key as `DupeCheck.isDupe` (with no known band only the call, and possibly the mode, is compared).
     public func isDupe(call: String, band: String?, mode: String) -> Bool {
-        dupes.contains("\(QSORecord.baseCall(call))|\(band ?? "*")|\(mode.uppercased())")
+        dupes.contains(DupeCheck.key(call: call, band: band, mode: mode, perMode: dupePerMode))
     }
 }
 
-/// Styl značky v příjmu.
+/// The style of a callsign in the receive window.
 public enum CallStyle: Equatable, Sendable {
-    case own       // moje značka: červeně tučně
-    case dupe      // duplicita v závodě: šedě přeškrtnuto
-    case worked    // už v logu: modře
-    case new       // ještě v logu není: tučně
+    case own       // my own call: red and bold
+    case dupe      // a dupe in the contest: gray and struck through
+    case worked    // already in the log: blue
+    case new       // not in the log yet: bold
 }
 
-/// Čistá logika zvýrazňování značek v příjmu (bez AppKit, testovatelná).
+/// Pure logic for highlighting callsigns in the receive window (no AppKit, testable).
 public enum CallHighlight {
-    /// Styl slova (nil = není značka). `myBase` = základní značka stanice, `contest` = běží závod.
+    /// The style of a word (nil = not a callsign). `myBase` = the station's base call, `contest` = a contest is running.
     public static func style(word: String, myBase: String, band: String?, mode: String, contest: Bool,
                              index: LogIndex) -> CallStyle? {
         guard let call = WordClassifier.callCandidate(word) else { return nil }
@@ -85,7 +87,7 @@ public enum CallHighlight {
         return index.worked(call) ? .worked : .new
     }
 
-    /// Rozsahy slov (úseky bez mezer) v `range`.
+    /// The ranges of the words (runs without spaces) within `range`.
     public static func wordRanges(in text: NSString, range: NSRange) -> [NSRange] {
         var out: [NSRange] = []
         var start: Int?
@@ -101,8 +103,8 @@ public enum CallHighlight {
         return out
     }
 
-    /// Odkud přestylovat po přidání textu na pozici `appendedAt`: pokud přidání navazuje na neúplné slovo,
-    /// od jeho začátku (slovo rozdělené mezi dvě přidání), jinak od místa přidání.
+    /// Where to restyle from after text was appended at `appendedAt`: if the append continues an incomplete word,
+    /// from that word's start (a word split across two appends), otherwise from the append position.
     public static func restyleStart(in text: NSString, appendedAt: Int) -> Int {
         var i = min(max(0, appendedAt), text.length)
         while i > 0, !isSpace(text.character(at: i - 1)) { i -= 1 }
@@ -113,7 +115,7 @@ public enum CallHighlight {
 }
 
 extension WordClassifier {
-    /// Slovo bez okolní interpunkce (kromě „/“) velkými písmeny; nil pro prázdné nebo příliš dlouhé.
+    /// The word without the surrounding punctuation (except "/") in uppercase; nil for an empty or overly long one.
     public static func callCandidate(_ word: String) -> String? {
         let w = word.uppercased().trimmingCharacters(in: .punctuationCharacters.subtracting(CharacterSet(charactersIn: "/"))
             .union(.whitespacesAndNewlines))
@@ -121,7 +123,7 @@ extension WordClassifier {
     }
 }
 
-/// Čistá logika „potřebné“: hlídaná značka, nová země na pásmu, nová země vůbec.
+/// Pure "needed" logic: a watched call, a new entity on the band, a new entity at all.
 public enum NeededCheck {
     public enum Reason: Equatable, Sendable {
         case watched
@@ -129,7 +131,7 @@ public enum NeededCheck {
         case newCountryBand(country: String, band: String)
     }
 
-    /// Důvody, proč je značka potřebná (prázdné = není). Nová země vůbec má přednost před novou zemí na pásmu.
+    /// The reasons why a call is needed (empty = it is not). A brand-new entity takes precedence over a new entity on the band.
     public static func check(call: String, band: String?, country: CountryRef?, settings: AlertSettings,
                              index: LogIndex) -> [Reason] {
         var out: [Reason] = []
@@ -144,11 +146,11 @@ public enum NeededCheck {
         return out
     }
 
-    /// Klíč pro deduplikaci upozornění (značka + pásmo).
+    /// The key for deduplicating alerts (call + band).
     public static func dedupeKey(call: String, band: String?) -> String { "needed|\(QSORecord.baseCall(call))|\(band ?? "")" }
 }
 
-/// Omezení opakování upozornění: stejný klíč nejdřív po `interval` sekundách. Paměť je omezená.
+/// Rate limit for repeated alerts: the same key no sooner than `interval` seconds later. The memory is bounded.
 public struct AlertThrottle: Sendable {
     private var last: [String: Date] = [:]
     public let maxKeys: Int
@@ -165,7 +167,7 @@ public struct AlertThrottle: Sendable {
     }
 }
 
-/// Výskyty značek v příjmu za posledních `window` sekund (potvrzení značky proti šumu). Paměť je omezená.
+/// Occurrences of callsigns in the receive text over the last `window` seconds (confirming a call against noise). The memory is bounded.
 public struct RxCallSightings: Sendable {
     public static let window: TimeInterval = 600
     private var seen: [String: [Date]] = [:]
@@ -173,7 +175,7 @@ public struct RxCallSightings: Sendable {
     public init(maxKeys: Int = 2000) { self.maxKeys = max(1, maxKeys) }
     public var count: Int { seen.count }
 
-    /// Zaznamená výskyt značky a vrátí počet jejích výskytů v okně (včetně tohoto).
+    /// Records an occurrence of a call and returns how many times it occurred within the window (including this one).
     public mutating func record(_ call: String, now: Date) -> Int {
         var list = (seen[call] ?? []).filter { now.timeIntervalSince($0) < Self.window }
         list.append(now)
@@ -190,8 +192,8 @@ public struct RxCallSightings: Sendable {
     }
 }
 
-/// Dělí přijímaný text (po znacích i po částech) na dokončená slova; echo vlastního vysílání přeskakuje
-/// a ukončuje rozdělané slovo. Značka rozdělená mezi dvě přidání se tak nalezne jednou, celá.
+/// Splits the received text (character by character or in chunks) into completed words; it skips the echo of our own transmission
+/// and terminates the word in progress. A call split across two appends is therefore found once, whole.
 public struct RxWordScanner: Sendable {
     public static let maxWord = 40
     private var pending = ""
@@ -207,7 +209,7 @@ public struct RxWordScanner: Sendable {
             } else if pending.count < Self.maxWord {
                 pending.append(ch)
             } else {
-                pending = String(pending.dropFirst()); pending.append(ch)     // příliš dlouhé „slovo“ (šum): jen konec
+                pending = String(pending.dropFirst()); pending.append(ch)     // an overly long "word" (noise): keep only the end
             }
         }
         return out
@@ -216,12 +218,12 @@ public struct RxWordScanner: Sendable {
     public mutating func reset() { pending = "" }
 }
 
-/// Zvuk a systémové oznámení (vyměnitelné v testech).
+/// Sound and system notification (replaceable in tests).
 @MainActor public protocol AlertSink: AnyObject {
     func playSound()
-    /// Zobrazí oznámení; skutečná implementace ho posílá jen když aplikace není aktivní.
+    /// Shows a notification; the real implementation only posts it when the app is not active.
     func notify(title: String, body: String)
-    /// Vyžádá oprávnění k oznámením (volá se až při zapnutí funkce).
+    /// Requests notification permission (only called when the feature is turned on).
     func requestNotificationAuthorization()
 }
 

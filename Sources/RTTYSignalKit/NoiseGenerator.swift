@@ -1,6 +1,6 @@
 import Foundation
 
-/// Deterministický gaussovský šum (SplitMix64 + Box–Muller).
+/// Deterministic Gaussian noise (SplitMix64 + Box–Muller).
 public struct NoiseGenerator: Sendable {
     private var state: UInt64
     private var spare: Float?

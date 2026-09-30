@@ -2,7 +2,7 @@
 import CSerial
 import Foundation
 
-/// Skutečný sériový port (termios + IOSSIOSPEED). Volání serializuje interní zámek.
+/// A real serial port (termios + IOSSIOSPEED). Calls are serialized by an internal lock.
 public final class POSIXSerialPort: SerialPort, @unchecked Sendable {
     public let path: String
     private var fd: Int32 = -1
@@ -34,7 +34,7 @@ public final class POSIXSerialPort: SerialPort, @unchecked Sendable {
             guard fd >= 0 else { throw SerialError.closed }
             let e = body(fd)
             if e != 0 {
-                // odpojené zařízení (USB): fd zavřít, další open() port otevře znovu
+                // disconnected device (USB): close the fd, the next open() reopens the port
                 if e == ENXIO || e == EIO || e == ENODEV || e == EBADF {
                     _ = cserial_close(fd); fd = -1
                 }
@@ -63,14 +63,14 @@ public final class POSIXSerialPort: SerialPort, @unchecked Sendable {
     public func drain() throws { try op("drain") { cserial_drain($0) } }
     public func flushOutput() { try? op("flush") { cserial_flush_output($0) } }
 
-    /// Sériová zařízení (/dev/cu.*).
+    /// Serial devices (/dev/cu.*).
     public static func availablePorts() -> [String] {
         let items = (try? FileManager.default.contentsOfDirectory(atPath: "/dev")) ?? []
         return items.filter { $0.hasPrefix("cu.") }.sorted().map { "/dev/" + $0 }
     }
 }
 
-/// Systémové hodiny (mach_absolute_time / mach_wait_until) v nanosekundách.
+/// System clock (mach_absolute_time / mach_wait_until) in nanoseconds.
 public struct HostClock: Clock {
     private static let timebase: mach_timebase_info_data_t = {
         var tb = mach_timebase_info_data_t(); mach_timebase_info(&tb); return tb

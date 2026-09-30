@@ -1,4 +1,4 @@
-// Kontext jádra – nahrazuje globální proměnné MMTTY. Aktivní po dobu volání C API.
+// Core context – replaces the MMTTY global variables. Active for the duration of a C API call.
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 #pragma once
 #include "MMTTYTypes.h"
@@ -12,7 +12,7 @@ struct CoreContext {
 
 extern thread_local CoreContext* g_ctx;
 
-// RAII: po dobu života nastaví aktivní kontext aktuálního vlákna (vnořitelné).
+// RAII: sets the active context of the current thread for its lifetime (nestable).
 struct CoreScope {
     CoreContext* prev;
     explicit CoreScope(CoreContext* c) : prev(g_ctx) { g_ctx = c; }

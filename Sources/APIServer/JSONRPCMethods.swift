@@ -82,7 +82,7 @@ extension JSONRPCServer {
             await app.notchClick(hz: hz)
             return (await app.modemParams()).mapValues(Self.toJSON)
         case "modem.describeParams": return await engine.parameterDescriptors().map(Self.descriptorJSON)
-        // profily
+        // profiles
         case "profile.list":
             return await app.profileList().enumerated().map { i, pr in ["slot": i, "name": pr?.name ?? NSNull()] as [String: Any] }
         case "profile.load":
@@ -105,7 +105,7 @@ extension JSONRPCServer {
         case "rig.setMode":
             do { try await app.setRigMode(try str(p, "mode")) } catch let e as RPCError { throw e } catch { throw RPCError(code: -32002, message: "rig: \(error)") }
             return true
-        // makra
+        // macros
         case "macro.list":
             return await app.settings.macros.enumerated().map { ["index": $0, "name": $1.name, "text": $1.text] as [String: Any] }
         case "macro.run":
@@ -123,7 +123,7 @@ extension JSONRPCServer {
             catch { throw RPCError(code: -32001, message: "TX odmítnuto: \(error)") }
             s.startedTx = true
             return true
-        // QSO okno
+        // QSO window
         case "qso.getCurrent": return Self.encodable(await app.qso)
         case "qso.setField":
             do { try await app.setQSOField(try str(p, "name"), try str(p, "value")) } catch let e as RPCError { throw e } catch { throw RPCError.params("\(error)") }
@@ -150,7 +150,7 @@ extension JSONRPCServer {
         case "log.update":
             var obj: Any? = p["record"]
             if obj == nil, let idS = p["id"] as? String, let fields = p["fields"] as? [String: Any] {
-                // {id, fields}: sloučit se stávajícím záznamem
+                // {id, fields}: merge with the existing record
                 guard let log = app.log, let id = UUID(uuidString: idS),
                       let cur = await log.records.first(where: { $0.id == id }),
                       var base = Self.recordJSON(cur) as? [String: Any] else { throw RPCError(code: -32003, message: "záznam nenalezen") }
@@ -172,7 +172,7 @@ extension JSONRPCServer {
             guard let id = UUID(uuidString: try str(p, "id")) else { throw RPCError.params("neplatné id") }
             do { try await app.deleteQSO(id) } catch { throw RPCError(code: -32003, message: "\(error)") }
             return true
-        // spektrum
+        // spectrum
         case "spectrum.get":
             guard let f = await engine.spectrum() else { return NSNull() }
             return Self.spectrumJSON(f, bins: (p["bins"] as? NSNumber)?.intValue)
@@ -188,7 +188,7 @@ extension JSONRPCServer {
             }
             return true
         case "spectrum.stopStream": s.spectrumTask = nil; s.unsubscribe(["spectrum"]); return true
-        // události
+        // events
         case "events.subscribe":
             guard let ev = p["events"] as? [String] else { throw RPCError.params("chybí 'events' (array)") }
             s.subscribe(ev); return true

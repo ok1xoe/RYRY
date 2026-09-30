@@ -2,7 +2,7 @@ import Testing
 import MMTTYCore
 import RTTYSignalKit
 
-/// Pomocník: pustí vzorky jádrem po blocích 512 a vrátí dekódovaný text.
+/// Helper: runs the samples through the core in blocks of 512 and returns the decoded text.
 func decode(_ core: OpaquePointer, _ samples: [Float], block: Int = 512) -> String {
     var text = ""
     var buf = [RTTYCoreChar](repeating: RTTYCoreChar(), count: 256)
@@ -38,8 +38,8 @@ func decodesCleanSignalWithEveryDemodulator(demod: Int) throws {
 func decodesOtherBaudAndShift(baud: Double, shift: Double) throws {
     let core = try #require(makeCore())
     defer { rttycore_destroy(core) }
-    // Široký shift: space musí zůstat pod Nyquistem demodulátoru (11025/4 ≈ 2756 Hz),
-    // proto 850 Hz s mark 1275 Hz (běžné nastavení v MMTTY).
+    // A wide shift: space must stay below the demodulator's Nyquist frequency (11025/4 ≈ 2756 Hz),
+    // hence 850 Hz with mark at 1275 Hz (a common setting in MMTTY).
     let mark = shift > 200 ? 1275.0 : 2125.0
     #expect(rttycore_set_param(core, RC_BAUD, baud) == RC_OK)
     #expect(rttycore_set_param(core, RC_MARK, mark) == RC_OK)
@@ -60,7 +60,7 @@ func decodesOtherBaudAndShift(baud: Double, shift: Double) throws {
     defer { rttycore_destroy(core) }
     var s = RTTYSignalGenerator(amplitude: 0.3).generate(text: sample)
     var noise = NoiseGenerator(seed: 1)
-    noise.addNoise(to: &s, rms: 0.1)          // SNR ≈ 6,5 dB v celém pásmu 0–5,5 kHz
+    noise.addNoise(to: &s, rms: 0.1)          // SNR ≈ 6.5 dB across the whole 0–5.5 kHz band
     #expect(decode(core, s) == sample)
 }
 
@@ -106,7 +106,7 @@ func rejectsUnsupportedSampleRate(rate: Double) {
     let a = try #require(makeCore(sampleRate: 11025))
     let b = try #require(makeCore(sampleRate: 12000))
     defer { rttycore_destroy(a); rttycore_destroy(b) }
-    // Přenastavení po vytvoření b: návrh filtrů čte vzorkovací frekvenci – musí být ta z a.
+    // Reconfiguring after b was created: the filter design reads the sample rate – it must be the one from a.
     #expect(rttycore_set_param(a, RC_SPACE, 2300) == RC_OK)
     #expect(rttycore_set_param(a, RC_SPACE, 2295) == RC_OK)
     #expect(rttycore_set_param(a, RC_IIR_BW, 60) == RC_OK)
@@ -116,7 +116,7 @@ func rejectsUnsupportedSampleRate(rate: Double) {
     var ta = "", tb = ""
     var buf = [RTTYCoreChar](repeating: RTTYCoreChar(), count: 256)
     var ia = 0, ib = 0
-    while ia < sa.count || ib < sb.count {           // prokládané zpracování
+    while ia < sa.count || ib < sb.count {           // interleaved processing
         if ia < sa.count {
             let n = min(512, sa.count - ia)
             sa.withUnsafeBufferPointer { rttycore_process_rx(a, $0.baseAddress! + ia, n) }; ia += n

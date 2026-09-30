@@ -1,10 +1,10 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
 import Foundation
 
-/// Průběžný záznam přijatého textu do souboru (MMTTY „Log Rx file“): jeden soubor na den UTC
-/// `rx-YYYY-MM-DD.txt`, volitelně s časovou značkou UTC na začátku každého řádku.
+/// Continuous recording of the received text into a file (MMTTY "Log Rx file"): one file per UTC day
+/// `rx-YYYY-MM-DD.txt`, optionally with a UTC timestamp at the start of every line.
 public final class RxTextLog {
-    /// Převod přijatého textu na řádky souboru (CR se zahodí, LF ukončí řádek).
+    /// Conversion of the received text into file lines (CR is discarded, LF ends a line).
     public struct Formatter: Sendable {
         public var timestamps: Bool
         var atLineStart = true

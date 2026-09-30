@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import RigControl
 
-// CI-V: rámec FE FE <rádio> E0 <příkaz> … FD, frekvence 5 bajtů BCD od nejnižšího řádu
+// CI-V: the frame FE FE <radio> E0 <command> … FD, the frequency as 5 BCD bytes from the lowest order
 @Test func civFrames() {
     #expect(CIV.frame(to: 0x94, cmd: 0x03) == [0xFE, 0xFE, 0x94, 0xE0, 0x03, 0xFD])
     #expect(CIV.bcd(14_085_123) == [0x23, 0x51, 0x08, 0x14, 0x00])
@@ -12,7 +12,7 @@ import Testing
     #expect(CIV.ptt(true, to: 0xA4) == [0xFE, 0xFE, 0xA4, 0xE0, 0x1C, 0x00, 0x01, 0xFD])
 }
 
-// Rozbor proudu bajtů: echo vlastních rámců (od E0) a vysílání do všech (00) se přeskočí
+// Parsing the byte stream: the echo of our own frames (from E0) and broadcasts to all (00) are skipped
 @Test func civParseStream() {
     let echo = CIV.frame(to: 0x94, cmd: 0x03)
     let answer: [UInt8] = [0xFE, 0xFE, 0xE0, 0x94, 0x03, 0x00, 0x50, 0x08, 0x14, 0x00, 0xFD]
@@ -23,7 +23,7 @@ import Testing
     #expect(frames[0].cmd == 0x03 && frames[0].from == 0x94)
     #expect(CIV.fromBCD(Array(frames[0].data)) == 14_085_000)
     var q = CIV.Parser()
-    #expect(q.feed(Array(answer.prefix(6))).isEmpty && q.feed(Array(answer.dropFirst(6))).count == 1)   // po částech
+    #expect(q.feed(Array(answer.prefix(6))).isEmpty && q.feed(Array(answer.dropFirst(6))).count == 1)   // in parts
 }
 
 @Test func civModes() {
@@ -31,7 +31,7 @@ import Testing
     #expect(CIV.modeCode("RTTY") == 0x04 && CIV.modeCode("PKTUSB") == 0x01 && CIV.modeCode("XYZ") == nil)
 }
 
-// Textový CAT: Kenwood/Elecraft 11 číslic, Yaesu 9 číslic
+// Text CAT: Kenwood/Elecraft 11 digits, Yaesu 9 digits
 @Test func textCATCommands() {
     #expect(TextCAT.setFrequency(14_085_000, dialect: .kenwood) == "FA00014085000;")
     #expect(TextCAT.setFrequency(14_085_000, dialect: .elecraft) == "FA00014085000;")
