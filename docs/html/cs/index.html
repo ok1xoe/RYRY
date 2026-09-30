@@ -171,12 +171,17 @@
   <figure><a href="../img/cs-contest.png"><img src="../img/cs-contest.png" alt="OK DX RTTY Contest v hlavním okně" loading="lazy"></a><figcaption>OK DX RTTY: QSO okno nabízí jen RST a CQ zónu; vaši zónu doplní aplikace, zónu protistanice předvyplní podle značky.</figcaption></figure>
 </div>
 <p><b>Duplicity:</b> když se stanicí už máte v tomto závodě spojení na stejném pásmu a módu, zobrazí se u značky červené <b>DUPE</b>. Zalogovat lze i tak.</p>
-<p>Formáty výměny: RST + pořadové číslo (nebo pevná výměna), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Pořadová čísla se po zalogování zvyšují sama. Body a násobiče aplikace nepočítá.</p>
+<p>Formáty výměny: RST + pořadové číslo (nebo pevná výměna), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Pořadová čísla se po zalogování zvyšují sama.</p>
 <h3>ESM – Enter posílá zprávy (Run / S&amp;P)</h3>
 <p>Po zapnutí v Nastavení → Závod → ESM pošle Enter v poli Call nebo výměny makro podle stavu spojení, podobně jako v N1MM: <b>Run</b> (voláte CQ) – CQ → výměna → TU a zalogování; <b>S&amp;P</b> (odpovídáte) – moje značka → výměna a zalogování. Režim přepnete v hlavičce QSO panelu nebo <kbd>⌃</kbd><kbd>R</kbd>; panel ukazuje, co Enter pošle. Během vysílání Enter nic neposílá a prázdné makro se nikdy neodešle.</p>
 <p><b>Rychlost:</b> ve stavovém řádku je v závodě počet spojení a rychlost za posledních 10 a 60 minut (spojení za hodinu); v okně Log jsou počty podle pásem.</p>
+<h3>Skóre</h3>
+<p>Okno <b>Okno → Skóre</b> ukazuje pro zvolenou předvolbu počet spojení, duplicit, bodů a násobičů po pásmech a celkem, a výsledné skóre i s výpočtem (např. „Body 120 × násobiče 35 = 4 200“). Aktualizuje se s každým zalogovaným, opraveným nebo smazaným spojením; skóre je vidět i ve stavovém řádku. Jde o odhad – vyhodnocení závodu odečte chybná a nepotvrzená spojení. Pravidla, která nešlo ověřit, okno označí.</p>
+<div class="gallery">
+  <figure><a href="../img/cs-score.png"><img src="../img/cs-score.png" alt="Okno Skóre" loading="lazy"></a><figcaption>Body, spojení a násobiče po pásmech a celkem.</figcaption></figure>
+</div>
 <h3>Násobiče a band mapa</h3>
-<p>Okno <b>Okno → Násobiče</b> ukazuje u zvolené předvolby odpracované násobiče po pásmech (země DXCC, CQ zóny, prefixy WPX, státy a provincie, oblasti…) a u konečných množin i chybějící. U zadané značky se v QSO okně objeví zelené <b>NEW MULT</b>. Pravidla, která nešlo ověřit v oficiálních pravidlech závodu, jsou v okně označena. <b>Okno → Band mapa</b> ukazuje RTTY část pásma se spoty podle frekvence a naladěním rigu; klik naladí rig a vloží značku.</p>
+<p>Okno <b>Okno → Násobiče</b> ukazuje u zvolené předvolby odpracované násobiče po pásmech (země DXCC, CQ zóny, prefixy WPX, státy a provincie, oblasti…) a u konečných množin i chybějící. U zadané značky se v QSO okně objeví zelené <b>NEW MULT</b>. Pravidla, která nešlo ověřit v oficiálních pravidlech závodu, jsou v okně označena. <b>Okno → Band mapa</b> ukazuje RTTY část pásma se spoty podle frekvence a naladěním rigu; klik na spot naladí rig a vloží značku. Pásmo se volí samo podle rigu, frekvence v QSO okně nebo podle toho, kde je nejvíc spotů; ručně ho vyberete v rozbalovacím seznamu. Stupnici přiblížíte lupami nebo kolečkem myši, tažením ji posunete a tlačítkem <b>⤢</b> se vrátíte na celý úsek pásma.</p>
 <p><b>Historie značek:</b> soubor ve formátu N1MM Call History (Nastavení → Závod) předvyplní jméno, lokátor a výměnu protistanice (např. zónu).</p>
 <h3>WAE a QTC</h3>
 <p>Ve formátu WAE je v QSO okně panel QTC: <b>QTC?</b> se zeptá protistanice, <b>QRV – přijmout</b> otevře příjem série, <b>Poslat…</b> připraví a odvysílá sérii z vašeho logu. Aplikace hlídá pravidla – nejvýše 10 QTC na dvojici stanic, jen mezi kontinenty, každé spojení jen jednou. Přijaté řádky se plní klikem na slova nebo tlačítkem <b>Načíst z příjmu</b>.</p>
@@ -210,6 +215,7 @@
   <tr><th>Služba</th><th>Kde zapnout</th><th>Co dělá</th></tr>
   <tr><td>Callbook (QRZ.com, HamQTH)</td><td>Nastavení → API a log</td><td>doplní jméno, QTH a lokátor protistanice</td></tr>
   <tr><td>DX cluster a RBN</td><td>Nastavení → Spoty, okno Okno → Spoty</td><td>seznam RTTY spotů; dvojklik naladí rig a vloží značku (posun frekvence pro LSB/AFSK nastavíte); spoty v propustném pásmu se zobrazí jako štítky přímo ve vodopádu (zelená = nová stanice, oranžová = v logu, červená = duplicita), klik naladí mark</td></tr>
+  <tr><td>Příkazy pro DX cluster</td><td>okno Okno → Spoty (dole)</td><td>10 tlačítek s příkazy (např. <code>sh/dx 30</code>, <code>sh/wwv</code>, <code>set/skimmer</code>) a řádek pro ruční příkaz s historií (šipky ↑↓); odpovědi clusteru jsou v rozbalovací konzoli. Pravé tlačítko myši upraví příkaz stejným editorem jako makra pro vysílání; <code>%k</code> = frekvence rigu v kHz, <code>%c</code> = protistanice (např. <code>dx %k %c RTTY</code>)</td></tr>
   <tr><td>LoTW, eQSL, Club Log</td><td>Nastavení → Online, okno Log → Nahrát</td><td>nahraje dosud nenahraná spojení (LoTW přes program TQSL); volitelně automaticky po zalogování</td></tr>
   <tr><td>Aktualizace</td><td>menu aplikace → Zkontrolovat aktualizace…</td><td>upozorní na novou verzi a stáhne DMG (nic neinstaluje samo)</td></tr>
 </table>
