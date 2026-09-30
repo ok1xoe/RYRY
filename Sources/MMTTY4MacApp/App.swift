@@ -71,6 +71,15 @@ struct MMTTY4MacApp: App {
         }
     }
 
+    /// A short RTTY contest QSO with noise, bundled so the app can be tried without a radio.
+    @MainActor func playDemo() {
+        guard let url = Bundle.main.url(forResource: "demo-rtty", withExtension: "wav") else { return }
+        Task { @MainActor in
+            do { try await model.playWAV(url, speed: 1) }
+            catch { NSAlert(error: error).runModal() }
+        }
+    }
+
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var model = AppModel(alertSink: SystemAlertSink())
     @Environment(\.openWindow) private var openWindow
@@ -134,6 +143,7 @@ struct MMTTY4MacApp: App {
             }
             CommandGroup(replacing: .help) {
                 Button(L("Příručka RYRY")) { openManual() }.keyboardShortcut("?", modifiers: .command)
+                Button(L("Přehrát ukázkový signál")) { playDemo() }
                 Divider()
                 Button(L("Web RYRY")) { openWeb("") }
                 Button(L("Podpora")) { openWeb("support.html") }
