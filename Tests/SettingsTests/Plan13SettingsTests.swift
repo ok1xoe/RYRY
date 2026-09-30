@@ -26,8 +26,8 @@ import Testing
         .write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     let o = SettingsStore(directory: dir).load().0
     #expect(o.txWindow.wrapColumn == 0 && o.display.palette == .classic && o.display.fftResponse == .slow)
-    #expect(o.display.rxBackground == nil)                       // neplatná barva
-    #expect(o.shortcuts.isEmpty)                                 // neplatná zkratka
+    #expect(o.display.rxBackground == nil)                       // an invalid colour
+    #expect(o.shortcuts.isEmpty)                                 // an invalid shortcut
 }
 
 @Test func keyBindings() {
@@ -36,7 +36,7 @@ import Testing
     #expect(KeyBinding(key: "return", modifiers: [.control]).display == "⌃↩")
     #expect(RigSettings().catRTS == nil)
     #expect(KeyBinding(key: "f13").isValid && KeyBinding.none.isValid)
-    #expect(!KeyBinding(key: "a").isValid)                       // samotné písmeno – kolize s psaním
+    #expect(!KeyBinding(key: "a").isValid)                       // a bare letter – it would clash with typing
     #expect(!KeyBinding(key: "space").isValid && !KeyBinding(key: "return").isValid && !KeyBinding(key: "left").isValid)
     #expect(KeyBinding(key: "return", modifiers: [.command]).isValid)
     #expect(!KeyBinding(key: "f21").isValid && !KeyBinding(key: "").isValid && !KeyBinding(key: "ab", modifiers: [.command]).isValid)
@@ -48,7 +48,7 @@ import Testing
     #expect(s.conflictingShortcuts() == [[.macro(0), .tune]])
 }
 
-// CAT přes USB: vestavěný protokol nebo hamlib spuštěný aplikací
+// CAT over USB: the built-in protocol or a hamlib started by the application
 @Test func rigCATSettings() throws {
     var r = RigSettings()
     #expect(r.catProtocol == .icom && r.civAddress == 0x94 && r.baud == 19200 && r.stopBits == 1 && r.hamlibModel == 1)
@@ -65,7 +65,7 @@ import Testing
     #expect(RigSettings.icomAddresses.first { $0.0 == "IC-7300" }?.1 == 0x94)
 }
 
-// Správa logu: název logu a nedávné logy
+// Log management: the log name and the recent logs
 @Test func logNameAndRecent() throws {
     var l = LogSettings()
     #expect(l.name == "mmtty4mac" && l.recent.isEmpty)
@@ -77,5 +77,5 @@ import Testing
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     try #"{"log":{"name":"../zlo","recent":["/a.adi",5]}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     let o = SettingsStore(directory: dir).load().0.log
-    #expect(o.name == "mmtty4mac")                                   // název s lomítkem odmítnut
+    #expect(o.name == "mmtty4mac")                                   // a name containing a slash is rejected
 }

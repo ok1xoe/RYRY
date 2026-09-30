@@ -65,7 +65,7 @@ import Settings
     #expect(h.count == 30_000 && h.lookup("K29999ABC")?.cqZone == 40)
 }
 
-// MARK: Mapování podle formátu
+// MARK: Mapping per format
 
 private func contest(_ f: ContestFormat, exchange: String = "", enabled: Bool = true) -> ContestSettings {
     var c = ContestSettings(); c.enabled = enabled; c.format = f; c.exchange = exchange; return c
@@ -78,12 +78,12 @@ private let full = CallHistoryEntry(name: "Hans", loc: "JO62", exch: "ABC", cqZo
     #expect(h.fields(for: full, contest: contest(.cqrj), isNorthAmerica: true)["exchangeRcvd"] == "5 NY")
     #expect(h.fields(for: full, contest: contest(.cqrj), isNorthAmerica: false)["exchangeRcvd"] == "5")
     #expect(h.fields(for: full, contest: contest(.serial, exchange: "OK"), isNorthAmerica: nil)["exchangeRcvd"] == "ABC")
-    #expect(h.fields(for: full, contest: contest(.serial), isNorthAmerica: nil)["exchangeRcvd"] == nil)   // pořadová čísla
+    #expect(h.fields(for: full, contest: contest(.serial), isNorthAmerica: nil)["exchangeRcvd"] == nil)   // serial numbers
     #expect(h.fields(for: full, contest: contest(.bartg), isNorthAmerica: nil) == ["name": "Hans", "locator": "JO62"])
     #expect(h.fields(for: full, contest: contest(.zone, enabled: false), isNorthAmerica: nil) == ["name": "Hans", "locator": "JO62"])
 }
 
-// MARK: Chování AppController
+// MARK: AppController behaviour
 
 private func historyApp(_ f: ContestFormat, contestOn: Bool = true, fillEmptyOnly: Bool = true, enabled: Bool = true,
                         exchange: String = "") async throws -> Harness {
@@ -100,7 +100,7 @@ private func historyApp(_ f: ContestFormat, contestOn: Bool = true, fillEmptyOnl
     return h
 }
 
-// DXCC: DL = CQ 14, OK = CQ 15; v testovací historii má DL1ABC zónu 17, aby bylo znát, odkud hodnota je.
+// DXCC: DL = CQ 14, OK = CQ 15; in the test history DL1ABC has zone 17 so that it is clear where the value comes from.
 
 @Test func historyFillsNameLocatorAndZone() async throws {
     let h = try await historyApp(.zone)
@@ -113,7 +113,7 @@ private func historyApp(_ f: ContestFormat, contestOn: Bool = true, fillEmptyOnl
 
 @Test func historyBeatsDXCCZoneEvenAfterIntermediateCall() async throws {
     let h = try await historyApp(.zone)
-    try await h.app.setQSOField("call", "DL1AB")                       // rozepsaná značka: zóna z DXCC
+    try await h.app.setQSOField("call", "DL1AB")                       // a partially typed call: zone from DXCC
     #expect(await h.app.qso.exchangeRcvd == "14")
     try await h.app.setQSOField("call", "DL1ABC")
     #expect(await h.app.qso.exchangeRcvd == "17")
@@ -153,7 +153,7 @@ private func historyApp(_ f: ContestFormat, contestOn: Bool = true, fillEmptyOnl
     let h = try await historyApp(.serial, exchange: "OK")
     try await h.app.setQSOField("call", "DL1ABC")
     #expect(await h.app.qso.exchangeRcvd == "FIX")
-    let h2 = try await historyApp(.serial)                             // pořadová čísla: bez výměny
+    let h2 = try await historyApp(.serial)                             // serial numbers: no exchange
     try await h2.app.setQSOField("call", "DL1ABC")
     let q = await h2.app.qso
     #expect(q.exchangeRcvd.isEmpty && q.name == "HANS")
@@ -182,13 +182,13 @@ private func historyApp(_ f: ContestFormat, contestOn: Bool = true, fillEmptyOnl
 @Test func historyChangedCallReplacesOldAutoFilledValues() async throws {
     let h = try await historyApp(.zone)
     try await h.app.setQSOField("call", "DL1ABC")
-    try await h.app.setQSOField("call", "OK2AAA")                      // bez záznamu: staré údaje z historie zmizí
+    try await h.app.setQSOField("call", "OK2AAA")                      // no record: the old data from the history disappears
     let q = await h.app.qso
     #expect(q.name.isEmpty && q.locator.isEmpty && q.exchangeRcvd == "15" && q.historyFilled.isEmpty)
 }
 
-// (dříve historyMarkerSurvivesUnchangedCommitButNotEdit – kontrola plánu 17: ruční zadání i shodné hodnoty
-// zruší označení, viz Plan17ReviewTests.historyMarkerClearedByAnyManualSet)
+// (formerly historyMarkerSurvivesUnchangedCommitButNotEdit – plan 17 check: manual entry clears the marker
+// even for an identical value, see Plan17ReviewTests.historyMarkerClearedByAnyManualSet)
 
 @Test func historyFilledNotSerialized() throws {
     var q = QSOFields(); q.call = "X"; q.historyFilled = ["name": "A"]

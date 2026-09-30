@@ -7,7 +7,7 @@ import Settings
 import WaveFile
 @testable import AppUI
 
-// C1: po dosažení limitu musí model hlásit, kolik se ořízlo zepředu a kolik přibylo (pro inkrementální NSTextView)
+// C1: once the limit is reached the model must report how much was trimmed from the front and how much was added (incremental NSTextView)
 @Test @MainActor func rxCountersTrackTrimAndAppend() {
     let f = Fixture()
     f.model.appendRx(String(repeating: "A", count: AppModel.rxLimit), echo: false)
@@ -21,7 +21,7 @@ import WaveFile
     #expect(tail.last?.echo == true && tail.first?.echo == false)
 }
 
-// I3: souběžné změny nastavení se provedou postupně, žádný engine nezůstane běžet
+// I3: concurrent settings changes are applied one after another, no engine is left running
 @Test @MainActor func concurrentApplySettingsAreSerialized() async throws {
     let f = Fixture()
     await f.model.start()
@@ -29,20 +29,20 @@ import WaveFile
     var s2 = f.model.settings; s2.station.call = "OK2BBB"
     async let a: Void = f.model.applySettings(s1)
     async let b: Void = f.model.applySettings(s2)
-    async let c: Void = f.model.start()                 // navíc start (např. druhé okno)
+    async let c: Void = f.model.start()                 // one extra start (e.g. a second window)
     _ = await (a, b, c)
     #expect(f.engines.count == 3)
     for e in f.engines.dropLast() { #expect(await e.state == .stopped) }
     #expect(await f.engine.state == .rx)
-    #expect(["OK1AAA", "OK2BBB"].contains(f.model.settings.station.call))   // pořadí souběžných volání není dané
+    #expect(["OK1AAA", "OK2BBB"].contains(f.model.settings.station.call))   // the order of concurrent calls is not defined
     await f.model.stop()
 }
 
-// I4: Použít nastavení nesmí vrátit parametry modemu ani makra změněná jinde
+// I4: Apply settings must not revert modem parameters or macros changed elsewhere
 @Test @MainActor func applySettingsKeepsModemParamsAndMacros() async throws {
     let f = Fixture()
     await f.model.start()
-    let draft = f.model.settings                         // dialog otevřen se starými hodnotami
+    let draft = f.model.settings                         // the dialog was opened with the old values
     await f.model.setParam("demodType", .string("pll"))
     var m = f.model.settings.macros; m[0].text = "NEW CQ"
     await f.model.saveMacros(m)
@@ -55,7 +55,7 @@ import WaveFile
     await f.model.stop()
 }
 
-// I6: ukončení nesmí viset – shutdown má časový limit
+// I6: quitting must not hang – shutdown has a timeout
 @Test @MainActor func shutdownHasTimeout() async throws {
     let f = Fixture()
     await f.model.start()
@@ -64,14 +64,14 @@ import WaveFile
     #expect(Date().timeIntervalSince(t0) < 2)
 }
 
-// Review 7: klasifikace nesmí brát šum jako značku ani čísla jako RST
+// Review 7: the classifier must not take noise for a call or numbers for an RST
 @Test func stricterWordClassifier() {
     for w in ["3580", "1234", "E5T", "R5T", "1A2B"] { #expect(WordClassifier.classify(w) != .call && WordClassifier.classify(w) != .rst, "\(w)") }
     for c in ["OK1ABC", "DL1ABC/P", "W1AW", "VK2/G4ABC", "2E0XYZ"] { #expect(WordClassifier.classify(c) == .call, "\(c)") }
     for r in ["599", "579", "5NN", "599001", "59912"] { #expect(WordClassifier.classify(r) == .rst, "\(r)") }
 }
 
-// Předvolba závodu a záznam příjmu z dialogu Nastavení se po Použít uloží
+// The contest preset and the receive log from the Settings dialog are stored on Apply
 @Test @MainActor func applySettingsTakesPresetAndRxLog() async throws {
     let f = Fixture()
     await f.model.start()
@@ -88,7 +88,7 @@ import WaveFile
     await f.model.stop()
 }
 
-// Nahrávání příjmu do WAV: vstup zvukovky se zapíše, po zastavení je soubor kompletní
+// Recording the receive path into a WAV: the sound card input is written, the file is complete after stopping
 @Test @MainActor func recordsInputToWAV() async throws {
     let f = Fixture()
     await f.model.start()
@@ -104,19 +104,19 @@ import WaveFile
     await f.model.stop()
 }
 
-// Review 4: Použít ze starší kopie dialogu nesmí vypnout záznam příjmu zapnutý v menu
+// Review 4: Apply from an older copy of the dialog must not turn off the receive log enabled from the menu
 @Test @MainActor func applySettingsKeepsRxLogToggledInMenu() async throws {
     let f = Fixture()
     await f.model.start()
-    let draft = f.model.settings                       // dialog otevřen
-    f.model.setRxTextLog(true)                         // menu Soubor
+    let draft = f.model.settings                       // the dialog is open
+    f.model.setRxTextLog(true)                         // the File menu
     var d = draft; d.station.call = "OK9ZZZ"
     await f.model.applySettings(d, baseline: draft)
     #expect(f.model.settings.log.rxText && f.model.rxLogActive)
     await f.model.stop()
 }
 
-// Správa logu: nový log, uložit jako, otevřít cizí ADIF; Použít ze starší kopie dialogu log nepřepne zpět
+// Log management: new log, save as, open a foreign ADIF; Apply from an older copy of the dialog does not switch the log back
 @Test @MainActor func logManagement() async throws {
     let f = Fixture()
     await f.model.start()
@@ -132,7 +132,7 @@ import WaveFile
 
     await f.model.setQSOField("call", "OK2BBB")
     await f.model.logQSO(); await f.settle()
-    await #expect(throws: (any Error).self) { try await f.model.newLog(file: newURL) }   // už existuje
+    await #expect(throws: (any Error).self) { try await f.model.newLog(file: newURL) }   // already exists
     let copyURL = f.dir.appendingPathComponent("kopie.adi")
     try await f.model.saveLogAs(file: copyURL)
     #expect(f.model.settings.log.name == "kopie" && f.model.logRecords.map(\.call) == ["OK2BBB"])
@@ -145,21 +145,21 @@ import WaveFile
 
     var d = draft; d.station.call = "OK9ZZZ"
     await f.model.applySettings(d, baseline: draft)
-    #expect(f.model.settings.log.name == "cizi")                     // dialog log nevrátil
+    #expect(f.model.settings.log.name == "cizi")                     // the dialog did not revert the log
     await f.model.stop()
 }
 
-// Bod 1, 2, 4: návrhy značek z logu, DUPE v závodě, ruční frekvence se pamatuje v nastavení
+// Items 1, 2, 4: call suggestions from the log, DUPE in a contest, the manual frequency is remembered in the settings
 @Test @MainActor func scpDupeAndManualFrequency() async throws {
     let f = Fixture()
     f.configure = { $0.contest = ContestSettings.preset(.cqwpxRTTY, year: 2026); $0.contest.start = Date().addingTimeInterval(-3600) }
     await f.model.start()
-    /// Čeká na podmínku (asynchronní aktualizace modelu) místo pevné prodlevy – stabilní i při zátěži.
+    /// Waits for a condition (an asynchronous model update) instead of a fixed delay – stable even under load.
     func until(_ c: () -> Bool) async { for _ in 0..<300 where !c() { try? await Task.sleep(for: .milliseconds(10)) } }
     await f.model.setQSOField("freq", "14080")
     await f.model.setQSOField("call", "DL1ABC")
     await f.model.logQSO()
-    // po zalogování v závodě se QSO okno vyprázdní asynchronně – počkat, ať pozdní událost nepřepíše další zadání
+    // in a contest the QSO window is cleared asynchronously after logging – wait so that a late event does not overwrite the next entry
     await until { f.model.settings.log.manualFrequency == 14_080_000 && f.model.scpCount > 0 && f.model.qso.call.isEmpty }
     #expect(f.model.settings.log.manualFrequency == 14_080_000)
     await f.model.setQSOField("call", "1AB"); await until { f.model.scpPartial == ["DL1ABC"] }
@@ -173,13 +173,13 @@ import WaveFile
     await f.model.stop()
 }
 
-// Review (odloženo): selhání záznamu příjmu vypne i přepínač (menu neukazuje „zapnuto“)
+// Review (deferred): a failure of the receive log also turns the switch off (the menu does not show "on")
 @Test @MainActor func rxLogFailureTurnsToggleOff() async throws {
     let f = Fixture()
     await f.model.start()
     let blocker = URL(fileURLWithPath: f.model.settings.log.directory).appendingPathComponent("rx")
     try FileManager.default.createDirectory(at: blocker.deletingLastPathComponent(), withIntermediateDirectories: true)
-    try Data("x".utf8).write(to: blocker)               // místo složky rx soubor → zápis selže
+    try Data("x".utf8).write(to: blocker)               // a file instead of the rx folder → the write fails
     f.model.setRxTextLog(true)
     f.model.appendRx("CQ", echo: false)
     #expect(!f.model.settings.log.rxText && !f.model.rxLogActive)

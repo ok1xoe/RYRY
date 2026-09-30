@@ -28,7 +28,7 @@ import Testing
     #expect(throws: WaveFile.Error.self) { try WaveFile.read(from: url) }
 }
 
-// Plán 9: 24/32bit PCM, float32 a WAVE_FORMAT_EXTENSIBLE; srozumitelná chyba
+// Plan 9: 24/32-bit PCM, float32 and WAVE_FORMAT_EXTENSIBLE; a comprehensible error
 private func wav(format: UInt16, bits: UInt16, channels: UInt16 = 2, extensible: Bool = false, samples: [Double]) -> Data {
     var d = Data()
     func u32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
@@ -77,7 +77,7 @@ func readsMoreWaveFormats(format: UInt16, bits: UInt16, ext: Bool) throws {
     }
 }
 
-// Streamovaný zápis (nahrávání příjmu): hlavička se doplní při zavření, čtení vrátí totéž
+// Streamed writing (recording the receive path): the header is completed on close, reading returns the same data
 @Test func streamingWriterRoundTrip() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("rec-\(UUID()).wav")
     let w = try WaveWriter(url: url, sampleRate: 11025)
@@ -90,12 +90,12 @@ func readsMoreWaveFormats(format: UInt16, bits: UInt16, ext: Bool) throws {
     for (x, y) in zip(s, a + b) { #expect(abs(x - y) < 0.0001) }
 }
 
-// Review (odloženo): hlavička se průběžně aktualizuje – nahrávka přerušená pádem jde přečíst
+// Review (deferred): the header is updated as it goes – a recording interrupted by a crash can still be read
 @Test func streamingWriterHeaderWithoutClose() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("rec-\(UUID()).wav")
     let w = try WaveWriter(url: url, sampleRate: 11025)
     try w.append([Float](repeating: 0.5, count: 1000))
-    let (s, _) = try WaveFile.read(from: url)            // bez close()
+    let (s, _) = try WaveFile.read(from: url)            // without close()
     #expect(s.count == 1000)
     try w.close()
 }

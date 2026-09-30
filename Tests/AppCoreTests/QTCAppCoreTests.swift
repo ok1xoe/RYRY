@@ -41,14 +41,14 @@ private func logQSO(_ h: Harness, _ call: String, rcvd: Int) async throws {
 
 @Test func waeUsesSerialsAndOffersQTCToOtherContinent() async throws {
     let (h, _) = try makeWAEApp()
-    #expect(await h.app.qso.serialSent == 1)                       // WAE = RST + pořadové číslo
+    #expect(await h.app.qso.serialSent == 1)                       // WAE = RST + serial number
     try await logQSO(h, "DL1ABC", rcvd: 5)
     try await logQSO(h, "OK2PBR", rcvd: 12)
     let st = await h.app.qtcStatus(for: "W1AW")
     #expect(st.available.map(\.call) == ["DL1ABC", "OK2PBR"] && st.exchanged == 0 && st.nextSeries == 1)
     #expect(st.differentContinent == true)
     let eu = await h.app.qtcStatus(for: "DL9ZZ")
-    #expect(eu.differentContinent == false)                         // v RTTY jen mezi kontinenty
+    #expect(eu.differentContinent == false)                         // in RTTY only between continents
 }
 
 @Test func sendQTCTransmitsAndSavesAfterConfirm() async throws {
@@ -62,12 +62,12 @@ private func logQSO(_ h: Harness, _ call: String, rcvd: Int) async throws {
     await run(h) { await h.engine.state == .rx && h.audio.tx.count > 0 }
     let text = try await decodeTxAudio(h.audio.tx)
     #expect(text.contains("QTC 1/2 QTC 1/2") && text.contains("DL1ABC 005") && text.contains("OK2PBR 012"), "\(text)")
-    #expect(await store.series.isEmpty)                            // uloží se až po potvrzení
+    #expect(await store.series.isEmpty)                            // stored only after confirmation
     try await h.app.confirmSentQTC()
     let s = await store.series
     #expect(s.count == 1 && s[0].direction == .sent && s[0].counterpart == "W1AW" && s[0].count == 2)
     #expect(await h.app.qtcStatus(for: "W1AW").exchanged == 2)
-    #expect(await h.app.qtcStatus(for: "K2ZZ").available.isEmpty)   // obě QSO už nahlášená
+    #expect(await h.app.qtcStatus(for: "K2ZZ").available.isEmpty)   // both QSOs already reported
     #expect(await h.app.qtcStatus(for: "K2ZZ").nextSeries == 2)
     await h.app.stop()
 }
@@ -93,16 +93,16 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
     return t
 }
 
-// Review plán 12: pravidla se kontrolují i při odeslání, kontinent se vynucuje, protistanice se předá explicitně
+// Review plan 12: the rules are checked when sending as well, the continent is enforced, the other station is passed explicitly
 @Test func sendQTCValidatesLinesAndContinent() async throws {
     let (h, store) = try makeWAEApp()
     try await h.app.start()
     try await logQSO(h, "K2ZZ", rcvd: 5)
     try await logQSO(h, "DL1ABC", rcvd: 6)
-    let forW1 = await h.app.qtcStatus(for: "W1AW").available               // obsahuje K2ZZ
+    let forW1 = await h.app.qtcStatus(for: "W1AW").available               // contains K2ZZ
     try await h.app.setQSOField("call", "K2ZZ")
-    await #expect(throws: AppError.self) { try await h.app.sendQTC(forW1) }  // QTC o K2ZZ stanici K2ZZ
-    try await h.app.setQSOField("call", "DL9ZZ")                              // stejný kontinent (EU)
+    await #expect(throws: AppError.self) { try await h.app.sendQTC(forW1) }  // a QTC about K2ZZ to station K2ZZ
+    try await h.app.setQSOField("call", "DL9ZZ")                              // the same continent (EU)
     let forDL = await h.app.qtcStatus(for: "DL9ZZ").available
     await #expect(throws: AppError.self) { try await h.app.sendQTC(forDL) }
     await #expect(throws: AppError.self) { try await h.app.saveReceivedQTC(counterpart: "DL9ZZ", number: 1, declaredCount: 1,
@@ -122,7 +122,7 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
 
 @Test func receivedSeriesUsesExplicitCounterpart() async throws {
     let (h, store) = try makeWAEApp()
-    try await h.app.setQSOField("call", "OK2NEXT")                            // okno už má dalšího
+    try await h.app.setQSOField("call", "OK2NEXT")                            // the window already holds the next one
     try await h.app.saveReceivedQTC(counterpart: "W1AW", number: 2, declaredCount: 10,
                                     lines: [QTCLine(time: "0915", call: "JA1YY", serial: 7)])
     let s = try #require(await store.series.first)
@@ -147,7 +147,7 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
     #expect(await store.series.isEmpty)
 }
 
-// Formát „RST + CQ zóna“ (OK DX RTTY): moje zóna z DXCC, zóna protistanice předvyplněná podle značky
+// The "RST + CQ zone" format (OK DX RTTY): my zone from DXCC, the other station's zone prefilled from the call
 @Test func zoneFormatFillsZones() async throws {
     var s = AppSettings(); s.station.call = "OK1XOE"; s.ptt.method = .none
     s.contest = ContestSettings.preset(.okDXRTTY, year: 2026)
@@ -164,14 +164,14 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
     let t = MacroEngine.expand("%N|%M", context: await app.macroContext()).outputs
         .compactMap { if case .text(let x) = $0 { return x } else { return nil } }.joined()
     #expect(t == "15|5")
-    try await app.setQSOField("exchangeRcvd", "4")                      // stanice poslala jinou – oprava platí
+    try await app.setQSOField("exchangeRcvd", "4")                      // the station sent a different one – the correction wins
     let r = try await app.logQSO()
     #expect(r.exchangeSent == "15" && r.exchangeRcvd == "4")
     let q1 = await app.qso
     #expect(q1.exchangeSent == "15" && q1.call.isEmpty)
 }
 
-// CQ WW RTTY (CQ/RJ) bez vyplněné výměny: moje CQ zóna z DXCC
+// CQ WW RTTY (CQ/RJ) with no exchange filled in: my CQ zone from DXCC
 @Test func cqwwFillsOwnZone() async throws {
     var s = AppSettings(); s.station.call = "OK1XOE"; s.ptt.method = .none
     s.contest = ContestSettings.preset(.cqwwRTTY, year: 2026)
@@ -182,7 +182,7 @@ func decodeTxAudio(_ samples: [Float]) async throws -> String {
                             countries: try CountryDB(text: cty))
     #expect(await app.qso.exchangeSent == "15")
     try await app.setQSOField("call", "W1AW")
-    #expect(await app.qso.exchangeRcvd == "")                       // přijatá výměna CQ/RJ nese i stát – nepředvyplňovat
+    #expect(await app.qso.exchangeRcvd == "")                       // the received CQ/RJ exchange also carries a state – do not prefill
     _ = try await app.logQSO()
     #expect(await app.qso.exchangeSent == "15")
 }

@@ -50,7 +50,7 @@ func makeEngine(ptt: PTTMethod = .rts, rig: Rig = NoRig(), txOutput: TxOutput = 
     return Rig_(engine: e, audio: audio, port: port, clock: clock, events: e.events())
 }
 
-/// Pumpuje engine s posunem hodin, dokud neplatí podmínka (max `steps` kroků).
+/// Pumps the engine with the clock advancing until the condition holds (at most `steps` steps).
 func pump(_ r: Rig_, ms: Double = 50, steps: Int = 2000, until: () async -> Bool) async {
     for _ in 0..<steps {
         if await until() { return }
@@ -59,7 +59,7 @@ func pump(_ r: Rig_, ms: Double = 50, steps: Int = 2000, until: () async -> Bool
     }
 }
 
-/// Poslední nastavená úroveň RTS (PTT).
+/// The last RTS (PTT) level that was set.
 func lastRTS(_ p: FakeSerialPort) -> Bool? {
     for e in p.events.reversed() { if case .rts(let v) = e { return v } }
     return nil
@@ -89,16 +89,16 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     #expect(r.port.events.contains(.rts(true)))
     let pttOnTime = r.clock.now()
     await r.engine.pump()
-    #expect(r.audio.writeCalls == 0)                         // před txDelay nic
+    #expect(r.audio.writeCalls == 0)                         // nothing before txDelay
     await pump(r) { await r.engine.state == .tx }
     #expect(r.clock.now() - pttOnTime >= 100_000_000)
-    await r.engine.rx()                                       // RX po dovysílání
+    await r.engine.rx()                                       // RX once the transmission finishes
     await pump(r) { await r.engine.state == .rx }
     #expect(lastRTS(r.port) == false)
-    // PTT se vypnulo až po pttTail za koncem modulace
+    // PTT went off only after pttTail past the end of the modulation
     let offEvent = r.port.timedEvents.last { $0.1 == .rts(false) }!
     #expect(offEvent.0 >= pttOnTime + 300_000_000)
-    // odvysílaný zvuk dekóduje nezávislý modem
+    // the transmitted audio is decoded by an independent modem
     let m = try RTTYModem()
     let ev = m.events
     (r.audio.tx + [Float](repeating: 0, count: 4000)).withUnsafeBufferPointer { m.processRx($0) }
@@ -147,7 +147,7 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
 @Test func failingPTTPortIsRejected() async throws {
     let r = try makeEngine()
     r.port.failOpen = true
-    try await r.engine.start()                                  // RX běží i bez PTT
+    try await r.engine.start()                                  // RX runs even without PTT
     await #expect(throws: EngineError.self) { try await r.engine.tx() }
     #expect(await r.engine.state == .rx)
     await r.engine.stop()
@@ -197,7 +197,7 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     await r.engine.rxNow(); await r.engine.rxNow()
     #expect(await r.engine.state == .rx)
     try await r.engine.tx()
-    await r.engine.stop()                                      // stop během TX
+    await r.engine.stop()                                      // stop during TX
     #expect(await r.engine.state == .stopped)
     #expect(lastRTS(r.port) == false)
 }
@@ -230,7 +230,7 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     #expect(statuses.last?.online == false)
 }
 
-/// tx() a hned rx() (typicky: odeslat řádek) musí text odvysílat celý, ne ho zahodit.
+/// tx() followed immediately by rx() (typically: send a line) must transmit the whole text, not drop it.
 @Test func rxRequestedDuringPttOnStillTransmitsQueuedText() async throws {
     let r = try makeEngine()
     try await r.engine.start()
@@ -248,7 +248,7 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     await r.engine.stop()
 }
 
-/// Review: výstup zamrzne (zařízení zmizelo) → PTT se vypne nejpozději tail + 2 s.
+/// Review: the output freezes (the device is gone) → PTT goes off no later than the tail + 2 s.
 @Test func stuckAudioOutputStillReleasesPTT() async throws {
     let r = try makeEngine()
     try await r.engine.start()
@@ -266,7 +266,7 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     #expect(sawError)
 }
 
-/// Review: selhání zvukového zařízení během TX → RX + chyba.
+/// Review: a failure of the audio device during TX → RX plus an error.
 @Test func audioFailureDuringTxAborts() async throws {
     let r = try makeEngine()
     try await r.engine.start()
@@ -280,7 +280,7 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
     await r.engine.stop()
 }
 
-/// Review: UART buffer se musí dovysílat (tcdrain) dřív, než PTT spadne; přerušení frontu zahodí.
+/// Review: the UART buffer must be flushed (tcdrain) before PTT drops; an abort discards the queue.
 @Test func uartIsDrainedBeforePTTOffAndFlushedOnAbort() async throws {
     let r = try makeEngine(txOutput: .fskUART(path: "/dev/cu.fake"))
     try await r.engine.start()
@@ -302,7 +302,7 @@ func collectText(_ events: AsyncStream<EngineEvent>, echo: Bool = false) async -
 }
 
 
-// Zastavení engine uvolní rig (sériový port CAT, spuštěný rigctld) – nový engine po Použít ho může hned otevřít
+// Stopping the engine releases the rig (the CAT serial port, a started rigctld) – a new engine can open it right after Apply
 @Test func stopDisconnectsRig() async throws {
     let rig = FakeRig()
     let r = try makeEngine(ptt: .none, rig: rig)

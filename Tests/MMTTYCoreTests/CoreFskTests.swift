@@ -20,14 +20,14 @@ func fskCodes(_ core: OpaquePointer, seconds: Double) -> [UInt8] {
     rttycore_tx_begin(core, 0)
     _ = rttycore_queue_tx(core, "RY")
     let codes = fskCodes(core, seconds: 1.5)
-    // MMTTY pořadí bitů: LTRS 0x1F, R 0x0A, Y 0x15
+    // The MMTTY bit order: LTRS 0x1F, R 0x0A, Y 0x15
     #expect(codes == [0x1F, 0x0A, 0x15])
 }
 
 @Test func diddleProducesLtrsCodes() throws {
     let core = try #require(makeCore())
     defer { rttycore_destroy(core) }
-    rttycore_tx_begin(core, 0)            // výchozí diddle LTR, začíná po 0,25 s
+    rttycore_tx_begin(core, 0)            // the default diddle is LTR, it starts after 0.25 s
     let codes = fskCodes(core, seconds: 2)
     #expect(codes.count >= 8)
     #expect(codes.allSatisfy { $0 == 0x1F })

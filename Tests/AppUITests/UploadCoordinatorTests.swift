@@ -74,7 +74,7 @@ private func secrets() throws -> UploadMemoryStore {
     let (log, _) = try await makeLog()
     let c = UploadCoordinator(http: FakeHTTP(200, "OK"), runner: FakeRunner(status: 0), secrets: UploadMemoryStore())
     await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.eqsl, settings: settings { $0.upload.eqslEnabled = false }, log: log) }
-    await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.eqsl, settings: settings { _ in }, log: log) }   // bez hesla
+    await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.eqsl, settings: settings { _ in }, log: log) }   // without a password
     await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.clublog, settings: settings { _ in }, log: log) }
 }
 

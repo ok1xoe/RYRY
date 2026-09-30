@@ -4,7 +4,7 @@ import Foundation
 import Testing
 @testable import Updates
 
-// MARK: pomůcky
+// MARK: helpers
 
 final class MockNetwork: UpdateNetwork, @unchecked Sendable {
     private let lock = NSLock()
@@ -48,7 +48,7 @@ func checker(_ net: MockNetwork, url: String? = feed, current: AppVersion = v("0
     UpdateChecker(feedURL: url, network: net, defaults: defaults, current: current, systemVersion: os, now: now)
 }
 
-// MARK: verze
+// MARK: versions
 
 @Test func versionParsing() {
     #expect(AppVersion("v0.13.0")?.description == "0.13.0")
@@ -62,21 +62,21 @@ func checker(_ net: MockNetwork, url: String? = feed, current: AppVersion = v("0
 
 @Test func versionComparison() {
     #expect(v("0.13.0").isNewer(than: v("0.12.9")))
-    #expect(v("0.10.0").isNewer(than: v("0.9.0")))            // číselně, ne textově
+    #expect(v("0.10.0").isNewer(than: v("0.9.0")))            // numerically, not as text
     #expect(v("1.0.0").isNewer(than: v("0.99.99")))
     #expect(!v("0.12.0").isNewer(than: v("0.12.0")))
     #expect(!v("0.11.0").isNewer(than: v("0.12.0")))
-    #expect(v("1.0.0").isNewer(than: v("1.0.0-rc.1")))         // vydání > předvydání
+    #expect(v("1.0.0").isNewer(than: v("1.0.0-rc.1")))         // a release > a pre-release
     #expect(v("1.0.0-rc.2").isNewer(than: v("1.0.0-rc.1")))
     #expect(v("1.0.0-rc.10").isNewer(than: v("1.0.0-rc.9")))
-    #expect(v("0.12.0", 101).isNewer(than: v("0.12.0", 100)))  // stejná verze, vyšší build
+    #expect(v("0.12.0", 101).isNewer(than: v("0.12.0", 100)))  // the same version, a higher build
     #expect(!v("0.12.0", 100).isNewer(than: v("0.12.0", 100)))
     #expect(!v("0.12.0", 99).isNewer(than: v("0.12.0", 100)))
-    #expect(!v("0.12.0").isNewer(than: v("0.12.0", 100)))       // build neznámý = beze změny
-    #expect(v("0.13.0", 1).isNewer(than: v("0.12.0", 500)))     // semver má přednost před buildem
+    #expect(!v("0.12.0").isNewer(than: v("0.12.0", 100)))       // an unknown build = no change
+    #expect(v("0.13.0", 1).isNewer(than: v("0.12.0", 500)))     // semver takes precedence over the build
 }
 
-// MARK: formáty
+// MARK: formats
 
 @Test func appcastParsing() throws {
     let i = try UpdateFeed.parse(Data(appcast.utf8), feedURL: URL(string: feed)!)
@@ -86,7 +86,7 @@ func checker(_ net: MockNetwork, url: String? = feed, current: AppVersion = v("0
     #expect(i.sha256 == String(repeating: "ab", count: 32))
     #expect(i.notes(for: "cs") == "Nové věci")
     #expect(i.notes(for: "en") == "New things")
-    #expect(i.notes(for: "de") == "New things")   // jiný jazyk → angličtina
+    #expect(i.notes(for: "de") == "New things")   // another language → English
 }
 
 @Test func githubParsing() throws {
@@ -117,7 +117,7 @@ func checker(_ net: MockNetwork, url: String? = feed, current: AppVersion = v("0
     #expect(throws: UpdateError.self) { try UpdateFeed.parse(Data(json.utf8), feedURL: URL(string: feed)!) }
 }
 
-// MARK: kontrola
+// MARK: checking
 
 @Test func emptyFeedURLDisablesAndDoesNoNetwork() async {
     let n = MockNetwork(appcast)
@@ -134,8 +134,8 @@ func checker(_ net: MockNetwork, url: String? = feed, current: AppVersion = v("0
 
 @Test func olderAndSameVersionAreUpToDate() async {
     let n = MockNetwork(appcast)
-    #expect(await checker(n, current: v("0.13.0", 150)).check(manual: true) == .upToDate)   // stejná
-    #expect(await checker(n, current: v("0.14.0", 1)).check(manual: true) == .upToDate)     // novější než feed
+    #expect(await checker(n, current: v("0.13.0", 150)).check(manual: true) == .upToDate)   // the same
+    #expect(await checker(n, current: v("0.14.0", 1)).check(manual: true) == .upToDate)     // newer than the feed
     guard case .available = await checker(n, current: v("0.13.0", 149)).check(manual: true) else {
         Issue.record("nižší build má být novinka"); return
     }
@@ -185,12 +185,12 @@ final class Box: @unchecked Sendable {
     let c = checker(n, defaults: d)
     guard case .available(let i) = await c.check(manual: true) else { Issue.record("available"); return }
     c.skip(i)
-    let c2 = checker(n, defaults: d)   // nová instance, stejné UserDefaults
+    let c2 = checker(n, defaults: d)   // a new instance, the same UserDefaults
     #expect(await c2.check(manual: true) != .skippedByLimit)
     d.removeObject(forKey: UpdateChecker.lastCheckKey)
     guard case .skippedVersion = await c2.check(manual: false) else { Issue.record("auto má přeskočit"); return }
     guard case .available = await c2.check(manual: true) else { Issue.record("ruční ukáže i přeskočenou"); return }
-    // ještě novější verze přeskočení neplatí
+    // for an even newer version the skip does not apply
     n.body = Data(appcast.replacingOccurrences(of: "0.13.0", with: "0.14.0").utf8)
     d.removeObject(forKey: UpdateChecker.lastCheckKey)
     guard case .available = await c2.check(manual: false) else { Issue.record("novější než přeskočená"); return }
@@ -202,7 +202,7 @@ final class Box: @unchecked Sendable {
     #expect(await checker(n, os: OperatingSystemVersion(majorVersion: 15, minorVersion: 0, patchVersion: 0)).check(manual: true) != .upToDate)
 }
 
-// MARK: stažení
+// MARK: download
 
 private func tmpDir() -> URL {
     let d = FileManager.default.temporaryDirectory.appendingPathComponent("upd-\(UUID().uuidString)")
@@ -218,11 +218,11 @@ private func tmpDir() -> URL {
     let f = try await UpdateChecker.download(info, to: dir, network: n)
     #expect(f.lastPathComponent == "mmtty4mac-0.13.0.dmg")
     #expect(try Data(contentsOf: f) == n.fileContent)
-    let f2 = try await UpdateChecker.download(info, to: dir, network: n)      // nepřepíše
+    let f2 = try await UpdateChecker.download(info, to: dir, network: n)      // does not overwrite
     #expect(f2.lastPathComponent == "mmtty4mac-0.13.0 (1).dmg")
     info.sha256 = String(repeating: "00", count: 32)
     await #expect(throws: UpdateError.checksumMismatch) { try await UpdateChecker.download(info, to: dir, network: n) }
-    #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).count == 2)   // vadný soubor se nezachová
+    #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).count == 2)   // a bad file is not kept
     info.sha256 = nil
-    _ = try await UpdateChecker.download(info, to: dir, network: n)                      // bez sha256 se neověřuje
+    _ = try await UpdateChecker.download(info, to: dir, network: n)                      // without a sha256 nothing is verified
 }

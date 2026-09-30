@@ -34,7 +34,7 @@ func spotModel(rig: Rig, configure: (inout AppSettings) -> Void = { _ in }) -> A
     s.station.call = "OK1XOE"
     s.log.directory = dir.appendingPathComponent("log").path
     s.api.fldigiPort = 0; s.api.jsonRPCPort = 0
-    s.rig.type = .flrig                       // „rig nastaven“; skutečného řídí továrna enginu
+    s.rig.type = .flrig                       // "a rig is configured"; the real one is decided by the engine factory
     configure(&s)
     try? SettingsStore(directory: dir).save(s)
     let audio = FakeAudioBackend(), clock = ManualClock()
@@ -53,7 +53,7 @@ let spot = Spot(frequencyKHz: 14080.0, call: "DL1ABC", spotter: "W3LPL-#", comme
     let m = spotModel(rig: rig) { $0.spots.offsetHz = 2125 }
     await m.start()
     await m.useSpot(spot)
-    #expect(rig.freqs == [14_082_125])                       // kHz → Hz + posun
+    #expect(rig.freqs == [14_082_125])                       // kHz → Hz + the offset
     #expect(m.qso.call == "DL1ABC")
     await m.stop()
 }
@@ -74,12 +74,12 @@ let spot = Spot(frequencyKHz: 14080.0, call: "DL1ABC", spotter: "W3LPL-#", comme
     await m.useSpot(spot)
     #expect(rig.freqs.isEmpty)
     #expect(m.qso.call == "DL1ABC")
-    #expect(m.messages.isEmpty)                              // bez rigu žádná chyba
+    #expect(m.messages.isEmpty)                              // no error without a rig
     await m.stop()
 }
 
 @Test @MainActor func rigFailureStillFillsCall() async throws {
-    let m = spotModel(rig: NoRig())                          // rig nastaven, ale odpojen → chyba nastavení
+    let m = spotModel(rig: NoRig())                          // a rig configured but disconnected → a settings error
     await m.start()
     await m.useSpot(spot)
     #expect(m.qso.call == "DL1ABC")
@@ -89,7 +89,7 @@ let spot = Spot(frequencyKHz: 14080.0, call: "DL1ABC", spotter: "W3LPL-#", comme
 
 @Test @MainActor func spotFeedConfigFollowsSettings() async throws {
     let m = spotModel(rig: NoRig())
-    #expect(m.spotFeedConfig() == nil)                       // výchozí: vše vypnuto, žádná síť
+    #expect(m.spotFeedConfig() == nil)                       // default: everything off, no networking
     let m2 = spotModel(rig: NoRig()) {
         $0.spots.clusterEnabled = true; $0.spots.clusterHost = "dxfun.com"; $0.spots.clusterPort = 8000
         $0.spots.clusterCommands = ["sh/dx 30"]; $0.spots.rbnEnabled = true; $0.spots.maxAgeMinutes = 45

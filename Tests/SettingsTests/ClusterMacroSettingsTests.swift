@@ -15,7 +15,7 @@ import Testing
     s.spots.clusterMacros[2] = Macro(name: "Moje", text: "sh/dx 5\nsh/wwv", color: "#FF0000")
     try SettingsStore(directory: dir).save(s)
     #expect(SettingsStore(directory: dir).load().0 == s)
-    // chybějící klíč = výchozí; krátký seznam se doplní na 10; dlouhý se ořízne; vadná položka se nahradí prázdnou
+    // a missing key = the default; a short list is padded to 10; a long one is trimmed; a broken item is replaced with an empty one
     let d = JSONDecoder()
     #expect(try d.decode(SpotSettings.self, from: Data("{}".utf8)).clusterMacros == SpotSettings.defaultClusterMacros)
     let short = try d.decode(SpotSettings.self, from: Data(#"{"clusterMacros":[{"name":"A","text":"sh/dx"}]}"#.utf8)).clusterMacros
@@ -28,10 +28,10 @@ import Testing
     #expect(notArray.count == 10)
 }
 
-// Starší výchozí české názvy (Slunce, Uživatelé) se při načtení nahradí jazykově neutrálními; upravené zůstanou.
+// The older Czech default names are replaced with language-neutral ones on load; edited ones are kept.
 @Test func oldCzechDefaultClusterMacroNamesMigrate() throws {
     let json = #"{"clusterMacros":[{"name":"Slunce","text":"sh/sun"},{"name":"Uživatelé","text":"sh/users"},{"name":"Slunce","text":"sh/sun 5"}]}"#
     let m = try JSONDecoder().decode(SpotSettings.self, from: Data(json.utf8)).clusterMacros
     #expect(m[0] == Macro(name: "SUN", text: "sh/sun") && m[1] == Macro(name: "USERS", text: "sh/users"))
-    #expect(m[2].name == "Slunce")                                       // jiný text = uživatelovo makro
+    #expect(m[2].name == "Slunce")                                       // a different text = the user's own macro
 }

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Spots
 
-// Výpis `sh/dx` (DXSpider, AR-Cluster, CC Cluster): řádky se skutečným datem a časem a spotterem v <…>.
+// The `sh/dx` listing (DXSpider, AR-Cluster, CC Cluster): lines with a real date and time and the spotter in <…>.
 
 private func utc(_ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int) -> Date {
     var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!
@@ -19,35 +19,35 @@ private func utc(_ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int) -> Date {
 
 @Test func parsesARAndCCClusterVariants() throws {
     let now = utc(2026, 9, 30, 7, 20)
-    // AR-Cluster: jedna mezera, skimmer spotter s „-#“
+    // AR-Cluster: a single space, a skimmer spotter with "-#"
     let ar = try #require(SpotParser.parse("14083.5 DL1ABC 30-Sep-2026 0655Z 22 dB 45 BPS CQ <W3LPL-#>", now: now))
     #expect(ar.call == "DL1ABC" && ar.spotter == "W3LPL-#" && ar.time == utc(2026, 9, 30, 6, 55))
-    #expect(ar.mode == "RTTY" && ar.snr == 22)                                  // RTTY segment, SNR z komentáře
-    // CC Cluster: rok dvouciferně, za spotterem lokátor
+    #expect(ar.mode == "RTTY" && ar.snr == 22)                                  // an RTTY segment, the SNR from the comment
+    // CC Cluster: a two-digit year, the locator after the spotter
     let cc = try #require(SpotParser.parse(" 7033.0  UA3XYZ  30-Sep-26 0610Z  CW 599  <DK9IP>  JO40", now: now))
     #expect(cc.call == "UA3XYZ" && cc.spotter == "DK9IP" && cc.mode == "CW" && cc.time == utc(2026, 9, 30, 6, 10))
-    // datum bez roku (přes Nový rok = loňský rok)
+    // a date with no year (across New Year = last year)
     let ny = try #require(SpotParser.parse("14085.0 K1ABC 31-Dec 2350Z RTTY <W1AW>", now: utc(2027, 1, 1, 0, 10)))
     #expect(ny.time == utc(2026, 12, 31, 23, 50))
-    // prázdný komentář
+    // an empty comment
     let bare = try #require(SpotParser.parse("21080.0 VK2ABC 30-Sep-2026 0700Z <ZL1AA>", now: now))
     #expect(bare.comment.isEmpty && bare.mode == "RTTY")
 }
 
 @Test func listingNeedsFullPatternAndClusterSource() {
     let now = utc(2026, 9, 30, 7, 20)
-    // RBN výpisy nepřijímá (jen DX cluster)
+    // RBN listings are not accepted (a DX cluster only)
     #expect(SpotParser.parse("14080.0 JA1ABC 30-Sep-2026 0701Z RTTY <OK1XOE>", now: now, source: .rbn) == nil)
     for junk in [
-        "14080.0 JA1ABC 30-Sep-2026 0701Z RTTY",                 // bez <spottera>
-        "14080.0 JA1ABC 0701Z RTTY <OK1XOE>",                    // bez data
-        "14080.0 JA1ABC 30-Sep-2026 RTTY <OK1XOE>",              // bez času
-        "14080.0 JA1ABC 31-Feb-2026 0701Z RTTY <OK1XOE>",        // neplatné datum
-        "JA1ABC 14080.0 30-Sep-2026 0701Z RTTY <OK1XOE>",        // prohozené pořadí
+        "14080.0 JA1ABC 30-Sep-2026 0701Z RTTY",                 // without <spotter>
+        "14080.0 JA1ABC 0701Z RTTY <OK1XOE>",                    // without a date
+        "14080.0 JA1ABC 30-Sep-2026 RTTY <OK1XOE>",              // no time
+        "14080.0 JA1ABC 31-Feb-2026 0701Z RTTY <OK1XOE>",        // an invalid date
+        "JA1ABC 14080.0 30-Sep-2026 0701Z RTTY <OK1XOE>",        // the order swapped
         "sh/dx 30",
         "Date Hour   SFI   A   K Forecast",
         "30-Sep-2026 0700Z dxspider >",
-        "14080.0 RTTY 30-Sep-2026 0701Z cq <OK1XOE>",            // RTTY není značka
+        "14080.0 RTTY 30-Sep-2026 0701Z cq <OK1XOE>",            // RTTY is not a call
     ] {
         #expect(SpotParser.parse(junk, now: now) == nil, "\(junk)")
     }
@@ -62,7 +62,7 @@ private func utc(_ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int) -> Date {
     let reply = [
         "  14080.0  JA1ABC      \(fresh)  RTTY cq                  <OK1XOE>",
         "   7040.0  PY2ABC      \(fresh)  CW                       <PY1XX>",
-        "  21080.0  VK2ABC      \(old)  RTTY                     <ZL1AA>",       // starší než maxAge
+        "  21080.0  VK2ABC      \(old)  RTTY                     <ZL1AA>",       // older than maxAge
         "sh/dx: 3 spots",
     ]
     let cluster = try FakeCluster(spots: [], responses: ["sh/dx 3": reply])

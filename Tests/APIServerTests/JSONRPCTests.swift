@@ -7,7 +7,7 @@ import RTTYSignalKit
 final class WSClient: @unchecked Sendable {
     let task: URLSessionWebSocketTask
     private var nextId = 1
-    private var pending: [[String: Any]] = []          // přijaté, ještě nezpracované zprávy
+    private var pending: [[String: Any]] = []          // received messages not processed yet
     init(port: UInt16) {
         task = URLSession.shared.webSocketTask(with: URL(string: "ws://127.0.0.1:\(port)/v1")!)
         task.resume()
@@ -24,7 +24,7 @@ final class WSClient: @unchecked Sendable {
               let o = try JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] else { return [:] }
         return o
     }
-    /// Zavolá metodu a vrátí odpověď (notifikace mezitím uloží).
+    /// Calls a method and returns the response (notifications arriving meanwhile are stored).
     func call(_ method: String, _ params: [String: Any] = [:]) async throws -> [String: Any] {
         let id = nextId; nextId += 1
         let req: [String: Any] = ["jsonrpc": "2.0", "id": id, "method": method, "params": params]
@@ -113,10 +113,10 @@ func jsonServer(_ h: APIHarness, maxQueue: Int = 1000) async throws -> (JSONRPCS
     await h.app.stop()
 }
 
-// Review Focus 2: klient, jehož odesílání se nestíhá dokončovat, se po překročení fronty odpojí
+// Review Focus 2: a client that cannot keep up with sending is disconnected once the queue overflows
 final class StuckSink: WSSink, @unchecked Sendable {
     var sent = 0, closed = false
-    func send(_ text: String, completion: @escaping @Sendable (Error?) -> Void) { sent += 1 }   // nikdy nedokončí
+    func send(_ text: String, completion: @escaping @Sendable (Error?) -> Void) { sent += 1 }   // never finishes
     func close() { closed = true }
 }
 
@@ -159,7 +159,7 @@ final class StuckSink: WSSink, @unchecked Sendable {
     await h.app.stop()
 }
 
-/// Požadavky jednoho klienta se zpracují v pořadí (qso.setField musí proběhnout před macro.run).
+/// Requests from one client are processed in order (qso.setField must run before macro.run).
 @Test func requestsFromOneClientAreProcessedInOrder() async throws {
     let h = try await makeAPIHarness()
     let (srv, port) = try await jsonServer(h)

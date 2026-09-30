@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Spots
 
-// Review plan18: kontrola řádků pro cluster, spot bez značky/kmitočtu, připravenost příkazů až po přihlášení.
+// Review plan18: checking the lines for the cluster, a spot with no call/frequency, commands ready only after the login.
 
 @Test func clusterCommandRejectsC1AndUnicodeLineSeparators() throws {
     for bad in ["sh/dx\u{85}30", "sh/dx\u{80}", "sh/dx\u{9F}", "sh/dx\u{2028}set/skimmer", "sh/dx\u{2029}"] {
@@ -12,18 +12,18 @@ import Testing
 }
 
 @Test func dxSpotCommandNeedsCallAndFrequency() throws {
-    #expect(throws: ClusterCommandError.incompleteSpot) { try ClusterCommand.validate("dx 14085.0 RTTY") }     // %c prázdné
-    #expect(throws: ClusterCommandError.incompleteSpot) { try ClusterCommand.validate("dx  DL1ABC RTTY") }    // %k prázdné
+    #expect(throws: ClusterCommandError.incompleteSpot) { try ClusterCommand.validate("dx 14085.0 RTTY") }     // %c empty
+    #expect(throws: ClusterCommandError.incompleteSpot) { try ClusterCommand.validate("dx  DL1ABC RTTY") }    // %k empty
     #expect(throws: ClusterCommandError.incompleteSpot) { try ClusterCommand.validate("DX 14085") }
     #expect(try ClusterCommand.validate("DX 14085.0 DL1ABC RTTY") == "DX 14085.0 DL1ABC RTTY")
     #expect(try ClusterCommand.validate("dx DL1ABC 14085") == "dx DL1ABC 14085")
-    #expect(try ClusterCommand.validate("dxstat") == "dxstat")                           // jiný příkaz
+    #expect(try ClusterCommand.validate("dxstat") == "dxstat")                           // a different command
     #expect(try ClusterCommand.validate("sh/dx 30") == "sh/dx 30")
 }
 
-/// Cluster bez výzvy k přihlášení: posílá jen uvítání (nebo nic).
+/// A cluster with no login prompt: it only sends a greeting (or nothing).
 @Test @MainActor func commandsReadyOnlyAfterLoginOrGreetingWithoutPrompt() async throws {
-    // server nepošle nic kromě telnetového vyjednávání: TCP je připojené, ale příkazy se ještě posílat nesmí
+    // the server sends nothing except the telnet negotiation: TCP is connected, but commands must not be sent yet
     let silent = try FakeCluster(prompt: "", spots: [])
     await silent.start()
     defer { silent.stop() }
@@ -39,7 +39,7 @@ import Testing
     await #expect(throws: ClusterCommandError.notConnected) { try await feed.sendClusterCommand("sh/dx") }
     feed.stop()
 
-    // uvítání bez výzvy: po uplynutí čekání na výzvu lze posílat (bez přihlášení)
+    // a greeting with no prompt: once the wait for the prompt has elapsed, sending is allowed (without a login)
     let greet = try FakeCluster(prompt: "Welcome to the cluster\r\n", spots: [])
     await greet.start()
     defer { greet.stop() }
@@ -49,7 +49,7 @@ import Testing
     #expect(await waitUntil { await MainActor.run { feed.clusterCommandsReady } })
     try await feed.sendClusterCommand("sh/wwv")
     #expect(await waitUntil { greet.received.contains("sh/wwv") })
-    #expect(greet.received.first == "sh/wwv")                     // přihlášení se neposlalo
+    #expect(greet.received.first == "sh/wwv")                     // the login was not sent
 }
 
 @Test @MainActor func commandsReadyAfterLoginAndResetOnStop() async throws {
@@ -66,7 +66,7 @@ import Testing
     #expect(!feed.clusterCommandsReady)
 }
 
-// Filtr módů = jen filtr zobrazení: CW spot se uloží i při zapnutém filtru, po zaškrtnutí CW je hned vidět.
+// The mode filter is only a display filter: a CW spot is stored even with the filter on, and it is visible as soon as CW is checked.
 @Test @MainActor func modeFilterIsDisplayFilterOnly() async throws {
     let cluster = try FakeCluster(spots: sampleLines())
     await cluster.start()
@@ -78,10 +78,10 @@ import Testing
     feed.start(cfg)
     defer { feed.stop() }
     #expect(await waitUntil { await MainActor.run { feed.book.count >= 3 } })
-    #expect(feed.book.byID.values.contains { $0.call == "UA3XYZ" && $0.mode == "CW" })     // uložen
-    #expect(!feed.visible.contains { $0.call == "UA3XYZ" })                                  // skrytý
+    #expect(feed.book.byID.values.contains { $0.call == "UA3XYZ" && $0.mode == "CW" })     // stored
+    #expect(!feed.visible.contains { $0.call == "UA3XYZ" })                                  // hidden
     let starts = feed.starts
     feed.filter.modes = SpotFilter.allModes
     #expect(feed.visible.contains { $0.call == "UA3XYZ" })
-    #expect(feed.starts == starts && cluster.connections == 1)                               // bez nového připojení
+    #expect(feed.starts == starts && cluster.connections == 1)                               // without a new connection
 }

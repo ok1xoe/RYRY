@@ -13,15 +13,15 @@ import Testing
 }
 
 @Test func rttyModeUsesCurrentMark() {
-    // RTTY/FSK: rig hlásí dial ≈ mark → spot na dialu leží na aktuálním marku, níž na RF = výš v audiu
+    // RTTY/FSK: the rig reports the dial ≈ mark → a spot on the dial sits at the current mark, lower in RF = higher in audio
     #expect(BandMap.audioOffset(spotHz: 14_080_000, dialHz: 14_080_000, mode: "RTTY", offsetHz: 0, markHz: 2125) == 2125)
     #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "RTTY", offsetHz: 0, markHz: 2125) == 2625)
     #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "FSK", offsetHz: 0, markHz: 1275) == 1775)
     #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "RTTY", offsetHz: 170, markHz: 2125) == 2625)
-    // RTTYR / FSK-R: obrácené znaménko
+    // RTTYR / FSK-R: the sign is reversed
     #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "RTTYR", offsetHz: 0, markHz: 2125) == 1625)
     #expect(BandMap.audioOffset(spotHz: 14_079_500, dialHz: 14_080_000, mode: "FSK-R", offsetHz: 0, markHz: 2125) == 1625)
-    // bez známého marku v RTTY nic
+    // nothing in RTTY without a known mark
     #expect(BandMap.audioOffset(spotHz: 14_080_000, dialHz: 14_080_000, mode: "RTTY", offsetHz: 0) == nil)
 }
 
@@ -35,7 +35,7 @@ import Testing
 }
 
 @Test func offsetIsConsistentWithDoubleClick() {
-    // useSpot: rig = spot + offset → značka na tónu daném posunem (LSB +2125, USB −2125)
+    // useSpot: rig = spot + offset → the call lands on the tone given by the offset (LSB +2125, USB −2125)
     let spot = 14_080_000.0
     #expect(BandMap.audioOffset(spotHz: spot, dialHz: spot + 2125, mode: "LSB", offsetHz: 2125) == 2125)
     #expect(BandMap.audioOffset(spotHz: spot, dialHz: spot - 2125, mode: "USB", offsetHz: -2125) == 2125)

@@ -1,22 +1,22 @@
-# Java klient mmtty4mac (JSON-RPC 2.0 / WebSocket)
+# mmtty4mac Java client (JSON-RPC 2.0 / WebSocket)
 
-Klient pro napojení loggeru v Javě nebo Kotlinu, například MacContestLogger, na mmtty4mac.
-Potřebuje jen **JDK 21**, žádné další závislosti nemá.
+A client for connecting a logger written in Java or Kotlin, for example MacContestLogger, to mmtty4mac.
+All it needs is **JDK 21**; it has no other dependencies.
 
-| Soubor | Obsah |
+| File | Contents |
 |---|---|
-| `Mmtty4macClient.java` | připojení, volání metod (blokující, s časovým limitem) a notifikace |
-| `Json.java` | minimální JSON |
-| `Example.java` | ukázka: příjem textu, QSO okno, DXCC |
-| `SelfTest.java` | test JSON a volitelně i proti běžícímu mmtty4mac |
+| `Mmtty4macClient.java` | connecting, calling methods (blocking, with a timeout) and notifications |
+| `Json.java` | minimal JSON |
+| `Example.java` | example: receiving text, QSO window, DXCC |
+| `SelfTest.java` | tests JSON and, optionally, a running mmtty4mac as well |
 
 ```bash
 ./build-jar.sh                                  # → mmtty4mac-client.jar
-./run-selftest.sh                               # jen JSON
-./run-selftest.sh ws://127.0.0.1:7363/v1        # proti běžící aplikaci / rtty-tool live
+./run-selftest.sh                               # JSON only
+./run-selftest.sh ws://127.0.0.1:7363/v1        # against a running app / rtty-tool live
 ```
 
-## Použití
+## Usage
 
 ```java
 try (var c = Mmtty4macClient.connect()) {              // ws://127.0.0.1:7363/v1
@@ -25,37 +25,37 @@ try (var c = Mmtty4macClient.connect()) {              // ws://127.0.0.1:7363/v1
         if (method.equals("qso.logged")) System.out.println("QSO " + p.get("call"));
     });
     c.subscribe("rx.char", "qso.logged", "engine.state");
-    c.setQsoField("call", "DL1ABC");       // značka z loggeru do QSO okna (makra %c)
-    c.runMacro(0);                         // F1 v mmtty4mac
-    c.rxNow();                             // okamžitě RX
+    c.setQsoField("call", "DL1ABC");       // call from the logger into the QSO window (the %c macro)
+    c.runMacro(0);                         // F1 in mmtty4mac
+    c.rxNow();                             // RX immediately
 }
 ```
 
-Metody odpovídají `docs/api.md`. Chyba API vyhodí `Mmtty4macClient.RpcException` s kódem:
+The methods mirror `docs/api.md`. An API error throws `Mmtty4macClient.RpcException` with a code:
 
-| Kód | Význam |
+| Code | Meaning |
 |---|---|
-| −32001 | TX odmítnuto |
-| −32002 | chyba rigu |
-| −32602 | špatné parametry |
+| −32001 | TX rejected |
+| −32002 | rig error |
+| −32602 | bad parameters |
 
-**Notifikace** chodí z vlákna WebSocketu. V Compose je předejte do UI vlákna, například do `MutableStateFlow`.
+**Notifications** arrive from the WebSocket thread. In Compose, hand them over to the UI thread, for example into a `MutableStateFlow`.
 
-## Napojení MacContestLoggeru (návrh)
+## Connecting MacContestLogger (a proposal)
 
-Doporučený způsob: **logger je hlavní, mmtty4mac je modem.**
+The recommended approach: **the logger is in charge, mmtty4mac is the modem.**
 
-1. Připojení při zapnutí módu RTTY:
+1. Connect when RTTY mode is switched on:
    - `Mmtty4macClient.connect()`,
    - `subscribe("rx.char", "engine.state", "qso.changed")`.
-2. **Entry okno → mmtty4mac.** Při změně značky nebo výměny volejte `setQsoField("call", …)`, případně `serialSent` nebo `exchangeSent`. Makra mmtty4mac (`%c`, `%N`…) pak posílají údaje z loggeru.
-3. **Funkční klávesy loggeru:**
-   - `runMacro(i)`, nebo rovnou `send("… text …")` a `tx()` s textem zprávy z konfigurace závodu;
-   - `rx()` = RX po dovysílání, `rxNow()` = Esc.
-4. **Příjem:**
-   - okno RX v loggeru z `rx.char` (`echo=true` je vlastní vysílání);
-   - klik na slovo v loggeru → pole Entry.
-5. **Log vede logger.** mmtty4mac jen modemuje a `qso.log` se nevolá. Kdo chce mít log i v mmtty4mac, zavolá po zalogování v loggeru `logQso()`.
-6. **Rig:** když CAT ovládá logger přes vlastní rigctld, nastavte v mmtty4mac rig na „žádný“ a PTT na VOX/RTS, nebo sdílejte rigctld. mmtty4mac umí hamlib i flrig.
+2. **Entry window → mmtty4mac.** Whenever the call or the exchange changes, call `setQsoField("call", …)`, and `serialSent` or `exchangeSent` if needed. The mmtty4mac macros (`%c`, `%N`…) then send the data coming from the logger.
+3. **The logger's function keys:**
+   - `runMacro(i)`, or `send("… text …")` plus `tx()` directly with the message text from the contest configuration;
+   - `rx()` = RX once the transmission finishes, `rxNow()` = Esc.
+4. **Receiving:**
+   - the logger's RX window fed from `rx.char` (`echo=true` is our own transmission);
+   - clicking a word in the logger → the Entry field.
+5. **The logger keeps the log.** mmtty4mac only acts as a modem and `qso.log` is not called. If you want the log in mmtty4mac as well, call `logQso()` after logging the QSO in the logger.
+6. **Rig:** when CAT is controlled by the logger through its own rigctld, set the rig in mmtty4mac to "none" and PTT to VOX/RTS, or share the rigctld. mmtty4mac supports both hamlib and flrig.
 
-Alternativa bez klienta: loggery, které umí fldigi (RUMlogNG, MacLoggerDX…), se připojí přes fldigi XML-RPC `http://127.0.0.1:7362/RPC2`.
+An alternative without this client: loggers that speak fldigi (RUMlogNG, MacLoggerDX…) connect through the fldigi XML-RPC endpoint `http://127.0.0.1:7362/RPC2`.

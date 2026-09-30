@@ -5,7 +5,7 @@ import Testing
 
 private let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
-/// Klíče L("…") ve zdrojích (stejný regex jako scripts/i18n-extract.py).
+/// The L("…") keys in the sources (the same regex as scripts/i18n-extract.py).
 private func sourceKeys() throws -> Set<String> {
     let re = try NSRegularExpression(pattern: #"\bL\("((?:[^"\\]|\\.)*)""#)
     var out = Set<String>()
@@ -20,7 +20,7 @@ private func sourceKeys() throws -> Set<String> {
     return out
 }
 
-// Přibalená angličtina pokrývá všechny texty rozhraní a zástupné znaky sedí
+// The bundled English covers all the interface texts and the placeholders match
 @Test func englishCatalogIsComplete() throws {
     let keys = try sourceKeys()
     #expect(keys.count > 100)
@@ -35,7 +35,7 @@ private func sourceKeys() throws -> Set<String> {
 }
 
 
-// Přibalená čeština obsahuje všechny texty rozhraní
+// The bundled Czech contains all the interface texts
 @Test func czechCatalogIsComplete() throws {
     let keys = try sourceKeys()
     let cs = try LanguagePack.decode(Data(contentsOf: root.appendingPathComponent("Resources/Languages/cs.json")))

@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Test klienta: bez argumentu jen JSON, s URI i proti běžícímu mmtty4mac (rtty-tool live / aplikace). */
+/** Client test: with no argument JSON only, with a URI also against a running mmtty4mac (rtty-tool live / the app). */
 public final class SelfTest {
     static int failures = 0;
     static void check(boolean ok, String what) {

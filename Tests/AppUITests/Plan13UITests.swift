@@ -7,16 +7,16 @@ import ModemKit
 import Settings
 @testable import AppUI
 
-// Zalamování psaného textu na sloupci (MMTTY „Word wrap on keyboard“)
+// Word wrapping of typed text at a column (MMTTY "Word wrap on keyboard")
 @Test func txWrap() {
     #expect(TxWrap.wrap("CQ CQ DE OK1XOE", column: 0) == "CQ CQ DE OK1XOE")
     #expect(TxWrap.wrap("CQ CQ DE OK1XOE", column: 10) == "CQ CQ DE\nOK1XOE")
-    #expect(TxWrap.wrap("ABCDEFGHIJKLMN", column: 10) == "ABCDEFGHIJ\nKLMN")          // bez mezery = tvrdý zlom
+    #expect(TxWrap.wrap("ABCDEFGHIJKLMN", column: 10) == "ABCDEFGHIJ\nKLMN")          // no space = a hard break
     #expect(TxWrap.wrap("AB CD\nEF GH IJ KL MN", column: 8) == "AB CD\nEF GH IJ\nKL MN")
-    #expect(TxWrap.wrap("0123456789", column: 10) == "0123456789")                    // přesně na sloupci – beze změny
+    #expect(TxWrap.wrap("0123456789", column: 10) == "0123456789")                    // exactly at the column – unchanged
 }
 
-// Palety vodopádu: šedá má R = G = B; každá paleta je od tmavé po světlou
+// Waterfall palettes: grey has R = G = B; every palette runs from dark to light
 @Test func waterfallPalettes() {
     for p in WaterfallPalette.allCases {
         let lo = WaterfallRenderer.color(0, p), hi = WaterfallRenderer.color(1, p)
@@ -27,7 +27,7 @@ import Settings
     #expect(g & 0xFF == (g >> 8) & 0xFF && g & 0xFF == (g >> 16) & 0xFF)
 }
 
-// Odezva FFT: pomalá doznívá déle než rychlá
+// FFT response: the slow one decays longer than the fast one
 @Test func fftResponseDecay() {
     func afterDrop(_ r: FFTResponse) -> Float {
         var w = WaterfallRenderer(width: 10, height: 2); w.autoGain = false; w.decay = r.decay
@@ -38,7 +38,7 @@ import Settings
     #expect(afterDrop(.slow) > afterDrop(.normal) && afterDrop(.normal) > afterDrop(.fast))
 }
 
-// Automatické CR LF při TX tlačítkem (MMTTY „Auto send CR/LF with TX button“)
+// Automatic CR LF with the TX button (MMTTY "Auto send CR/LF with TX button")
 @Test @MainActor func autoCRLFOnTx() async throws {
     let f = Fixture()
     f.configure = { $0.txWindow.autoCRLF = true; $0.ptt.method = .none }
@@ -48,10 +48,10 @@ import Settings
     await f.model.stop()
 }
 
-// Review (odloženo): zalamování počítá i text odvysílaný od posledního konce řádku
+// Review (deferred): wrapping also counts the text transmitted since the last line end
 @Test func txWrapWithSentPrefix() {
     #expect(TxWrap.wrap("DE OK1XOE", column: 10, startColumn: 6) == "DE\nOK1XOE")
-    #expect(TxWrap.wrap("AB", column: 10, startColumn: 9) == "\nAB")               // na konci řádku zlom před slovem
+    #expect(TxWrap.wrap("AB", column: 10, startColumn: 9) == "\nAB")               // at the end of the line the break comes before the word
     #expect(TxWrap.wrap("CQ CQ", column: 10, startColumn: 0) == "CQ CQ")
     #expect(TxWrap.column(afterSending: "CQ CQ\r\nDE OK1") == 6 && TxWrap.column(afterSending: "XY", from: 3) == 5)
 }

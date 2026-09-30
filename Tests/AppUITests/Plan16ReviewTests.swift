@@ -1,5 +1,5 @@
 // Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
-// Kontrola plánu 16: ESM, import z MMTTY, band map v RTTY/FSK, zálohy.
+// Plan 16 check: ESM, import from MMTTY, the band map in RTTY/FSK, backups.
 import Foundation
 import Testing
 import AppCore
@@ -24,7 +24,7 @@ import Spots
     await f.settle()
 }
 
-// 1: prázdné makro ESM nespustí (TX by visel), jen hláška
+// 1: an empty macro does not start ESM (TX would hang), only a message
 @Test @MainActor func esmEmptyMacroDoesNotKeyTransmitter() async throws {
     let f = esmFixture { s in s.macros[0] = Macro(name: "CQ", text: " \r\n ") }
     await f.model.start()
@@ -38,7 +38,7 @@ import Spots
     await f.model.stop()
 }
 
-// 1: obecná pojistka – makro bez textu nezaklíčuje, %l samotné jen zaloguje
+// 1: the general safeguard – a macro with no text does not key up, %l alone only logs
 @Test @MainActor func emptyMacroDoesNotKeyButStillLogs() async throws {
     let f = Fixture()
     f.configure = { s in s.macros[15] = Macro(name: "", text: ""); s.macros[14] = Macro(name: "Log", text: "%l") }
@@ -55,7 +55,7 @@ import Spots
     await f.model.stop()
 }
 
-// 2: podržený / rychlý Enter – druhý Enter během zpracování prvního se ignoruje
+// 2: Enter held down / pressed quickly – a second Enter while the first is being processed is ignored
 @Test @MainActor func esmEnterIgnoresSecondEnterWhileBusy() async throws {
     let f = esmFixture()
     await f.model.start()
@@ -67,12 +67,12 @@ import Spots
     await f.model.stop()
 }
 
-// 3: TU s %l – po návratu z esmEnter je QSO už zalogované a prázdné (stará výměna nepřejde do dalšího QSO)
+// 3: TU with %l – after esmEnter returns the QSO is already logged and empty (the old exchange does not carry into the next QSO)
 @Test @MainActor func esmRunTUClearsQSOBeforeReturning() async throws {
     let f = esmFixture()
     await f.model.start()
     await f.model.setQSOField("call", "DL1ABC")
-    _ = await f.model.esmEnter()                                   // výměna
+    _ = await f.model.esmEnter()                                   // the exchange
     await drain(f)
     await f.model.setQSOField("serialRcvd", "12")
     #expect(f.model.esmStep == .tu)
@@ -86,7 +86,7 @@ import Spots
     await f.model.stop()
 }
 
-// 6: import během TX – nejdřív RX a zastavit opakování
+// 6: an import during TX – RX first and stop the repeat
 @Test @MainActor func mmttyImportStopsTransmission() async throws {
     let f = Fixture()
     await f.model.start()
@@ -101,7 +101,7 @@ import Spots
     await f.model.stop()
 }
 
-// 6: import maker se zapnutým ESM – upozornění a volitelné vypnutí ESM
+// 6: importing macros with ESM enabled – a warning and optionally turning ESM off
 @Test @MainActor func mmttyImportMacrosWithESMCanDisableESM() async throws {
     let f = esmFixture()
     await f.model.start()
@@ -115,12 +115,12 @@ import Spots
     await f.model.stop()
 }
 
-// 5: kolize zkratek proti aktuálnímu nastavení – kolidující se nepřevezme, varování
+// 5: shortcut clashes against the current settings – a clashing one is not taken over, a warning is shown
 @Test @MainActor func mmttyImportShortcutConflictAgainstCurrentSettings() async throws {
     let f = Fixture()
     f.configure = { s in s.shortcuts["toggleTx"] = KeyBinding(key: "1", modifiers: [.command]) }
     await f.model.start()
-    let r = MMTTYImport.parse(text: "[MacroKey]\nM1=305\nM2=376\n")       // ⌘1 (koliduje), ⌘F9
+    let r = MMTTYImport.parse(text: "[MacroKey]\nM1=305\nM2=376\n")       // ⌘1 (clashes), ⌘F9
     await f.model.applyMMTTYImport(r, options: [.shortcuts])
     #expect(f.model.settings.binding(for: .macro(0)) == KeyBinding(key: "f1"))
     #expect(f.model.settings.binding(for: .macro(1)) == KeyBinding(key: "f9", modifiers: [.command]))
@@ -129,7 +129,7 @@ import Spots
     await f.model.stop()
 }
 
-// 10: soubor větší než 1 MB se nečte
+// 10: a file larger than 1 MB is not read
 @Test @MainActor func mmttyImportRejectsHugeFile() throws {
     let f = Fixture()
     let url = f.dir.appendingPathComponent("big.ini")
@@ -137,7 +137,7 @@ import Spots
     #expect(throws: (any Error).self) { try f.model.previewMMTTYImport(url) }
 }
 
-// 7: band map v RTTY/FSK – audio = aktuální mark + (dial − spot)
+// 7: the band map in RTTY/FSK – audio = the current mark + (dial − spot)
 @Test func bandMapMarkersUseCurrentMarkInRTTYMode() {
     let spot = Spot(frequencyKHz: 14_079.5, call: "DL1ABC", spotter: "X", comment: "RTTY", time: Date(), mode: "RTTY", source: .rbn)
     let m = AppModel.bandMapMarkers(spots: [spot], dialHz: 14_080_000, mode: "RTTY", offsetHz: 0, markHz: 2000,
@@ -145,14 +145,14 @@ import Spots
     #expect(m.first?.audioHz == 2500)
 }
 
-// 9: automatická záloha – bez souběhu a selhání hlášené jen jednou
+// 9: automatic backup – no overlapping runs and a failure reported only once
 @Test @MainActor func autoBackupDoesNotOverlapAndReportsFailureOnce() async throws {
     let f = Fixture()
     f.configure = { s in s.log.backup = true }
     let loc = f.model.logLocation
     try FileManager.default.createDirectory(at: loc.directory, withIntermediateDirectories: true)
     try "{}\n".write(to: loc.jsonlURL, atomically: true, encoding: .utf8)
-    try "blokuje".write(to: LogBackup.directory(for: loc), atomically: true, encoding: .utf8)   // soubor místo složky
+    try "blokuje".write(to: LogBackup.directory(for: loc), atomically: true, encoding: .utf8)   // a file instead of a folder
     let t1 = f.model.backupLogIfDue(), t2 = f.model.backupLogIfDue()
     #expect(t1 != nil && t2 == nil)
     await t1?.value
@@ -161,7 +161,7 @@ import Spots
     #expect(f.model.messages.filter { $0.contains("Záloha") }.count == 1)
 }
 
-// 9: ruční záloha neblokuje MainActor (async)
+// 9: a manual backup does not block the MainActor (async)
 @Test @MainActor func manualBackupIsAsync() async throws {
     let f = Fixture()
     let loc = f.model.logLocation
@@ -171,7 +171,7 @@ import Spots
     #expect(FileManager.default.fileExists(atPath: dir.appendingPathComponent(loc.jsonlURL.lastPathComponent).path))
 }
 
-// 8: rychlost ve stavovém řádku se počítá k danému času (TimelineView) – bez provozu klesá
+// 8: the speed in the status bar is computed for the given time (TimelineView) – with no traffic it drops
 @Test @MainActor func contestRateDropsWithoutTraffic() async throws {
     let f = Fixture()
     f.configure = { s in s.contest.enabled = true; s.contest.format = .serial }

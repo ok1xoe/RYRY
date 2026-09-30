@@ -51,10 +51,10 @@ func tmp() -> URL {
     try Data(json.utf8).write(to: dir.appendingPathComponent("settings.json"))
     let (s, w) = SettingsStore(directory: dir).load()
     #expect(s.station.call == "OK1XOE")
-    #expect(s.api.fldigiPort == 7362)          // neplatné → výchozí
-    #expect(s.api.allowRemote == true)          // platné se zachová
+    #expect(s.api.fldigiPort == 7362)          // invalid → the default
+    #expect(s.api.allowRemote == true)          // a valid value is kept
     #expect(s.ptt.method == .none)
-    #expect(s.macros.count == 16)               // chybějící sekce → výchozí
+    #expect(s.macros.count == 16)               // a missing section → the defaults
     #expect(w.count >= 2)
 }
 
@@ -81,7 +81,7 @@ func tmp() -> URL {
     s.fsk.output = .fskSoft; s.fsk.line = .txdBreak
     #expect(s.engineConfig().txOutput == .fskSoft(path: "/dev/cu.y", line: .txdBreak))
     s.fsk.port = nil
-    #expect(s.engineConfig().txOutput == .afsk)          // FSK bez portu → AFSK
+    #expect(s.engineConfig().txOutput == .afsk)          // FSK with no port → AFSK
 }
 
 @Test func profilesHave16Slots() throws {
@@ -98,7 +98,7 @@ func tmp() -> URL {
     #expect(throws: SettingsError.self) { try store.save(p, slot: -1) }
 }
 
-// Review I6: jedno vadné makro / parametr nesmí zahodit ostatní
+// Review I6: one broken macro / parameter must not discard the others
 @Test func badMacroOrParamKeepsTheRest() throws {
     let dir = tmp()
     let json = """
@@ -114,7 +114,7 @@ func tmp() -> URL {
     #expect(w.count >= 2)
 }
 
-// Review I6: nečitelný profiles.json se nesmí tiše přepsat
+// Review I6: an unreadable profiles.json must not be silently overwritten
 @Test func unreadableProfilesAreNotOverwritten() throws {
     let dir = tmp()
     let url = dir.appendingPathComponent("profiles.json")

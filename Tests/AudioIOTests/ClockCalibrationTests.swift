@@ -9,8 +9,8 @@ import Testing
 
 @Test func ppmIgnoresOutliersAndEmpty() {
     #expect(ClockCalibration.ppm(actual: [], nominal: 48000) == nil)
-    #expect(ClockCalibration.ppm(actual: [0, 0], nominal: 48000) == nil)          // zařízení neběží
-    // medián: jeden úlet (start zařízení) výsledek nezmění
+    #expect(ClockCalibration.ppm(actual: [0, 0], nominal: 48000) == nil)          // the device is not running
+    // median: a single outlier (device start-up) does not change the result
     let p = ClockCalibration.ppm(actual: [48000.96, 48000.96, 47000, 48000.96, 48000.96], nominal: 48000)!
     #expect(abs(p - 20) < 0.01)
 }

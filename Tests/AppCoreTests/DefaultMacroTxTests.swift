@@ -17,7 +17,7 @@ private func decode(_ samples: [Float]) async throws -> String {
     return t
 }
 
-/// Každé výchozí makro F1–F11 musí odvysílat přesně svůj rozvinutý text.
+/// Every default macro F1–F11 must transmit exactly its expanded text.
 @Test(arguments: 0..<11)
 func defaultMacroTransmitsItsText(index: Int) async throws {
     let h = try makeApp(ptt: .none)
@@ -26,7 +26,7 @@ func defaultMacroTransmitsItsText(index: Int) async throws {
     try await h.app.setQSOField("name", "HANS")
     let expected = MacroEngine.expand(AppSettings.defaultMacros[index].text, context: await h.app.macroContext()).plainText
     try await h.app.runMacro(index: index)
-    if index == 8 { await h.app.rx() }                      // RYRY končí '#' (zůstat v TX)
+    if index == 8 { await h.app.rx() }                      // RYRY ends with '#' (stay in TX)
     await run(h) { await h.engine.state == .rx && h.audio.tx.count > 0 }
     let got = try await decode(h.audio.tx)
     let norm = { (s: String) in s.replacingOccurrences(of: "\r", with: "").replacingOccurrences(of: "\n", with: "|") }

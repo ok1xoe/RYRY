@@ -33,7 +33,7 @@ import Testing
     cfg.clientTuning = (0.05, 0.1)
     feed.start(cfg)
     defer { feed.stop() }
-    // příkaz jde až po přihlášení – zkoušíme, dokud se neodešle
+    // the command only goes out after the login – keep trying until it is sent
     nonisolated(unsafe) var sent = false
     #expect(await waitUntil {
         if sent { return true }
@@ -43,11 +43,11 @@ import Testing
     #expect(await waitUntil { await MainActor.run { wwv.allSatisfy(feed.consoleLines.contains) } })
     #expect(cluster.received.contains("sh/wwv"))
     #expect(cluster.received.first == "OK1XOE")
-    #expect(!rbn.received.contains("sh/wwv"))                  // RBN příkazy nedostává
-    // spoty jdou do seznamu, ne do konzole; uvítání a odpovědi do konzole; odeslaný příkaz jako „> …“
+    #expect(!rbn.received.contains("sh/wwv"))                  // RBN receives no commands
+    // spots go into the list, not the console; the greeting and the replies into the console; a sent command as "> …"
     #expect(await waitUntil { await MainActor.run { feed.book.count >= 3 } })
     #expect(!feed.consoleLines.contains { $0.hasPrefix("DX de") })
-    #expect(feed.consoleLines.contains { $0.hasSuffix("Hello, OK1XOE") })     // výzva „login:“ se slepí s prvním řádkem
+    #expect(feed.consoleLines.contains { $0.hasSuffix("Hello, OK1XOE") })     // the "login:" prompt runs into the first line
     #expect(feed.consoleLines.contains("garbage line without structure"))
     #expect(feed.consoleLines.contains("> sh/wwv"))
     feed.clearConsole()

@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Minimální JSON (RFC 8259) bez závislostí: objekt = Map, pole = List, čísla = Long/Double. */
+/** Minimal JSON (RFC 8259) with no dependencies: object = Map, array = List, numbers = Long/Double. */
 public final class Json {
     private Json() {}
 

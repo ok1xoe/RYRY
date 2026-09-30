@@ -5,7 +5,7 @@ import QSOLog
 import Settings
 @testable import AppCore
 
-// Review plan18: duplicity podle pravidel závodu, okno závodu ve skóre, BARTG tabulka, %k, vlastní země.
+// Review plan18: dupes per the contest rules, the contest window in the score, the BARTG table, %k, own entity.
 
 private let db = CountryDB.shared!
 private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
@@ -20,13 +20,13 @@ private func calc(_ p: ContestPreset, own: String = "OK1XOE", locator: String = 
     ScoreCalculator(preset: p, ownCall: own, ownLocator: locator, countries: db)
 }
 
-// MARK: Duplicity
+// MARK: Dupes
 
-// Všechny předvolby (jen RTTY): stejná stanice jednou na pásmu bez ohledu na mód a etapu (ověřeno v pravidlech).
+// All presets (RTTY only): the same station once per band regardless of mode and leg (verified against the rules).
 @Test(arguments: ContestPreset.allCases)
 func presetDupeIsOncePerBandRegardlessOfMode(_ p: ContestPreset) {
     let log = [rec("W1AW", 14080, exch: "05 CT JO70", min: 1), rec("W1AW", 14081, exch: "05 CT JO70", min: 2, mode: "PSK"),
-               rec("W1AW", 14082, exch: "05 CT JO70", min: 9 * 60)]                        // jiná etapa (SARTG, Makrothen)
+               rec("W1AW", 14082, exch: "05 CT JO70", min: 9 * 60)]                        // a different leg (SARTG, Makrothen)
     let t = calc(p).tally(records: log, qtc: [], since: t0)
     #expect(t.band("20m").dupes == 2, "\(p)")
     #expect(!DupeCheck.perMode(preset: p))
@@ -42,20 +42,20 @@ func presetDupeIsOncePerBandRegardlessOfMode(_ p: ContestPreset) {
     #expect(DupeCheck.key(call: "W1AW", band: "20m", mode: "PSK", perMode: false) == DupeCheck.key(call: "W1AW", band: "20m", mode: "RTTY", perMode: false))
 }
 
-// MARK: Okno závodu
+// MARK: Contest window
 
 @Test func scoreWindowIsFrozenAndHasEnd() {
     let c = calc(.okDXRTTY)                                                  // OK DX: 24 h
     var contest = ContestSettings.preset(.okDXRTTY, year: 2026)
     contest.start = t0
     #expect(contest.end == t0.addingTimeInterval(24 * 3600))
-    let log = [rec("DL1ABC", 14080, min: 1), rec("W1AW", 14080, min: 25 * 60)]            // druhé po konci
+    let log = [rec("DL1ABC", 14080, min: 1), rec("W1AW", 14080, min: 25 * 60)]            // the second one after the end
     let full = c.tally(records: log, qtc: [], since: t0, until: contest.end)
     #expect(full.qsos == 1 && full.since == t0 && full.until == contest.end)
     var inc = c.tally(records: [], qtc: [], since: t0, until: contest.end)
     for r in log { c.add(r, to: &inc) }
-    #expect(inc == full)                                                     // přírůstek používá stejné okno
-    // bez začátku: okno se zafixuje při výpočtu (neposouvá se s časem)
+    #expect(inc == full)                                                     // the increment uses the same window
+    // without a start: the window is fixed when the score is computed (it does not move with time)
     var none = ContestSettings(); none.enabled = true
     #expect(none.end == nil)
 }
@@ -65,16 +65,16 @@ func presetDupeIsOncePerBandRegardlessOfMode(_ p: ContestPreset) {
                                       .makrothen: 40, .jartsRTTY: 48, .waeRTTY: 48, .okDXRTTY: 24]
     for p in ContestPreset.allCases { #expect(p.durationHours == h[p], "\(p)") }
     var c = ContestSettings.preset(.sartgRTTY, year: 2026)
-    c.format = .zone                                                          // už to není předvolba → konec neznámý
+    c.format = .zone                                                          // no longer a preset → the end is unknown
     #expect(c.end == nil)
 }
 
-// MARK: BARTG tabulka, Makrothen počet spojení v násobičích, vlastní země
+// MARK: The BARTG table, the Makrothen QSO count in multipliers, own entity
 
 @Test func bartgTableTotalExcludesContinents() {
     let log = [rec("DL1ABC", 14080, min: 1), rec("W1AW", 14082, min: 2), rec("W1AW", 7040, min: 3)]
     let t = calc(.bartgHF).tally(records: log, qtc: [], since: t0)
-    // 20 m: DL, K, W1; 40 m: K, W1 → 5; kontinenty EU, NA ve vzorci zvlášť
+    // 20 m: DL, K, W1; 40 m: K, W1 → 5; the continents EU, NA counted separately in the formula
     #expect(t.tableMultiplierTotal == 5 && t.continents == 2)
     #expect(!t.showsOnceMultiplierRow)
     let cq = calc(.cqwwRTTY).tally(records: log, qtc: [], since: t0)
@@ -95,20 +95,20 @@ func presetDupeIsOncePerBandRegardlessOfMode(_ p: ContestPreset) {
     #expect(calc(.cqwwRTTY, own: "").tally(records: [], qtc: [], since: t0).ownCountryUnknown)
     let noDB = ScoreCalculator(preset: .cqwwRTTY, ownCall: "OK1XOE", ownLocator: "", countries: nil)
     #expect(noDB.tally(records: [], qtc: [], since: t0).ownCountryUnknown)
-    #expect(!calc(.makrothen, own: "").tally(records: [], qtc: [], since: t0).ownCountryUnknown)   // Makrothen zemi nepotřebuje
+    #expect(!calc(.makrothen, own: "").tally(records: [], qtc: [], since: t0).ownCountryUnknown)   // Makrothen does not need the entity
     #expect(calc(.makrothen, locator: "").tally(records: [], qtc: [], since: t0).ownLocatorMissing)
     #expect(!calc(.cqwwRTTY, locator: "").tally(records: [], qtc: [], since: t0).ownLocatorMissing)
 }
 
-// MARK: %k = kmitočet spotu (RF), ne kmitočet rigu
+// MARK: %k = the spot frequency (RF), not the rig frequency
 
 @Test func clusterSpotKHzUndoesSpotOffset() {
-    // useSpot ladí rig na spot + posun → %k = rig − posun
+    // useSpot tunes the rig to the spot + the offset → %k = rig − offset
     #expect(AppController.clusterSpotKHz(rigHz: 14_082_125, manualHz: nil, offsetHz: 2125) == 14080)
     #expect(AppController.clusterSpotKHz(rigHz: 14_080_000, manualHz: 7_040_000, offsetHz: 0) == 14080)
-    // posun mimo rozsah se ořízne jako v useSpot
+    // an offset outside the range is clamped, as in useSpot
     #expect(AppController.clusterSpotKHz(rigHz: 14_090_000, manualHz: nil, offsetHz: 50_000) == 14080)
-    // ruční frekvence je už RF (bez rigu se zapisuje frekvence spotu) – posun se neodečítá
+    // the manual frequency is already RF (with no rig the spot frequency is logged) – the offset is not subtracted
     #expect(AppController.clusterSpotKHz(rigHz: nil, manualHz: 7_040_000, offsetHz: 2125) == 7040)
     #expect(AppController.clusterSpotKHz(rigHz: nil, manualHz: nil, offsetHz: 0) == nil)
     #expect(AppController.clusterSpotKHz(rigHz: 1000, manualHz: nil, offsetHz: 2125) == nil)             // ≤ 0

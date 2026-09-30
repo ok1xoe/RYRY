@@ -27,7 +27,7 @@ private func rec(_ call: String, _ time: String, sent: Int?, rcvd: Int?, exS: St
     #expect(lines.contains("CATEGORY-POWER: LOW"))
     #expect(lines.contains("GRID-LOCATOR: JO70"))
     let qsos = lines.filter { $0.hasPrefix("QSO:") }
-    // chronologicky
+    // chronologically
     #expect(qsos == [
         "QSO:  7045 RY 2026-09-29 1201 OK1XOE        599 14     HA7AB         599 15",
         "QSO: 14083 RY 2026-09-29 1203 OK1XOE        599 001    DL1ABC        599 015",
@@ -38,7 +38,7 @@ private func rec(_ call: String, _ time: String, sent: Int?, rcvd: Int?, exS: St
 @Test func cabrilloWithoutFrequencyUsesZeroAndEmptyLog() {
     let t = Cabrillo.export([rec("DL1ABC", "2026-09-29T12:03:00Z", sent: 1, rcvd: nil, freq: nil)],
                             header: CabrilloHeader(callsign: "OK1XOE", contest: ""))
-    // bez kmitočtu není platný QSO řádek → X-QSO (vyhodnocovač ho ignoruje, ale v logu zůstane)
+    // without a frequency it is not a valid QSO line → X-QSO (the checker ignores it, but it stays in the log)
     #expect(t.contains("X-QSO:     0 RY 2026-09-29 1203 OK1XOE        599 001    DL1ABC        599"))
     #expect(!t.contains("\r\nQSO:"))
     let empty = Cabrillo.export([], header: CabrilloHeader(callsign: "OK1XOE", contest: "X"))

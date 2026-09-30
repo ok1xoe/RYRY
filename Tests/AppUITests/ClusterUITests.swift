@@ -10,7 +10,7 @@ import Spots
     #expect(await m.runClusterMacro(0) == false)
     #expect(m.clusterMessage != nil)
     #expect(await m.sendClusterLine("sh/dx 30") == false)
-    #expect(m.clusterHistory.isEmpty)                      // neodeslané se do historie nedává
+    #expect(m.clusterHistory.isEmpty)                      // an unsent command is not added to the history
 }
 
 @Test @MainActor func saveClusterMacrosPadsToTenAndDoesNotReconnect() async throws {
@@ -20,10 +20,10 @@ import Spots
     #expect(m.settings.spots.clusterMacros[0].name == "A" && m.settings.spots.clusterMacros[1].isBlank)
     m.setSpots { $0.clusterMacros[1] = Macro(name: "B", text: "sh/wwv") }
     #expect(m.settings.spots.clusterMacros[1].name == "B")
-    #expect(!m.spotFeed.isRunning)                         // změna maker nespouští síť
+    #expect(!m.spotFeed.isRunning)                         // changing the macros does not start any networking
 }
 
-// Zaškrtávátka pásem a módů v okně Spoty jen přepínají filtr zobrazení – spojení se nerestartuje.
+// The band and mode check boxes in the Spots window only toggle the display filter – the connection is not restarted.
 @Test @MainActor func togglingSpotFiltersDoesNotRestartFeed() async throws {
     let m = spotModel(rig: NoRig()) {
         $0.spots.clusterEnabled = true; $0.spots.clusterHost = "127.0.0.1"; $0.spots.clusterPort = 1
@@ -35,11 +35,11 @@ import Spots
     #expect(m.spotFeed.filter.modes == SpotFilter.allModes && m.spotFeed.starts == starts)
     m.setSpots { $0.filterModes = [.rtty] }
     #expect(m.spotFeed.filter.modes == [.rtty] && m.spotFeed.starts == starts)
-    m.setSpots { $0.filterBands = [] }                                     // „Nic“ u pásem
+    m.setSpots { $0.filterBands = [] }                                     // "None" for the bands
     #expect(m.spotFeed.filter.bands.isEmpty && m.spotFeed.starts == starts)
-    m.setSpots { $0.filterBands = SpotFilter.allBandsSet }                 // „Vše“ u pásem
+    m.setSpots { $0.filterBands = SpotFilter.allBandsSet }                 // "All" for the bands
     #expect(m.spotFeed.filter.bands == SpotFilter.allBandsSet && m.spotFeed.starts == starts)
-    m.setSpots { $0.clusterPort = 2 }                                      // změna serveru = nové spojení
+    m.setSpots { $0.clusterPort = 2 }                                      // changing the server = a new connection
     #expect(m.spotFeed.starts == starts + 1)
     await m.stop()
 }

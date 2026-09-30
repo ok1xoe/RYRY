@@ -67,7 +67,7 @@ import Settings
     await f.model.stop()
 }
 
-/// Rychlé události kolečka se nesmí ztratit ani přeházet.
+/// Fast wheel events must be neither lost nor reordered.
 @Test @MainActor func rapidWheelStepsAccumulate() async throws {
     let f = Fixture()
     await f.model.start()
@@ -80,7 +80,7 @@ import Settings
     await f.model.stop()
 }
 
-/// Parametr změněný mimo GUI (API) se promítne do modelu i uloženého nastavení.
+/// A parameter changed outside the GUI (the API) is reflected in the model and in the stored settings.
 @Test @MainActor func externalParamChangeUpdatesModel() async throws {
     let f = Fixture()
     await f.model.start()
@@ -91,7 +91,7 @@ import Settings
     await f.model.stop()
 }
 
-/// Čárové spektrum: poslední řádek s vyhlazením (průměr přes snímky) a špičkou na správném místě.
+/// Line spectrum: the last row with smoothing (averaged over frames) and a peak in the right place.
 @Test func spectrumLineIsSmoothedAndPeaksAtTone() {
     var w = WaterfallRenderer(width: 100, height: 4)
     var mags = [Float](repeating: 0, count: 600)
@@ -102,5 +102,5 @@ import Settings
     let peak = line1.enumerated().max { $0.element < $1.element }!.offset
     #expect(abs(peak - 50) <= 1)
     w.push(SpectrumFrame(binHz: 5, magnitudes: [Float](repeating: 0, count: 600)), fromHz: 0, toHz: 3000)
-    #expect(w.spectrumLine[peak] > 0 && w.spectrumLine[peak] < line1[peak])   // doznívá, nespadne hned na 0
+    #expect(w.spectrumLine[peak] > 0 && w.spectrumLine[peak] < line1[peak])   // decays, does not drop to 0 straight away
 }
