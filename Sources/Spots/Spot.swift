@@ -23,7 +23,6 @@ public struct Spot: Sendable, Equatable, Identifiable {
         self.time = time; self.mode = mode; self.snr = snr; self.source = source
     }
 
-    public var isRTTY: Bool { mode == "RTTY" }
     public var frequencyHz: Double { frequencyKHz * 1000 }
     public var band: String? { Bands.band(forHz: frequencyHz) }
     /// Deduplication key: call + band.

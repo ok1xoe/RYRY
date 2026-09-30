@@ -76,9 +76,10 @@ extension AppModel {
         return a.newCountryAny || a.newCountryBand || !a.watchCalls.isEmpty
     }
 
-    /// A new spot: alerts when it is needed (at most once per spot).
+    /// A new spot: alerts when it is needed (at most once per spot). A spot hidden by the display filter
+    /// (unchecked band or mode group) raises no alert - only what the Spots table shows is alerted on.
     public func checkSpotNeeded(_ spot: Spot) {
-        guard neededActive else { return }
+        guard neededActive, settings.spots.filter.matches(spot) else { return }
         let reasons = neededReasons(for: spot)
         guard !reasons.isEmpty else { return }
         emitNeeded(call: spot.call, band: spot.band, reasons: reasons, source: L("spot"), interval: 3600, batch: true)

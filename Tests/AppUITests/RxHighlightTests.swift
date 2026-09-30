@@ -208,6 +208,25 @@ private func country(_ call: String) -> CountryRef? {
         #expect(m.neededReasons(for: spot) == [.watched])
         #expect(m.neededReasons(for: other).isEmpty)
     }
+    // The alert for a needed station goes through the display filter of the spots: a spot the Spots table does not show
+    // (unchecked band or mode group) makes no sound and no notification.
+    @Test func neededSpotAlertRespectsDisplayFilter() {
+        let (m, sink) = model {
+            $0.alerts.watchCalls = "DL1ABC"; $0.alerts.neededNotification = true
+            $0.spots.filterBands = ["20m"]; $0.spots.filterModes = [.rtty]
+        }
+        func spot(_ kHz: Double, _ mode: String) -> Spot {
+            Spot(frequencyKHz: kHz, call: "DL1ABC", spotter: "X", comment: "", time: Date(timeIntervalSince1970: 5000), mode: mode)
+        }
+        m.checkSpotNeeded(spot(28_085, "RTTY"))                 // 10 m – the band is not checked
+        #expect(sink.sounds == 0 && sink.notes.isEmpty)
+        m.checkSpotNeeded(spot(14_085, "FT8"))                  // 20 m, but the DIGI group is not checked
+        #expect(sink.sounds == 0 && sink.notes.isEmpty)
+        #expect(!m.messages.contains { $0.contains("DL1ABC") })
+        m.checkSpotNeeded(spot(14_085, "RTTY"))                 // passes the filter → an alert
+        #expect(sink.sounds == 1 && sink.notes.count == 1)
+        #expect(m.messages.contains { $0.contains("DL1ABC") })
+    }
     @Test func neededCallInRxText() {
         let (m, sink) = model { $0.alerts.watchCalls = "DL1ABC" }
         for ch in "CQ CQ DE DL1ABC/P DL1ABC K " { m.appendRx(String(ch), echo: false) }

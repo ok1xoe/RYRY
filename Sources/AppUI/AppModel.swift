@@ -211,6 +211,7 @@ public final class AppModel {
         settings = s
         messages = w
         syncDisplay()
+        spotFeed.filter = s.spots.filter          // the feed only mirrors the filter from the settings (source of truth `settings.spots.filter`)
         spotFeed.onNewSpot = { [weak self] spot in self?.checkSpotNeeded(spot) }
     }
 

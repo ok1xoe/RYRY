@@ -12,7 +12,7 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
     #expect(s.call == "DL1ABC")
     #expect(s.spotter == "W3LPL-#")
     #expect(s.comment == "RTTY 25 dB 45 BPS CQ")
-    #expect(s.mode == "RTTY" && s.isRTTY)
+    #expect(s.mode == "RTTY" && SpotModeGroup.group(for: s.mode) == .rtty)
     #expect(s.snr == 25)
     #expect(s.source == .rbn)
     #expect(s.band == "20m")
@@ -31,7 +31,7 @@ let refNow = Date(timeIntervalSince1970: 1_773_490_200)
 
 @Test func cwSpotIsNotRTTY() throws {
     let s = try #require(SpotParser.parse("DX de DK9IP-#:    14033.2  UA3XYZ       CW 22 dB 26 WPM CQ         1204Z", now: refNow, source: .rbn))
-    #expect(s.mode == "CW" && !s.isRTTY)
+    #expect(s.mode == "CW" && SpotModeGroup.group(for: s.mode) == .cw)
     #expect(s.snr == 22)
 }
 

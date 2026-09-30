@@ -80,6 +80,30 @@ import Testing
     #expect(back.filter == SpotFilter(bands: ["160m", "6m"], modes: [.digi, .ssb, .psk]))
 }
 
+// An unknown band or mode group name is dropped, but it is named in a warning – just as an invalid type on the same key
+// (a silently unchecked filter would look like a lost setting).
+@Test func unknownFilterNamesAreReported() throws {
+    let dir = tmp()
+    func load(_ json: String) throws -> (SpotSettings, [String]) {
+        try json.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+        let r = SettingsStore(directory: dir).load()
+        return (r.0.spots, r.1)
+    }
+    var (s, w) = try load(#"{"spots":{"filterBands":["20m","2m","xx"]}}"#)
+    #expect(s.filterBands == ["20m"])
+    #expect(w.contains { $0.contains("spots.filterBands") && $0.contains("2m") && $0.contains("xx") })
+    (s, w) = try load(#"{"spots":{"filterModes":["CW","NIC"]}}"#)
+    #expect(s.filterModes == [.cw])
+    #expect(w.contains { $0.contains("spots.filterModes") && $0.contains("NIC") })
+    (s, w) = try load(#"{"spots":{"previousFilterModes":["SSB","XY"]}}"#)
+    #expect(s.previousFilterModes == [.ssb])
+    #expect(w.contains { $0.contains("spots.previousFilterModes") && $0.contains("XY") })
+    (s, w) = try load(#"{"spots":{"filterBands":["20m"],"filterModes":["CW"]}}"#)
+    #expect(s.filterBands == ["20m"] && w.isEmpty)                      // only known names → no warning
+    (s, w) = try load(#"{"spots":{"filterBands":"20m"}}"#)              // an invalid type warns as before
+    #expect(s.filterBands == SpotFilter.allBandsSet && w.contains { $0.contains("spots.filterBands") })
+}
+
 // The "other" check box for the bands (spots outside the fixed list): checked by default, even in an old settings.json;
 // the All / None buttons toggle it together with the fixed list, so after "None" not a single spot gets through.
 @Test func otherBandsFilterDefaultsOnAndIsTolerant() throws {

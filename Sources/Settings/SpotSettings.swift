@@ -92,6 +92,20 @@ public struct SpotSettings: Codable, Sendable, Equatable {
         !h.isEmpty && h.count <= 253 && !h.contains(where: { $0.isWhitespace || $0 == "/" })
     }
 
+    /// Names of bands / mode groups from settings.json: an unknown name is dropped and named in a warning, so a filter
+    /// does not end up silently unchecked (an invalid type on the key is already reported by `tolerant`).
+    static func knownNames<T: Hashable>(_ items: [String], _ key: CodingKeys, _ w: WarningSink?, _ section: String,
+                                        _ map: (String) -> T?) -> Set<T> {
+        var out = Set<T>(), dropped: [String] = []
+        for n in items {
+            if let v = map(n) { out.insert(v) } else { dropped.append(n) }
+        }
+        if !dropped.isEmpty {
+            w?.add("\(section).\(key.stringValue): neznámé názvy vynechány: \(dropped.joined(separator: ", "))")
+        }
+        return out
+    }
+
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "spots", x = SpotSettings()
         clusterEnabled = c.tolerant(.clusterEnabled, x.clusterEnabled, w, s)
@@ -116,21 +130,25 @@ public struct SpotSettings: Codable, Sendable, Equatable {
         let rh = c.tolerant(.rbnHost, x.rbnHost, w, s).trimmingCharacters(in: .whitespaces)
         rbnHost = Self.validHost(rh) ? rh : x.rbnHost
         let rp = c.tolerant(.rbnPort, x.rbnPort, w, s); rbnPort = (1...65535).contains(rp) ? rp : x.rbnPort
-        // bands: unknown names are dropped, an empty list is valid ("None"), an invalid value = the default
+        // bands: unknown names are dropped with a warning, an empty list is valid ("None"), an invalid value = the default
         let fb: TolerantArray<String>? = c.tolerant(.filterBands, nil, w, s)
-        filterBands = fb.map { Set($0.items.filter(SpotFilter.allBandsSet.contains)) } ?? x.filterBands
+        filterBands = fb.map {
+            Self.knownNames($0.items, .filterBands, w, s) { SpotFilter.allBandsSet.contains($0) ? $0 : nil }
+        } ?? x.filterBands
         // "other" (spots outside the fixed band list): a missing as well as an invalid value = the default, checked
         filterOtherBands = c.tolerant(.filterOtherBands, x.filterOtherBands, w, s)
         // migration: an older settings.json has only "rttyOnly" (true = only RTTY, false = all modes)
-        let fm: TolerantArray<SpotModeGroup>? = c.tolerant(.filterModes, nil, w, s)
+        // mode groups: an unknown group name is dropped with a warning (the names are decoded as strings just for that)
+        let fm: TolerantArray<String>? = c.tolerant(.filterModes, nil, w, s)
         let legacy = try? d.container(keyedBy: LegacyKeys.self)
-        if let fm { filterModes = Set(fm.items) }
+        if let fm { filterModes = Self.knownNames(fm.items, .filterModes, w, s, SpotModeGroup.init(rawValue:)) }
         else if let legacy, legacy.contains(.rttyOnly) {
             filterModes = legacy.tolerant(.rttyOnly, true, w, s) ? [.rtty] : SpotFilter.allModes
         } else { filterModes = x.filterModes }
         // the remembered selection for unchecking "RTTY only" (an invalid value = the default, an empty list is valid)
-        let pm: TolerantArray<SpotModeGroup>? = c.tolerant(.previousFilterModes, nil, w, s)
-        previousFilterModes = pm.map { Set($0.items) } ?? x.previousFilterModes
+        let pm: TolerantArray<String>? = c.tolerant(.previousFilterModes, nil, w, s)
+        previousFilterModes = pm.map { Self.knownNames($0.items, .previousFilterModes, w, s, SpotModeGroup.init(rawValue:)) }
+            ?? x.previousFilterModes
         let a = c.tolerant(.maxAgeMinutes, x.maxAgeMinutes, w, s); maxAgeMinutes = Self.ageRange.contains(a) ? a : x.maxAgeMinutes
         let o = c.tolerant(.offsetHz, x.offsetHz, w, s); offsetHz = Self.offsetRange.contains(o) ? o : x.offsetHz
         showInWaterfall = c.tolerant(.showInWaterfall, x.showInWaterfall, w, s)
