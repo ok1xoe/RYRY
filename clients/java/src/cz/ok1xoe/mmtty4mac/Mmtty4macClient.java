@@ -68,7 +68,7 @@ public final class Mmtty4macClient implements AutoCloseable {
             h.client = c;
             return c;
         } catch (Exception e) {
-            throw new IOException("mmtty4mac: nelze se připojit k " + uri + ": " + e.getMessage(), e);
+            throw new IOException("mmtty4mac: cannot connect to " + uri + ": " + e.getMessage(), e);
         }
     }
 
@@ -100,10 +100,10 @@ public final class Mmtty4macClient implements AutoCloseable {
             if (e.getCause() instanceof RpcException r) throw r;
             throw new IOException(method + ": " + e.getCause(), e.getCause());
         } catch (java.util.concurrent.TimeoutException e) {
-            throw new IOException(method + ": vypršel časový limit");
+            throw new IOException(method + ": timed out");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException(method + ": přerušeno");
+            throw new IOException(method + ": interrupted");
         } finally {
             pending.remove(id);
         }
@@ -143,7 +143,7 @@ public final class Mmtty4macClient implements AutoCloseable {
     @Override public void close() {
         try { ws.sendClose(WebSocket.NORMAL_CLOSURE, "bye").get(2, TimeUnit.SECONDS); } catch (Exception ignored) {}
         ws.abort();
-        fail(new IOException("spojení zavřeno"));
+        fail(new IOException("connection closed"));
     }
 
     // ---- receive ----
@@ -201,7 +201,7 @@ public final class Mmtty4macClient implements AutoCloseable {
 
         @Override public CompletionStage<?> onClose(WebSocket w, int code, String reason) {
             Mmtty4macClient c = client;
-            if (c != null) c.fail(new IOException("server zavřel spojení: " + code + " " + reason));
+            if (c != null) c.fail(new IOException("the server closed the connection: " + code + " " + reason));
             return null;
         }
 

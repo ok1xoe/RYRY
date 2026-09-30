@@ -70,7 +70,7 @@ public final class Json {
         Parser p = new Parser(s);
         Object v = p.value();
         p.ws();
-        if (p.i != s.length()) throw new IllegalArgumentException("JSON: nadbytečné znaky na pozici " + p.i);
+        if (p.i != s.length()) throw new IllegalArgumentException("JSON: extra characters at position " + p.i);
         return v;
     }
 
@@ -81,11 +81,11 @@ public final class Json {
 
         void ws() { while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++; }
 
-        IllegalArgumentException err(String m) { return new IllegalArgumentException("JSON: " + m + " na pozici " + i); }
+        IllegalArgumentException err(String m) { return new IllegalArgumentException("JSON: " + m + " at position " + i); }
 
         Object value() {
             ws();
-            if (i >= s.length()) throw err("neočekávaný konec");
+            if (i >= s.length()) throw err("unexpected end of input");
             char c = s.charAt(i);
             switch (c) {
                 case '{': return obj();
@@ -99,7 +99,7 @@ public final class Json {
         }
 
         void expect(String w) {
-            if (!s.startsWith(w, i)) throw err("očekáváno " + w);
+            if (!s.startsWith(w, i)) throw err("expected " + w);
             i += w.length();
         }
 
@@ -112,14 +112,14 @@ public final class Json {
                 ws();
                 String k = string();
                 ws();
-                if (i >= s.length() || s.charAt(i) != ':') throw err("očekávána ':'");
+                if (i >= s.length() || s.charAt(i) != ':') throw err("expected ':'");
                 i++;
                 m.put(k, value());
                 ws();
-                if (i >= s.length()) throw err("neukončený objekt");
+                if (i >= s.length()) throw err("unterminated object");
                 char c = s.charAt(i++);
                 if (c == '}') return m;
-                if (c != ',') throw err("očekávána ',' nebo '}'");
+                if (c != ',') throw err("expected ',' or '}'");
             }
         }
 
@@ -131,23 +131,23 @@ public final class Json {
             while (true) {
                 l.add(value());
                 ws();
-                if (i >= s.length()) throw err("neukončené pole");
+                if (i >= s.length()) throw err("unterminated array");
                 char c = s.charAt(i++);
                 if (c == ']') return l;
-                if (c != ',') throw err("očekávána ',' nebo ']'");
+                if (c != ',') throw err("expected ',' or ']'");
             }
         }
 
         String string() {
-            if (i >= s.length() || s.charAt(i) != '"') throw err("očekáván řetězec");
+            if (i >= s.length() || s.charAt(i) != '"') throw err("expected a string");
             i++;
             StringBuilder sb = new StringBuilder();
             while (true) {
-                if (i >= s.length()) throw err("neukončený řetězec");
+                if (i >= s.length()) throw err("unterminated string");
                 char c = s.charAt(i++);
                 if (c == '"') return sb.toString();
                 if (c != '\\') { sb.append(c); continue; }
-                if (i >= s.length()) throw err("neukončený escape");
+                if (i >= s.length()) throw err("unterminated escape");
                 char e = s.charAt(i++);
                 switch (e) {
                     case '"', '\\', '/' -> sb.append(e);
@@ -157,11 +157,11 @@ public final class Json {
                     case 'r' -> sb.append('\r');
                     case 't' -> sb.append('\t');
                     case 'u' -> {
-                        if (i + 4 > s.length()) throw err("neúplné \\u");
+                        if (i + 4 > s.length()) throw err("incomplete \\u");
                         sb.append((char) Integer.parseInt(s.substring(i, i + 4), 16));
                         i += 4;
                     }
-                    default -> throw err("neplatný escape \\" + e);
+                    default -> throw err("invalid escape \\" + e);
                 }
             }
         }
@@ -171,7 +171,7 @@ public final class Json {
             if (i < s.length() && s.charAt(i) == '-') i++;
             while (i < s.length() && "0123456789.eE+-".indexOf(s.charAt(i)) >= 0) i++;
             String t = s.substring(st, i);
-            if (t.isEmpty() || t.equals("-")) throw err("neplatná hodnota");
+            if (t.isEmpty() || t.equals("-")) throw err("invalid value");
             if (t.contains(".") || t.contains("e") || t.contains("E")) return Double.parseDouble(t);
             try { return Long.parseLong(t); } catch (NumberFormatException ex) { return Double.parseDouble(t); }
         }

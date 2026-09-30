@@ -26,21 +26,21 @@ public final class Example {
             c.onNotification((method, p) -> {
                 switch (method) {
                     case "rx.char" -> { if (!Boolean.TRUE.equals(p.get("echo"))) System.out.print(p.get("char")); }
-                    case "qso.logged" -> System.out.println("\n[logger] zalogováno: " + p.get("call") + " " + p.get("band"));
-                    case "engine.state" -> System.out.println("\n[stav] " + p.get("state"));
+                    case "qso.logged" -> System.out.println("\n[logger] logged: " + p.get("call") + " " + p.get("band"));
+                    case "engine.state" -> System.out.println("\n[state] " + p.get("state"));
                     default -> { }
                 }
             });
             c.subscribe("rx.char", "qso.logged", "engine.state");
             Map<String, Object> st = c.status();
-            System.out.println("mmtty4mac: " + st.get("mode") + ", stav " + st.get("state"));
+            System.out.println("mmtty4mac: " + st.get("mode") + ", state " + st.get("state"));
             c.setQsoField("call", call);
             Map<String, Object> dx = c.dxcc(call);
-            System.out.println(call + " → " + (dx == null ? "neznámá země" : dx.get("name") + " (" + dx.get("continent") + ", CQ " + dx.get("cqZone") + ")"));
-            System.out.println("Poslouchám příjem 30 s… (Ctrl-C ukončí)");
+            System.out.println(call + " → " + (dx == null ? "unknown entity" : dx.get("name") + " (" + dx.get("continent") + ", CQ " + dx.get("cqZone") + ")"));
+            System.out.println("Listening to the receive side for 30 s… (Ctrl-C quits)");
             c.closedFuture().get(30, java.util.concurrent.TimeUnit.SECONDS);
         } catch (java.util.concurrent.TimeoutException done) {
-            System.out.println("\nkonec ukázky");
+            System.out.println("\nend of the example");
         }
     }
 }
