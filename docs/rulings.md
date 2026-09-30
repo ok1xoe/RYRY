@@ -183,7 +183,7 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - QTC jen ve formátu závodu WAE; pravidla RTTY podle DARC: ≤ 10 QTC na dvojici (odeslaná + přijatá), QSO nahlásit jen jednou a ne stanici, které se týká, výměna jen mezi kontinenty (DXCC; neznámý kontinent jen varuje, neblokuje).
 - Odeslaná série se uloží až po „Potvrzeno – uložit“ (příjemce R R ALL OK); do té doby lze opakovat řádky (AGN N).
 - Příjem: „Načíst z příjmu“ rozebere text přijatý od „Přijmout…“; ručně klik na slova (n/k, čas, značka, číslo) nebo úprava řádku.
-- Násobiče a váhy pásem WAE se nepočítají – zobrazují se body za QTC; skóre spočítá vyhodnocení / logger.
+- (Plán 12) Násobiče a váhy pásem WAE se tehdy nepočítaly – od plánu 17 okno Násobiče, od větve `score` okno Skóre.
 - Série QTC v `qtc.jsonl` v adresáři logu; Cabrillo řádky `QTC:` podle DARC (QTC bez kmitočtu jako `X-QTC:`).
 
 ### Review plánu 12 – opraveno
@@ -202,7 +202,7 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - QSO okno nabízí pole podle režimu (`QSOLayout`): bez závodu Name/QTH/Locator; v závodě jen výměna formátu; panel QTC jen ve WAE.
 - Nový formát „RST + CQ zóna“ (`zone`) pro OK DX RTTY Contest (ČRK: výměna RST + CQ zóna, CONTEST: OK-DX-RTTY): moje zóna z DXCC, zóna protistanice předvyplněná z DXCC (klik na číslo 1–40 ji přepíše).
 - Předvolby závodů (OK DX RTTY: sobota 3. celého víkendu v prosinci; WAE RTTY: 2. celý víkend v listopadu) nastaví název, formát a začátek.
-- Body a násobiče OK DX RTTY se nepočítají (vyhodnocení / logger).
+- Body a násobiče OK DX RTTY: viz „Násobiče v závodech“ a „Bodování a skóre“.
 
 ## Předvolby závodů (9) a „Vlastní nastavení“
 - Předvolby ARRL RU, CQ WPX, BARTG HF, SARTG, CQ WW, Makrothen, JARTS, WAE, OK DX RTTY; termín podle obvyklého pravidla („n-tý celý víkend“), výběr nastaví nejbližší ještě neskončený termín. Přesné datum ověřit v pravidlech.
@@ -380,7 +380,7 @@ Záznam rozhodnutí (Ruling) z implementace plánů 1–5 a drobností z revizí
 - Bez zapnutého DX clusteru / RBN a bez rigu hláška „Zapněte DX cluster nebo RBN (Nastavení → Spoty)“.
 
 ## Násobiče v závodech (okno Násobiče, štítek NEW MULT)
-Jen násobiče (body a skóre se nepočítají). Logika `AppCore/Multipliers.swift` (`MultiplierRule`, `MultiplierCalculator`, `MultiplierTally`, `WPX`), přepočet v `AppModel` jen při změně logu nebo závodu/značky (ne při překreslení); NEW MULT se vyhodnocuje při změně QSO okna nebo pásma. Pravidla ověřena v oficiálních pravidlech 30. 9. 2026:
+Body a skóre viz „Bodování a skóre“. Logika `AppCore/Multipliers.swift` (`MultiplierRule`, `MultiplierCalculator`, `MultiplierTally`, `WPX`), přepočet v `AppModel` jen při změně logu nebo závodu/značky (ne při překreslení); NEW MULT se vyhodnocuje při změně QSO okna nebo pásma. Pravidla ověřena v oficiálních pravidlech 30. 9. 2026:
 
 | Závod | Násobiče | Po pásmech / jednou | Zvláštnosti | Zdroj |
 |---|---|---|---|---|
@@ -423,3 +423,26 @@ Opravy nálezů kontroly větve plan17 (každá podložená testem v `Tests/AppC
 - **Nová proměnná `%k`** = frekvence rigu v kHz na 0,1 (`MacroContext.rigKHz`; z rigu, jinak ruční frekvence QSO; neznámá = nic). `%f` už je zkrácený pozdrav (GM/GA/GE), proto ne `%f`. Ve vysílacích makrech je `%k` prázdné (kontext nemá frekvenci). Výchozí „Spot“: `dx %k %c RTTY` (DXSpider: `dx <frekvence> <značka> <komentář>`).
 - **Výchozí příkazy**: `sh/dx 30`, `sh/dx 30 info rtty`, `sh/dx on 20m`, `sh/dx on 40m`, `sh/wwv`, `sh/sun`, `set/skimmer`, `unset/skimmer`, `sh/users`, `dx %k %c RTTY`. **Neověřeno proti skutečnému clusteru**: kvalifikátor `info` u `sh/dx` (hledání „rtty“ v komentáři) – podle dokumentace DXSpider, u CC Clusteru může být syntaxe jiná (`sh/dx/30 rtty`); uživatel si makro může upravit.
 - **UI**: `ClusterPanel` pod tabulkou spotů – 10 tlačítek (1×10, při malé šířce 2×5; barva jako MacroBar, pravé tlačítko „Upravit…“ i bez spojení), řádek příkazu (Enter odešle, šipka nahoru/dolů = historie 30 příkazů v paměti) a rozbalitelná konzola (monospace, posun na konec). Tlačítka a řádek jsou neaktivní, dokud `clusterState != .connected`.
+
+## Bodování a skóre (okno Skóre, id `score`)
+Logika `AppCore/Score.swift` (`ScoreRule`, `ScoreCalculator`, `ScoreTally` – obsahuje i `MultiplierTally`, takže `AppModel.multipliers` = `score.multipliers`). Počítají se spojení od `contest.effectiveStart` (jako násobiče); zalogování se přičte (`ScoreCalculator.add`), úplný přepočet jen při načtení/změně logu, změně závodu, vlastní značky nebo lokátoru; QTC série (WAE) se přepočtou při změně `qtcSeries`. Pravidla ověřena v oficiálních pravidlech 30. 9. 2026 (stejné zdroje jako násobiče):
+
+| Závod | Body za QSO | Skóre | Zdroj |
+|---|---|---|---|
+| ARRL RTTY Roundup | 1 | body × (země DXCC bez W/VE + státy + provincie), jednou za závod | RTTY-RU-Rules.pdf §5 – ověřeno |
+| CQ WPX RTTY | jiný kontinent 3 (80/40 m: 6), stejný kontinent jiná země 2 (4), stejná země 1 (2) | body × prefixy | cqwpxrtty.com/rules.htm – ověřeno (bez výjimky pro Severní Ameriku) |
+| BARTG HF RTTY | 1 | body × násobiče po pásmech (země + oblasti) × kontinenty | bartg-hf-rtty-rules-2025-v3.pdf („QSO points x multipliers x continents“) – ověřeno |
+| SARTG WW RTTY | vlastní země 5, vlastní kontinent 10, jiný kontinent 15 | body × násobiče | sartg.com/contest/wwrules.htm – ověřeno |
+| CQ WW RTTY | stejná země 1, stejný kontinent 2, jiný kontinent 3 | body × (zóny + země + W/VE QTH) | cqwwrtty.com/rules.htm – ověřeno |
+| Makrothen RTTY | km mezi středy čtverců (4 znaky), R = 6378,16 km, dolů; × váha pásma 80 m 2, 40 m 1,5, ostatní 1, dolů; stejný čtverec 100 bez váhy | součet bodů | pl259.org/makrothen – ověřeno |
+| JARTS WW RTTY | stejný kontinent (i vlastní země) 2, jiný kontinent 3 | body × násobiče | jarl.org – ověřeno; **text „body na každém pásmu × násobiče na každém pásmu“ je nejednoznačný – počítá se součet × součet (neověřeno)** |
+| WAE DX RTTY | 1 za QSO + 1 za každé odeslané i přijaté QTC | (QSO + QTC) × násobiče s váhou pásem (80 m × 4, 40 m × 3, ostatní × 2) | darc.de WAE rules §8 – ověřeno |
+| OK DX RTTY | 20/15/10 m: vlastní kontinent 1, jiný 2; 80/40 m: 3 a 6 | body × násobiče | okrtty.crk.cz – ověřeno |
+
+- Duplicita = stejná základní značka, pásmo a mód (jako `DupeCheck`) – 0 bodů, v okně sloupec Duplicity. Všechny závody: stejnou stanici jen jednou na pásmu.
+- Země a kontinent podle cty.dat (`CountryDB.lookup`, u CQ WW a WAE i seznam WAE). **Neznámá země jedné ze stanic (např. /MM) → nejnižší bodová hodnota (neověřeno, pravidla to neřeší).**
+- Makrothen: lokátor protistanice = první platný lokátor v přijaté výměně, jinak pole Grid; vlastní = Nastavení → Stanice → lokátor, jinak odesílaná výměna. Bez lokátoru 0 bodů.
+- WAE: QTC do pásma podle kmitočtu série (bez kmitočtu řádek „neznámé“), série před začátkem závodu se nepočítají.
+- Spojení bez kmitočtu jsou v řádku „neznámé“; WPX a OK DX je boduje jako vysoká pásma.
+- Výsledek je odhad (claimed score): vyhodnocení odečte NIL, chybné výměny a penalizace (např. CQ WW 2× body za bust/NIL), to aplikace nedělá.
+- Stavový řádek: „Skóre N“ vedle rychlosti, když je závod zapnutý se zvolenou předvolbou.

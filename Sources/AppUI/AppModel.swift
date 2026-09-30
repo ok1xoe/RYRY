@@ -616,19 +616,25 @@ public final class AppModel {
 
     // MARK: Násobiče
 
-    /// Odpracované násobiče závodu (přepočet jen při změně logu nebo závodu); nil = mimo závod / vlastní závod.
-    public private(set) var multipliers: MultiplierTally?
+    /// Odpracované násobiče závodu (část skóre; přepočet jen při změně logu nebo závodu); nil = mimo závod / vlastní závod.
+    public var multipliers: MultiplierTally? { score?.multipliers }
+    /// Skóre závodu: po pásmech QSO, duplicity, body, násobiče, QTC (WAE); nil = mimo závod / vlastní závod.
+    public private(set) var score: ScoreTally?
     /// Pravidla násobičů zvoleného závodu (i Makrothen bez násobičů); nil = mimo závod.
     public private(set) var multiplierRule: MultiplierRule?
     /// Násobiče, které by přineslo spojení se značkou v QSO okně (štítek NEW MULT).
     public private(set) var newMultiplier = NewMultiplier(hits: [], band: nil)
-    private var multiplierCalculator: MultiplierCalculator?
+    private var scoreCalculator: ScoreCalculator?
     private var multiplierKeyApplied: MultiplierKey?
 
-    private struct MultiplierKey: Equatable { var contest: ContestSettings; var call: String }
+    private struct MultiplierKey: Equatable { var contest: ContestSettings; var call: String; var locator: String }
     private var multiplierKey: MultiplierKey {
-        var c = settings.contest; c.nextSerial = 0                     // číslo spojení násobiče nemění
-        return MultiplierKey(contest: c, call: settings.station.call.uppercased())
+        var c = settings.contest; c.nextSerial = 0                     // číslo spojení násobiče ani body nemění
+        return MultiplierKey(contest: c, call: settings.station.call.uppercased(), locator: ownLocator)
+    }
+    /// Vlastní lokátor pro body Makrothenu (Nastavení → Stanice, jinak odesílaná výměna závodu).
+    private var ownLocator: String {
+        settings.station.locator.isEmpty ? settings.contest.exchange.uppercased() : settings.station.locator.uppercased()
     }
     private var countryDB: CountryDB? { app?.countries ?? CountryDB.shared }
 
@@ -641,14 +647,14 @@ public final class AppModel {
     /// Počet úplných přepočtů násobičů (test: zalogování nepřepočítává celý log).
     private(set) var multiplierFullRecomputes = 0
 
-    /// Zalogované spojení: do logu a průběžně do násobičů (bez přepočtu celého logu).
+    /// Zalogované spojení: do logu a průběžně do skóre a násobičů (bez přepočtu celého logu).
     private func addLoggedRecord(_ r: QSORecord) {
         logRecordsIncremental = true
         logRecords.insert(r, at: 0)
         logRecordsIncremental = false
-        guard let calc = multiplierCalculator, var t = multipliers else { return }
+        guard let calc = scoreCalculator, var t = score else { return }
         calc.add(r, to: &t, since: settings.contest.effectiveStart)
-        multipliers = t
+        score = t
         refreshNewMultiplier()
     }
 
@@ -657,18 +663,21 @@ public final class AppModel {
         multiplierKeyApplied = multiplierKey
         let db = countryDB
         let own = db?.lookup(settings.station.call)?.primaryPrefix
-        guard let rule = MultiplierRule.rule(for: settings.contest, ownCountry: own) else {
-            multiplierRule = nil; multipliers = nil; multiplierCalculator = nil; refreshNewMultiplier(); return
+        guard let rule = MultiplierRule.rule(for: settings.contest, ownCountry: own),
+              let sRule = ScoreRule.rule(for: settings.contest) else {
+            multiplierRule = nil; score = nil; scoreCalculator = nil; refreshNewMultiplier(); return
         }
-        let calc = MultiplierCalculator(rule: rule, countries: db)
-        multiplierRule = rule; multiplierCalculator = calc
-        multipliers = calc.tally(records: logRecords, since: settings.contest.effectiveStart)
+        let calc = ScoreCalculator(rule: sRule, multiplierRule: rule, ownCall: settings.station.call, ownLocator: ownLocator) {
+            call, wae in db?.lookup(call, wae: wae)
+        }
+        multiplierRule = rule; scoreCalculator = calc
+        score = calc.tally(records: logRecords, qtc: qtcSeries, since: settings.contest.effectiveStart)
         refreshNewMultiplier()
     }
 
     private func refreshNewMultiplier() {
         var n = NewMultiplier(hits: [], band: nil)
-        if let calc = multiplierCalculator, let t = multipliers, !qso.call.isEmpty {
+        if let calc = scoreCalculator?.multipliers, let t = multipliers, !qso.call.isEmpty {
             n = t.newHits(calc.hits(call: qso.call, exchange: qso.exchangeRcvd), band: currentBand)
         }
         if n != newMultiplier { newMultiplier = n }
@@ -858,7 +867,9 @@ public final class AppModel {
     }
 
     /// Všechny uložené série (okno Log → QTC), nejnovější první.
-    public private(set) var qtcSeries: [QTCSeries] = []
+    public private(set) var qtcSeries: [QTCSeries] = [] {
+        didSet { if score != nil { score?.setQTC(qtcSeries, since: settings.contest.effectiveStart) } }   // body za QTC (WAE)
+    }
     public struct QTCSummary: Equatable, Sendable { public var sent = 0, received = 0, seriesCount = 0; public var points: Int { sent + received } }
     public var qtcSummary: QTCSummary {
         var r = QTCSummary()
