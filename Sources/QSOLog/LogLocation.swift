@@ -18,7 +18,12 @@ public struct LogLocation: Sendable, Equatable {
     public var directory: URL
     public var name: String
 
-    public init(directory: URL, name: String) { self.directory = directory.standardizedFileURL; self.name = name }
+    /// Always stored as a directory URL: `URL(fileURLWithPath:)` adds the trailing slash only when the folder exists,
+    /// and without it the same folder would not compare equal (`copy(to:)` would miss "the same as the current log").
+    public init(directory: URL, name: String) {
+        self.directory = URL(fileURLWithPath: directory.standardizedFileURL.path, isDirectory: true)
+        self.name = name
+    }
 
     /// From the selected file (`.adi`, `.adif`, `.jsonl` or without an extension).
     public init(file: URL) {

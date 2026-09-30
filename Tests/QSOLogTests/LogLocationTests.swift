@@ -12,6 +12,9 @@ private func tmp() -> URL {
 @Test func logLocationFromFile() {
     let d = URL(fileURLWithPath: "/tmp/x")
     #expect(LogLocation(file: d.appendingPathComponent("zavod.adi")) == LogLocation(directory: d, name: "zavod"))
+    // the same folder with and without the trailing slash (URL(fileURLWithPath:) adds it only for an existing directory)
+    #expect(LogLocation(directory: URL(fileURLWithPath: "/nonexistent/x"), name: "a")
+            == LogLocation(directory: URL(fileURLWithPath: "/nonexistent/x/"), name: "a"))
     #expect(LogLocation(file: d.appendingPathComponent("zavod.jsonl")).name == "zavod")
     #expect(LogLocation(file: d.appendingPathComponent("moje.log.ADIF")).name == "moje.log")
     let l = LogLocation(directory: d, name: "zavod")
