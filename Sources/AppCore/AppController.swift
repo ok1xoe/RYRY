@@ -227,6 +227,13 @@ public actor AppController {
         return c
     }
 
+    /// Kontext pro příkazy DX clusteru: jako `macroContext()` + frekvence rigu (nebo ruční frekvence QSO) v kHz pro `%k`.
+    public func clusterMacroContext() async -> MacroContext {
+        var c = macroContext()
+        if let hz = await currentFrequency(manual: qso.frequency), hz > 0 { c.rigKHz = hz / 1000 }
+        return c
+    }
+
     private var isBARTG: Bool { settings.contest.enabled && settings.contest.format == .bartg }
 
     /// BARTG: první vysílání se zadanou značkou = začátek QSO → čas se zafixuje (MMTTY SetHisUTC).

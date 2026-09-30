@@ -11,6 +11,8 @@ public struct MacroContext: Sendable, Equatable {
     public var now: Date = Date()
     /// Místní čas protistanice = UTC + offset (z DXCC); nil = země neznámá (%g → HELLO, %f → nic).
     public var hisUTCOffsetHours: Double?
+    /// Frekvence rigu v kHz (%k; jen pro příkazy DX clusteru, např. `dx %k %c RTTY`); nil = neznámá (%k → nic).
+    public var rigKHz: Double?
     public init() {}
 }
 
@@ -118,6 +120,22 @@ public enum MacroEngine {
         return res
     }
 
+    /// Maximální délka jednoho příkazu pro DX cluster (znaků).
+    public static let maxClusterLine = 250
+
+    /// Makro pro DX cluster: stejné proměnné jako vysílací makro (+ `%k` frekvence rigu v kHz), ale jen text:
+    /// `\` a `#` na začátku/konci, CW ID `%{…}`, `%L` `%F` `%l` `%E` se neberou jako řídicí (zahodí se), řádek = příkaz.
+    /// Řídicí znaky (kromě dělení řádků CR/LF) se odstraní, prázdné řádky se vynechají, řádek se ořízne na 250 znaků.
+    public static func expandCluster(_ template: String, context c: MacroContext) -> [String] {
+        let r = expand(template, context: c)
+        let text = r.outputs.compactMap { o -> String? in if case .text(let t) = o { t } else { nil } }.joined()
+        return text.split(whereSeparator: { $0 == "\r" || $0 == "\n" || $0 == "\r\n" }).compactMap { line in
+            let clean = String(String.UnicodeScalarView(line.unicodeScalars.filter { $0.value >= 0x20 && $0.value != 0x7F }))
+                .trimmingCharacters(in: .whitespaces)
+            return clean.isEmpty ? nil : String(clean.prefix(maxClusterLine))
+        }
+    }
+
     /// Hodnota proměnné %x (bez řídicích a CW maker).
     static func variable(_ code: Unicode.Scalar, _ c: MacroContext) -> String {
         func after3(_ s: String) -> String { s.count > 3 ? String(s.dropFirst(3)) : "" }
@@ -138,6 +156,9 @@ public enum MacroEngine {
             let n = after3(c.hisRST)
             let parts = n.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
             return parts.count > 1 ? String(parts[1]) : ""
+        case "k":
+            guard let k = c.rigKHz, k.isFinite, k > 0 else { return "" }
+            return String(format: "%.1f", k)
         case "g", "f":
             // TMmttyWd::SetGreetingString: místní čas protistanice podle země
             guard let off = c.hisUTCOffsetHours, off.isFinite else { return code == "g" ? "HELLO" : "" }

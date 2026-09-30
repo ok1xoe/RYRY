@@ -178,6 +178,10 @@ public final class AppModel {
     public private(set) var app: AppController?
     /// Spoty z DX clusteru a RBN (síť běží mimo hlavní vlákno, jen když je uživatel zapnul).
     public let spotFeed = SpotFeed()
+    /// Naposledy ručně odeslané příkazy DX clusteru (nejnovější poslední; max. 30) – šipka nahoru v okně Spoty.
+    public internal(set) var clusterHistory: [String] = []
+    /// Hláška o posledním příkazu clusteru (chyba); nil = v pořádku.
+    public internal(set) var clusterMessage: String?
     private var fldigi: FldigiXMLRPCServer?
     private var json: JSONRPCServer?
     private var eventTask: Task<Void, Never>?
@@ -1393,9 +1397,10 @@ public final class AppModel {
         settings.spots = p
         do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
         guard app != nil else { return }
-        var noReconnect = old; noReconnect.showInWaterfall = p.showInWaterfall
+        var noReconnect = old; noReconnect.showInWaterfall = p.showInWaterfall; noReconnect.clusterMacros = p.clusterMacros
         if noReconnect == p { return }                                   // jen zobrazení štítků, spojení se nemění
         var onlyFilter = old; onlyFilter.rttyOnly = p.rttyOnly; onlyFilter.showInWaterfall = p.showInWaterfall
+        onlyFilter.clusterMacros = p.clusterMacros
         if onlyFilter == p, p.rttyOnly { spotFeed.rttyOnly = true }      // jen zúžení zobrazení, spojení se nemění
         else { startSpots() }                                            // rozšíření na všechny módy: nová data ze serveru
     }
@@ -1646,6 +1651,14 @@ public final class AppModel {
         var s = settings; s.macros = m; settings = s
         await app?.setMacros(m)
         do { try settingsStore.save(s) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
+    }
+
+    /// Uloží makra clusteru (10 položek) – spojení se nemění.
+    public func saveClusterMacros(_ m: [Macro]) {
+        var list = Array(m.prefix(SpotSettings.clusterMacroCount))
+        while list.count < SpotSettings.clusterMacroCount { list.append(Macro(name: "", text: "")) }
+        settings.spots.clusterMacros = list
+        do { try settingsStore.save(settings) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
     }
 
     public func saveMessages(_ m: [Macro]) async {

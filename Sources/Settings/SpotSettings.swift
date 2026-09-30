@@ -9,6 +9,8 @@ public struct SpotSettings: Codable, Sendable, Equatable {
     public var clusterPort = 23
     /// Příkazy po přihlášení, jeden na řádek (např. `set/skimmer`, `sh/dx 30`).
     public var clusterCommands: [String] = ["sh/dx 30"]
+    /// Makra tlačítek příkazů DX clusteru (vždy 10 položek); text = příkaz(y), jeden na řádek, proměnné jako u maker pro vysílání.
+    public var clusterMacros: [Macro] = SpotSettings.defaultClusterMacros
     public var rbnEnabled = false
     public var rbnHost = "telnet.reversebeacon.net"
     public var rbnPort = 7000
@@ -24,10 +26,24 @@ public struct SpotSettings: Codable, Sendable, Equatable {
     public static let ageRange = 1...240
     public static let offsetRange = -10_000.0...10_000.0
     public static let maxCommands = 10
+    public static let clusterMacroCount = 10
+    /// Výchozí příkazy DXSpider / CC Cluster. „RTTY“ (`sh/dx 30 info rtty`) – kvalifikátor `info` hledá v komentáři.
+    public static let defaultClusterMacros: [Macro] = [
+        Macro(name: "SH/DX", text: "sh/dx 30"),
+        Macro(name: "RTTY", text: "sh/dx 30 info rtty"),
+        Macro(name: "20 m", text: "sh/dx on 20m"),
+        Macro(name: "40 m", text: "sh/dx on 40m"),
+        Macro(name: "WWV", text: "sh/wwv"),
+        Macro(name: "Slunce", text: "sh/sun"),
+        Macro(name: "Skimmer ON", text: "set/skimmer"),
+        Macro(name: "Skimmer OFF", text: "unset/skimmer"),
+        Macro(name: "Uživatelé", text: "sh/users"),
+        Macro(name: "Spot", text: "dx %k %c RTTY"),
+    ]
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case clusterEnabled, clusterHost, clusterPort, clusterCommands, rbnEnabled, rbnHost, rbnPort, rttyOnly, maxAgeMinutes, offsetHz, showInWaterfall
+        case clusterEnabled, clusterHost, clusterPort, clusterCommands, clusterMacros, rbnEnabled, rbnHost, rbnPort, rttyOnly, maxAgeMinutes, offsetHz, showInWaterfall
     }
 
     static func validHost(_ h: String) -> Bool {
@@ -44,6 +60,11 @@ public struct SpotSettings: Codable, Sendable, Equatable {
             ? Array(c.tolerant(.clusterCommands, TolerantArray<String>(), w, s).items
                 .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.prefix(Self.maxCommands))
             : x.clusterCommands
+        var cm = c.contains(.clusterMacros)
+            ? Array(c.tolerant(.clusterMacros, TolerantArray<Macro>(), w, s).items.prefix(Self.clusterMacroCount))
+            : x.clusterMacros
+        while cm.count < Self.clusterMacroCount { cm.append(Macro(name: "", text: "")) }
+        clusterMacros = cm
         rbnEnabled = c.tolerant(.rbnEnabled, x.rbnEnabled, w, s)
         let rh = c.tolerant(.rbnHost, x.rbnHost, w, s).trimmingCharacters(in: .whitespaces)
         rbnHost = Self.validHost(rh) ? rh : x.rbnHost

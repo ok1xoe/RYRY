@@ -13,13 +13,15 @@ final class FakeCluster: @unchecked Sendable {
     let prompt: String
     let spots: [String]
     let dropAfterSpots: Bool
+    /// Odpovědi na příkazy po přihlášení (klíč = příkaz).
+    let responses: [String: [String]]
     private(set) var port: UInt16 = 0
 
     var received: [String] { lock.withLock { _received } }
     var connections: Int { lock.withLock { _connections } }
 
-    init(prompt: String = "login: ", spots: [String], dropAfterSpots: Bool = false) throws {
-        self.prompt = prompt; self.spots = spots; self.dropAfterSpots = dropAfterSpots
+    init(prompt: String = "login: ", spots: [String], dropAfterSpots: Bool = false, responses: [String: [String]] = [:]) throws {
+        self.prompt = prompt; self.spots = spots; self.dropAfterSpots = dropAfterSpots; self.responses = responses
         listener = try NWListener(using: .tcp, on: .any)
     }
 
@@ -51,6 +53,9 @@ final class FakeCluster: @unchecked Sendable {
                 while let r = buf.range(of: "\r\n") {
                     let line = String(buf[..<r.lowerBound]); buf.removeSubrange(..<r.upperBound)
                     self.lock.withLock { self._received.append(line) }
+                    if loggedIn, let r = self.responses[line] {
+                        c.send(content: Data((r.joined(separator: "\r\n") + "\r\n").utf8), completion: .idempotent)
+                    }
                     if !loggedIn {
                         loggedIn = true
                         let text = "Hello, " + line + "\r\n" + self.spots.joined(separator: "\r\n") + "\r\n"
