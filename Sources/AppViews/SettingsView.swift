@@ -42,7 +42,7 @@ public struct SettingsView: View {
             }
             Divider()
             HStack {
-                Image(systemName: "info.circle").foregroundStyle(.secondary)
+                Image(systemName: "info.circle").foregroundStyle(.secondary).accessibilityHidden(true)
                 Text(L("Změny se projeví po Použít (restart zvuku, rigu a API). Parametry modemu platí hned."))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
@@ -80,8 +80,11 @@ struct NumberRow: View {
         LabeledContent(title) {
             HStack(spacing: 4) {
                 TextField("", value: $value, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 70)
+                    .accessibilityLabel(unit.isEmpty ? title : title + " (" + unit + ")")
                 Text(unit).foregroundStyle(.secondary).frame(minWidth: 18, alignment: .leading)
+                    .accessibilityHidden(true)                  // the unit is part of the field's label
                 Stepper("", value: $value, in: range, step: step).labelsHidden()
+                    .accessibilityLabel(title)
             }
         }
     }
@@ -132,7 +135,10 @@ struct AudioTab: View {
                 LabeledContent(L("Hlasitost")) {
                     HStack {
                         Slider(value: $s.audio.outputGain, in: 0...1)
+                            .accessibilityLabel(L("Hlasitost"))
+                            .accessibilityValue("\(Int(s.audio.outputGain * 100)) %")
                         Text("\(Int(s.audio.outputGain * 100)) %").monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
+                            .accessibilityHidden(true)           // the same value is on the slider
                     }
                 }
             }
@@ -141,14 +147,16 @@ struct AudioTab: View {
                     HStack(spacing: 4) {
                         TextField("", value: $s.clock.rxPPM, format: .number.precision(.fractionLength(0...2)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
-                        Text("ppm").foregroundStyle(.secondary)
+                            .accessibilityLabel(L("Korekce RX (ppm)"))
+                        Text("ppm").foregroundStyle(.secondary).accessibilityHidden(true)
                     }
                 }
                 LabeledContent(L("Korekce TX")) {
                     HStack(spacing: 4) {
                         TextField("", value: $s.clock.txPPM, format: .number.precision(.fractionLength(0...2)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
-                        Text("ppm").foregroundStyle(.secondary)
+                            .accessibilityLabel(L("Korekce TX (ppm)"))
+                        Text("ppm").foregroundStyle(.secondary).accessibilityHidden(true)
                     }
                 }
                 LabeledContent {
@@ -267,6 +275,7 @@ struct RigTab: View {
                             TextField("", text: Binding(get: { String(format: "%02X", s.rig.civAddress) },
                                                         set: { if let v = Int($0, radix: 16), (1...0xDF).contains(v) { s.rig.civAddress = v } }))
                                 .multilineTextAlignment(.trailing).frame(width: 60)
+                                .accessibilityLabel(L("Adresa CI-V (hex)"))
                         }
                     }
                 }
@@ -298,8 +307,10 @@ struct RigTab: View {
                                     Text(s.rig.serialPort + " " + L("(nepřipojen)")).tag(s.rig.serialPort)
                                 }
                             }.labelsHidden()
+                            .accessibilityLabel(L("Sériový port"))
                             Button { ports = POSIXSerialPort.availablePorts() } label: { Image(systemName: "arrow.clockwise") }
                                 .hint(L("Znovu načíst porty"))
+                                .accessibilityLabel(L("Znovu načíst porty"))
                         }
                     }
                     Picker(L("Rychlost"), selection: $s.rig.baud) {
@@ -413,10 +424,12 @@ struct APITab: View {
                 Toggle("fldigi XML-RPC", isOn: $s.api.fldigiEnabled)
                 LabeledContent(L("Port")) {
                     TextField("", value: $s.api.fldigiPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                        .accessibilityLabel(L("Port fldigi XML-RPC"))
                 }.disabled(!s.api.fldigiEnabled)
                 Toggle("JSON-RPC (WebSocket)", isOn: $s.api.jsonRPCEnabled)
                 LabeledContent(L("Port")) {
                     TextField("", value: $s.api.jsonRPCPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                        .accessibilityLabel(L("Port JSON-RPC"))
                 }.disabled(!s.api.jsonRPCEnabled)
                 Toggle(L("Povolit přístup ze sítě"), isOn: $s.api.allowRemote)
             } header: { Text(L("API pro loggery")) } footer: {
@@ -449,6 +462,7 @@ struct APITab: View {
                         Button { try? FileManager.default.createDirectory(at: s.log.rxDirectory, withIntermediateDirectories: true)
                                  NSWorkspace.shared.open(s.log.rxDirectory) } label: { Image(systemName: "folder") }
                             .hint(L("Otevřít složku"))
+                            .accessibilityLabel(L("Otevřít složku záznamu příjmu"))
                     }
                 }
             } header: { Text(L("Záznam příjmu")) } footer: {
@@ -476,9 +490,11 @@ struct SpotsTab: View {
                 TextField(L("Server"), text: $s.spots.clusterHost).disabled(!s.spots.clusterEnabled)
                 LabeledContent(L("Port")) {
                     TextField("", value: $s.spots.clusterPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                        .accessibilityLabel(L("Port DX clusteru"))
                 }.disabled(!s.spots.clusterEnabled)
                 LabeledContent(L("Příkazy po přihlášení")) {
                     TextEditor(text: commands).font(.system(.body, design: .monospaced)).frame(width: 260, height: 54)
+                        .accessibilityLabel(L("Příkazy po přihlášení"))
                         .border(Color.secondary.opacity(0.3))
                 }.disabled(!s.spots.clusterEnabled)
             } header: { Text("DX cluster") } footer: {
@@ -489,6 +505,7 @@ struct SpotsTab: View {
                 TextField(L("Server"), text: $s.spots.rbnHost).disabled(!s.spots.rbnEnabled)
                 LabeledContent(L("Port")) {
                     TextField("", value: $s.spots.rbnPort, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
+                        .accessibilityLabel(L("Port RBN"))
                 }.disabled(!s.spots.rbnEnabled)
             } header: { Text("RBN") } footer: {
                 Text(L("Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat ve filtru módů jen RTTY."))
@@ -500,7 +517,8 @@ struct SpotsTab: View {
                 LabeledContent(L("Posun frekvence rigu")) {
                     HStack {
                         TextField("", value: $s.spots.offsetHz, format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 80)
-                        Text("Hz")
+                            .accessibilityLabel(L("Posun frekvence rigu (Hz)"))
+                        Text("Hz").accessibilityHidden(true)
                     }
                 }
             } header: { Text(L("Spoty")) } footer: {
@@ -513,6 +531,7 @@ struct SpotsTab: View {
                 Toggle(L("Hlídat novou zemi vůbec"), isOn: $s.alerts.newCountryAny)
                 LabeledContent(L("Hlídané značky")) {
                     TextEditor(text: $s.alerts.watchCalls).font(.system(.body, design: .monospaced)).frame(width: 260, height: 70)
+                        .accessibilityLabel(L("Hlídané značky"))
                         .border(Color.secondary.opacity(0.3))
                 }
                 Toggle(L("Zvuk u potřebných značek a zemí"), isOn: $s.alerts.neededSound)
@@ -680,14 +699,18 @@ struct ModemTab: View {
                     LabeledContent(title) {
                         HStack(spacing: 4) {
                             TextField("", value: model.doubleBinding(d.id), format: .number).multilineTextAlignment(.trailing).frame(width: 90)
+                                .accessibilityLabel(unit.map { title + " (" + $0 + ")" } ?? title)
                             Text(unit ?? "").foregroundStyle(.secondary).frame(width: 28, alignment: .leading)
+                                .accessibilityHidden(true)
                         }
                     }.hint("\(r.lowerBound.formatted())…\(r.upperBound.formatted())")
                 case .int(let r):
                     LabeledContent(title) {
                         HStack(spacing: 4) {
                             TextField("", value: intBinding(d.id), format: .number).multilineTextAlignment(.trailing).frame(width: 70)
+                                .accessibilityLabel(title)
                             Stepper("", value: intBinding(d.id), in: r).labelsHidden()
+                                .accessibilityLabel(title)
                         }
                     }
                 }
@@ -762,7 +785,9 @@ struct ContestTab: View {
                         if s.contest.start != nil {
                             DatePicker("", selection: Binding(get: { s.contest.start ?? Date() }, set: { s.contest.start = $0 }))
                                 .labelsHidden().environment(\.timeZone, TimeZone(identifier: "UTC")!)
+                                .accessibilityLabel(L("Začátek (UTC)"))
                             Button(L("Zrušit")) { s.contest.start = nil }
+                                .accessibilityLabel(L("Zrušit začátek závodu"))
                         } else {
                             Text(L("posledních 72 h")).foregroundStyle(.secondary)
                         }
@@ -821,7 +846,10 @@ struct DisplayTab: View {
                 LabeledContent(L("Zesílení")) {
                     HStack {
                         Slider(value: $s.display.gainDB, in: -30...30, step: 1)
+                            .accessibilityLabel(L("Zesílení"))
+                            .accessibilityValue("\(Int(s.display.gainDB)) dB")
                         Text("\(Int(s.display.gainDB)) dB").monospacedDigit().foregroundStyle(.secondary).frame(width: 48, alignment: .trailing)
+                            .accessibilityHidden(true)           // the same value is on the slider
                     }
                 }
                 Picker(L("Paleta vodopádu"), selection: $s.display.palette) {
@@ -851,8 +879,10 @@ struct DisplayTab: View {
                 }
                 LabeledContent(L("Velikost písma")) {
                     HStack(spacing: 4) {
-                        Text("\(Int(s.display.fontSize)) pt").monospacedDigit()
+                        Text("\(Int(s.display.fontSize)) pt").monospacedDigit().accessibilityHidden(true)
                         Stepper("", value: $s.display.fontSize, in: 9...32).labelsHidden()
+                            .accessibilityLabel(L("Velikost písma"))
+                            .accessibilityValue("\(Int(s.display.fontSize)) pt")
                     }
                 }
                 ColorRow(title: L("Pozadí příjmu"), hex: $s.display.rxBackground, fallback: Color(nsColor: .textBackgroundColor))
@@ -911,9 +941,13 @@ struct ColorRow: View {
     var body: some View {
         LabeledContent(title) {
             HStack {
-                if hex != nil { Button(L("Výchozí")) { hex = nil }.controlSize(.small) }
+                if hex != nil {
+                    Button(L("Výchozí")) { hex = nil }.controlSize(.small)
+                        .accessibilityLabel(L("Výchozí barva: %@", title))
+                }
                 ColorPicker("", selection: Binding(get: { Color(hex: hex) ?? fallback }, set: { hex = $0.hexString }),
                             supportsOpacity: false).labelsHidden()
+                    .accessibilityLabel(title)
             }
         }
     }
@@ -930,8 +964,10 @@ struct KeysTab: View {
                         HStack {
                             if s.shortcuts[c.id] != nil {
                                 Button(L("Výchozí")) { s.shortcuts[c.id] = nil }.controlSize(.small)
+                                    .accessibilityLabel(L("Výchozí zkratka: %@", title(c)))
                             }
-                            KeyRecorder(binding: Binding(get: { s.binding(for: c) },
+                            KeyRecorder(label: title(c),
+                                        binding: Binding(get: { s.binding(for: c) },
                                                          set: { s.shortcuts[c.id] = $0 == c.defaultBinding ? nil : $0 }))
                         }
                     }
@@ -964,12 +1000,17 @@ struct KeysTab: View {
         case .openLog: return L("Otevřít log")
         case .esmMode: return L("ESM: přepnout Run / S&P")
         case .enterFrequency: return L("Zadat frekvenci")
+        case .tuneStrongest: return L("Naladit na nejsilnější signál")
+        case .notchStrongest: return L("Zářez na nejsilnější rušení")
+        case .insertLastCall: return L("Vložit poslední přijatou značku")
         }
     }
 }
 
 /// A field for recording a shortcut: after a click it waits for a key press.
 struct KeyRecorder: View {
+    /// The command name - VoiceOver would otherwise only hear the symbols of the shortcut.
+    var label = ""
     @Binding var binding: KeyBinding
     @State private var recording = false
     @State private var monitor: Any?
@@ -978,6 +1019,9 @@ struct KeyRecorder: View {
         Button(recording ? L("Stiskni klávesy…") : binding.display) { recording ? stop() : start() }
             .monospaced()
             .frame(minWidth: 110)
+            .accessibilityLabel(label.isEmpty ? L("Klávesová zkratka") : L("Zkratka: %@", label))
+            .accessibilityValue(binding.isNone ? L("bez zkratky") : binding.display)
+            .accessibilityHint(Text(L("Aktivuj a stiskni novou kombinaci kláves; Delete = bez zkratky, Esc = zrušit")))
             .onDisappear { stop() }
     }
 

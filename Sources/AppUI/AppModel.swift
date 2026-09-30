@@ -240,6 +240,12 @@ public final class AppModel {
 
     func noteForTesting(_ m: String) { note(m) }
 
+    /// Feeds one spectrum frame into the waterfall (the spectrum loop does this; used by tests of the
+    /// keyboard routes that work off the spectrum - see AppModel+Accessibility).
+    func pushSpectrumForTesting(_ f: SpectrumFrame) {
+        waterfall.push(f, fromHz: waterfallFromHz, toHz: waterfallToHz)
+    }
+
     func note(_ m: String) {
         logger.notice("\(m, privacy: .public)")
         messages.append(m)
@@ -1457,6 +1463,10 @@ public final class AppModel {
 
     /// A request to open the frequency entry (a shortcut / the menu); the top bar shows it and clears the request.
     public var showFrequencyEntry = false
+
+    /// A request to open the editor of macro N (the menu / a VoiceOver action - the keyboard route instead of a
+    /// right click on the macro button); the macro bar shows the sheet and clears the request.
+    public var editMacroRequest: Int?
 
     /// Sets the frequency in kHz: with a rig it retunes the rig (in RX only, just like `useSpot`), without a rig it writes the manual QSO frequency.
     @discardableResult

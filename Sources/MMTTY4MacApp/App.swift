@@ -113,6 +113,13 @@ struct MMTTY4MacApp: App {
                 Button(L("Zastavit opakování makra")) { Task { await model.stopMacro() } }
                     .shortcut(model.settings.binding(for: .stopMacro))
                 Button(L("Odeslat textový soubor…")) { FileActions.sendTextFile(model) }
+                // the keyboard route instead of a right click on a macro button
+                Menu(L("Upravit makro")) {
+                    ForEach(0..<AppSettings.macroCount, id: \.self) { i in
+                        let name = i < model.settings.macros.count ? model.settings.macros[i].name : ""
+                        Button(name.isEmpty ? L("Makro %ld", i + 1) : L("Makro %ld – %@", i + 1, name)) { model.editMacroRequest = i }
+                    }
+                }
                 Divider()
                 Button(L("Zalogovat QSO")) { Task { await model.logQSO() } }.shortcut(model.settings.binding(for: .logQSO))
                 Button(L("Vymazat QSO")) { Task { await model.clearQSO() } }.shortcut(model.settings.binding(for: .clearQSO))
@@ -124,6 +131,13 @@ struct MMTTY4MacApp: App {
                 Divider()
                 Button(L("Zadat frekvenci…")) { model.showFrequencyEntry = true }
                     .shortcut(model.settings.binding(for: .enterFrequency))
+                // keyboard routes for what otherwise needs the mouse in the waterfall, the spectrum and the receive window
+                Button(L("Naladit na nejsilnější signál")) { Task { await model.tuneToStrongestSignal() } }
+                    .shortcut(model.settings.binding(for: .tuneStrongest))
+                Button(L("Zářez na nejsilnější rušení")) { Task { await model.notchStrongestInterference() } }
+                    .shortcut(model.settings.binding(for: .notchStrongest))
+                Button(L("Vložit poslední přijatou značku")) { Task { await model.insertLastReceivedCall() } }
+                    .shortcut(model.settings.binding(for: .insertLastCall))
             }
             CommandGroup(replacing: .appInfo) {
                 Button(L("O aplikaci mmtty4mac")) { showAbout() }

@@ -27,13 +27,24 @@ struct MacroBar: View {
                                                           color: i < macros.count ? Color(hex: macros[i].color) : nil))
                         .contextMenu { Button(L("Upravit…")) { editing = i } }
                         .disabled(i >= macros.count || macros[i].text.isEmpty)
+                        // the visible label is the shortcut plus a short name; VoiceOver gets the macro number and name
+                        .accessibilityLabel(name.isEmpty ? L("Makro %ld", i + 1) : L("Makro %ld – %@", i + 1, name))
+                        .accessibilityValue(kb.isNone ? "" : kb.display)
+                        // the keyboard/VoiceOver route instead of a right click (also in Vysílání → Upravit makro)
+                        .accessibilityAction(named: L("Upravit makro")) { editing = i }
                     }
                 }
             }
         }
         .padding(6)
+        // one group of 16 buttons, each still individually reachable
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L("Makra"))
         .sheet(item: Binding(get: { editing.map { EditIndex(id: $0) } }, set: { editing = $0?.id })) { e in
             MacroEditor(model: model, index: e.id)
+        }
+        .onChange(of: model.editMacroRequest) { _, v in
+            if let v { model.editMacroRequest = nil; editing = v }
         }
     }
 }
@@ -70,15 +81,18 @@ struct MacroEditor: View {
             Text(target == .cluster ? L("Příkaz clusteru %ld", index + 1) : L("Makro %@", MacroBar.keyName(index))).font(.headline)
             TextField(L("Název"), text: $name)
             TextEditor(text: $text).font(.system(.body, design: .monospaced)).frame(minHeight: 120)
+                .accessibilityLabel(target == .cluster ? L("Příkazy clusteru") : L("Text makra"))
             HStack {
                 Toggle(L("Barva tlačítka"), isOn: $useColor)
                 ColorPicker("", selection: $color, supportsOpacity: false).labelsHidden().disabled(!useColor)
+                    .accessibilityLabel(L("Barva tlačítka"))
                 Spacer()
             }
             if target == .transmit {
                 HStack {
                     Text(L("Opakovat po (s, 0 = ne):"))
                     TextField("", value: $repeatSec, format: .number).frame(width: 60)
+                        .accessibilityLabel(L("Opakovat po (s, 0 = ne):"))
                 }
             }
             if target == .cluster {

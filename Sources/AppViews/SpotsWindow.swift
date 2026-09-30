@@ -35,6 +35,7 @@ public struct SpotsWindow: View {
     func status(_ title: String, _ s: TelnetSpotClient.State, enabled: Bool) -> some View {
         HStack(spacing: 4) {
             Circle().fill(Self.stateColor(s, enabled: enabled)).frame(width: 8, height: 8)
+                .accessibilityHidden(true)                       // the state is in the text next to it
             Text(title + ": " + Self.stateText(s, enabled: enabled)).font(.caption)
         }
     }
@@ -57,6 +58,7 @@ public struct SpotsWindow: View {
                     TextField("", value: Binding(get: { model.settings.spots.offsetHz },
                                                  set: { v in model.setSpots { $0.offsetHz = min(max(v, SpotSettings.offsetRange.lowerBound), SpotSettings.offsetRange.upperBound) } }),
                               format: .number.grouping(.never)).multilineTextAlignment(.trailing).frame(width: 64)
+                        .accessibilityLabel(L("Posun (Hz)"))
                 }.fixedSize()
             }
             SpotFilterBar(model: model)
@@ -92,7 +94,16 @@ public struct SpotsWindow: View {
                 guard let id = ids.first, let spot = rows.first(where: { $0.id == id }) else { return }
                 Task { await model.useSpot(spot) }
             }
-            Text(L("Dvojklik: nastaví rig na frekvenci spotu + posun a vloží značku do QSO okna. Rádio v režimu LSB/AFSK s mark 2125 Hz potřebuje posun +2125 Hz. „✓ pásmo“ = značka je už v logu na tomto pásmu."))
+            // keyboard route instead of a double click: Enter uses the selected spot
+            .onKeyPress(.return) {
+                guard let id = selection.first, let spot = rows.first(where: { $0.id == id }) else { return .ignored }
+                Task { await model.useSpot(spot) }
+                return .handled
+            }
+            .accessibilityLabel(L("Tabulka spotů"))
+            .accessibilityHint(Text(L("Enter použije vybraný spot: naladí rig a vloží značku do QSO okna")))
+            Text(L("Dvojklik: nastaví rig na frekvenci spotu + posun a vloží značku do QSO okna. Rádio v režimu LSB/AFSK s mark 2125 Hz potřebuje posun +2125 Hz. „✓ pásmo“ = značka je už v logu na tomto pásmu.")
+                 + " " + L("Enter na vybraném řádku udělá totéž jako dvojklik."))
                 .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             Divider()
             ClusterPanel(model: model)

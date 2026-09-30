@@ -115,6 +115,13 @@ mmtty4mac looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers su
 - **Language:** English by default; change it in Settings → Display → Interface language (Czech, English, loaded languages). Your own translation: **Save template…**, translate the values in `strings`, set `code` and `name`, **Load language…**.
 - **Language files** `cs.json` and `en.json` are in `~/Library/Application Support/mmtty4mac/Languages` and can be edited (a saved change applies immediately; updates do not overwrite an edited file).
 - **Keys:** Settings → Keys – click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).
+- **Without a mouse** (among others for working with VoiceOver, ⌘F5) – all of these are assignable in Settings → Keys:
+  - **⌥⌘F** frequency entry, **⌥⌘S** tune to the strongest signal in the spectrum (instead of clicking the waterfall),
+  - **⌥⌘N** notch on the strongest interference outside the received signal (instead of the right button in the spectrum),
+  - **⌥⌘C** put the last received callsign into the QSO window (instead of clicking a word in the receive window),
+  - **Enter** in the Spots table uses the selected spot; in the Log window it opens the selected QSO for editing,
+  - **Transmit → Edit macro** opens the macro editor (instead of right-clicking a macro button).
+  - For Tab to also move through buttons and checkboxes, turn on System Settings → Accessibility → Keyboard → **Full Keyboard Access**.
 
 ## 11. Troubleshooting
 

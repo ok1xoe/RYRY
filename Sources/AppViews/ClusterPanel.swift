@@ -33,6 +33,9 @@ struct ClusterPanel: View {
                     }
                 }
             }
+            // one group of 10 buttons, each still individually reachable
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(L("Příkazy clusteru"))
             HStack(spacing: 6) {
                 // typing ends the history walk (the arrow then starts again from the newest entry)
                 TextField(L("Příkaz pro DX cluster (např. sh/dx 30)"),
@@ -43,6 +46,7 @@ struct ClusterPanel: View {
                     .onKeyPress(.upArrow) { history(-1); return .handled }
                     .onKeyPress(.downArrow) { history(+1); return .handled }
                     .disabled(!connected)
+                    .accessibilityHint(Text(L("Šipka nahoru a dolů prochází historii příkazů, Enter příkaz odešle")))
                 Button(L("Odeslat")) { send() }
                     .disabled(!connected || command.trimmingCharacters(in: .whitespaces).isEmpty)
                 Menu(L("Upravit")) {
@@ -77,6 +81,11 @@ struct ClusterPanel: View {
             }
             .buttonStyle(.borderedProminentIf(m?.color != nil, color: Color(hex: m?.color)))
             .disabled(!connected || m == nil || m!.isBlank)
+            .accessibilityLabel((m?.name ?? "").isEmpty ? L("Příkaz clusteru %ld", i + 1)
+                                                        : L("Příkaz clusteru %ld – %@", i + 1, m!.name))
+            .accessibilityValue(m?.text ?? "")
+            // the keyboard/VoiceOver route instead of a right click (also in the "Upravit" menu next to Odeslat)
+            .accessibilityAction(named: L("Upravit…")) { editing = i }
         }
         .contentShape(Rectangle())
         .hint(m?.text ?? "")
@@ -98,6 +107,7 @@ struct ClusterPanel: View {
                     .padding(4)
                 }
                 .frame(height: 140)
+                .accessibilityLabel(L("Konzola clusteru"))
                 .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
                 .onChange(of: lines.count) { proxy.scrollTo("end", anchor: .bottom) }
                 .onChange(of: showConsole) { proxy.scrollTo("end", anchor: .bottom) }

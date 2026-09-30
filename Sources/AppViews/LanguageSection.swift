@@ -26,6 +26,7 @@ struct LanguageSection: View {
                         .disabled(library.reference() == nil)
                     Button { openFolder() } label: { Image(systemName: "folder") }
                         .hint(L("Otevřít složku jazyků"))
+                        .accessibilityLabel(L("Otevřít složku jazyků"))
                 }
             }
             if let message { Text(message).font(.caption).foregroundStyle(.secondary) }

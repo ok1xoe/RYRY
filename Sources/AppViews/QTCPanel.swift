@@ -47,6 +47,7 @@ struct QTCPanel: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Button("QTC?") { Task { await model.qtcPhrase(.ask) } }.hint(L("Zeptat se, zda má protistanice QTC"))
+                    .accessibilityLabel(L("Zeptat se na QTC"))
                 Button(L("QRV – přijmout")) { Task { await model.qtcQRVReceive() } }
                     .disabled(model.qso.call.isEmpty || sameContinent)
                     .hint(L("Protistanice nabízí QTC: otevřít příjem a odvysílat QRV"))
@@ -74,14 +75,17 @@ struct QTCPanel: View {
                     if model.qtcPending != nil {
                         Button("↻") { Task { await model.qtcRepeat(i + 1) } }.hint(L("Zopakovat řádek (AGN %ld)", i + 1))
                             .controlSize(.mini)
+                            .accessibilityLabel(L("Zopakovat řádek %ld", i + 1))
                     } else {
                         Button { sending?.remove(at: i) } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.borderless).hint(L("Vynechat"))
+                            .accessibilityLabel(L("Vynechat řádek %ld", i + 1))
                     }
                 }
             }
             HStack {
                 Button("QRV?") { Task { await model.qtcPhrase(.qrvQuery) } }
+                    .accessibilityLabel(L("Zeptat se, zda je protistanice připravena"))
                 Button(L("Poslat vše")) { Task { await model.qtcSend(lines) } }.disabled(lines.isEmpty)
             }
             HStack {
@@ -106,6 +110,7 @@ struct QTCPanel: View {
                 TextField("n/k", text: Binding(get: { d.number.map { "\($0)/\(d.count ?? 0)" } ?? "" },
                                                set: { model.qtcSetHeader($0) }))
                     .frame(width: 60).font(.caption.monospaced())
+                    .accessibilityLabel(L("Číslo série a počet řádků"))
                 Spacer()
                 Button(L("Načíst z příjmu")) { NSApp.keyWindow?.makeFirstResponder(nil); model.qtcFillFromRx() }.hint(L("Rozebrat text přijatý od „Přijmout…“"))
             }
@@ -115,15 +120,18 @@ struct QTCPanel: View {
                     TextField("HHMM ZNAČKA NNN", text: Binding(get: { d.lines[i].map(QTCText.line) ?? "" },
                                                               set: { model.qtcSetLine(i, $0) }))
                         .font(.caption.monospaced())
+                        .accessibilityLabel(L("Řádek QTC %ld", i + 1))
                         // a new field when the content changes from the receive side - a half-typed (empty) field must not overwrite the loaded row
                         .id("\(i)-\(d.lines[i].map(QTCText.line) ?? "")")
                     Button("AGN") { Task { await model.qtcPhrase(.agn(i + 1)) } }.controlSize(.mini)
+                        .accessibilityLabel(L("Požádat o zopakování řádku %ld", i + 1))
                 }
             }
             Text(L("Klik na slova v příjmu: série n/k, pak čas, značka, číslo.")).font(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 4) {
                 Button("QRV") { Task { await model.qtcPhrase(.qrv) } }
+                    .accessibilityLabel(L("Oznámit, že jsem připraven"))
                 Button(L("Uložit – R R ALL OK")) {
                     // save first; only send the confirmation when the series was actually written
                     NSApp.keyWindow?.makeFirstResponder(nil)
