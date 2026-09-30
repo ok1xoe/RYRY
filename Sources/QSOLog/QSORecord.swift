@@ -55,7 +55,7 @@ public struct QSORecord: Codable, Sendable, Equatable, Identifiable {
 public enum UploadTarget: String, Codable, Sendable, CaseIterable { case lotw, eqsl, clublog }
 
 public enum Bands {
-    static let table: [(String, Double, Double)] = [
+    public static let table: [(band: String, lowMHz: Double, highMHz: Double)] = [
         ("2190m", 0.1357, 0.1378), ("630m", 0.472, 0.479), ("160m", 1.8, 2.0), ("80m", 3.5, 4.0),
         ("60m", 5.06, 5.45), ("40m", 7.0, 7.3), ("30m", 10.1, 10.15), ("20m", 14.0, 14.35),
         ("17m", 18.068, 18.168), ("15m", 21.0, 21.45), ("12m", 24.89, 24.99), ("10m", 28.0, 29.7),

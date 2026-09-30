@@ -29,8 +29,8 @@ public struct BandMapWindow: View {
 
     /// Step of the scale labels in kHz, based on the visible range.
     static func tickStep(span: Double) -> Double {
-        for s in [0.1, 0.2, 0.5, 1, 2, 5, 10] where span / s <= 14 { return s }
-        return 10
+        for s in [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500] where span / s <= 14 { return s }
+        return 500
     }
 
     struct Entry: Identifiable {

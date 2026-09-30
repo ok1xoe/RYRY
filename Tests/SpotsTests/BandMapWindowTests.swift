@@ -7,17 +7,39 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     Spot(frequencyKHz: kHz, call: call, spotter: "X", comment: "", time: now.addingTimeInterval(-age), mode: mode)
 }
 
-@Test func rttyBandPlanTable() {
-    #expect(RTTYBandPlan.segment(for: "20m")?.lowKHz == 14070)
-    #expect(RTTYBandPlan.segment(for: "20m")?.highKHz == 14100)
-    #expect(RTTYBandPlan.segment(for: "40m")?.lowKHz == 7030)
-    #expect(RTTYBandPlan.segment(for: "40m")?.highKHz == 7060)
-    #expect(RTTYBandPlan.segment(for: "6m") == nil)
-    #expect(RTTYBandPlan.segment(for: nil) == nil)
-    // identical to the segments of the spot parser
-    for s in RTTYBandPlan.segments { #expect(SpotParser.rttySegments.contains(s.lowKHz...s.highKHz), "\(s.band)") }
-    #expect(RTTYBandPlan.bands.first == "80m")
-    for s in RTTYBandPlan.segments { #expect(s.lowKHz < s.highKHz) }
+@Test func bandPlanCoversWholeBands() {
+    // the scale spans the whole band, not just the RTTY part
+    #expect(RTTYBandPlan.segment(for: "20m")?.lowKHz == 14000)
+    #expect(RTTYBandPlan.segment(for: "20m")?.highKHz == 14350)
+    #expect(RTTYBandPlan.segment(for: "40m")?.lowKHz == 7000)
+    #expect(RTTYBandPlan.segment(for: "40m")?.highKHz == 7300)
+    // the digimode part is the initial view
+    #expect(RTTYBandPlan.segment(for: "20m")?.rttyLowKHz == 14070)
+    #expect(RTTYBandPlan.segment(for: "20m")?.rttyHighKHz == 14100)
+    // all HF bands and 6 m, in the order of the band table
+    #expect(RTTYBandPlan.bands == Bands.hfAnd6m)
+    #expect(RTTYBandPlan.segment(for: "6m") != nil && RTTYBandPlan.segment(for: "160m") != nil)
+    #expect(RTTYBandPlan.segment(for: "2m") == nil && RTTYBandPlan.segment(for: nil) == nil)
+    for s in RTTYBandPlan.segments {
+        #expect(s.lowKHz < s.highKHz, "\(s.band)")
+        // the initial view lies inside the band
+        #expect(s.rttyLowKHz >= s.lowKHz && s.rttyHighKHz <= s.highKHz && s.rttyLowKHz < s.rttyHighKHz, "\(s.band)")
+    }
+    // the mode detection of the spot parser keeps its own narrow segments
+    for s in RTTYBandPlan.segments where SpotParser.rttySegments.contains(where: { $0.lowerBound == s.rttyLowKHz }) {
+        #expect(SpotParser.rttySegments.contains(s.rttyLowKHz...s.rttyHighKHz), "\(s.band)")
+    }
+}
+
+@Test func scaleStartsOnTheDigimodePartAndResetsToTheWholeBand() {
+    let seg = RTTYBandPlan.segment(for: "20m")!
+    var s = BandScale(segment: seg)
+    #expect(s.visibleLow == 14070 && s.visibleHigh == 14100)     // opens where RTTY lives
+    #expect(s.fullLow == 14000 && s.fullHigh == 14350)           // but the whole band is reachable
+    s.reset()
+    #expect(s.visibleLow == 14000 && s.visibleHigh == 14350)
+    s.pan(by: -1000)                                             // cannot leave the band
+    #expect(s.visibleLow == 14000)
 }
 
 @Test func bandSelectionPrefersChoiceThenRigThenManual() {
@@ -25,17 +47,19 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: 14_080_000, manualHz: 21_080_000) == "20m")
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: 21_080_000) == "15m")
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil) == nil)
-    // the rig is on a band with no RTTY table (6 m) → it falls back to the manual frequency
-    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: 50_100_000, manualHz: 7_040_000) == "40m")
+    // the rig is on a band the map does not have (2 m) → it falls back to the manual frequency
+    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: 145_000_000, manualHz: 7_040_000) == "40m")
     // an unknown choice is ignored
-    #expect(RTTYBandPlan.selectBand(choice: "6m", rigHz: 14_080_000, manualHz: nil) == "20m")
+    #expect(RTTYBandPlan.selectBand(choice: "2m", rigHz: 14_080_000, manualHz: nil) == "20m")
+    // 6 m is on the map now
+    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: 50_100_000, manualHz: nil) == "6m")
 }
 
 @Test func bandSelectionFallsBackToSpotsThenDefault() {
     // with no rig and no manual frequency: the band with the most spots, so that the map is not left empty
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: ["15m", "40m"]) == "15m")
-    // a band with no RTTY segment is skipped
-    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: ["6m", "40m"]) == "40m")
+    // a band the map does not have is skipped
+    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: ["2m", "40m"]) == "40m")
     // no spots → the default band
     #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: []) == RTTYBandPlan.defaultBand)
     #expect(RTTYBandPlan.segment(for: RTTYBandPlan.defaultBand) != nil)
@@ -44,24 +68,27 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(RTTYBandPlan.selectBand(choice: "10m", rigHz: nil, manualHz: nil, spotBands: ["15m"]) == "10m")
 }
 
-@Test func scaleResetsToWholeSegment() {
+@Test func scaleResetsToWholeBand() {
     var s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
     s.zoom(by: 0.2, around: 14_075)
     #expect(s.span < 20)
     s.reset()
-    #expect(s.visibleLow == 14_070 && s.visibleHigh == 14_100)
+    #expect(s.visibleLow == 14_000 && s.visibleHigh == 14_350)
 }
 
-@Test func scalePansAndClampsToSegment() {
+@Test func scalePansAndClampsToBandEdges() {
     var s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
     s.zoom(by: 0.5, around: 14_085)                       // a 15 kHz range around the centre
     let span = s.span
     s.pan(by: 3)
     #expect(abs(s.span - span) < 1e-9 && s.visibleLow > 14_070)
-    s.pan(by: 1_000)                                      // above the upper edge → clamped
-    #expect(s.visibleHigh == 14_100 && abs(s.span - span) < 1e-9)
-    s.pan(by: -1_000)
-    #expect(s.visibleLow == 14_070 && abs(s.span - span) < 1e-9)
+    // panning now reaches outside the digimode part, all the way to the band edges
+    s.pan(by: 100)
+    #expect(s.visibleLow > 14_100 && abs(s.span - span) < 1e-9)
+    s.pan(by: 10_000)                                     // above the upper edge → clamped
+    #expect(s.visibleHigh == 14_350 && abs(s.span - span) < 1e-9)
+    s.pan(by: -10_000)
+    #expect(s.visibleLow == 14_000 && abs(s.span - span) < 1e-9)
 }
 
 @Test func scaleMovesLowAbsolutely() {
@@ -70,10 +97,10 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     let span = s.span
     s.moveLow(to: 14_080)
     #expect(s.visibleLow == 14_080 && abs(s.span - span) < 1e-9)
-    s.moveLow(to: 14_099)                                  // past the upper edge → clamped
-    #expect(s.visibleHigh == 14_100 && abs(s.span - span) < 1e-9)
+    s.moveLow(to: 14_349)                                  // past the upper band edge → clamped
+    #expect(s.visibleHigh == 14_350 && abs(s.span - span) < 1e-9)
     s.moveLow(to: .nan)                                    // nonsense is ignored
-    #expect(s.visibleHigh == 14_100)
+    #expect(s.visibleHigh == 14_350)
 }
 
 @Test func scaleConvertsFrequencyAndY() {
@@ -96,11 +123,11 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     s.zoom(by: 0.5, around: 14071)                          // at the edge: it does not run out of the band
     #expect(s.visibleLow >= 14070)
     s.center(on: 14099)
-    #expect(s.visibleHigh <= 14100 && s.visibleLow >= 14070)
+    #expect(s.visibleHigh <= 14350 && s.visibleLow >= 14000)
     for _ in 0..<20 { s.zoom(by: 0.5, around: 14090) }
     #expect(abs((s.visibleHigh - s.visibleLow) - BandScale.minSpanKHz) < 1e-9)
-    for _ in 0..<20 { s.zoom(by: 2, around: 14090) }
-    #expect(s.visibleLow == 14070 && s.visibleHigh == 14100)
+    for _ in 0..<20 { s.zoom(by: 2, around: 14090) }      // zooming out reaches the whole band
+    #expect(s.visibleLow == 14000 && s.visibleHigh == 14350)
     s.zoom(by: 0.25, around: nil); s.center(on: 14085)
     #expect(abs((s.visibleLow + s.visibleHigh) / 2 - 14085) < 1e-9)
 }

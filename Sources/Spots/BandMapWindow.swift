@@ -4,17 +4,32 @@ import QSOLog
 
 /// The RTTY part of a band for the "Band map" window (approximate, IARU band plans; same as `SpotParser.rttySegments`).
 public enum RTTYBandPlan {
+    /// One band of the map: the whole amateur band, plus the part where RTTY and the other digimodes live.
+    /// The scale spans the whole band; it only opens on the digimode part, so the map is useful straight away.
     public struct Segment: Sendable, Equatable {
         public let band: String
         public let lowKHz: Double
         public let highKHz: Double
+        public let rttyLowKHz: Double
+        public let rttyHighKHz: Double
     }
-    public static let segments: [Segment] = [
-        Segment(band: "80m", lowKHz: 3580, highKHz: 3600), Segment(band: "40m", lowKHz: 7030, highKHz: 7060),
-        Segment(band: "30m", lowKHz: 10130, highKHz: 10150), Segment(band: "20m", lowKHz: 14070, highKHz: 14100),
-        Segment(band: "17m", lowKHz: 18095, highKHz: 18109), Segment(band: "15m", lowKHz: 21070, highKHz: 21100),
-        Segment(band: "12m", lowKHz: 24910, highKHz: 24930), Segment(band: "10m", lowKHz: 28070, highKHz: 28120),
+
+    /// The usual RTTY/digimode part per band (IARU band plans; 160 m, 60 m and 6 m are the digimode corner,
+    /// not an RTTY allocation). A band that is missing here opens on its whole width.
+    static let digimodeParts: [String: (Double, Double)] = [
+        "160m": (1838, 1843), "80m": (3580, 3600), "40m": (7030, 7060), "30m": (10130, 10150),
+        "20m": (14070, 14100), "17m": (18095, 18109), "15m": (21070, 21100), "12m": (24910, 24930),
+        "10m": (28070, 28120), "6m": (50300, 50500),
     ]
+
+    /// All HF bands and 6 m, with the edges of the band table (`Bands.table`), in the order of that table.
+    public static let segments: [Segment] = Bands.hfAnd6m.compactMap { band in
+        guard let e = Bands.table.first(where: { $0.band == band }) else { return nil }
+        let low = e.lowMHz * 1000, high = e.highMHz * 1000
+        let d = digimodeParts[band] ?? (low, high)
+        return Segment(band: band, lowKHz: low, highKHz: high,
+                       rttyLowKHz: max(low, d.0), rttyHighKHz: min(high, d.1))
+    }
     public static var bands: [String] { segments.map(\.band) }
     public static func segment(for band: String?) -> Segment? { segments.first { $0.band == band } }
     /// The band when nothing else determines it (no rig, no frequency in the QSO and no spots).
@@ -34,7 +49,8 @@ public enum RTTYBandPlan {
     }
 }
 
-/// Vertical frequency scale (high frequency at the top): the visible range in kHz inside the RTTY part of the band.
+/// Vertical frequency scale (high frequency at the top): the visible range in kHz inside the band.
+/// The whole band is reachable; the scale only opens on the digimode part of it.
 public struct BandScale: Sendable, Equatable {
     public static let minSpanKHz = 1.0
     public let fullLow: Double, fullHigh: Double
@@ -42,7 +58,7 @@ public struct BandScale: Sendable, Equatable {
 
     public init(segment: RTTYBandPlan.Segment) {
         fullLow = segment.lowKHz; fullHigh = segment.highKHz
-        visibleLow = fullLow; visibleHigh = fullHigh
+        visibleLow = segment.rttyLowKHz; visibleHigh = segment.rttyHighKHz
     }
 
     public var span: Double { visibleHigh - visibleLow }

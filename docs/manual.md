@@ -2,6 +2,8 @@
 
 mmtty4mac is an RTTY program for macOS: a native port of MMTTY (JE3HHT) with the same demodulator, plus a log, contest support and an API for loggers. Česká verze: [prirucka.md](prirucka.md).
 
+**New in 0.15.1:** the band map covers the whole band, not just the official RTTY segment (it opens on the digimode part, `⤢` shows the whole band); 160 m, 60 m and 6 m were added.
+
 **New in 0.15:** in the band map the mouse wheel pans and Shift + wheel zooms; screenshots in the README.
 
 **New in 0.14 (2):** call highlighting in RX and an alert when someone calls you; watching calls and new countries; beam heading and distance; frequency entry (⌥⌘F) and band buttons; N1MM call history; Multipliers window with NEW MULT; Band Map window.
