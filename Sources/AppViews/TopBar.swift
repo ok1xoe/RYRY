@@ -190,6 +190,7 @@ struct SignalMeter: View {
         .accessibilityElement()
         .accessibilityLabel(L("Úroveň signálu"))
         .accessibilityValue(open ? L("%.0f, squelch otevřený", level) : L("%.0f, squelch zavřený", level))
+        .accessibilityAddTraits(.isStaticText)      // without a role the value is not spoken (see tuningAccessibility)
         .hint(L("Signál %.0f", level))
     }
 }

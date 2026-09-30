@@ -60,11 +60,7 @@ struct WaterfallView: View {
                 }
                 .hint(L("Klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = úroveň squelche"))
                 // a picture of noise says nothing spoken: one element whose value is the tuning and the signal
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(L("Vodopád"))
-                .accessibilityValue(model.tuningSummary)
-                .accessibilityHint(L("Rozsah %ld až %ld Hz. Hodnota se čte na vyžádání, nehlásí se sama.",
-                                     Int(model.waterfallFromHz), Int(model.waterfallToHz)))
+                .tuningAccessibility(L("Vodopád"), model: model)
                 .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
                                             onRightClick: { f in notch(f) })
                     .accessibilityHidden(true))
@@ -85,6 +81,20 @@ struct WaterfallView: View {
                     .accessibilityHidden(true)      // the same values are in the waterfall's accessibility value
             }
         }
+    }
+}
+
+extension View {
+    /// The spectrum or the waterfall as one VoiceOver element: the name, the tuning summary as the value, the range as the hint.
+    /// The static text trait matters: without a role SwiftUI exposes the value only as AXValueDescription (no AXValue),
+    /// which VoiceOver does not speak - the element then said just its name.
+    @MainActor func tuningAccessibility(_ label: String, model: AppModel) -> some View {
+        accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
+            .accessibilityValue(model.tuningSummary)
+            .accessibilityHint(L("Rozsah %ld až %ld Hz. Hodnota se čte na vyžádání, nehlásí se sama.",
+                                 Int(model.waterfallFromHz), Int(model.waterfallToHz)))
+            .accessibilityAddTraits(.isStaticText)
     }
 }
 
@@ -187,18 +197,15 @@ struct SpectrumView: View {
                 let hz = model.waterfallFromHz + Double(loc.x / g.size.width) * (model.waterfallToHz - model.waterfallFromHz)
                 Task { await model.tune(toMarkHz: hz) }
             }
+            // before the accessibility modifiers, so the spoken hint below wins over the mouse tooltip
+            .hint(L("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch"))
             // the same as the waterfall: instead of the picture, the values behind it (mark, space, shift, AFC, signal)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(L("Spektrum"))
-            .accessibilityValue(model.tuningSummary)
-            .accessibilityHint(L("Rozsah %ld až %ld Hz. Hodnota se čte na vyžádání, nehlásí se sama.",
-                                 Int(model.waterfallFromHz), Int(model.waterfallToHz)))
+            .tuningAccessibility(L("Spektrum"), model: model)
             .overlay(ScrollWheelCatcher(onScroll: { dy in Task { await model.adjustSquelch(steps: dy > 0 ? 1 : -1) } },
                                         onRightClick: { f in
                 let hz = model.waterfallFromHz + f * (model.waterfallToHz - model.waterfallFromHz)
                 Task { await model.notchClick(hz: hz) }
             }).accessibilityHidden(true))
-            .hint(L("Spektrum · klik = naladit mark · pravé tlačítko = zářez (notch) · kolečko = squelch"))
             .overlay { BandMapOverlay(model: model, topInset: 24) }
             .overlay(alignment: .topLeading) { SpectrumMenu(model: model).padding(4) }
         }

@@ -40,6 +40,7 @@ public struct ScopeWindow: View {
                 .accessibilityValue(model.scopeSummary(source: Self.sourceName(model.scopeSource),
                                                        width: Int(width), offset: offset))
                 .accessibilityHint(L("Hodnota se čte na vyžádání, nehlásí se sama."))
+                .accessibilityAddTraits(.isStaticText)      // without a role the value is not spoken (see tuningAccessibility)
                 .overlay(alignment: .topLeading) {
                     VStack(alignment: .leading, spacing: 2) {
                         Label("mark", systemImage: "circle.fill").foregroundStyle(.yellow)
