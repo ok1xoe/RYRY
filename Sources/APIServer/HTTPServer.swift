@@ -235,7 +235,7 @@ final class HTTPConnection: @unchecked Sendable {
         let reason = [200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 408: "Request Timeout",
                       411: "Length Required", 413: "Payload Too Large", 431: "Request Header Fields Too Large",
                       503: "Service Unavailable"][r.status] ?? "Status"
-        var h = "HTTP/1.1 \(r.status) \(reason)\r\nContent-Length: \(r.body.count)\r\nServer: mmtty4mac\r\n"
+        var h = "HTTP/1.1 \(r.status) \(reason)\r\nContent-Length: \(r.body.count)\r\nServer: RYRY\r\n"
         for (k, v) in r.headers where k.lowercased() != "content-length" { h += "\(k): \(v)\r\n" }
         if close && r.headers["Connection"] == nil { h += "Connection: close\r\n" }
         h += "\r\n"

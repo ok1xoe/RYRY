@@ -116,7 +116,7 @@ final class Counter: @unchecked Sendable {
     let e = try await h.lookup("OK1XOE")
     #expect(e == CallbookEntry(call: "OK1XOE", name: "Tomas", qth: "Praha", grid: "JO70FB", country: "Czech Republic"))
     #expect(m.urls[0].absoluteString == "https://www.hamqth.com/xml.php?u=ok1xoe&p=pw")
-    #expect(m.urls[1].absoluteString == "https://www.hamqth.com/xml.php?id=09b0ae90050be03c452ad235a1f2915ad684393c&callsign=OK1XOE&prg=mmtty4mac")
+    #expect(m.urls[1].absoluteString == "https://www.hamqth.com/xml.php?id=09b0ae90050be03c452ad235a1f2915ad684393c&callsign=OK1XOE&prg=RYRY")
 }
 
 @Test func hamqthLoginErrorNotFoundAndExpiry() async throws {

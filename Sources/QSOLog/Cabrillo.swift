@@ -16,7 +16,7 @@ public struct CabrilloHeader: Sendable, Equatable {
 public enum Cabrillo {
     /// `qtc` = QTC series (WAE) – after the QSO lines as `QTC:` (DARC: QRG MODE DATE TIME CALL-RX QTC-GRP CALL-TX TIME-QSO CALL-QSO NR-QSO).
     public static func export(_ records: [QSORecord], header h: CabrilloHeader, qtc: [QTCSeries] = []) -> String {
-        var lines = ["START-OF-LOG: 3.0", "CREATED-BY: mmtty4mac", "CALLSIGN: \(h.callsign.uppercased())"]
+        var lines = ["START-OF-LOG: 3.0", "CREATED-BY: RYRY", "CALLSIGN: \(h.callsign.uppercased())"]
         if !h.contest.isEmpty { lines.append("CONTEST: \(h.contest)") }
         for c in h.categories {
             let t = c.trimmingCharacters(in: .whitespaces)

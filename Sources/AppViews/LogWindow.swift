@@ -11,7 +11,7 @@ import Localization
 @MainActor public func exportCabrillo(_ model: AppModel) {
     let p = NSSavePanel()
     let base = model.settings.contest.name.isEmpty ? "log" : model.settings.contest.name
-    p.nameFieldStringValue = "\(model.settings.station.call.isEmpty ? "mmtty4mac" : model.settings.station.call)-\(base).log"
+    p.nameFieldStringValue = "\(model.settings.station.call.isEmpty ? "RYRY" : model.settings.station.call)-\(base).log"
     p.allowedContentTypes = [UTType(filenameExtension: "log") ?? .plainText, UTType(filenameExtension: "cbr") ?? .plainText, .plainText]
     func picker(_ d: Date) -> NSDatePicker {
         let dp = NSDatePicker(); dp.datePickerStyle = .textFieldAndStepper

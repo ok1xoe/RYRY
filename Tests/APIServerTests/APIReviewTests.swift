@@ -21,7 +21,7 @@ import XMLRPC
     #expect((try await c.receive()["error"] as? [String: Any])?["code"] as? Int == -32602)
     try await c.sendRaw(#"{"jsonrpc":"2.0","id":2,"method":"profile.load","params":{"slot":-1e300}}"#)
     #expect((try await c.receive()["error"] as? [String: Any]) != nil)
-    #expect(try await t.call("fldigi.name", []) == .string("mmtty4mac"))    // still running
+    #expect(try await t.call("fldigi.name", []) == .string("RYRY"))    // still running
     await h.app.stop()
 }
 

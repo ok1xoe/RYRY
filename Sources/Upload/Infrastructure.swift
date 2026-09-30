@@ -56,7 +56,7 @@ public enum UploadSelection {
 
     /// ADIF with a header (optional extra header fields, e.g. EQSL_USER) and records without the upload flags.
     public static func adif(_ records: [QSORecord], headerFields: String = "") -> String {
-        "mmtty4mac upload\n" + ADIF.field("ADIF_VER", ADIF.version) + ADIF.field("PROGRAMID", "mmtty4mac")
+        "RYRY upload\n" + ADIF.field("ADIF_VER", ADIF.version) + ADIF.field("PROGRAMID", "RYRY")
             + headerFields + "<EOH>\n" + records.map(ADIF.uploadRecord).joined()
     }
 }
@@ -111,7 +111,7 @@ public struct MultipartBody: Sendable {
     public func request(url: URL) -> URLRequest {
         var r = URLRequest(url: url); r.httpMethod = "POST"
         r.setValue(contentType, forHTTPHeaderField: "Content-Type"); r.httpBody = body
-        r.setValue("mmtty4mac", forHTTPHeaderField: "User-Agent")
+        r.setValue("RYRY", forHTTPHeaderField: "User-Agent")
         return r
     }
 }
@@ -123,7 +123,7 @@ public enum FormBody {
         func enc(_ s: String) -> String { s.addingPercentEncoding(withAllowedCharacters: allowed) ?? s }
         var r = URLRequest(url: url); r.httpMethod = "POST"
         r.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        r.setValue("mmtty4mac", forHTTPHeaderField: "User-Agent")
+        r.setValue("RYRY", forHTTPHeaderField: "User-Agent")
         r.httpBody = Data(fields.map { enc($0.0) + "=" + enc($0.1) }.joined(separator: "&").utf8)
         return r
     }

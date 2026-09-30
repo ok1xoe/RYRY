@@ -47,7 +47,7 @@ public struct EQSLUploader: Sendable {
         let header = ADIF.field("EQSL_USER", user) + ADIF.field("EQSL_PSWD", password)
         var mp = MultipartBody()
         mp.addField("EQSL_USER", user); mp.addField("EQSL_PSWD", password)
-        mp.addFile("Filename", filename: "mmtty4mac.adi", Data(UploadSelection.adif(eligible, headerFields: header).utf8))
+        mp.addFile("Filename", filename: "RYRY.adi", Data(UploadSelection.adif(eligible, headerFields: header).utf8))
         let res = try await http.send(mp.request(url: url))
         guard (200..<300).contains(res.status) else { throw UploadError.http(res.status, String(res.text.prefix(200))) }
         let p = Self.parse(res.text)
@@ -102,7 +102,7 @@ public struct ClubLogUploader: Sendable {
     public func uploadBatch(_ records: [QSORecord]) async throws {
         var mp = MultipartBody()
         mp.addField("email", email); mp.addField("password", password); mp.addField("callsign", callsign); mp.addField("api", apiKey)
-        mp.addFile("file", filename: "mmtty4mac.adi", Data(UploadSelection.adif(records).utf8))
+        mp.addFile("file", filename: "RYRY.adi", Data(UploadSelection.adif(records).utf8))
         try Self.check(try await http.send(mp.request(url: putlogs)))
     }
 

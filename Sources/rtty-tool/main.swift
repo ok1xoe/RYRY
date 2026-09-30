@@ -261,7 +261,7 @@ case "live":
     }
     // Ctrl-C / SIGTERM: always switch off PTT and the FSK line safely
     installStopOnSignals(engine)
-    FileHandle.standardError.write(Data("mmtty4mac live – text + Enter = vysílat, :q = konec\n".utf8))
+    FileHandle.standardError.write(Data("RYRY live – text + Enter = vysílat, :q = konec\n".utf8))
     while let line = readLine() {
         if line.hasPrefix(":c ") { try? await app.setQSOField("call", String(line.dropFirst(3))); continue }
         if line == ":log" { do { _ = try await app.logQSO() } catch { print("log: \(error)") }; continue }

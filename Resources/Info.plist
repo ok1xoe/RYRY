@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>mmtty4mac</string>
+	<string>RYRY</string>
 	<key>CFBundleExecutable</key>
 	<string>MMTTY4MacApp</string>
 	<key>CFBundleIconFile</key>
@@ -11,13 +11,15 @@
 	<key>CFBundleIdentifier</key>
 	<string>cz.ok1xoe.mmtty4mac</string>
 	<key>CFBundleName</key>
-	<string>mmtty4mac</string>
+	<string>RYRY</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.17.0</string>
+	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
@@ -25,9 +27,9 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>LGPL v3 · založeno na MMTTY (JE3HHT)</string>
+	<string>© 2026 OK1XOE · LGPL v3 · based on MMTTY by JE3HHT</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>mmtty4mac potřebuje zvukový vstup pro příjem RTTY z rádia.</string>
+	<string>RYRY needs the audio input to receive RTTY from your radio.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

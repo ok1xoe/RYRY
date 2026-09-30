@@ -38,12 +38,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     NSWorkspace.shared.open(r)
 }
 
+/// A page of the product website (ryry.ok1xoe.dev) in the UI language (Czech under /cs/).
+@MainActor func openWeb(_ page: String) {
+    let base = Localizer.shared.code == "cs" ? "https://ryry.ok1xoe.dev/cs/" : "https://ryry.ok1xoe.dev/"
+    if let u = URL(string: base + page) { NSWorkspace.shared.open(u) }
+}
+
 @MainActor func showAbout() {
     let credits = [
         L("RTTY pro macOS – nativní přepis MMTTY s API pro loggery (fldigi XML-RPC, JSON-RPC)."),
         "",
         L("Jádro demodulátoru a modulátoru: MMTTY © 2000–2013 Makoto Mori (JE3HHT), Nobuyuki Oba."),
-        L("mmtty4mac © 2026 OK1XOE. Licence GNU LGPL v3 (COPYING, COPYING.LESSER)."),
+        L("RYRY © 2026 OK1XOE. Licence GNU LGPL v3, zdrojový kód: github.com/ok1xoe/mmtty4mac."),
         L("DXCC: cty.dat – Jim Reisert AD1C (country-files.com)."),
     ].joined(separator: "\n")
     let para = NSMutableParagraphStyle(); para.alignment = .center
@@ -83,7 +89,7 @@ struct MMTTY4MacApp: App {
     }
 
     var body: some Scene {
-        Window("mmtty4mac", id: "main") {
+        Window("RYRY", id: "main") {
             MainView(model: model)
                 .environment(\.showHints, model.settings.display.showHints)
                 .task {
@@ -124,10 +130,14 @@ struct MMTTY4MacApp: App {
                     .shortcut(model.settings.binding(for: .enterFrequency))
             }
             CommandGroup(replacing: .appInfo) {
-                Button(L("O aplikaci mmtty4mac")) { showAbout() }
+                Button(L("O aplikaci RYRY")) { showAbout() }
             }
             CommandGroup(replacing: .help) {
-                Button(L("Příručka mmtty4mac")) { openManual() }.keyboardShortcut("?", modifiers: .command)
+                Button(L("Příručka RYRY")) { openManual() }.keyboardShortcut("?", modifiers: .command)
+                Divider()
+                Button(L("Web RYRY")) { openWeb("") }
+                Button(L("Podpora")) { openWeb("support.html") }
+                Button(L("Ochrana osobních údajů")) { openWeb("privacy.html") }
             }
             CommandGroup(replacing: .newItem) {
                 Button(L("Nový log…")) { FileActions.newLog(model) }.keyboardShortcut("n", modifiers: .command)
