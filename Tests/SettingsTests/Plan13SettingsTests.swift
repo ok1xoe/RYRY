@@ -48,20 +48,20 @@ import Testing
     #expect(s.conflictingShortcuts() == [[.macro(0), .tune]])
 }
 
-// CAT over USB: the built-in protocol or a hamlib started by the application
+// CAT over USB: the built-in protocol
 @Test func rigCATSettings() throws {
     var r = RigSettings()
-    #expect(r.catProtocol == .icom && r.civAddress == 0x94 && r.baud == 19200 && r.stopBits == 1 && r.hamlibModel == 1)
+    #expect(r.catProtocol == .icom && r.civAddress == 0x94 && r.baud == 19200 && r.stopBits == 1)
     r.type = .cat; r.catProtocol = .yaesu; r.serialPort = "/dev/cu.SLAB_USBtoUART"; r.baud = 38400; r.stopBits = 2
     var s = AppSettings(); s.rig = r
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rig-\(UUID())")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     try SettingsStore(directory: dir).save(s)
     #expect(SettingsStore(directory: dir).load().0.rig == r)
-    try #"{"rig":{"type":"hamlibManaged","baud":-3,"stopBits":7,"civAddress":999,"hamlibModel":0}}"#
+    try #"{"rig":{"type":"cat","baud":-3,"stopBits":7,"civAddress":999}}"#
         .write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     let o = SettingsStore(directory: dir).load().0.rig
-    #expect(o.type == .hamlibManaged && o.baud == 19200 && o.stopBits == 1 && o.civAddress == 0x94 && o.hamlibModel == 1)
+    #expect(o.type == .cat && o.baud == 19200 && o.stopBits == 1 && o.civAddress == 0x94)
     #expect(RigSettings.icomAddresses.first { $0.0 == "IC-7300" }?.1 == 0x94)
 }
 

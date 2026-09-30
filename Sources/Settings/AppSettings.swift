@@ -65,8 +65,9 @@ public struct FSKSettings: Codable, Sendable, Equatable {
     }
 }
 
-/// hamlib/flrig over the network, the built-in CAT over a USB serial port, or hamlib launched by the app.
-public enum RigType: String, Codable, Sendable, CaseIterable { case none, hamlib, flrig, cat, hamlibManaged }
+/// hamlib (rigctld) or flrig over the network, or the built-in CAT over a USB serial port.
+/// The App Store sandbox cannot launch rigctld, so the former `hamlibManaged` loads as `hamlib`.
+public enum RigType: String, Codable, Sendable, CaseIterable { case none, hamlib, flrig, cat }
 /// Protocol of the built-in CAT.
 public enum CATKind: String, Codable, Sendable, CaseIterable { case icom, yaesu, kenwood, elecraft }
 
@@ -74,15 +75,13 @@ public struct RigSettings: Codable, Sendable, Equatable {
     public var type: RigType = .none
     public var host = "127.0.0.1"
     public var port: Int?                     // nil = default (4532 / 12345)
-    /// CAT over USB (both the built-in one and hamlib launched by the app): serial port and speed.
+    /// The built-in CAT over USB: serial port and speed.
     public var serialPort = ""
     public var baud = 19200
     public var stopBits = 1
     public var catProtocol = CATKind.icom
     /// CI-V address of an Icom radio (IC-7300 = 94h).
     public var civAddress = 0x94
-    /// hamlib model number (`rigctld -l`), 1 = Dummy.
-    public var hamlibModel = 1
     /// RTS on the CAT port enabled (nil = according to the protocol: Yaesu yes – the "CAT RTS" menu).
     public var catRTS: Bool?
     public var effectiveCatRTS: Bool { catRTS ?? (catProtocol == .yaesu) }
@@ -93,16 +92,21 @@ public struct RigSettings: Codable, Sendable, Equatable {
     public static let icomAddresses: [(String, Int)] = [("IC-7300", 0x94), ("IC-7610", 0x98), ("IC-705", 0xA4), ("IC-9700", 0xA2),
                                                         ("IC-7100", 0x88), ("IC-7851", 0x8E), ("IC-7600", 0x7A), ("IC-7000", 0x70),
                                                         ("IC-7410", 0x80), ("IC-718", 0x5E), ("IC-7300MK2", 0xB6)]
-    enum CodingKeys: String, CodingKey { case type, host, port, serialPort, baud, stopBits, catProtocol, civAddress, hamlibModel, catRTS }
+    enum CodingKeys: String, CodingKey { case type, host, port, serialPort, baud, stopBits, catProtocol, civAddress, catRTS }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "rig", x = RigSettings()
-        type = c.tolerant(.type, x.type, w, s); host = c.tolerant(.host, x.host, w, s); port = c.tolerant(.port, x.port, w, s)
+        if (try? c.decodeIfPresent(String.self, forKey: .type)) == "hamlibManaged" {
+            type = .hamlib
+            w?.add(L("Spouštění rigctld aplikací už není k dispozici (App Store). Spusťte rigctld sami, RYRY se k němu připojí na 127.0.0.1:4532."))
+        } else {
+            type = c.tolerant(.type, x.type, w, s)
+        }
+        host = c.tolerant(.host, x.host, w, s); port = c.tolerant(.port, x.port, w, s)
         serialPort = c.tolerant(.serialPort, x.serialPort, w, s)
         let b = c.tolerant(.baud, x.baud, w, s); baud = (300...1_000_000).contains(b) ? b : x.baud
         let sb = c.tolerant(.stopBits, x.stopBits, w, s); stopBits = (1...2).contains(sb) ? sb : x.stopBits
         catProtocol = c.tolerant(.catProtocol, x.catProtocol, w, s)
         let a = c.tolerant(.civAddress, x.civAddress, w, s); civAddress = (1...0xDF).contains(a) ? a : x.civAddress
-        let m = c.tolerant(.hamlibModel, x.hamlibModel, w, s); hamlibModel = m > 0 ? m : x.hamlibModel
         catRTS = c.tolerant(.catRTS, x.catRTS, w, s)
     }
 }

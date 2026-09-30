@@ -229,12 +229,10 @@ struct PTTTab: View {
 struct RigTab: View {
     @Binding var s: AppSettings
     @State private var ports: [String] = POSIXSerialPort.availablePorts()
-    @State private var models: [HamlibModel] = []
-    @State private var rigctld: String? = ManagedHamlibRig.findRigctld()
     @State private var testResult: String?
     @State private var testing = false
 
-    var usesSerial: Bool { s.rig.type == .cat || s.rig.type == .hamlibManaged }
+    var usesSerial: Bool { s.rig.type == .cat }
 
     var body: some View {
         Form {
@@ -242,7 +240,6 @@ struct RigTab: View {
                 Picker(L("Ovládání"), selection: $s.rig.type) {
                     Text(L("Žádné")).tag(RigType.none)
                     Text(L("CAT přes USB (vestavěný)")).tag(RigType.cat)
-                    Text(L("hamlib – spustit automaticky")).tag(RigType.hamlibManaged)
                     Text(L("hamlib rigctld (síť)")).tag(RigType.hamlib)
                     Text("flrig").tag(RigType.flrig)
                 }
@@ -269,21 +266,6 @@ struct RigTab: View {
                                 .multilineTextAlignment(.trailing).frame(width: 60)
                         }
                     }
-                }
-            }
-
-            if s.rig.type == .hamlibManaged {
-                Section(L("Model hamlib")) {
-                    if rigctld == nil {
-                        Text(L("rigctld nenalezen – nainstaluj hamlib: brew install hamlib")).foregroundStyle(.orange)
-                    } else if models.isEmpty {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Picker(L("Model"), selection: $s.rig.hamlibModel) {
-                            ForEach(models) { m in Text("\(m.title) (#\(m.id))").tag(m.id) }
-                        }
-                    }
-                    TextField(L("Místní TCP port"), value: $s.rig.port, format: .number.grouping(.never), prompt: Text("4534"))
                 }
             }
 
@@ -333,17 +315,12 @@ struct RigTab: View {
             }
         }
         .formStyle(.grouped)
-        .task(id: s.rig.type) {
-            guard s.rig.type == .hamlibManaged, models.isEmpty, let bin = rigctld else { return }
-            models = await Task.detached { ManagedHamlibRig.availableModels(binary: bin) }.value
-        }
     }
 
     var typeHint: String {
         switch s.rig.type {
         case .none: return L("Frekvence se nečte a PTT přes CAT není k dispozici.")
         case .cat: return L("Vestavěné ovládání bez dalších programů: frekvence, mód a PTT přímo přes USB kabel rádia.")
-        case .hamlibManaged: return L("Pro ostatní rádia: aplikace sama spustí rigctld se zvoleným modelem a portem (hamlib z Homebrew).")
         case .hamlib: return L("hamlib: spusťte např. „rigctld -m <model> -r /dev/cu.X -s <baud>“. flrig: stačí spuštěný flrig. Prázdný port = výchozí.")
         case .flrig: return L("flrig musí běžet a mít povolené XML-RPC (výchozí port 12345).")
         }

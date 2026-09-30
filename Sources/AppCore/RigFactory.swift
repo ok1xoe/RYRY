@@ -20,10 +20,6 @@ public enum RigFactory {
             case .elecraft: p = .text(.elecraft)
             }
             return SerialCATRig(transport: t, protocol: p, name: "CAT \(r.catProtocol.rawValue) \(r.serialPort)")
-        case .hamlibManaged:
-            guard let bin = ManagedHamlibRig.findRigctld() else { return NoRig() }
-            return ManagedHamlibRig(binary: bin, model: r.hamlibModel, serialPort: r.serialPort, baud: r.baud,
-                                    tcpPort: UInt16(clamping: r.port ?? 4534))
         case .none: return NoRig()
         }
     }
