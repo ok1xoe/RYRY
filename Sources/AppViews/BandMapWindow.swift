@@ -125,22 +125,27 @@ public struct BandMapWindow: View {
         }
         .labelsHidden().fixedSize()
         .hint(L("Pásmo mapy; auto = podle rigu, frekvence v QSO okně nebo spotů"))
+        .accessibilityLabel(L("Pásmo mapy"))
     }
 
     var zoomButtons: some View {
         HStack(spacing: 8) {
             Button { zoom(0.6, band: band) } label: { Image(systemName: "plus.magnifyingglass") }
                 .hint(L("Přiblížit stupnici"))
+                .accessibilityLabel(L("Přiblížit stupnici"))
             Button { zoom(1 / 0.6, band: band) } label: { Image(systemName: "minus.magnifyingglass") }
                 .hint(L("Oddálit stupnici"))
+                .accessibilityLabel(L("Oddálit stupnici"))
             Button { var s = scale(for: band); s.reset(); scales[band] = s } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
             }
             .hint(L("Celý RTTY úsek pásma"))
+            .accessibilityLabel(L("Celý RTTY úsek pásma"))
             Button {
                 if let f = rigKHz { var s = scale(for: band); s.center(on: f); scales[band] = s }
             } label: { Image(systemName: "scope") }
                 .hint(L("Střed na rig")).disabled(rigKHz == nil)
+                .accessibilityLabel(L("Střed na rig"))
         }
     }
 
@@ -150,6 +155,8 @@ public struct BandMapWindow: View {
             if showLogged {
                 Stepper(value: $loggedMinutes, in: 5...1440, step: 15) { Text(L("%ld min", loggedMinutes)).monospacedDigit() }
                     .fixedSize()
+                    .accessibilityLabel(L("Stáří spojení z logu v minutách"))
+                    .accessibilityValue(L("%ld min", loggedMinutes))
             }
         }
     }

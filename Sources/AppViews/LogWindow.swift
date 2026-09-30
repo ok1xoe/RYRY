@@ -81,6 +81,8 @@ public struct LogWindow: View {
                 Text(letter).bold()
                     .foregroundStyle(r.isUploaded(t) ? Color.green : Color.secondary.opacity(0.35))
                     .help(r.isUploaded(t) ? "\(t.title): \(fmt.string(from: r.uploads?[t.rawValue] ?? Date()))" : t.title)
+                    .accessibilityLabel(t.title)
+                    .accessibilityValue(r.isUploaded(t) ? L("nahráno") : L("nenahráno"))
             }
         }
     }
@@ -117,6 +119,14 @@ public struct LogWindow: View {
             } primaryAction: { ids in
                 if let id = ids.first { editing = model.logRecords.first { $0.id == id } }
             }
+            // keyboard route instead of a double click: Enter opens the editor of the selected QSO
+            .onKeyPress(.return) {
+                guard let id = selection, let r = model.logRecords.first(where: { $0.id == id }) else { return .ignored }
+                editing = r
+                return .handled
+            }
+            .accessibilityLabel(L("Tabulka spojení"))
+            .accessibilityHint(Text(L("Enter otevře úpravu vybraného spojení")))
             HStack {
                 Text(L("%ld spojení", filtered.count)).foregroundStyle(.secondary)
                 Text(model.logStats.byBand.map { "\($0.band) \($0.count)" }.joined(separator: " · "))
@@ -222,6 +232,7 @@ struct QTCLogView: View {
                             HStack {
                                 Image(systemName: s.direction == .sent ? "arrow.up.right" : "arrow.down.left")
                                     .foregroundStyle(s.direction == .sent ? .orange : .green)
+                                    .accessibilityHidden(true)       // "Odesláno"/"Přijato" follows in text
                                 Text(s.direction == .sent ? L("Odesláno") : L("Přijato")).frame(width: 70, alignment: .leading)
                                 Text("QTC \(s.number)/\(s.groupSize)").monospacedDigit().frame(width: 80, alignment: .leading)
                                 Text(s.counterpart).bold().frame(width: 100, alignment: .leading)
@@ -272,6 +283,7 @@ struct QTCSeriesEditor: View {
             }
             Text(L("Řádky (HHMM ZNAČKA NNN):")).font(.caption)
             TextEditor(text: $text).font(.system(.body, design: .monospaced)).frame(minHeight: 180)
+                .accessibilityLabel(L("Řádky (HHMM ZNAČKA NNN):"))
             if parsed.contains(where: { $0 == nil }) || parsed.count > 10 || parsed.isEmpty {
                 Text(L("Každý řádek musí mít tvar „HHMM ZNAČKA NNN“, 1–10 řádků.")).font(.caption).foregroundStyle(.red)
             }

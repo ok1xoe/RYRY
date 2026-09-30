@@ -53,6 +53,7 @@ struct BandMapOverlay: View {
                         .offset(x: left, y: topInset + CGFloat(r) * Self.rowHeight)
                         .hint(String(format: "%@ · %.1f kHz · %@ · %@", m.spot.call, m.spot.frequencyKHz, m.status.legend,
                                      L("klik = naladit mark a vložit značku")))
+                        .accessibilityLabel(L("Spot %@, %.1f kHz, %@", m.spot.call, m.spot.frequencyKHz, m.status.legend))
                     }
                 }
             }

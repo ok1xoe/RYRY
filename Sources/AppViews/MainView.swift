@@ -38,8 +38,12 @@ struct StatusBar: View {
         HStack(spacing: 8) {
             if let m = model.messages.last {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    .accessibilityHidden(true)                       // the message text follows
                 Text(m).lineLimit(1).truncationMode(.tail)
+                    .accessibilityLabel(L("Hlášení"))
+                    .accessibilityValue(m)
                 Button("OK") { model.dismissMessages() }.buttonStyle(.borderless)
+                    .accessibilityLabel(L("Zavřít hlášení"))
             }
             Spacer()
             if model.settings.contest.enabled {

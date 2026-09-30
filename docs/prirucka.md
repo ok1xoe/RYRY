@@ -111,6 +111,13 @@ mmtty4mac se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovláda
 - **Jazyk:** ve výchozím stavu angličtina; změna v Nastavení → Zobrazení → Jazyk rozhraní (čeština, angličtina, nahrané jazyky). Vlastní překlad: **Uložit šablonu…**, přeložit hodnoty v `strings`, nastavit `code` a `name`, **Nahrát jazyk…**.
 - **Jazykové soubory** `cs.json` a `en.json` jsou v `~/Library/Application Support/mmtty4mac/Languages` a lze je upravit (uložená změna se projeví okamžitě; upravený soubor aktualizace nepřepíše).
 - **Klávesy:** Nastavení → Klávesy – klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).
+- **Bez myši** (mimo jiné pro práci s VoiceOverem, ⌘F5) – vše jsou přiřaditelné zkratky v Nastavení → Klávesy:
+  - **⌥⌘F** zadat frekvenci, **⌥⌘S** naladit na nejsilnější signál ve spektru (místo kliknutí do vodopádu),
+  - **⌥⌘N** zářez na nejsilnější rušení mimo přijímaný signál (místo pravého tlačítka ve spektru),
+  - **⌥⌘C** vložit poslední přijatou značku do QSO okna (místo kliknutí na slovo v příjmu),
+  - **Enter** v tabulce Spoty použije vybraný spot, v okně Log otevře úpravu vybraného spojení,
+  - **Vysílání → Upravit makro** otevře editor makra (místo pravého tlačítka na tlačítku makra).
+  - Aby se tabulátor pohyboval i po tlačítkách a zaškrtávátkách, zapněte v systému Nastavení → Přístupnost → Klávesnice → **Plný přístup z klávesnice**.
 
 ## 11. Když něco nefunguje
 

@@ -78,8 +78,11 @@ public struct KeyBinding: Codable, Sendable, Hashable {
 /// Commands that can be assigned a shortcut (MMTTY "Assign ShortCut Keys").
 public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
     case macro(Int), toggleTx, rxNow, tune, logQSO, clearQSO, clearRx, stopMacro, openLog, esmMode, enterFrequency
+    /// Keyboard routes for actions that used to need the mouse (waterfall / spectrum / receive window).
+    case tuneStrongest, notchStrongest, insertLastCall
     public static var allCases: [ShortcutCommand] {
-        (0..<AppSettings.macroCount).map { .macro($0) } + [.toggleTx, .rxNow, .tune, .logQSO, .clearQSO, .clearRx, .stopMacro, .openLog, .esmMode, .enterFrequency]
+        (0..<AppSettings.macroCount).map { .macro($0) } + [.toggleTx, .rxNow, .tune, .logQSO, .clearQSO, .clearRx, .stopMacro, .openLog, .esmMode, .enterFrequency,
+                                                          .tuneStrongest, .notchStrongest, .insertLastCall]
     }
     public var id: String {
         switch self {
@@ -88,9 +91,11 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
         case .clearQSO: "clearQSO"; case .clearRx: "clearRx"; case .stopMacro: "stopMacro"; case .openLog: "openLog"
         case .esmMode: "esmMode"
         case .enterFrequency: "enterFrequency"
+        case .tuneStrongest: "tuneStrongest"; case .notchStrongest: "notchStrongest"; case .insertLastCall: "insertLastCall"
         }
     }
-    /// Default shortcuts (the existing fixed ones): F1–F12, ⇧F1–⇧F4, ⌘T, ⌘., ⌘L, ⌘K, ⇧⌘L; ⌃R toggles Run / S&P, ⌥⌘F frequency entry.
+    /// Default shortcuts (the existing fixed ones): F1–F12, ⇧F1–⇧F4, ⌘T, ⌘., ⌘L, ⌘K, ⇧⌘L; ⌃R toggles Run / S&P, ⌥⌘F frequency entry,
+    /// ⌥⌘S tune to the strongest signal, ⌥⌘N notch the strongest interference, ⌥⌘C last received callsign into the QSO window.
     public var defaultBinding: KeyBinding {
         switch self {
         case .macro(let i): i < 12 ? KeyBinding(key: "f\(i + 1)") : KeyBinding(key: "f\(i - 11)", modifiers: [.shift])
@@ -101,6 +106,9 @@ public enum ShortcutCommand: Hashable, Sendable, CaseIterable {
         case .openLog: KeyBinding(key: "l", modifiers: [.command, .shift])
         case .esmMode: KeyBinding(key: "r", modifiers: [.control])
         case .enterFrequency: KeyBinding(key: "f", modifiers: [.option, .command])
+        case .tuneStrongest: KeyBinding(key: "s", modifiers: [.option, .command])
+        case .notchStrongest: KeyBinding(key: "n", modifiers: [.option, .command])
+        case .insertLastCall: KeyBinding(key: "c", modifiers: [.option, .command])
         case .tune, .clearQSO, .stopMacro: .none
         }
     }
