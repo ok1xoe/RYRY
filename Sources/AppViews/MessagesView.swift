@@ -48,16 +48,13 @@ struct MessagesEditor: View {
                             .onMove { rows.move(fromOffsets: $0, toOffset: $1) }
                     }
                     .frame(width: 180)
-                    .accessibilityLabel(L("Seznam zpráv"))
                     HStack {
                         Button { let r = Row(m: Macro(name: L("Nová"), text: "")); rows.append(r); sel = r.id } label: { Image(systemName: "plus") }
-                            .accessibilityLabel(L("Přidat zprávu"))
                         Button {
                             NSApp.keyWindow?.makeFirstResponder(nil)        // commit the half-typed field before deleting
                             if let s = sel { rows.removeAll { $0.id == s }; sel = rows.first?.id }
                         } label: { Image(systemName: "minus") }
                             .disabled(sel == nil)
-                            .accessibilityLabel(L("Odebrat vybranou zprávu"))
                         Spacer()
                     }
                 }
@@ -67,7 +64,6 @@ struct MessagesEditor: View {
                         TextEditor(text: Binding(get: { binding(s, \.text).wrappedValue.replacingOccurrences(of: "\r\n", with: "\n") },
                                                  set: { binding(s, \.text).wrappedValue = $0.replacingOccurrences(of: "\n", with: "\r\n") }))
                             .font(.system(.body, design: .monospaced))
-                            .accessibilityLabel(L("Text zprávy"))
                     }
                     .id(s)                                           // a new field when the selection changes, no state carried over
                 } else {

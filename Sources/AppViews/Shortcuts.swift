@@ -76,7 +76,6 @@ extension View {
     }
 
     /// A tooltip that can be turned off in Settings (MMTTY "Show Button Hint").
-    /// The same text is always exposed to VoiceOver as the accessibility hint, even with the tooltip off.
     public func hint(_ text: String) -> some View { modifier(HintModifier(text: text)) }
 }
 
@@ -91,15 +90,7 @@ extension EnvironmentValues {
 struct HintModifier: ViewModifier {
     let text: String
     @Environment(\.showHints) private var show
-    /// `help` gives both the tooltip and the VoiceOver hint; when tooltips are off only the hint remains,
-    /// because accessibility must never depend on a display setting.
-    @ViewBuilder func body(content: Content) -> some View {
-        if show {
-            content.help(text)
-        } else if text.isEmpty {
-            content
-        } else {
-            content.accessibilityHint(Text(text))
-        }
+    func body(content: Content) -> some View {
+        if show { content.help(text) } else { content }
     }
 }

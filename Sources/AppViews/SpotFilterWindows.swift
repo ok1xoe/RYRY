@@ -42,24 +42,17 @@ public struct SpotBandFilterWindow: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // the grid of checkboxes is one group; each band stays individually reachable inside it
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Self.rows, id: \.self) { row in
-                    HStack(spacing: 4) {
-                        ForEach(row, id: \.self) { toggle($0) }
-                        Spacer(minLength: 0)
-                    }
+            ForEach(Self.rows, id: \.self) { row in
+                HStack(spacing: 4) {
+                    ForEach(row, id: \.self) { toggle($0) }
+                    Spacer(minLength: 0)
                 }
-                otherToggle
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(L("Zobrazovaná pásma"))
+            otherToggle
             Divider()
             HStack(spacing: 10) {
                 Button(L("Vše")) { model.setSpots { $0.setAllBands(true) } }
-                    .accessibilityLabel(L("Zaškrtnout všechna pásma"))
                 Button(L("Nic")) { model.setSpots { $0.setAllBands(false) } }
-                    .accessibilityLabel(L("Odškrtnout všechna pásma"))
                 Spacer(minLength: 0)
             }
             Text(L("Zaškrtnutá pásma se zobrazují v tabulce Spoty; „ostatní“ = spoty mimo pevný seznam pásem."))
@@ -98,23 +91,16 @@ public struct SpotModeFilterWindow: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // the grid of checkboxes is one group; each mode group stays individually reachable inside it
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Self.rows, id: \.self) { row in
-                    HStack(spacing: 4) {
-                        ForEach(row, id: \.self) { toggle($0) }
-                        Spacer(minLength: 0)
-                    }
+            ForEach(Self.rows, id: \.self) { row in
+                HStack(spacing: 4) {
+                    ForEach(row, id: \.self) { toggle($0) }
+                    Spacer(minLength: 0)
                 }
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(L("Zobrazované skupiny módů"))
             Divider()
             HStack(spacing: 10) {
                 Button(L("Vše")) { model.setSpots { $0.setFilterModes(SpotFilter.allModes) } }
-                    .accessibilityLabel(L("Zaškrtnout všechny módy"))
                 Button(L("Nic")) { model.setSpots { $0.setFilterModes([]) } }
-                    .accessibilityLabel(L("Odškrtnout všechny módy"))
                 Spacer(minLength: 0)
             }
             Text(L("Skupiny módů spotů; „ostatní“ = i spoty, u kterých mód nejde poznat. Právě RTTY = „Jen RTTY“ v okně Spoty."))

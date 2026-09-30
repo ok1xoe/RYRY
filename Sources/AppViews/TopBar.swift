@@ -24,20 +24,14 @@ struct TopBar: View {
                         .font(.headline).frame(width: 44)
                 }
                 .hint(L("Přepnout TX/RX (⌘T)"))
-                .accessibilityLabel(L("Přepnout vysílání a příjem"))
-                .accessibilityValue(Self.stateName(model.state))
                 Button("Tune") { Task { await model.tune() } }.fixedSize()
-                    .accessibilityLabel(L("Ladicí signál (tune)"))
                 Button("Stop") { Task { await model.rxNow() } }.fixedSize()
                     .keyboardShortcut(.escape, modifiers: [])
                     .hint(L("Okamžitě RX (Esc)"))
-                    .accessibilityLabel(L("Okamžitě RX"))
                 Text(Self.stateLabel(model.state))
                     .font(.system(.body, design: .monospaced).bold()).lineLimit(1).fixedSize()
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
-                    .accessibilityLabel(L("Stav modemu"))
-                    .accessibilityValue(Self.stateName(model.state))
                 if model.wavPlaying { WAVControls(model: model) }
                 if model.recordingURL != nil {
                     Button { Task { await model.stopRecordingWAV() } } label: {
@@ -45,14 +39,11 @@ struct TopBar: View {
                               systemImage: "record.circle").foregroundStyle(.red).monospacedDigit()
                     }
                     .fixedSize().hint(L("Nahrává se příjem do WAV – kliknutím zastavit"))
-                    .accessibilityLabel(L("Zastavit nahrávání WAV"))
                 }
                 Picker("Demod", selection: model.choiceBinding("demodType")) {
                     ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
                 }.labelsHidden().fixedSize().hint(L("Demodulátor"))
-                    .accessibilityLabel(L("Demodulátor"))
                 Button("HAM") { Task { await model.hamShift() } }.fixedSize().hint("Shift 170 Hz")
-                    .accessibilityLabel(L("Nastavit shift 170 Hz"))
                 ProfileMenu(model: model)
                 Spacer()
                 FrequencyControl(model: model)
@@ -62,32 +53,24 @@ struct TopBar: View {
                 Picker("Baud", selection: baudBinding) {
                     ForEach([45.45, 50, 75, 100, 110], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
                 }.fixedSize()
-                    .accessibilityLabel(L("Rychlost (baud)"))
                 Picker("Shift", selection: model.doubleBinding("shift")) {
                     ForEach([170.0, 200, 425, 850], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
                 }.fixedSize()
-                    .accessibilityLabel(L("Shift v Hz"))
                 Text(model.fig ? "FIGS" : "LTRS")
                     .font(.caption.monospaced().bold()).lineLimit(1).fixedSize()
                     .padding(.horizontal, 4).padding(.vertical, 2)
                     .background((model.fig ? Color.orange : Color.secondary).opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
                     .hint(L("Stav přijímače LTRS/FIGS"))
-                    .accessibilityLabel(L("Stav přijímače"))
-                    .accessibilityValue(model.fig ? L("FIGS (číslice a znaky)") : L("LTRS (písmena)"))
                 FilterMenu(model: model)
                 Spacer(minLength: 4)
                 Group {
-                    // the visible labels are MMTTY's abbreviations; VoiceOver gets the full name
                     Toggle("XY", isOn: Binding(get: { model.xyEnabled }, set: { v in Task { await model.setXYScope(v) } }))
                         .hint(L("XY scope (křížový indikátor ladění)"))
-                        .accessibilityLabel(L("XY scope"))
                     Toggle(L("2. dek."), isOn: Binding(get: { model.settings.decoders.secondEnabled },
                                                        set: { v in Task { await model.setSecondDecoder(v) } }))
                         .hint(L("2. dekodér: stejný signál jiným demodulátorem, text v panelu pod příjmem"))
-                        .accessibilityLabel(L("2. dekodér"))
                     Toggle("AFC", isOn: model.boolBinding("afc"))
                         .hint(L("AFC · kontextová nabídka: vazba na squelch, omezení rozsahu"))
-                        .accessibilityLabel(L("AFC – automatické dolaďování"))
                         .contextMenu {
                             Toggle(L("Jen při otevřeném squelchi"), isOn: model.boolBinding("afcGate"))
                             Picker(L("Max. odchylka od naladění"), selection: model.doubleBinding("afcMaxDev")) {
@@ -96,13 +79,9 @@ struct TopBar: View {
                             }
                         }
                     Toggle("NET", isOn: model.boolBinding("net"))
-                        .accessibilityLabel(L("NET – vysílač ladí podle příjmu"))
                     Toggle("REV", isOn: model.boolBinding("reverse"))
-                        .accessibilityLabel(L("REV – obrácená polarita"))
                     Toggle("ATC", isOn: model.boolBinding("atc"))
-                        .accessibilityLabel(L("ATC – automatické řízení prahu"))
                     Toggle("SQ", isOn: model.boolBinding("squelch"))
-                        .accessibilityLabel(L("SQ – squelch"))
                 }
                 .toggleStyle(.button).fixedSize()
             }
@@ -121,19 +100,6 @@ struct TopBar: View {
         case .tx: return "TX"
         case .drain: return "TX…"
         case .pttOff: return "PTT↓"
-        }
-    }
-
-    /// The state in words - VoiceOver cannot make sense of the short "PTT↓" style labels.
-    static func stateName(_ s: EngineState) -> String {
-        switch s {
-        case .stopped: return L("zastaveno")
-        case .rx: return L("příjem")
-        case .keying: return L("zapínám PTT")
-        case .pttOn: return L("PTT zapnuto")
-        case .tx: return L("vysílání")
-        case .drain: return L("dovysílám")
-        case .pttOff: return L("vypínám PTT")
         }
     }
 
@@ -170,8 +136,6 @@ struct FilterMenu: View {
         }
         .fixedSize()
         .hint(L("Filtry příjmu (pravé tlačítko ve spektru = zářez) a UOS"))
-        .accessibilityLabel(L("Filtry příjmu"))
-        .accessibilityValue(active)
     }
 }
 
@@ -186,11 +150,6 @@ struct SignalMeter: View {
                     .frame(width: g.size.width * min(1, max(0, log10(max(level, 1)) / 4)))
             }
         }
-        // the bar has no children of its own - it must be made into an element before it can carry a label
-        .accessibilityElement()
-        .accessibilityLabel(L("Úroveň signálu"))
-        .accessibilityValue(open ? L("%.0f, squelch otevřený", level) : L("%.0f, squelch zavřený", level))
-        .accessibilityAddTraits(.isStaticText)      // without a role the value is not spoken (see tuningAccessibility)
         .hint(L("Signál %.0f", level))
     }
 }
@@ -236,24 +195,18 @@ struct WAVControls: View {
         HStack(spacing: 4) {
             Button { Task { await model.seekWAV(0) } } label: { Image(systemName: "backward.end.fill") }
                 .hint(L("Převinout na začátek"))
-                .accessibilityLabel(L("Převinout na začátek"))
             Button { Task { await model.pauseWAV(!model.wavPaused) } } label: {
                 Image(systemName: model.wavPaused ? "play.fill" : "pause.fill")
             }.hint(model.wavPaused ? L("Pokračovat v přehrávání") : L("Pozastavit přehrávání"))
-                .accessibilityLabel(model.wavPaused ? L("Pokračovat v přehrávání") : L("Pozastavit přehrávání"))
             Slider(value: Binding(get: { dragging ?? model.wavProgress }, set: { dragging = $0 }), in: 0...1) { editing in
                 if !editing, let f = dragging { Task { await model.seekWAV(f); dragging = nil } }
             }
             .frame(width: 110).controlSize(.small)
             .hint(L("Posun v přehrávaném souboru"))
-            .accessibilityLabel(L("Posun v přehrávaném souboru"))
-            .accessibilityValue(Self.time((dragging ?? model.wavProgress) * model.wavDuration) + " / " + Self.time(model.wavDuration))
             Text("\(Self.time((dragging ?? model.wavProgress) * model.wavDuration))/\(Self.time(model.wavDuration))")
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary).fixedSize()
-                .accessibilityHidden(true)                      // the same value is on the slider
             Button { Task { await model.stopWAV() } } label: { Image(systemName: "stop.fill") }
                 .hint(L("Zastavit přehrávání WAV"))
-                .accessibilityLabel(L("Zastavit přehrávání WAV"))
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 6).padding(.vertical, 2)
@@ -283,8 +236,6 @@ struct FrequencyControl: View {
             }
             .fixedSize().controlSize(.small)
             .hint(model.settings.rig.type == .none ? L("Pásmo do logu (bez rigu)") : L("Přeladit rig na RTTY kmitočet pásma"))
-            .accessibilityLabel(L("Pásmo"))
-            .accessibilityValue(Bands.band(forHz: model.rig?.frequency ?? model.qso.frequency) ?? L("nezvoleno"))
             Button { open() } label: {
                 Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")
                     .font(.system(.title3, design: .monospaced))
@@ -293,8 +244,6 @@ struct FrequencyControl: View {
             }
             .buttonStyle(.plain)
             .hint((online ? L("Rig online") : L("Rig offline")) + " – " + L("kliknutím zadáte frekvenci (%@)", model.settings.binding(for: .enterFrequency).display))
-            .accessibilityLabel(L("Zadat frekvenci"))
-            .accessibilityValue(model.rig?.frequency.map { L("%.3f kHz", $0 / 1000) } ?? (online ? L("neznámá") : L("Rig offline")))
             .popover(isPresented: $shown, arrowEdge: .bottom) { entry }
         }
         .onChange(of: model.showFrequencyEntry) { _, v in if v { model.showFrequencyEntry = false; open() } }
@@ -311,7 +260,6 @@ struct FrequencyControl: View {
             HStack {
                 TextField("kHz", text: $text)
                     .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 130)
-                    .accessibilityLabel(model.settings.rig.type == .none ? L("Frekvence do logu (kHz)") : L("Přeladit rig (kHz)"))
                     .focused($focused)
                     .onSubmit { submit() }
                     .onChange(of: text) { error = nil }

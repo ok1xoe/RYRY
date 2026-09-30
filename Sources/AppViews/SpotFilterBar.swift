@@ -29,10 +29,8 @@ public struct SpotFilterBar: View {
             Text(L("Filtry:")).foregroundStyle(.secondary)
             Button(L("Pásma")) { openWindow(id: SpotFilterWindowID.bands) }
                 .hint(L("Otevře okno se zaškrtávátky pásem"))
-                .accessibilityLabel(L("Filtr pásem"))
             Button(L("Módy")) { openWindow(id: SpotFilterWindowID.modes) }
                 .hint(L("Otevře okno se zaškrtávátky skupin módů"))
-                .accessibilityLabel(L("Filtr módů"))
             Toggle(L("Jen RTTY"), isOn: Binding(get: { model.settings.spots.rttyOnly },
                                                 set: { v in model.setSpots { $0.setRTTYOnly(v) } }))
                 .toggleStyle(.checkbox)

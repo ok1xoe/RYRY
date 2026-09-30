@@ -2,8 +2,6 @@
 
 mmtty4mac je RTTY program pro macOS: nativní přepis MMTTY (JE3HHT) se stejným demodulátorem, s logem, podporou závodů a s API pro loggery. English version: [manual.md](manual.md).
 
-**Novinky 0.16:** ovládání odečítačem obrazovky VoiceOver – pojmenované ovládací prvky, mluvené shrnutí vodopádu a spektra, předčítání příjmu na povel a hlášení důležitých událostí.
-
 **Novinky 0.15.1:** band mapa ukazuje celé pásmo, ne jen oficiální RTTY úsek (otevře se na digitální části, `⤢` zobrazí celé pásmo); přibyla pásma 160 m, 60 m a 6 m.
 
 **Novinky 0.15:** v band mapě posouvá kolečko myši a Shift + kolečko přibližuje; screenshoty v README.
@@ -117,14 +115,6 @@ mmtty4mac se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovláda
 - **Jazyk:** ve výchozím stavu angličtina; změna v Nastavení → Zobrazení → Jazyk rozhraní (čeština, angličtina, nahrané jazyky). Vlastní překlad: **Uložit šablonu…**, přeložit hodnoty v `strings`, nastavit `code` a `name`, **Nahrát jazyk…**.
 - **Jazykové soubory** `cs.json` a `en.json` jsou v `~/Library/Application Support/mmtty4mac/Languages` a lze je upravit (uložená změna se projeví okamžitě; upravený soubor aktualizace nepřepíše).
 - **Klávesy:** Nastavení → Klávesy – klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).
-- **Bez myši** (mimo jiné pro práci s VoiceOverem, ⌘F5) – vše jsou přiřaditelné zkratky v Nastavení → Klávesy:
-  - **⌥⌘F** zadat frekvenci, **⌥⌘S** naladit na nejsilnější signál ve spektru (místo kliknutí do vodopádu),
-  - **⌥⌘N** zářez na nejsilnější rušení mimo přijímaný signál (místo pravého tlačítka ve spektru),
-  - **⌥⌘C** vložit poslední přijatou značku do QSO okna (místo kliknutí na slovo v příjmu),
-  - **Enter** v tabulce Spoty použije vybraný spot, v okně Log otevře úpravu vybraného spojení,
-  - **Vysílání → Upravit makro** otevře editor makra (místo pravého tlačítka na tlačítku makra).
-  - Aby se tabulátor pohyboval i po tlačítkách a zaškrtávátkách, zapněte v systému Nastavení → Přístupnost → Klávesnice → **Plný přístup z klávesnice**.
-- **Předčítání (VoiceOver):** vodopád a spektrum hlásí naladění („mark 2125 Hz, space 2295 Hz, shift 170 Hz, AFC vypnuto, bez signálu, squelch otevřen"), scope shrnutí hodnot, spoty v band mapě značku, kmitočet, stáří a stav. Přijatý text se nepředčítá průběžně: **⌥⌘R** přečte poslední řádek, **⌥⇧⌘R** postupuje po předchozích, **⌥⌘T** přečte naladění. Sama se hlásí jen důležitá událost – vaše značka v příjmu, duplicita, nový násobič, potřebná stanice – nejvýš jedna za 2,5 s a osm za minutu; vypnout je lze v Nastavení → Upozornění.
 
 ## 11. Když něco nefunguje
 

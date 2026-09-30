@@ -24,15 +24,12 @@ struct TxEditor: View {
                     Text(L("po slovech")).tag(SendMode.word)
                     Text(L("po řádcích")).tag(SendMode.line)
                 }.pickerStyle(.segmented).frame(width: 260)
-                    .accessibilityLabel(L("Jak se odesílá psaný text"))
                 Spacer()
                 MessagesMenu(model: model)
                 Button(L("Odeslat vše")) { Task { await model.sendDraft(mode: .char) } }
                 Button(L("Smazat")) { model.txDraft = "" }
-                    .accessibilityLabel(L("Smazat text k vysílání"))
             }
             TextEditor(text: $model.txDraft)
-                .accessibilityLabel(L("Text k vysílání"))
                 .font(txFont)
                 .foregroundStyle(Color(hex: d.txTextColor) ?? .primary)
                 .scrollContentBackground(.hidden)

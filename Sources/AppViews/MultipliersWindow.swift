@@ -74,7 +74,6 @@ public struct MultipliersWindow: View {
                 ForEach(rows(t), id: \.self) { b in
                     GridRow {
                         Button(b) { detailBand = b }.buttonStyle(.link)
-                            .accessibilityLabel(L("Detail pásma %@", b))
                         ForEach(perBandKinds, id: \.self) { k in Text("\(t.worked(k, band: b).count)").monospacedDigit() }
                         ForEach(onceKinds, id: \.self) { _ in Text("") }
                         Text(weighted(t, b)).monospacedDigit()

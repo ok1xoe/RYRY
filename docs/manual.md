@@ -2,8 +2,6 @@
 
 mmtty4mac is an RTTY program for macOS: a native port of MMTTY (JE3HHT) with the same demodulator, plus a log, contest support and an API for loggers. Česká verze: [prirucka.md](prirucka.md).
 
-**New in 0.16:** VoiceOver support - named controls, a spoken summary of the waterfall and the spectrum, reading the received text on demand and announcements of important events.
-
 **New in 0.15.1:** the band map covers the whole band, not just the official RTTY segment (it opens on the digimode part, `⤢` shows the whole band); 160 m, 60 m and 6 m were added.
 
 **New in 0.15:** in the band map the mouse wheel pans and Shift + wheel zooms; screenshots in the README.
@@ -117,14 +115,6 @@ mmtty4mac looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers su
 - **Language:** English by default; change it in Settings → Display → Interface language (Czech, English, loaded languages). Your own translation: **Save template…**, translate the values in `strings`, set `code` and `name`, **Load language…**.
 - **Language files** `cs.json` and `en.json` are in `~/Library/Application Support/mmtty4mac/Languages` and can be edited (a saved change applies immediately; updates do not overwrite an edited file).
 - **Keys:** Settings → Keys – click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).
-- **Without a mouse** (among others for working with VoiceOver, ⌘F5) – all of these are assignable in Settings → Keys:
-  - **⌥⌘F** frequency entry, **⌥⌘S** tune to the strongest signal in the spectrum (instead of clicking the waterfall),
-  - **⌥⌘N** notch on the strongest interference outside the received signal (instead of the right button in the spectrum),
-  - **⌥⌘C** put the last received callsign into the QSO window (instead of clicking a word in the receive window),
-  - **Enter** in the Spots table uses the selected spot; in the Log window it opens the selected QSO for editing,
-  - **Transmit → Edit macro** opens the macro editor (instead of right-clicking a macro button).
-  - For Tab to also move across buttons and checkboxes, turn on System Settings → Accessibility → Keyboard → **Full Keyboard Access**.
-- **Speech (VoiceOver):** the waterfall and the spectrum report the tuning ("mark 2125 Hz, space 2295 Hz, shift 170 Hz, AFC off, no signal, squelch open"), the scope a summary of its values, and band-map spots the call, frequency, age and status. Received text is not read continuously: **⌥⌘R** reads the last line, **⌥⇧⌘R** steps back through earlier ones, **⌥⌘T** reads the tuning. Only important events announce themselves - your own call in the receive text, a dupe, a new multiplier, a needed station - at most one every 2.5 s and eight a minute; they can be switched off in Settings → Alerts.
 
 ## 11. Troubleshooting
 

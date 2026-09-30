@@ -72,7 +72,7 @@ struct QSOPanel: View {
                                 label(title)
                                 if field == "call" {
                                     HStack(spacing: 6) {
-                                        QSOField(model: model, label: "", field: field, name: title, esm: true,
+                                        QSOField(model: model, label: "", field: field, esm: true,
                                                  onTyping: { model.superCheckPreview($0) })
                                             .font(.title3.monospaced())
                                         if model.isDupe {
@@ -80,22 +80,18 @@ struct QSOPanel: View {
                                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                                 .background(.red, in: RoundedRectangle(cornerRadius: 4))
                                                 .hint(L("Duplicita: se stanicí už je v tomto závodě spojení na stejném pásmu (u vlastního závodu i módu)"))
-                                                .accessibilityLabel(L("Duplicita"))
                                         }
                                         if !model.isDupe, !model.newMultiplier.isEmpty {
                                             Text("NEW MULT").font(.caption.bold()).foregroundStyle(.white)
                                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                                 .background(.green, in: RoundedRectangle(cornerRadius: 4))
                                                 .hint(L("Nový násobič: %@", model.newMultiplier.text))
-                                                .accessibilityLabel(L("Nový násobič"))
-                                                .accessibilityValue(model.newMultiplier.text)
                                             Text(model.newMultiplier.text).font(.caption).foregroundStyle(.secondary)
                                                 .lineLimit(1)
-                                                .accessibilityHidden(true)      // already in the badge's value
                                         }
                                     }.gridCellColumns(3)
                                 } else {
-                                    QSOField(model: model, label: "", field: field, name: title).gridCellColumns(3)
+                                    QSOField(model: model, label: "", field: field).gridCellColumns(3)
                                 }
                             }
                             if field == "call", !model.scpPartial.isEmpty || !model.scpNear.isEmpty {
@@ -106,8 +102,8 @@ struct QSOPanel: View {
                             }
                         case .pair(let f1, let t1, let f2, let t2):
                             GridRow {
-                                label(t1); QSOField(model: model, label: "", field: f1, name: t1, esm: true)
-                                label(t2); QSOField(model: model, label: "", field: f2, name: t2, esm: true)
+                                label(t1); QSOField(model: model, label: "", field: f1, esm: true)
+                                label(t2); QSOField(model: model, label: "", field: f2, esm: true)
                             }
                         case .country:
                             if let c = model.dxcc {
@@ -136,18 +132,13 @@ struct QSOPanel: View {
                         }
                     }
                 }
-                // one group of QSO fields; each field stays individually reachable inside it
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel(L("Údaje spojení"))
                 FrequencyRow(model: model)
                 if !model.callbookStatus.isEmpty {
                     Text(model.callbookStatus).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
                 }
                 HStack {
                     Button("Log") { Task { await model.logQSO() } }.hint(L("Zalogovat (⌘L)"))
-                        .accessibilityLabel(L("Zalogovat QSO"))
                     Button("Clear") { Task { await model.clearQSO() } }
-                        .accessibilityLabel(L("Vymazat QSO"))
                 }
                 if QSOLayout.showsQTC(model.settings.contest) { QTCPanel(model: model) }
                 if !model.previousQSOs.isEmpty {
@@ -179,7 +170,6 @@ struct ESMBar: View {
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
             .hint(L("Režim ESM: Run (volám CQ) / S&P (odpovídám) – %@", model.settings.binding(for: .esmMode).display))
-            .accessibilityLabel(L("Režim ESM"))
             let step = model.esmStep
             let macro = ESM.macro(for: step, model.settings.esm)
             let key = macro.map { " (" + model.settings.binding(for: .macro($0)).display + ")" } ?? ""
@@ -189,12 +179,9 @@ struct ESMBar: View {
                 .padding(.horizontal, 8).padding(.vertical, 2)
                 .background(step == .none ? Color.clear : color(step), in: RoundedRectangle(cornerRadius: 4))
                 .hint(model.state == .rx ? L("Co pošle Enter v poli Call nebo výměny") : L("Během vysílání Enter nic neposílá"))
-                .accessibilityLabel(L("Co pošle Enter"))
-                .accessibilityValue(ESM.title(step))
             if let macro, model.esmMacroIsEmpty(macro) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                     .hint(L("Makro %@ je prázdné – nastavte ho v Nastavení → Závod → ESM", model.settings.binding(for: .macro(macro)).display))
-                    .accessibilityLabel(L("Upozornění: prázdné makro"))
             }
         }
     }
@@ -214,8 +201,6 @@ struct QSOField: View {
     @Bindable var model: AppModel
     let label: String
     let field: String
-    /// The name for VoiceOver (the visible label is in the grid's left column, not in the field).
-    var name = ""
     /// Enter triggers ESM (the Call and exchange fields).
     var esm = false
     /// Called on every text change (Super Check Partial for the callsign).
@@ -229,7 +214,6 @@ struct QSOField: View {
     var body: some View {
         TextField(label, text: $text)
             .textFieldStyle(.roundedBorder)
-            .accessibilityLabel(name.isEmpty ? label : name)
             .focused($focused)
             .overlay(alignment: .trailing) {
                 // a discreet label next to a value filled in from the call history (it disappears once the field is edited by hand)
@@ -279,14 +263,10 @@ struct SuperCheckList: View {
             if !model.scpNear.isEmpty {
                 HStack(spacing: 4) {
                     Text("≈").font(.caption.bold()).foregroundStyle(.orange).hint(L("Značky lišící se o jeden znak"))
-                        .accessibilityLabel(L("Značky lišící se o jeden znak"))
                     chips(model.scpNear, color: .orange)
                 }
             }
         }
-        // one group; every suggested call stays reachable inside it
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(L("Nabídka značek z databáze"))
     }
 
     func chips(_ calls: [String], color: Color) -> some View {
@@ -297,7 +277,6 @@ struct SuperCheckList: View {
                     ForEach(calls[i..<min(i + 4, calls.count, 12)], id: \.self) { c in
                         Button(c) { Task { await model.setQSOField("call", c) } }
                             .buttonStyle(.borderless).font(.caption.monospaced()).foregroundStyle(color)
-                            .accessibilityHint(Text(L("Vložit značku do pole Call")))
                     }
                 }
             }
@@ -322,9 +301,8 @@ struct FrequencyRow: View {
                     Divider()
                     Button(L("Bez frekvence")) { Task { await model.setQSOField("freq", "") } }
                 }.fixedSize()
-                    .accessibilityLabel(L("Pásmo do logu"))
-                QSOField(model: model, label: "kHz", field: "freq", name: L("Frekvence v kHz")).frame(width: 90)
-                Text("kHz").font(.caption).foregroundStyle(.secondary).accessibilityHidden(true)
+                QSOField(model: model, label: "kHz", field: "freq").frame(width: 90)
+                Text("kHz").font(.caption).foregroundStyle(.secondary)
             }
         }
         .hint(L("Bez rigu zadejte pásmo nebo frekvenci ručně – zapíše se do logu"))

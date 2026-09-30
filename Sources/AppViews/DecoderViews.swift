@@ -22,14 +22,11 @@ struct SecondDecoderPanel: View {
                 }
                 .labelsHidden().fixedSize()
                 .hint(L("Demodulátor druhého dekodéru (auto = jiný než hlavní)"))
-                .accessibilityLabel(L("Demodulátor druhého dekodéru"))
                 Spacer()
                 Button { model.clearRx2() } label: { Image(systemName: "trash") }
                     .buttonStyle(.borderless).hint(L("Vymazat text druhého dekodéru"))
-                    .accessibilityLabel(L("Vymazat text druhého dekodéru"))
                 Button { Task { await model.setSecondDecoder(false) } } label: { Image(systemName: "xmark") }
                     .buttonStyle(.borderless).hint(L("Vypnout druhý dekodér"))
-                    .accessibilityLabel(L("Vypnout druhý dekodér"))
             }
             .controlSize(.small)
             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -154,15 +151,11 @@ struct ChannelRow: View {
                     return .handled
                 })
                 .hint(L("Klik na slovo = vložit do QSO"))
-                .accessibilityLabel(L("Text kanálu %ld", index))
             Button(L("Naladit")) { Task { await model.tuneChannel(channel.id) } }
                 .controlSize(.small)
                 .hint(L("Přeladit hlavní dekodér na tento signál"))
-                .accessibilityLabel(L("Naladit na kanál %ld", index))
         }
         .contentShape(Rectangle())
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(L("Kanál %ld, %.0f Hz", index, channel.mark))
     }
 
     static let scheme = "mmtty4mac-word"
@@ -234,10 +227,8 @@ struct DecodersTab: View {
                     HStack(spacing: 4) {
                         TextField("", value: $s.decoders.channelTimeoutS, format: .number.precision(.fractionLength(0)))
                             .multilineTextAlignment(.trailing).frame(width: 70)
-                            .accessibilityLabel(L("Kanál zaniká po"))
                         Text("s").foregroundStyle(.secondary)
                         Stepper("", value: $s.decoders.channelTimeoutS, in: DecoderSettings.timeoutRange, step: 5).labelsHidden()
-                            .accessibilityLabel(L("Kanál zaniká po"))
                     }
                 }
                 Toggle(L("Značky kanálů ve vodopádu"), isOn: $s.decoders.showChannelMarks)
