@@ -2,6 +2,8 @@
 
 mmtty4mac je RTTY program pro macOS: nativní přepis MMTTY (JE3HHT) se stejným demodulátorem, s logem, podporou závodů a s API pro loggery. English version: [manual.md](manual.md).
 
+**Novinky 0.15:** v band mapě posouvá kolečko myši a Shift + kolečko přibližuje; screenshoty v README.
+
 **Novinky 0.14 (2):** zvýraznění značek v příjmu a upozornění, když vás někdo volá; hlídání značek a nových zemí; azimut a vzdálenost; zadání frekvence (⌥⌘F) a tlačítka pásem; historie značek N1MM; okno Násobiče s NEW MULT; okno Band mapa.
 
 **Novinky 0.14:** ESM – Enter posílá zprávy v závodě (Run/S&P, ⌃R), spoty jako štítky ve vodopádu, denní záloha logu (Soubor → Zálohovat log teď), rychlost závodu ve stavovém řádku, import maker a nastavení z Windows MMTTY (Soubor → Importovat z MMTTY…), univerzální aplikace i pro Intel Macy.

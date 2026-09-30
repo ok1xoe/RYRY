@@ -34,6 +34,8 @@ public struct MainView: View {
 
 struct StatusBar: View {
     @Bindable var model: AppModel
+    /// A fixed start for the rate timer; `.now` in the schedule would create a new schedule on every render.
+    @State private var timelineStart = Date()
     var body: some View {
         HStack(spacing: 8) {
             if let m = model.messages.last {
@@ -44,7 +46,7 @@ struct StatusBar: View {
             Spacer()
             if model.settings.contest.enabled {
                 // recompute every 30 s - the rate drops even without new QSOs
-                TimelineView(.periodic(from: .now, by: 30)) { tl in
+                TimelineView(.periodic(from: timelineStart, by: 30)) { tl in
                     let st = model.logStats(now: tl.date)
                     Text(L("QSO %ld · 10 min: %ld/h · 60 min: %ld/h", st.total, st.rate10, st.rate60))
                         .monospacedDigit().foregroundStyle(.secondary)

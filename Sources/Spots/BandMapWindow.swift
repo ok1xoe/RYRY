@@ -144,6 +144,7 @@ public enum BandMapFilter {
 
 /// Scale zoom with the mouse wheel / trackpad. The trackpad sends many small deltas (and momentum), so the deltas are
 /// summed up and zooming happens in steps (1 step per `pointsPerStep` points); momentum is ignored. Wheel = one step/event.
+/// Used for Shift + wheel; a plain wheel pans the scale instead.
 public struct ScrollZoomAccumulator: Sendable, Equatable {
     public static let pointsPerStep = 20.0
     public private(set) var accumulated = 0.0

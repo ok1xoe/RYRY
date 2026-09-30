@@ -19,6 +19,8 @@ public struct BandMapWindow: View {
     @State private var latchedBand: String?
     /// The bottom edge of the scale when the drag started; `@GestureState` resets itself even when the gesture is cancelled.
     @GestureState private var panStartLow: Double?
+    /// A fixed start for the redraw timer; `.now` in the schedule would create a new schedule on every render.
+    @State private var timelineStart = Date()
     public init(model: AppModel) { self.model = model }
 
     static let rowHeight: CGFloat = 16
@@ -107,7 +109,7 @@ public struct BandMapWindow: View {
     public var body: some View {
         VStack(spacing: 6) {
             controls
-            TimelineView(.periodic(from: .now, by: 30)) { ctx in
+            TimelineView(.periodic(from: timelineStart, by: 30)) { ctx in
                 mapView(band: band, now: ctx.date)
             }
         }
@@ -130,9 +132,9 @@ public struct BandMapWindow: View {
     var zoomButtons: some View {
         HStack(spacing: 8) {
             Button { zoom(0.6, band: band) } label: { Image(systemName: "plus.magnifyingglass") }
-                .hint(L("Přiblížit stupnici"))
+                .hint(L("Přiblížit stupnici (Shift + kolečko myši)"))
             Button { zoom(1 / 0.6, band: band) } label: { Image(systemName: "minus.magnifyingglass") }
-                .hint(L("Oddálit stupnici"))
+                .hint(L("Oddálit stupnici (Shift + kolečko myši)"))
             Button { var s = scale(for: band); s.reset(); scales[band] = s } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
             }
@@ -226,7 +228,12 @@ public struct BandMapWindow: View {
                         .frame(maxWidth: .infinity).padding(.top, 8)
                         .offset(x: 0, y: 0)
                 }
-                ScrollWheelZoom { steps, fromTop in
+                ScrollWheelHandler { points in                      // plain wheel = pan
+                    guard h > 0 else { return }
+                    var s = scale(for: band)
+                    s.pan(by: points / h * s.span)
+                    scales[band] = s
+                } onZoom: { steps, fromTop in                        // Shift + wheel = zoom
                     let f = sc.kHz(forY: fromTop * h, height: h)
                     zoom(pow(0.85, Double(steps)), band: band, around: f)
                 }
@@ -253,16 +260,23 @@ public struct BandMapWindow: View {
 }
 
 /// The mouse wheel over the area: a local event monitor (SwiftUI on macOS has no view for scrollWheel).
-/// Returns the number of zoom steps (> 0 = zoom in; trackpad steps are accumulated, see `ScrollZoomAccumulator`) and the cursor position from the top (0…1).
-private struct ScrollWheelZoom: NSViewRepresentable {
-    var onScroll: (Int, Double) -> Void
+/// Plain wheel = pan (`onPan` gets the shift in points, positive = towards higher frequencies);
+/// Shift + wheel = zoom (`onZoom` gets the number of steps, > 0 = zoom in, and the cursor position from the top, 0…1).
+private struct ScrollWheelHandler: NSViewRepresentable {
+    var onPan: (Double) -> Void
+    var onZoom: (Int, Double) -> Void
 
     final class Coordinator {
         var monitor: Any?
         var accumulator = ScrollZoomAccumulator()
-        var onScroll: (Int, Double) -> Void = { _, _ in }
+        var onPan: (Double) -> Void = { _ in }
+        var onZoom: (Int, Double) -> Void = { _, _ in }
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// One wheel notch is not in points; move the scale by a readable step.
+    static let pointsPerLine = 16.0
+
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         let c = context.coordinator
@@ -270,15 +284,26 @@ private struct ScrollWheelZoom: NSViewRepresentable {
             guard let v, let w = v.window, e.window === w else { return e }
             let p = v.convert(e.locationInWindow, from: nil)
             guard v.bounds.contains(p), v.bounds.height > 0 else { return e }
+            // with Shift held macOS reports a vertical wheel as horizontal scrolling
+            let shift = e.modifierFlags.contains(.shift)
+            let raw = Double(e.scrollingDeltaY != 0 ? e.scrollingDeltaY : e.scrollingDeltaX)
+            guard raw.isFinite, raw != 0 else { return nil }
             if e.phase.contains(.began) { c.accumulator.reset() }
-            let steps = c.accumulator.feed(deltaY: Double(e.scrollingDeltaY), precise: e.hasPreciseScrollingDeltas,
-                                           momentum: !e.momentumPhase.isEmpty)
-            if steps != 0 { c.onScroll(steps, Double(1 - p.y / v.bounds.height)) }
+            if shift {
+                let steps = c.accumulator.feed(deltaY: raw, precise: e.hasPreciseScrollingDeltas,
+                                               momentum: !e.momentumPhase.isEmpty)
+                if steps != 0 { c.onZoom(steps, Double(1 - p.y / v.bounds.height)) }
+            } else {
+                c.onPan(e.hasPreciseScrollingDeltas ? raw : raw * Self.pointsPerLine)
+            }
             return nil
         }
         return v
     }
-    func updateNSView(_ v: NSView, context: Context) { context.coordinator.onScroll = onScroll }
+    func updateNSView(_ v: NSView, context: Context) {
+        context.coordinator.onPan = onPan
+        context.coordinator.onZoom = onZoom
+    }
     static func dismantleNSView(_ v: NSView, coordinator: Coordinator) {
         if let m = coordinator.monitor { NSEvent.removeMonitor(m) }
     }
