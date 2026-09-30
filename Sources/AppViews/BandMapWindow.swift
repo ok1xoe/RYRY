@@ -15,6 +15,8 @@ public struct BandMapWindow: View {
     @State private var scales: [String: BandScale] = [:]
     @State private var showLogged = true
     @State private var loggedMinutes = 60
+    /// Poslední poloha při tažení (posun stupnice).
+    @State private var dragFrom: CGFloat?
     public init(model: AppModel) { self.model = model }
 
     static let rowHeight: CGFloat = 16
@@ -41,10 +43,20 @@ public struct BandMapWindow: View {
         return f / 1000
     }
 
-    var band: String? {
+    /// Pásma se spoty od nejvíce obsazeného – náhradní volba, když pásmo neurčí rig ani QSO okno.
+    var spotBands: [String] {
+        var n: [String: Int] = [:]
+        for s in model.spotFeed.book.byID.values where !model.spotFeed.rttyOnly || s.isRTTY {
+            if let b = s.band { n[b, default: 0] += 1 }
+        }
+        return n.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
+    }
+
+    /// Nikdy nil: bez rigu a bez frekvence v QSO okně se ukáže pásmo se spoty, jinak výchozí pásmo.
+    var band: String {
         // ruční frekvenci QSO číst jen když ruční volba ani rig pásmo neurčí (jinak by každá změna QSO okna překreslovala mapu)
         RTTYBandPlan.selectBand(choice: bandChoice, rigHz: rigKHz.map { $0 * 1000 }, manualHz: nil)
-            ?? RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: model.qso.frequency)
+            ?? RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: model.qso.frequency, spotBands: spotBands)
     }
 
     func scale(for band: String) -> BandScale {
@@ -81,40 +93,58 @@ public struct BandMapWindow: View {
     public var body: some View {
         VStack(spacing: 6) {
             controls
-            if let band {
-                TimelineView(.periodic(from: .now, by: 30)) { ctx in
-                    mapView(band: band, now: ctx.date)
-                }
-            } else {
-                Spacer()
-                Text(L("Zvolte pásmo (rig ani ruční frekvence nejsou na pásmu s RTTY částí)."))
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
+            TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                mapView(band: band, now: ctx.date)
             }
         }
         .padding(8)
         .frame(minWidth: 280, minHeight: 360)
     }
 
-    var controls: some View {
+    /// Výběr pásma; „auto“ = podle rigu, frekvence v QSO okně nebo spotů.
+    var bandPicker: some View {
+        Picker(L("Pásmo"), selection: $bandChoice) {
+            Text(L("auto (%@)", band)).tag(String?.none)
+            ForEach(RTTYBandPlan.bands, id: \.self) { Text($0).tag(String?.some($0)) }
+        }
+        .labelsHidden().fixedSize()
+        .hint(L("Pásmo mapy; auto = podle rigu, frekvence v QSO okně nebo spotů"))
+    }
+
+    var zoomButtons: some View {
         HStack(spacing: 8) {
-            Picker(L("Pásmo"), selection: $bandChoice) {
-                Text(L("auto")).tag(String?.none)
-                ForEach(RTTYBandPlan.bands, id: \.self) { Text($0).tag(String?.some($0)) }
-            }.fixedSize()
-            Button { if let band { zoom(0.6, band: band) } } label: { Image(systemName: "plus.magnifyingglass") }
-                .hint(L("Přiblížit stupnici")).disabled(band == nil)
-            Button { if let band { zoom(1 / 0.6, band: band) } } label: { Image(systemName: "minus.magnifyingglass") }
-                .hint(L("Oddálit stupnici")).disabled(band == nil)
+            Button { zoom(0.6, band: band) } label: { Image(systemName: "plus.magnifyingglass") }
+                .hint(L("Přiblížit stupnici"))
+            Button { zoom(1 / 0.6, band: band) } label: { Image(systemName: "minus.magnifyingglass") }
+                .hint(L("Oddálit stupnici"))
+            Button { var s = scale(for: band); s.reset(); scales[band] = s } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+            }
+            .hint(L("Celý RTTY úsek pásma"))
             Button {
-                if let band, let f = rigKHz { var s = scale(for: band); s.center(on: f); scales[band] = s }
+                if let f = rigKHz { var s = scale(for: band); s.center(on: f); scales[band] = s }
             } label: { Image(systemName: "scope") }
-                .hint(L("Střed na rig")).disabled(band == nil || rigKHz == nil)
-            Spacer()
+                .hint(L("Střed na rig")).disabled(rigKHz == nil)
+        }
+    }
+
+    var logControls: some View {
+        HStack(spacing: 8) {
             Toggle(L("Můj log"), isOn: $showLogged).toggleStyle(.checkbox)
             if showLogged {
                 Stepper(value: $loggedMinutes, in: 5...1440, step: 15) { Text(L("%ld min", loggedMinutes)).monospacedDigit() }
                     .fixedSize()
+            }
+        }
+    }
+
+    /// V úzkém okně se ovládání zalomí do dvou řádků (jinak by se popisky ořízly).
+    var controls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { bandPicker; zoomButtons; Spacer(minLength: 8); logControls }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) { bandPicker; Spacer(minLength: 4); zoomButtons }
+                logControls
             }
         }
     }
@@ -186,6 +216,20 @@ public struct BandMapWindow: View {
                 }
                 .allowsHitTesting(false)
             }
+            // tažení myší = posun stupnice (jen když je přiblížená); štítky spotů zůstávají klikací
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 3)
+                    .onChanged { g in
+                        guard h > 0 else { return }
+                        let last = dragFrom ?? g.startLocation.y
+                        var s = scale(for: band)
+                        s.pan(by: (g.location.y - last) / h * s.span)     // dolů = k nižším frekvencím
+                        scales[band] = s
+                        dragFrom = g.location.y
+                    }
+                    .onEnded { _ in dragFrom = nil }
+            )
             .frame(width: g.size.width, height: h, alignment: .topLeading)
         }
         .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))

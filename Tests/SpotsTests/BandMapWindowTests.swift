@@ -31,6 +31,39 @@ private func sp(_ call: String, _ kHz: Double, age: TimeInterval = 0, now: Date,
     #expect(RTTYBandPlan.selectBand(choice: "6m", rigHz: 14_080_000, manualHz: nil) == "20m")
 }
 
+@Test func bandSelectionFallsBackToSpotsThenDefault() {
+    // bez rigu a bez ruční frekvence: pásmo s nejvíce spoty, aby mapa nezůstala prázdná
+    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: ["15m", "40m"]) == "15m")
+    // pásmo bez RTTY segmentu se přeskočí
+    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: ["6m", "40m"]) == "40m")
+    // žádné spoty → výchozí pásmo
+    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: nil, manualHz: nil, spotBands: []) == RTTYBandPlan.defaultBand)
+    #expect(RTTYBandPlan.segment(for: RTTYBandPlan.defaultBand) != nil)
+    // rig a ruční frekvence mají přednost před spoty
+    #expect(RTTYBandPlan.selectBand(choice: nil, rigHz: 7_040_000, manualHz: nil, spotBands: ["15m"]) == "40m")
+    #expect(RTTYBandPlan.selectBand(choice: "10m", rigHz: nil, manualHz: nil, spotBands: ["15m"]) == "10m")
+}
+
+@Test func scaleResetsToWholeSegment() {
+    var s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
+    s.zoom(by: 0.2, around: 14_075)
+    #expect(s.span < 20)
+    s.reset()
+    #expect(s.visibleLow == 14_070 && s.visibleHigh == 14_100)
+}
+
+@Test func scalePansAndClampsToSegment() {
+    var s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
+    s.zoom(by: 0.5, around: 14_085)                       // rozsah 15 kHz kolem středu
+    let span = s.span
+    s.pan(by: 3)
+    #expect(abs(s.span - span) < 1e-9 && s.visibleLow > 14_070)
+    s.pan(by: 1_000)                                      // nad horní okraj → ořízne se
+    #expect(s.visibleHigh == 14_100 && abs(s.span - span) < 1e-9)
+    s.pan(by: -1_000)
+    #expect(s.visibleLow == 14_070 && abs(s.span - span) < 1e-9)
+}
+
 @Test func scaleConvertsFrequencyAndY() {
     let s = BandScale(segment: RTTYBandPlan.segment(for: "20m")!)
     #expect(s.visibleLow == 14070 && s.visibleHigh == 14100)

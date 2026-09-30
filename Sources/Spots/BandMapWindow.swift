@@ -17,8 +17,17 @@ public enum RTTYBandPlan {
     ]
     public static var bands: [String] { segments.map(\.band) }
     public static func segment(for band: String?) -> Segment? { segments.first { $0.band == band } }
+    /// Pásmo, když nic jiného pásmo neurčí (bez rigu, bez frekvence v QSO a bez spotů).
+    public static let defaultBand = "20m"
 
-    /// Pásmo okna: ruční volba → pásmo z rigu → pásmo z ruční frekvence QSO. Pásmo bez RTTY segmentu se přeskočí.
+    /// Pásmo okna: ruční volba → pásmo z rigu → pásmo z ruční frekvence QSO → pásma se spoty (`spotBands`, nejdřív to
+    /// nejzajímavější) → `defaultBand`. Pásmo bez RTTY segmentu se přeskočí. Nikdy nevrací nil, aby mapa nezůstala prázdná.
+    public static func selectBand(choice: String?, rigHz: Double?, manualHz: Double?, spotBands: [String]) -> String {
+        let candidates = [choice, Bands.band(forHz: rigHz), Bands.band(forHz: manualHz)] + spotBands.map { Optional($0) }
+        return candidates.compactMap { $0 }.first { segment(for: $0) != nil } ?? defaultBand
+    }
+
+    /// Bez `spotBands`: vrací nil, když pásmo neurčí volba, rig ani ruční frekvence.
     public static func selectBand(choice: String?, rigHz: Double?, manualHz: Double?) -> String? {
         let candidates = [choice, Bands.band(forHz: rigHz), Bands.band(forHz: manualHz)]
         return candidates.compactMap { $0 }.first { segment(for: $0) != nil }
@@ -53,6 +62,15 @@ public struct BandScale: Sendable, Equatable {
 
     /// Vystředí rozsah na frekvenci (šířka se nemění, posun se ořízne na pásmo).
     public mutating func center(on f: Double) { place(low: f - span / 2, span: span) }
+
+    /// Zpět na celý RTTY úsek pásma.
+    public mutating func reset() { visibleLow = fullLow; visibleHigh = fullHigh }
+
+    /// Posun stupnice o `kHz` (kladné = k vyšším frekvencím); ořízne se na pásmo.
+    public mutating func pan(by kHz: Double) {
+        guard kHz.isFinite else { return }
+        place(low: visibleLow + kHz, span: span)
+    }
 
     private mutating func place(low: Double, span s: Double) {
         let lo = min(max(low, fullLow), fullHigh - s)
