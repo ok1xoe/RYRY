@@ -35,10 +35,14 @@ public final class SpotFeed {
     public var bandFilter: String?
     /// Zobrazit jen RTTY (filtr zobrazení; příjem u klienta se řídí `config.rttyOnly`).
     public var rttyOnly = true
+    /// Posledních ~500 ne-spotových řádků z DX clusteru (odpovědi na příkazy, uvítání) a odeslané příkazy (`> příkaz`).
+    public private(set) var consoleLines: [String] = []
+    public static let consoleMax = 500
     /// Volá se pro každý nově přidaný spot (značka + pásmo, které v seznamu ještě nebylo).
     @ObservationIgnored public var onNewSpot: (@MainActor (Spot) -> Void)?
 
     @ObservationIgnored private var clients: [TelnetSpotClient] = []
+    @ObservationIgnored private var clusterClient: TelnetSpotClient?
     @ObservationIgnored private var pruneTask: Task<Void, Never>?
     @ObservationIgnored private let clock: @Sendable () -> Date
 
@@ -62,16 +66,20 @@ public final class SpotFeed {
         rttyOnly = cfg.rttyOnly
         book = SpotBook(maxCount: SpotBook.absoluteMax)
         clusterState = .off; rbnState = .off
+        consoleLines = []
         let clock = self.clock
         func make(_ e: SpotEndpoint, _ src: SpotSource) -> TelnetSpotClient {
             var c = TelnetSpotClient.Config(host: e.host, port: e.port, login: cfg.call, commands: e.commands,
                                             source: src, rttyOnly: cfg.rttyOnly)
             if let t = cfg.clientTuning { c.initialDelay = t.initialDelay; c.maxDelay = t.maxDelay }
+            var lineSink: (@Sendable ([String]) -> Void)?
+            if src == .cluster { lineSink = { [weak self] lines in Task { @MainActor in self?.appendConsole(lines) } } }
             return TelnetSpotClient(config: c, now: clock,
                 onSpots: { [weak self] spots in Task { @MainActor in self?.ingest(spots) } },
-                onState: { [weak self] st in Task { @MainActor in self?.setState(src, st) } })
+                onState: { [weak self] st in Task { @MainActor in self?.setState(src, st) } },
+                onLines: lineSink)
         }
-        if let e = cfg.cluster { clients.append(make(e, .cluster)) }
+        if let e = cfg.cluster { let c = make(e, .cluster); clusterClient = c; clients.append(c) }
         if let e = cfg.rbn { clients.append(make(e, .rbn)) }
         let started = clients
         Task { for c in started { await c.start() } }
@@ -85,11 +93,27 @@ public final class SpotFeed {
 
     public func stop() {
         let old = clients
-        clients = []
+        clients = []; clusterClient = nil
         pruneTask?.cancel(); pruneTask = nil
         Task { for c in old { await c.stop() } }
         clusterState = .off; rbnState = .off
     }
+
+    /// Pošle příkaz do DX clusteru (ne do RBN) přes existující spojení: `příkaz\r\n`. Bez spojení vyhodí `ClusterCommandError`.
+    public func sendClusterCommand(_ line: String) async throws {
+        let clean = try ClusterCommand.validate(line)
+        guard let c = clusterClient, clusterState == .connected else { throw ClusterCommandError.notConnected }
+        try await c.sendLine(clean)
+        appendConsole(["> " + clean])
+    }
+
+    func appendConsole(_ lines: [String]) {
+        guard isRunning else { return }
+        consoleLines += lines.map { String($0.prefix(500)) }
+        if consoleLines.count > Self.consoleMax { consoleLines.removeFirst(consoleLines.count - Self.consoleMax) }
+    }
+
+    public func clearConsole() { consoleLines = [] }
 
     func ingest(_ spots: [Spot]) {
         guard isRunning else { return }

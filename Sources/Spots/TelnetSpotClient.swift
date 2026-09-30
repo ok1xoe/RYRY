@@ -33,14 +33,25 @@ public actor TelnetSpotClient {
     private let config: Config
     private let onSpots: @Sendable ([Spot]) -> Void
     private let onState: @Sendable (State) -> Void
+    private let onLines: (@Sendable ([String]) -> Void)?
     private let now: @Sendable () -> Date
     private var task: Task<Void, Never>?
     private var connection: NWConnection?
+    /// Spojení, do kterého lze posílat příkazy (po přihlášení); jinak nil.
+    private var sendable: NWConnection?
     private let queue = DispatchQueue(label: "TelnetSpotClient")
 
     public init(config: Config, now: @escaping @Sendable () -> Date = { Date() },
-                onSpots: @escaping @Sendable ([Spot]) -> Void, onState: @escaping @Sendable (State) -> Void) {
-        self.config = config; self.now = now; self.onSpots = onSpots; self.onState = onState
+                onSpots: @escaping @Sendable ([Spot]) -> Void, onState: @escaping @Sendable (State) -> Void,
+                onLines: (@Sendable ([String]) -> Void)? = nil) {
+        self.config = config; self.now = now; self.onSpots = onSpots; self.onState = onState; self.onLines = onLines
+    }
+
+    /// Pošle řádek serveru (`řádek\r\n`) po přihlášení; bez spojení `.notConnected`. Řádek musí být platný (`ClusterCommand`).
+    public func sendLine(_ line: String) async throws {
+        let clean = try ClusterCommand.validate(line)
+        guard let c = sendable, c.state == .ready else { throw ClusterCommandError.notConnected }
+        await Self.send(c, Data((clean + "\r\n").utf8))
     }
 
     public func start() {
@@ -52,7 +63,7 @@ public actor TelnetSpotClient {
 
     public func stop() {
         task?.cancel(); task = nil
-        connection?.cancel(); connection = nil
+        connection?.cancel(); connection = nil; sendable = nil
     }
 
     // MARK: Smyčka připojení
@@ -76,7 +87,7 @@ public actor TelnetSpotClient {
         guard let port = NWEndpoint.Port(rawValue: config.port) else { return false }
         let c = NWConnection(host: NWEndpoint.Host(config.host), port: port, using: .tcp)
         connection = c
-        defer { c.cancel(); if connection === c { connection = nil } }
+        defer { c.cancel(); if connection === c { connection = nil }; if sendable === c { sendable = nil } }
         let timer = Task { [timeout = config.connectTimeout] in
             try? await Task.sleep(for: timeout)
             if !Task.isCancelled { c.cancel() }
@@ -105,15 +116,21 @@ public actor TelnetSpotClient {
             if !loginSent, (lines + [splitter.pending]).contains(where: TelnetPrompt.isLogin) {
                 loginSent = true
                 await Self.send(c, Data((login + "\r\n").utf8))
+                sendable = c
             }
             let t = now()
             var spots: [Spot] = []
+            var other: [String] = []
             for l in lines {
-                guard let s = SpotParser.parse(l, now: t, source: config.source) else { continue }
+                guard let s = SpotParser.parse(l, now: t, source: config.source) else {
+                    if !l.trimmingCharacters(in: .whitespaces).isEmpty { other.append(l) }
+                    continue
+                }
                 if config.rttyOnly, !s.isRTTY { continue }
                 spots.append(s)
             }
             if !spots.isEmpty { onSpots(spots) }
+            if !other.isEmpty { onLines?(other) }
         }
         return true
     }

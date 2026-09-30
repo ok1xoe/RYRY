@@ -50,9 +50,12 @@ extension MacroBar {
 
 struct EditIndex: Identifiable { let id: Int }
 
+/// Editor maker: makra pro vysílání (`settings.macros`) nebo příkazů DX clusteru (`settings.spots.clusterMacros`).
 struct MacroEditor: View {
+    enum Target { case transmit, cluster }
     @Bindable var model: AppModel
     let index: Int
+    var target: Target = .transmit
     @State private var name = ""
     @State private var text = ""
     @State private var repeatSec = 0.0
@@ -60,9 +63,11 @@ struct MacroEditor: View {
     @State private var color = Color.blue
     @Environment(\.dismiss) private var dismiss
 
+    private var list: [Macro] { target == .cluster ? model.settings.spots.clusterMacros : model.settings.macros }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L("Makro %@", MacroBar.keyName(index))).font(.headline)
+            Text(target == .cluster ? L("Příkaz clusteru %ld", index + 1) : L("Makro %@", MacroBar.keyName(index))).font(.headline)
             TextField(L("Název"), text: $name)
             TextEditor(text: $text).font(.system(.body, design: .monospaced)).frame(minHeight: 120)
             HStack {
@@ -70,21 +75,32 @@ struct MacroEditor: View {
                 ColorPicker("", selection: $color, supportsOpacity: false).labelsHidden().disabled(!useColor)
                 Spacer()
             }
-            HStack {
-                Text(L("Opakovat po (s, 0 = ne):"))
-                TextField("", value: $repeatSec, format: .number).frame(width: 60)
+            if target == .transmit {
+                HStack {
+                    Text(L("Opakovat po (s, 0 = ne):"))
+                    TextField("", value: $repeatSec, format: .number).frame(width: 60)
+                }
             }
+            if target == .cluster {
+                Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %k frekvence rigu v kHz · %D %T %t čas UTC · jeden řádek = jeden příkaz · \\ # a CW ID se ignorují"))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
             Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %N odesílané číslo · %M přijaté číslo · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX"))
                 .font(.caption).foregroundStyle(.secondary)
+            }
             HStack {
                 Spacer()
                 Button(L("Zrušit")) { dismiss() }
                 Button(L("Uložit")) {
-                    var m = model.settings.macros
+                    var m = list
                     while m.count <= index { m.append(Macro(name: "", text: "")) }
-                    m[index] = Macro(name: name, text: text.replacingOccurrences(of: "\n", with: "\r\n"),
-                                     repeatSeconds: repeatSec > 0 ? repeatSec : nil, color: useColor ? color.hexString : nil)
-                    Task { await model.saveMacros(m) }
+                    m[index] = Macro(name: name, text: target == .cluster ? text : text.replacingOccurrences(of: "\n", with: "\r\n"),
+                                     repeatSeconds: target == .transmit && repeatSec > 0 ? repeatSec : nil,
+                                     color: useColor ? color.hexString : nil)
+                    switch target {
+                    case .transmit: Task { await model.saveMacros(m) }
+                    case .cluster: model.saveClusterMacros(m)
+                    }
                     dismiss()
                 }.keyboardShortcut(.defaultAction)
             }
@@ -92,7 +108,7 @@ struct MacroEditor: View {
         .padding()
         .frame(width: 520)
         .onAppear {
-            let m = index < model.settings.macros.count ? model.settings.macros[index] : Macro(name: "", text: "")
+            let m = index < list.count ? list[index] : Macro(name: "", text: "")
             name = m.name; text = m.text.replacingOccurrences(of: "\r\n", with: "\n"); repeatSec = m.repeatSeconds ?? 0
             useColor = m.color != nil; color = Color(hex: m.color) ?? .blue
         }

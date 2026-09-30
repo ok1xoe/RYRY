@@ -98,8 +98,10 @@ public struct SpotsWindow: View {
             }
             Text(L("Dvojklik: nastaví rig na frekvenci spotu + posun a vloží značku do QSO okna. Rádio v režimu LSB/AFSK s mark 2125 Hz potřebuje posun +2125 Hz. „✓ pásmo“ = značka je už v logu na tomto pásmu."))
                 .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+            Divider()
+            ClusterPanel(model: model)
         }
         .padding(8)
-        .frame(minWidth: 720, minHeight: 320)
+        .frame(minWidth: 720, minHeight: 440)
     }
 }
