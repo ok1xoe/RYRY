@@ -55,8 +55,10 @@ public enum WordClassifier {
     /// Clicking a word during a contest, per format (MMTTY TMmttyWd::PBoxRxMouseDown, StoreZone/StoreQTH/StoreNR/StoreUTC).
     /// Returns the QSO window field to set. PED is handled by the caller (every word is a call).
     /// `roundup` = ARRL RTTY Roundup: the state/province (W/VE) goes into the received exchange, a number into the number.
+    /// `serialOrCode` = I send a number, some stations send a code instead (Russian contests: an oblast) – a number goes
+    /// into the number, a word into the received exchange.
     public static func contestUpdate(_ word: String, format: ContestFormat, serialMode: Bool, roundup: Bool = false,
-                                     current q: QSOFields) -> [(String, String)] {
+                                     serialOrCode: Bool = false, current q: QSOFields) -> [(String, String)] {
         let w = word.uppercased().trimmingCharacters(in: .punctuationCharacters.subtracting(CharacterSet(charactersIn: ":"))
             .union(.whitespaces))
         // states/provinces that are also common abbreviations (CQ WW RTTY: OK = Oklahoma, AR = Arkansas)
@@ -72,8 +74,23 @@ public enum WordClassifier {
             // RST + CQ zone: a number 1–40 (including "59914") = the other station's zone
             guard !rest.isEmpty, rest.count <= 2, rest.allSatisfy(\.isNumber), let z = Int(rest), (1...40).contains(z) else { return [] }
             return [("exchangeRcvd", String(z))]
+        case .serial where serialOrCode && !roundup:          // ARRL RU: only a valid state/province (above)
+            if let f = contestField(word, serialMode: true) { return [f] }
+            return contestField(word, serialMode: false).map { [$0] } ?? []
         case .serial, .ped, .wae:
             return contestField(word, serialMode: serialMode).map { [$0] } ?? []
+        case .serialText, .text:
+            // the first number = the serial, further numbers and words = the exchange text (zone, name, QTH …)
+            if format == .serialText, rest.allSatisfy(\.isNumber), q.serialRcvd == nil {
+                return contestField(word, serialMode: true).map { [$0] } ?? []
+            }
+            guard !rest.isEmpty, rest.count <= 10, rest.allSatisfy({ ($0.isLetter || $0.isNumber) && $0.isASCII }) else { return [] }
+            let t = String(rest)
+            if rest.allSatisfy(\.isNumber) { return [("exchangeRcvd", t)] }
+            var words = q.exchangeRcvd.split(separator: " ").map(String.init)
+            if words.contains(t) { return [] }
+            if words.count >= 3 { words.removeAll() }
+            return [("exchangeRcvd", (words + [t]).joined(separator: " "))]
         case .cqrj:
             // "ZZ QTH": a number = the zone, text = the QTH (the second part is kept)
             let parts = q.exchangeRcvd.split(separator: " ", maxSplits: 1).map(String.init)

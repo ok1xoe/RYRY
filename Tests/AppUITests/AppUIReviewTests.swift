@@ -185,3 +185,20 @@ import WaveFile
     #expect(!f.model.settings.log.rxText && !f.model.rxLogActive)
     await f.model.stop()
 }
+
+// The QSO start time belongs to the station in the Call field: a spot clicked 20 minutes ago and then replaced by another
+// call must not date the new QSO (TIME_ON 21:36 for a QSO logged at 21:56).
+@Test @MainActor func changingTheCallRestartsTheQSOTime() async throws {
+    let f = Fixture()
+    await f.model.start()
+    await f.model.setQSOField("call", "DL1ABC")
+    let first = try #require(f.model.qso.timeOn)
+    try await Task.sleep(for: .milliseconds(50))
+    await f.model.setQSOField("call", "3V8LL")
+    let second = try #require(f.model.qso.timeOn)
+    #expect(second > first)
+    try await Task.sleep(for: .milliseconds(50))
+    await f.model.setQSOField("call", "3V8LL")                 // the same call again (e.g. a click in RX): time kept
+    #expect(f.model.qso.timeOn == second)
+    await f.model.stop()
+}

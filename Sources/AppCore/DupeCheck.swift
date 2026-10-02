@@ -9,7 +9,8 @@ import Settings
 /// A single key (`key`) is shared by the QSO window, receive highlighting, the band map and the score.
 public enum DupeCheck {
     /// Is the mode distinguished? A preset = no (the rules: once per band), a custom contest = yes.
-    public static func perMode(preset: ContestPreset?) -> Bool { preset == nil }
+    /// Russian WW Digital and PRO Digi (RTTY + PSK/FT4): once per band and mode.
+    public static func perMode(preset: ContestPreset?) -> Bool { preset == nil || preset == .russianDigi || preset == .proDigi }
 
     /// Dupe key: base call | band ("*" = any) | mode (empty when the mode is not distinguished).
     public static func key(call: String, band: String?, mode: String, perMode: Bool) -> String {

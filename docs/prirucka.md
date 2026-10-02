@@ -1,6 +1,8 @@
-# mmtty4mac – uživatelská příručka
+# RYRY – uživatelská příručka
 
-mmtty4mac je RTTY program pro macOS: nativní přepis MMTTY (JE3HHT) se stejným demodulátorem, s logem, podporou závodů a s API pro loggery. English version: [manual.md](manual.md).
+RYRY (dříve mmtty4mac) je RTTY program pro macOS: nativní přepis MMTTY (JE3HHT) se stejným demodulátorem, s logem, podporou závodů a s API pro loggery. English version: [manual.md](manual.md).
+
+**Novinky 1.0 (Mac App Store):** nové jméno RYRY a nová ikona; distribuce přes Mac App Store (aplikace běží v sandboxu macOS); Nápověda → Přehrát ukázkový signál – dekódování vyzkoušíte i bez rádia; LoTW přes TrustedQSL (RYRY připraví ADIF, podepíšete a odešlete ho v TQSL); aplikace se jednou zeptá na přístup ke složce s logem. Odstraněno: spouštění hamlibu aplikací (rigctld spusťte sami) a kontrola aktualizací (aktualizuje App Store). Nastavení z mmtty4mac se při prvním spuštění přenese samo; hesla online služeb bude možná potřeba zadat znovu.
 
 **Novinky 0.15.1:** band mapa ukazuje celé pásmo, ne jen oficiální RTTY úsek (otevře se na digitální části, `⤢` zobrazí celé pásmo); přibyla pásma 160 m, 60 m a 6 m.
 
@@ -14,11 +16,12 @@ mmtty4mac je RTTY program pro macOS: nativní přepis MMTTY (JE3HHT) se stejným
 
 ## 1. Instalace
 
-1. Otevřete `mmtty4mac-<verze>.dmg` a přetáhněte aplikaci do složky Aplikace.
-2. Při prvním spuštění se macOS zeptá na přístup k **mikrofonu**. Potvrďte ho, jinak příjem nefunguje. Změnit to jde v Nastavení systému → Soukromí a zabezpečení → Mikrofon.
-3. Aplikace je podepsaná a notarizovaná, Gatekeeper ji pustí bez varování.
+1. Nainstalujte **RYRY** z Mac App Store (zdarma). Aktualizace přicházejí přes App Store.
+2. Při prvním spuštění se RYRY zeptá na **složku pro log** (dialog se otevře ve složce Dokumenty) – klikněte na **Povolit přístup** a RYRY si v ní založí složku `RYRY`. macOS pustí aplikaci do složky až po tom, co ji vyberete; RYRY si přístup zapamatuje. Když dialog zrušíte, log zůstane v kontejneru aplikace a stavový řádek řekne kde.
+3. macOS se zeptá na přístup k **mikrofonu**. Povolte ho, jinak příjem nefunguje. Změnit to jde v Nastavení systému → Soukromí a zabezpečení → Mikrofon.
+4. Nemáte po ruce rádio? **Nápověda → Přehrát ukázkový signál** přehraje krátké závodní spojení a uvidíte, jak RYRY dekóduje.
 
-Volitelně: pro rádia, která vestavěný CAT nezná, nainstalujte hamlib (`brew install hamlib`).
+Volitelně: pro rádia, která vestavěný CAT nezná, nainstalujte hamlib (`brew install hamlib`) a `rigctld` spusťte sami (viz kapitola 3).
 
 ## 2. První nastavení (⌘,)
 
@@ -47,8 +50,7 @@ Nastavení → Rig → Ovládání:
   - **Elecraft** (K3, K4, KX3).
 
   Zvolte sériový port rádia (`/dev/cu.…`, šipkou znovu načtete seznam), rychlost a stop bity – musí odpovídat nastavení CAT v menu rádia.
-- **hamlib – spustit automaticky** – pro ostatní rádia: vyberete model ze seznamu hamlib, port a rychlost; aplikace si `rigctld` spustí a ukončí sama.
-- **hamlib rigctld (síť)** / **flrig** – připojení k už běžícímu programu.
+- **hamlib rigctld (síť)** / **flrig** – pro ostatní rádia: připojení k běžícímu programu. rigctld spusťte sami, např. `rigctld -m <model> -r /dev/cu.X -s <rychlost>` (`rigctld -l` vypíše modely). Verze z App Store ho neumí spustit sama.
 
 Tlačítko **Vyzkoušet spojení** ukáže frekvenci a mód. Pro PTT přes CAT zvolte v záložce PTT / FSK metodu **CAT**. Port CAT nejde sdílet s PTT přes RTS/DTR na stejném portu.
 
@@ -84,10 +86,10 @@ Proměnné v makrech:
 - QSO okno vpravo ukazuje pole podle režimu (bez závodu jméno, QTH, lokátor; v závodě jen výměnu). Pod značkou je země DXCC, zóny a místní čas protistanice a předchozí spojení s ní.
 - **Log** (⌘L) zapíše spojení; **Clear** vyprázdní okno.
 - **Okno Log** (⇧⌘L): hledání, oprava (dvojklik), mazání, **Importovat ADIF…**, **Exportovat Cabrillo…**.
-- Log se ukládá do `~/Documents/mmtty4mac` (JSONL + ADIF `mmtty4mac.adi`, který přečte každý logger).
-- Starý log z MMTTY: v MMTTY ho exportujte do ADIF a v mmtty4mac importujte (duplicity se přeskočí).
+- Log se ukládá do složky z Nastavení → API a log (výchozí `~/Documents/RYRY`; log z mmtty4mac zůstává v `~/Documents/mmtty4mac`) jako JSONL + ADIF `mmtty4mac.adi`, který přečte každý logger. Když otevřete nebo založíte log v jiné složce, RYRY se jednou zeptá na přístup k ní.
+- Starý log z MMTTY: v MMTTY ho exportujte do ADIF a v RYRY importujte (duplicity se přeskočí).
 
-Správa logu (menu Soubor): **Nový log…** (⌘N; pořadová čísla závodu od 1), **Otevřít log…** (⌘O; log mmtty4mac nebo ADIF z jiného programu – převede se, originál zůstane jako `.adi.orig`), **Otevřít nedávný log**, **Uložit log jako…** (⇧⌘S; kopie, dál se pracuje v ní), **Exportovat ADIF…**, **Importovat ADIF…**. Spojení se ukládá hned při zalogování.
+Správa logu (menu Soubor): **Nový log…** (⌘N; pořadová čísla závodu od 1), **Otevřít log…** (⌘O; log RYRY nebo ADIF z jiného programu – převede se, originál zůstane jako `.adi.orig`), **Otevřít nedávný log**, **Uložit log jako…** (⇧⌘S; kopie, dál se pracuje v ní), **Exportovat ADIF…**, **Importovat ADIF…**. Spojení se ukládá hned při zalogování.
 
 ## 7. Závody
 
@@ -108,12 +110,12 @@ Menu Soubor:
 
 ## 9. API pro loggery
 
-mmtty4mac se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovládají loggery jako RUMlogNG nebo MacLoggerDX – v loggeru zvolte „fldigi“. Druhé API je JSON-RPC přes WebSocket (`ws://127.0.0.1:7363/v1`) s událostmi (přijatý text, stav, zalogovaná spojení); Java klient je v `clients/java`. Podrobnosti v [api.md](api.md). API ve výchozím stavu naslouchá jen na tomto Macu.
+RYRY se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovládají loggery jako RUMlogNG nebo MacLoggerDX – v loggeru zvolte „fldigi“. Druhé API je JSON-RPC přes WebSocket (`ws://127.0.0.1:7363/v1`) s událostmi (přijatý text, stav, zalogovaná spojení); Java klient je v `clients/java`. Podrobnosti v [api.md](api.md). API ve výchozím stavu naslouchá jen na tomto Macu.
 
 ## 10. Jazyk a klávesy
 
 - **Jazyk:** ve výchozím stavu angličtina; změna v Nastavení → Zobrazení → Jazyk rozhraní (čeština, angličtina, nahrané jazyky). Vlastní překlad: **Uložit šablonu…**, přeložit hodnoty v `strings`, nastavit `code` a `name`, **Nahrát jazyk…**.
-- **Jazykové soubory** `cs.json` a `en.json` jsou v `~/Library/Application Support/mmtty4mac/Languages` a lze je upravit (uložená změna se projeví okamžitě; upravený soubor aktualizace nepřepíše).
+- **Jazykové soubory** `cs.json` a `en.json` jsou v `~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages` (aplikace běží v sandboxu macOS) a lze je upravit (uložená změna se projeví okamžitě; upravený soubor aktualizace nepřepíše).
 - **Klávesy:** Nastavení → Klávesy – klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).
 
 ## 11. Když něco nefunguje
@@ -128,4 +130,4 @@ mmtty4mac se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovláda
 | Logger se nepřipojí | Nastavení → API a log: fldigi XML-RPC zapnuté, port 7362. |
 
 ---
-mmtty4mac © 2026 OK1XOE, licence GNU LGPL v3. Jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba. DXCC: cty.dat – AD1C.
+RYRY © 2026 OK1XOE, licence GNU LGPL v3 (zdrojový kód: github.com/ok1xoe/mmtty4mac). Jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba. DXCC: cty.dat – AD1C.

@@ -229,12 +229,10 @@ struct PTTTab: View {
 struct RigTab: View {
     @Binding var s: AppSettings
     @State private var ports: [String] = POSIXSerialPort.availablePorts()
-    @State private var models: [HamlibModel] = []
-    @State private var rigctld: String? = ManagedHamlibRig.findRigctld()
     @State private var testResult: String?
     @State private var testing = false
 
-    var usesSerial: Bool { s.rig.type == .cat || s.rig.type == .hamlibManaged }
+    var usesSerial: Bool { s.rig.type == .cat }
 
     var body: some View {
         Form {
@@ -242,7 +240,6 @@ struct RigTab: View {
                 Picker(L("Ovládání"), selection: $s.rig.type) {
                     Text(L("Žádné")).tag(RigType.none)
                     Text(L("CAT přes USB (vestavěný)")).tag(RigType.cat)
-                    Text(L("hamlib – spustit automaticky")).tag(RigType.hamlibManaged)
                     Text(L("hamlib rigctld (síť)")).tag(RigType.hamlib)
                     Text("flrig").tag(RigType.flrig)
                 }
@@ -269,21 +266,6 @@ struct RigTab: View {
                                 .multilineTextAlignment(.trailing).frame(width: 60)
                         }
                     }
-                }
-            }
-
-            if s.rig.type == .hamlibManaged {
-                Section(L("Model hamlib")) {
-                    if rigctld == nil {
-                        Text(L("rigctld nenalezen – nainstaluj hamlib: brew install hamlib")).foregroundStyle(.orange)
-                    } else if models.isEmpty {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Picker(L("Model"), selection: $s.rig.hamlibModel) {
-                            ForEach(models) { m in Text("\(m.title) (#\(m.id))").tag(m.id) }
-                        }
-                    }
-                    TextField(L("Místní TCP port"), value: $s.rig.port, format: .number.grouping(.never), prompt: Text("4534"))
                 }
             }
 
@@ -333,17 +315,12 @@ struct RigTab: View {
             }
         }
         .formStyle(.grouped)
-        .task(id: s.rig.type) {
-            guard s.rig.type == .hamlibManaged, models.isEmpty, let bin = rigctld else { return }
-            models = await Task.detached { ManagedHamlibRig.availableModels(binary: bin) }.value
-        }
     }
 
     var typeHint: String {
         switch s.rig.type {
         case .none: return L("Frekvence se nečte a PTT přes CAT není k dispozici.")
         case .cat: return L("Vestavěné ovládání bez dalších programů: frekvence, mód a PTT přímo přes USB kabel rádia.")
-        case .hamlibManaged: return L("Pro ostatní rádia: aplikace sama spustí rigctld se zvoleným modelem a portem (hamlib z Homebrew).")
         case .hamlib: return L("hamlib: spusťte např. „rigctld -m <model> -r /dev/cu.X -s <baud>“. flrig: stačí spuštěný flrig. Prázdný port = výchozí.")
         case .flrig: return L("flrig musí běžet a mít povolené XML-RPC (výchozí port 12345).")
         }
@@ -430,7 +407,11 @@ struct APITab: View {
                         Text(s.log.directory).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
                         Button(L("Vybrat…")) {
                             let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false; p.canCreateDirectories = true
-                            if p.runModal() == .OK, let u = p.url { s.log.directory = u.path }
+                            if p.runModal() == .OK, let u = p.url {
+                                s.log.directory = u.path
+                                // the sandbox allows this folder only now - keep the access for the next launches
+                                if let data = try? SecurityScopedCodec().make(u) { s.log.bookmarks.set(data, for: u.path) }
+                            }
                         }
                     }
                 }
@@ -709,7 +690,8 @@ struct ContestTab: View {
         Binding(get: { s.contest.selectedPreset }, set: { p in
             guard let p else { s.contest.preset = nil; return }
             let serial = s.contest.nextSerial
-            s.contest = ContestSettings.upcoming(p, locator: s.station.locator)
+            s.contest = ContestSettings.upcoming(p, locator: s.station.locator,
+                                                 exchange: model.defaultContestExchange(p, station: s.station))
             if p == .waeRTTY { s.contest.nextSerial = max(1, serial) }
         })
     }
@@ -719,6 +701,10 @@ struct ContestTab: View {
         case .serial: return L("Prázdné = posílá se pořadové číslo; jinak tento text (např. stát).")
         case .cqrj: return L("Prázdné = moje CQ zóna podle značky; W/VE přidají stát, např. „05 NY“.")
         case .zone: return L("Prázdné = moje CQ zóna podle značky (DXCC).")
+        case .serialText:
+            if s.contest.selectedPreset == .voltaRTTY { return L("Posílá se číslo a tento text; prázdné = moje CQ zóna podle značky.") }
+            return L("Posílá se pořadové číslo a za ním tento text (jméno, QTH, značka člena …).")
+        case .text: return L("Posílá se tento text bez pořadového čísla (teritorium, jméno a QTH, rok licence …).")
         case .bartg, .wae, .ped: return L("V tomto formátu se nepoužívá.")
         }
     }
@@ -739,6 +725,7 @@ struct ContestTab: View {
                     Text(L("Předvolba nastaví název, formát výměny a nejbližší začátek známého závodu."))
                 }
             }
+            if let p = s.contest.selectedPreset { ContestRulesSection(rules: ContestCatalog.rules(p, ownCountry: model.ownCountryPrefix(s.station.call))) }
             Section {
                 Picker(L("Formát výměny"), selection: $s.contest.format) {
                     Text(L("RST + pořadové číslo")).tag(ContestFormat.serial)
@@ -746,6 +733,8 @@ struct ContestTab: View {
                     Text(L("CQ/RJ – zóna + QTH (CQ WW)")).tag(ContestFormat.cqrj)
                     Text(L("BARTG – číslo + čas UTC")).tag(ContestFormat.bartg)
                     Text(L("WAE – číslo + QTC")).tag(ContestFormat.wae)
+                    Text(L("RST + číslo + text")).tag(ContestFormat.serialText)
+                    Text(L("RST + text (bez čísla)")).tag(ContestFormat.text)
                     Text(L("PED – klik = značka")).tag(ContestFormat.ped)
                 }
                 TextField(L("Odesílaná výměna"), text: $s.contest.exchange, prompt: Text(L("automaticky")))
@@ -875,11 +864,6 @@ struct DisplayTab: View {
                 Toggle(L("Zvýrazňovat značky v příjmu"), isOn: $s.display.highlightCalls)
             } header: { Text(L("Ostatní")) } footer: {
                 Text(L("Vaše značka červeně tučně, duplicita v závodě šedě přeškrtnutě, značka už v logu modře, nová značka tučně. Echo vlastního vysílání se nezvýrazňuje."))
-            }
-            Section {
-                Toggle(L("Automaticky kontrolovat aktualizace"), isOn: $s.updates.autoCheck)
-            } header: { Text(L("Aktualizace")) } footer: {
-                Text(L("Kontrola proběhne při startu nejvýš jednou denně. Nová verze se nikdy neinstaluje sama – stáhne se DMG a aplikaci přetáhnete do Aplikací. Ruční kontrola: menu aplikace → Zkontrolovat aktualizace…"))
             }
         }
         .formStyle(.grouped)
@@ -1036,21 +1020,12 @@ struct SecretField: View {
 struct UploadTab: View {
     @Binding var s: AppSettings
     let secrets: any UploadSecretStore
-    var tqslFound: String? { TQSLLocator.find(custom: s.upload.lotwTqslPath) }
     var body: some View {
         Form {
             Section {
                 Toggle(L("Nahrávat na LoTW"), isOn: $s.upload.lotwEnabled)
-                TextField(L("Station Location"), text: $s.upload.lotwLocation).disabled(!s.upload.lotwEnabled)
-                TextField(L("Cesta k tqsl"), text: $s.upload.lotwTqslPath, prompt: Text(L("prázdné = automaticky")))
-                    .disabled(!s.upload.lotwEnabled)
-                Toggle(L("Nahrát automaticky po zalogování"), isOn: $s.upload.lotwAuto).disabled(!s.upload.lotwEnabled)
-                LabeledContent("TQSL") {
-                    Text(tqslFound ?? L("nenalezen – nainstalujte TrustedQSL")).foregroundStyle(tqslFound == nil ? .orange : .secondary)
-                        .lineLimit(1).truncationMode(.middle)
-                }
             } header: { Text("LoTW") } footer: {
-                Text(L("Spojení se podepíšou a odešlou programem TQSL (certifikát a Station Location musí být v TQSL nastaveny)."))
+                Text(L("LoTW: RYRY připraví ADIF a otevře ho v TrustedQSL, kde ho podepíšete a odešlete (certifikát a Station Location nastavíte v TQSL)."))
             }
             Section {
                 Toggle(L("Nahrávat na eQSL"), isOn: $s.upload.eqslEnabled)
@@ -1134,7 +1109,10 @@ struct CallHistorySection: View {
         p.canChooseFiles = true; p.canChooseDirectories = false; p.allowsMultipleSelection = false
         p.allowedContentTypes = [.plainText, .commaSeparatedText, .text]
         p.message = L("Vyberte soubor historie značek (N1MM Call History, .txt nebo .csv)")
-        if p.runModal() == .OK, let u = p.url { s.callHistory.path = u.path; s.callHistory.enabled = true }
+        if p.runModal() == .OK, let u = p.url {
+            s.callHistory.path = u.path; s.callHistory.enabled = true
+            s.callHistory.bookmark = try? SecurityScopedCodec().make(u)   // the sandbox allows the file only now
+        }
     }
 
     var body: some View {
@@ -1161,5 +1139,28 @@ struct CallHistorySection: View {
         } header: { Text(L("Historie značek")) } footer: {
             Text(L("Po zadání značky doplní jméno, lokátor a výměnu protistanice ze souboru (N1MM Call History: hlavička !!Order!!, nebo jednoduché CSV Call,Name,Exch1). Historie má přednost před zónou z DXCC a před callbookem; ručně zadané hodnoty se nepřepisují. Počet značek se aktualizuje po uložení nastavení."))
         }
+    }
+}
+
+/// The selected contest's rules: dates, bands, what is exchanged, points, multipliers, dupes, the source.
+struct ContestRulesSection: View {
+    let rules: ContestRules
+    func row(_ title: String, _ text: String) -> some View {
+        LabeledContent(title) { Text(text).multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true) }
+    }
+    var body: some View {
+        Section {
+            row(L("Termín"), rules.dates)
+            row(L("Pásma"), rules.bands)
+            row(L("Výměna"), rules.exchange)
+            row(L("Body"), rules.points)
+            row(L("Násobiče"), rules.multipliers)
+            row(L("Duplicity"), rules.dupes)
+            ForEach(rules.unverified, id: \.self) { u in
+                Label(u, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let url = URL(string: rules.source) { Link(L("Oficiální pravidla"), destination: url) }
+        } header: { Text(L("Pravidla závodu")) }
     }
 }

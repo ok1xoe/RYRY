@@ -38,12 +38,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     NSWorkspace.shared.open(r)
 }
 
+/// A page of the product website (ryry.ok1xoe.dev) in the UI language (Czech under /cs/).
+@MainActor func openWeb(_ page: String) {
+    let base = Localizer.shared.code == "cs" ? "https://ryry.ok1xoe.dev/cs/" : "https://ryry.ok1xoe.dev/"
+    if let u = URL(string: base + page) { NSWorkspace.shared.open(u) }
+}
+
 @MainActor func showAbout() {
     let credits = [
         L("RTTY pro macOS – nativní přepis MMTTY s API pro loggery (fldigi XML-RPC, JSON-RPC)."),
         "",
         L("Jádro demodulátoru a modulátoru: MMTTY © 2000–2013 Makoto Mori (JE3HHT), Nobuyuki Oba."),
-        L("mmtty4mac © 2026 OK1XOE. Licence GNU LGPL v3 (COPYING, COPYING.LESSER)."),
+        L("RYRY © 2026 OK1XOE. Licence GNU LGPL v3, zdrojový kód: github.com/ok1xoe/mmtty4mac."),
         L("DXCC: cty.dat – Jim Reisert AD1C (country-files.com)."),
     ].joined(separator: "\n")
     let para = NSMutableParagraphStyle(); para.alignment = .center
@@ -65,9 +71,17 @@ struct MMTTY4MacApp: App {
         }
     }
 
+    /// A short RTTY contest QSO with noise, bundled so the app can be tried without a radio.
+    @MainActor func playDemo() {
+        guard let url = Bundle.main.url(forResource: "demo-rtty", withExtension: "wav") else { return }
+        Task { @MainActor in
+            do { try await model.playWAV(url, speed: 1) }
+            catch { NSAlert(error: error).runModal() }
+        }
+    }
+
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var model = AppModel(alertSink: SystemAlertSink())
-    @State private var updates = UpdateModel()
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
@@ -84,11 +98,12 @@ struct MMTTY4MacApp: App {
     }
 
     var body: some Scene {
-        Window("mmtty4mac", id: "main") {
+        Window("RYRY", id: "main") {
             MainView(model: model)
                 .environment(\.showHints, model.settings.display.showHints)
                 .task {
                     delegate.model = model
+                    model.folderAccess = FolderAccess(prompt: FolderAccessPanel())
                     // the -openSettings YES launch argument (+ -settingsTab N): open Settings (screenshots, support)
                     if UserDefaults.standard.bool(forKey: "openSettings") { openSettings() }
                     // -switchLanguage cs: after 4 s switch the language as if chosen in Settings (live switch test)
@@ -100,9 +115,9 @@ struct MMTTY4MacApp: App {
                     for id in (UserDefaults.standard.string(forKey: "openWindow") ?? "").split(separator: ",") {
                         openWindow(id: String(id))
                     }
-                    updates.showWindow = { openWindow(id: "update") }
                     if model.state == .stopped { await model.start() }
-                    await updates.checkAtLaunch(enabled: model.settings.updates.autoCheck)
+                    // -playDemo YES: play the demo signal right after start (App Store screenshots)
+                    if UserDefaults.standard.bool(forKey: "playDemo") { playDemo() }
                 }
         }
         .commands {
@@ -126,11 +141,15 @@ struct MMTTY4MacApp: App {
                     .shortcut(model.settings.binding(for: .enterFrequency))
             }
             CommandGroup(replacing: .appInfo) {
-                Button(L("O aplikaci mmtty4mac")) { showAbout() }
-                Button(L("Zkontrolovat aktualizace…")) { Task { await updates.checkManually() } }
+                Button(L("O aplikaci RYRY")) { showAbout() }
             }
             CommandGroup(replacing: .help) {
-                Button(L("Příručka mmtty4mac")) { openManual() }.keyboardShortcut("?", modifiers: .command)
+                Button(L("Příručka RYRY")) { openManual() }.keyboardShortcut("?", modifiers: .command)
+                Button(L("Přehrát ukázkový signál")) { playDemo() }
+                Divider()
+                Button(L("Web RYRY")) { openWeb("") }
+                Button(L("Podpora")) { openWeb("support.html") }
+                Button(L("Ochrana osobních údajů")) { openWeb("privacy.html") }
             }
             CommandGroup(replacing: .newItem) {
                 Button(L("Nový log…")) { FileActions.newLog(model) }.keyboardShortcut("n", modifiers: .command)
@@ -196,7 +215,6 @@ struct MMTTY4MacApp: App {
         Window(L("Scope demodulátoru"), id: "scope") {
             ScopeWindow(model: model).environment(\.showHints, model.settings.display.showHints)
         }
-        Window(L("Aktualizace"), id: "update") { UpdateWindow(model: updates) }
             .windowResizability(.contentSize)
         Window(L("Spoty"), id: "spots") {
             SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)

@@ -480,3 +480,40 @@ Logika `AppCore/Score.swift` (`ScoreRule`, `ScoreCalculator`, `ScoreTally` – o
 - Stavový řádek: „Skóre N“ vedle rychlosti, když je závod zapnutý se zvolenou předvolbou.
 - BARTG: v tabulce okna je ve sloupci Násobiče a řádku Celkem jen součet násobičů po pásmech (země + oblasti) a řádek „Za závod“ se nezobrazuje – kontinenty jsou jen v patičce a ve vzorci (body × násobiče × kontinenty), aby tabulka odpovídala vzorci.
 - Neznámá vlastní země (chybí značka stanice nebo cty.dat se nenačetl) → červené upozornění v okně Skóre (`ScoreTally.ownCountryUnknown`; ne u Makrothenu); Makrothen bez vlastního lokátoru → upozornění `ownLocatorMissing`. Přepočet po načtení databáze zemí: při startu enginu se log načte znovu a skóre se přepočítá úplně s databází AppControlleru (`CountryDB.shared` se načítá synchronně).
+
+## RYRY v Mac App Store (2026-09-30)
+
+- **Jen App Store.** DMG s notarizací a vlastní kontrola aktualizací skončily (modul `Updates`, `make-dmg.sh`,
+  `release.sh`). App Store aktualizuje sám a vlastní aktualizace nedovoluje. Staré nastavení `updates` se tiše
+  ignoruje.
+- **Jméno RYRY** (testovací vzor RTTY). „mmtty4mac“ v App Store neprojde: Apple nedovoluje „Mac“ jako součást
+  jména a „MMTTY“ by vzbuzovalo dojem oficiální verze. Identifikátor `cz.ok1xoe.mmtty4mac`, složka
+  `Application Support/mmtty4mac`, výchozí jméno logu a repozitář zůstávají, kvůli přechodu a existujícím logům.
+- **Sandbox.** Oprávnění: mikrofon, `device.serial` (klíč je jen ve starší dokumentaci, ověřeno testovací
+  aplikací), síťový klient a server, soubory vybrané uživatelem, bookmarky, Stažené soubory.
+- **Spravovaný hamlib odstraněn.** Sandbox nespustí cizí program. Uložené `hamlibManaged` se načte jako
+  `hamlib` (TCP 127.0.0.1:4532) s upozorněním.
+- **LoTW přes TrustedQSL.** Sandbox nespustí `tqsl`. ADIF nenahraných spojení se uloží do Stažených souborů
+  a otevře v TQSL přes `NSWorkspace`. Jako nahraná se označí až po potvrzení uživatelem. LoTW už nikdy není
+  automatické. Nastavení cesty k tqsl a Station Location zmizela, Station Location je v TQSL.
+- **Složka logu.** Přístup mimo kontejner jen přes security-scoped bookmark (`LogSettings.bookmarks`).
+  Pokud chybí, je rozbitý nebo ukazuje jinam (přesunutá složka), aplikace se zeptá s předvybranou složkou.
+  Při odmítnutí se log uloží do kontejneru (`Documents/RYRY`) a uživatel dostane zprávu kde. Výchozí složka pro
+  nové uživatele je `~/Documents/RYRY` ve skutečném domově (`HomeDirectory.real`, ne kontejner).
+- **Přechod z DMG verze.** `container-migration.plist` přesune `Application Support/mmtty4mac` a předvolby
+  při vzniku kontejneru. Hesla v Klíčence kvůli jinému podpisu nejspíš nepřejdou.
+- **Ukázkový signál** `Resources/demo-rtty.wav` (Nápověda → Přehrát ukázkový signál) pro nové uživatele
+  a recenzenta App Store. `-playDemo YES` ho pustí po startu (snímky obrazovky).
+- **Ikona** ve formátu Icon Composer (`Resources/AppIcon.icon` → `actool` → `Assets.car` + záložní `.icns`),
+  aby ji macOS 26 nezavřel do šedého rámečku.
+
+## Katalog závodů (contestcalendar.com, 2026-10-02)
+- Z contestcalendar.com převzaty všechny HF závody, kde se jede RTTY; pravidla ověřena v oficiálních pravidlech (agenti, 2026-10-02). Předvoleb je 28 (`ContestPreset`, `Sources/Settings/ContestPresets.swift`); bodování `ScoreRule.points(_:)`, násobiče `MultiplierRule.rule(for:)`, seznamy kódů `AppCore/ContestCodes.swift`, přehled pravidel a výchozí výměna `ContestCatalog`.
+- Vynecháno: SARL HF Digital (od 2026 jen FT4/FT8), Open Ukraine RTTY (zrušen 2022–2026, pravidla bez seznamu oblastí), 10-10 Fall Digital (už se nekoná), FT4/FT8 a VHF závody (Bucharest Digital, WW Digi, ARRL Digital, CQ VHF Digital).
+- Termíny: `ContestSchedule` – n-tý celý víkend, n-tý den v týdnu, pevné datum, týdně; více termínů za rok (NAQP, NA Sprint, DARC Sprint čtvrtletně). Výběr předvolby vezme nejbližší termín, který ještě neskončil (začátek + délka).
+- Výměna: nové formáty `serialText` (číslo + text: SARTG NY, NA Sprint, VOLTA, TRC/PRO člen – u členství je text nepovinný pro ESM) a `text` (text bez čísla: URC teritorium, WRT, NAQP, Rookie, IG-RY rok). „Číslo NEBO kód“ (`receivesSerialOrCode`) zobecňuje ARRL RU: ruské oblasti, DOK, státy XE, provincie EA, powiaty SP.
+- Násobiče z výměny = `MultiplierKind.region` se seznamem kódů nebo vzorem (rok licence, DOK písmeno + 2 číslice); filtry komponent podle země / kontinentu (NAQP: jen Severní Amerika, SP DX: bez UA/EW, PRO: bez vlastní země).
+- Výchozí odesílaná výměna podle stanice: URC teritorium z prefixu (jen jednoznačné prefixy, OK1 = BHE, OK2 = MOR), WRT/NAQP/NA Sprint/Rookie jméno + QTH (stát z Stanice → QTH, jinak „DX“ / prefix země).
+- Názvy CONTEST změněné podle pravidel: WAE `DARC-WAEDC-RTTY`, JARTS → JARL WW RTTY `JARL-WW-RTTY`; staré názvy se při načtení starého nastavení stále rozpoznají.
+- Nejednoznačnosti (zobrazené v Nastavení u závodu oranžově): Mexico (EN × ES pravidla – použita EN, násobiče na pásmu), PRO Digi (duplicita pásmo+mód), WRT/Rookie (vzorec jen implicitní), VOLTA (bonusový násobič za 4 pásma se nepočítá), DARC (zvláštní DOKy), URC/TRC (duplicita neuvedena → na pásmu). Russian WW Digital a PRO Digi: duplicita na pásmu a módu.
+- Nastavení → Závod: u zvolené předvolby sekce „Pravidla závodu“ (termín, pásma, výměna, body, násobiče, duplicity, neověřené body, odkaz na pravidla).

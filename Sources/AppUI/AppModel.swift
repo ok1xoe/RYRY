@@ -147,6 +147,8 @@ public final class AppModel {
     public var scopeFrozen = false
     /// Uploading to the online services (replaceable in tests).
     public var uploader = UploadCoordinator()
+    /// Access to the log folder outside the sandbox container (the app installs the real open panel at launch).
+    public var folderAccess = FolderAccess(prompt: NoFolderPrompt())
     public private(set) var uploadsRunning: Set<UploadTarget> = []
     private var sqTarget: Double?
     private var sqChain: Task<Void, Never>?
@@ -252,6 +254,7 @@ public final class AppModel {
 
     private func startNow() async {
         guard app == nil else { return }                 // already running
+        await ensureLogFolder()                          // first: it may move the log folder (and with it rx/)
         syncRxLog()
         let rig = Self.makeRig(settings.rig)
         let engine = engineFactory(settings, rig)
@@ -346,6 +349,7 @@ public final class AppModel {
     }
 
     private func stopNow() async {
+        defer { folderAccess.stopAll() }
         await stopWAV()
         await stopRecordingWAV()
         spectrumTask?.cancel(); spectrumTask = nil
@@ -379,8 +383,8 @@ public final class AppModel {
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)
-                take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.updates.autoCheck); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
-                take(\.log.directory)
+                take(\.callbook); take(\.callHistory); take(\.txWindow); take(\.shortcuts); take(\.log.rxText); take(\.log.rxTimestamps); take(\.log.superCheck); take(\.log.backup); take(\.log.backupKeep); take(\.spots); take(\.display.highlightCalls); take(\.alerts)
+                take(\.log.directory); take(\.log.bookmarks)
                 m.spots.clusterMacros = cur.spots.clusterMacros   // the dialog does not edit the cluster macros (the Spots window does)
                 // the display filter is changed immediately by the "Band filter" / "Mode filter" windows and "RTTY only" - the dialog does not overwrite it
                 m.spots.filterBands = cur.spots.filterBands; m.spots.filterModes = cur.spots.filterModes
@@ -642,7 +646,13 @@ public final class AppModel {
     private var ownLocator: String {
         settings.station.locator.isEmpty ? settings.contest.exchange.uppercased() : settings.station.locator.uppercased()
     }
-    private var countryDB: CountryDB? { app?.countries ?? CountryDB.shared }
+    var countryDB: CountryDB? { app?.countries ?? CountryDB.shared }
+    /// The sent exchange a contest preset needs from my station (URC territory, name + QTH …).
+    public func defaultContestExchange(_ p: ContestPreset, station: Station) -> String {
+        ContestCatalog.defaultExchange(p, station: station, countries: countryDB)
+    }
+    /// My own country (cty.dat primary prefix) for the contest rules.
+    public func ownCountryPrefix(_ call: String) -> String? { countryDB?.lookup(call)?.primaryPrefix }
 
     /// The band of the current QSO: the rig when it is online, otherwise the manually entered frequency.
     public var currentBand: String? { Self.band(rig, qso) }
@@ -1086,13 +1096,50 @@ public final class AppModel {
     }
 
     public enum LogFileError: Error, LocalizedError {
-        case exists(String), missing(String)
+        case exists(String), missing(String), noAccess(String)
         public var errorDescription: String? {
             switch self {
+            case .noAccess(let n): return L("Bez přístupu ke složce logu „%@“.", n)
             case .exists(let n): return L("Log „%@“ už existuje – otevřete ho přes Otevřít log.", n)
             case .missing(let n): return L("Log „%@“ neexistuje.", n)
             }
         }
+    }
+
+    /// The sandbox lets the app into a folder outside its container only after the user chose it once; the bookmark
+    /// keeps the access. nil = refused. The user may pick a different folder - the returned one counts.
+    private func accessLogFolder(_ path: String, name: String) async -> URL? {
+        var b = settings.log.bookmarks
+        let u = await folderAccess.acquire(path, bookmarks: &b,
+                                           message: L("RYRY potřebuje přístup ke složce s logem „%@“. Vyberte ji prosím.", name))
+        if b != settings.log.bookmarks {
+            settings.log.bookmarks = b
+            do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+        }
+        return u
+    }
+
+    /// At start: the configured log folder, or - when the user refuses access - a folder inside the container,
+    /// so logging always works and the user is told where the log is.
+    private func ensureLogFolder() async {
+        let dir: String
+        if let u = await accessLogFolder(settings.log.directory, name: settings.log.name) {
+            dir = u.path
+        } else {
+            dir = folderAccess.containerHome + "/Documents/RYRY"
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            note(L("Bez přístupu ke složce logu. Log se ukládá do %@.", dir))
+        }
+        guard FolderBookmarks.key(dir) != FolderBookmarks.key(settings.log.directory) else { return }
+        settings.log.directory = dir
+        do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
+    }
+
+    /// The log for a chosen file, in a folder the app may use (asks for access when needed).
+    private func accessibleLocation(_ file: URL) async throws -> LogLocation {
+        let loc = LogLocation(file: file)
+        guard let dir = await accessLogFolder(loc.directory.path, name: loc.name) else { throw LogFileError.noAccess(loc.name) }
+        return LogLocation(directory: dir, name: loc.name)
     }
 
     /// Switches to a different log (a restart as after Apply - while transmitting it first switches to RX).
@@ -1113,7 +1160,7 @@ public final class AppModel {
 
     /// A new empty log (the contest serial numbers start from 1).
     public func newLog(file: URL) async throws {
-        let loc = LogLocation(file: file)
+        let loc = try await accessibleLocation(file)
         let fm = FileManager.default
         if fm.fileExists(atPath: loc.jsonlURL.path) || fm.fileExists(atPath: loc.adifURL.path) { throw LogFileError.exists(loc.name) }
         try fm.createDirectory(at: loc.directory, withIntermediateDirectories: true)
@@ -1123,7 +1170,7 @@ public final class AppModel {
     /// Opens an existing log; an ADIF file from another program is converted (the original is kept as .orig). Returns a text for the user.
     @discardableResult
     public func openLog(file: URL) async throws -> String {
-        let loc = LogLocation(file: file)
+        let loc = try await accessibleLocation(file)
         let fm = FileManager.default
         guard fm.fileExists(atPath: loc.jsonlURL.path) || fm.fileExists(atPath: loc.adifURL.path)
                 || fm.fileExists(atPath: loc.directory.appendingPathComponent(loc.name + ".adif").path)
@@ -1139,7 +1186,7 @@ public final class AppModel {
 
     /// Saves a copy of the log under a different name and keeps working in that copy.
     public func saveLogAs(file: URL) async throws {
-        let dst = LogLocation(file: file)
+        let dst = try await accessibleLocation(file)
         if let log = app?.log, !(await log.isADIFConsistent()) { try await log.rebuildADIF() }
         try logLocation.copy(to: dst)
         await switchLog(to: dst, resetSerial: false)
@@ -1176,6 +1223,20 @@ public final class AppModel {
         guard !uploadsRunning.contains(t) else { return automatic ? nil : L("%@: nahrávání už běží.", t.title) }
         uploadsRunning.insert(t); defer { uploadsRunning.remove(t) }
         let coordinator = uploader, cfg = settings
+        if t == .lotw {
+            do {
+                guard let h = try await coordinator.prepareLoTW(settings: cfg, log: log, logName: cfg.log.name) else {
+                    return automatic ? nil : L("%@: žádná nenahraná spojení.", t.title)
+                }
+                // only a file opened in TQSL can have been sent - otherwise there is nothing to confirm
+                pendingLoTW = h.openedInTQSL ? h : nil
+                return h.openedInTQSL
+                    ? L("ADIF pro LoTW je otevřený v TQSL (%@). Podepište a odešlete ho, pak potvrďte v RYRY.", h.file.lastPathComponent)
+                    : L("TQSL nenalezen. ADIF pro LoTW je uložený ve Stažených souborech: %@. Nainstalujte TrustedQSL a otevřete ho v něm.", h.file.lastPathComponent)
+            } catch {
+                return "\(t.title): \((error as? LocalizedError)?.errorDescription ?? "\(error)")"
+            }
+        }
         do {
             let msg = try await coordinator.uploadPending(t, settings: cfg, log: log)
             await refreshLog()
@@ -1186,6 +1247,19 @@ public final class AppModel {
             if automatic { note(text); return nil }
             return text
         }
+    }
+
+    /// The LoTW file handed to TrustedQSL and waiting for the user's word that TQSL sent it (drives the Log window alert).
+    public var pendingLoTW: LoTWHandoff?
+
+    /// true = TQSL sent the QSOs: mark them as uploaded to LoTW; false = leave them for the next time.
+    public func confirmLoTW(_ uploaded: Bool) async {
+        guard let h = pendingLoTW else { return }
+        pendingLoTW = nil
+        guard uploaded, let log = app?.log else { return }
+        do { try await log.markUploaded(ids: h.ids, target: .lotw) }
+        catch { note(L("Nahráno, ale stav se nepodařilo zapsat do logu: %@", "\(error)")) }
+        await refreshLog()
     }
 
     private func refreshLog() async {
@@ -1544,6 +1618,12 @@ public final class AppModel {
             if let app { Task { await app.setCallHistory(h) } }
             return
         }
+        guard folderAccess.accessFile(cfg.path, bookmark: cfg.bookmark) != nil else {
+            callHistory = nil; callHistoryPath = ""; callHistoryCount = 0
+            callHistoryStatus = L("Soubor historie značek vyberte znovu (Nastavení → Závod → Historie značek) – bez toho ho aplikace v sandboxu nesmí číst.")
+            if let app { Task { await app.setCallHistory(nil) } }
+            return
+        }
         let path = cfg.path
         callHistoryStatus = L("Načítám historii značek…")
         callHistoryTask = Task { [weak self] in
@@ -1647,7 +1727,8 @@ public final class AppModel {
         if settings.contest.enabled, !qso.call.isEmpty, kind != .call {
             for (field, v) in WordClassifier.contestUpdate(word, format: settings.contest.format,
                                                            serialMode: settings.contest.exchange.isEmpty,
-                                                           roundup: settings.contest.isRoundupStateExchange, current: qso) {
+                                                           roundup: settings.contest.isRoundupStateExchange,
+                                                           serialOrCode: settings.contest.receivesSerialOrCode, current: qso) {
                 await setQSOField(field, v)
             }
             return

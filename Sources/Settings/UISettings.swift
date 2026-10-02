@@ -110,6 +110,11 @@ extension AppSettings {
     /// The valid shortcut of a command (custom, otherwise the default).
     public func binding(for c: ShortcutCommand) -> KeyBinding { shortcuts[c.id] ?? c.defaultBinding }
 
+    /// The macro whose shortcut is exactly this key combination; nil = none.
+    public func macro(for b: KeyBinding) -> Int? {
+        (0..<AppSettings.macroCount).first { binding(for: .macro($0)) == b }
+    }
+
     /// Commands with the same shortcut (for a warning in Settings).
     public func conflictingShortcuts() -> [[ShortcutCommand]] {
         var by: [KeyBinding: [ShortcutCommand]] = [:]

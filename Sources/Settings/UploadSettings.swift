@@ -3,10 +3,8 @@ import Foundation
 
 /// Uploading QSOs to LoTW (TQSL), eQSL and Club Log. Passwords and the API key are in the Keychain, not here.
 public struct UploadSettings: Codable, Sendable, Equatable {
+    /// LoTW via TrustedQSL: RYRY prepares the ADIF, the user signs and sends it in TQSL (never automatic).
     public var lotwEnabled = false
-    public var lotwLocation = ""            // name of the Station Location in TQSL
-    public var lotwTqslPath = ""            // empty = autodetect
-    public var lotwAuto = false
     public var eqslEnabled = false
     public var eqslUser = ""
     public var eqslAuto = false
@@ -15,14 +13,13 @@ public struct UploadSettings: Codable, Sendable, Equatable {
     public var clublogAuto = false
 
     enum CodingKeys: String, CodingKey {
-        case lotwEnabled, lotwLocation, lotwTqslPath, lotwAuto, eqslEnabled, eqslUser, eqslAuto,
+        case lotwEnabled, eqslEnabled, eqslUser, eqslAuto,
              clublogEnabled, clublogEmail, clublogAuto
     }
     public init() {}
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "upload", x = UploadSettings()
-        lotwEnabled = c.tolerant(.lotwEnabled, x.lotwEnabled, w, s); lotwLocation = c.tolerant(.lotwLocation, x.lotwLocation, w, s)
-        lotwTqslPath = c.tolerant(.lotwTqslPath, x.lotwTqslPath, w, s); lotwAuto = c.tolerant(.lotwAuto, x.lotwAuto, w, s)
+        lotwEnabled = c.tolerant(.lotwEnabled, x.lotwEnabled, w, s)
         eqslEnabled = c.tolerant(.eqslEnabled, x.eqslEnabled, w, s); eqslUser = c.tolerant(.eqslUser, x.eqslUser, w, s)
         eqslAuto = c.tolerant(.eqslAuto, x.eqslAuto, w, s)
         clublogEnabled = c.tolerant(.clublogEnabled, x.clublogEnabled, w, s); clublogEmail = c.tolerant(.clublogEmail, x.clublogEmail, w, s)

@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RYRY – user manual</title>
+<meta name="description" content="User manual for RYRY – RTTY for macOS based on MMTTY.">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../bridge.css">
+<link rel="icon" href="../img/icon.png">
+</head>
+<body>
+<header class="top"><div class="in">
+  <img class="icon" src="../img/icon.png" alt="">
+  <span class="brand">RYRY</span><span class="ver">user manual · version 1.0</span>
+  <a class="home" href="../../index.html">← RYRY</a>
+  <span class="lang"><a href="../cs/index.html">Čeština</a> <span>English</span></span>
+</div></header>
+
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <ol>
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#install">1. Installation</a></li>
+    <li><a href="#setup">2. First setup</a></li>
+    <li><a href="#cat">3. Radio control (CAT)</a></li>
+    <li><a href="#rx">4. Receiving</a></li>
+    <li><a href="#tx">5. Transmitting and macros</a></li>
+    <li><a href="#log">6. QSO and log</a></li>
+    <li><a href="#contests">7. Contests and QTC</a></li>
+    <li><a href="#files">8. Files and WAV</a></li>
+    <li><a href="#api">9. API for loggers</a></li>
+    <li><a href="#online">10. Online services</a></li>
+    <li><a href="#display">11. Display, language, keys</a></li>
+    <li><a href="#trouble">12. Troubleshooting</a></li>
+  </ol>
+</nav>
+
+<main>
+<div class="hero" id="intro">
+  <h1>RTTY for macOS</h1>
+  <p class="lead">RYRY (formerly mmtty4mac) is a native Mac port of MMTTY (JE3HHT). It uses the same proven demodulator and adds a log, contest support, radio control over USB and an API for loggers.</p>
+  <ul class="pills">
+    <li>MMTTY demodulator</li><li>AFSK and FSK</li><li>CAT Icom / Yaesu / Kenwood / Elecraft + hamlib</li>
+    <li>ADIF log, Cabrillo</li><li>9 contest presets, WAE QTC</li><li>fldigi-compatible API</li><li>English / Czech</li>
+  </ul>
+</div>
+<figure>
+  <a href="../img/en-main.png"><img src="../img/en-main.png" alt="RYRY main window while receiving" loading="lazy"></a>
+  <figcaption>Main window: modem controls at the top, spectrum and waterfall below (yellow = mark, orange = space), received text, the TX window and macros F1–⇧F4. On the right the QSO window with the DXCC country, the other station's local time and previous QSOs.</figcaption>
+</figure>
+
+<section id="install">
+<h2>1. Installation</h2>
+<ol>
+  <li>Install <b>RYRY</b> from the Mac App Store (free). Updates come through the App Store.</li>
+  <li>On first launch RYRY asks for the <b>folder for the log</b> (the panel opens on your Documents folder) – click <b>Allow Access</b> and RYRY creates its <code>RYRY</code> folder there. macOS lets the app into a folder only after you choose it; RYRY remembers the access. If you cancel, the log is kept inside the app's container and the status bar says where.</li>
+  <li>macOS asks for <b>microphone</b> access – allow it, otherwise receiving does not work. You can change it in System Settings → Privacy &amp; Security → Microphone.</li>
+  <li>No radio at hand? <b>Help → Play Demo Signal</b> plays a short contest QSO so you can watch RYRY decode.</li>
+  <li>Open this manual any time from the app: <b>Help → RYRY Manual</b> (<kbd>⌘</kbd><kbd>?</kbd>).</li>
+</ol>
+<p>Coming from mmtty4mac? Your settings move over on the first launch; RYRY asks once for your log folder (usually <code>~/Documents/mmtty4mac</code>), and online passwords may need to be entered again.</p>
+<p>Optional: for radios the built-in CAT does not know, install hamlib with <code>brew install hamlib</code> and start <code>rigctld</code> yourself (see Radio control).</p>
+</section>
+
+<section id="setup">
+<h2>2. First setup</h2>
+<p>Open Settings with <kbd>⌘</kbd><kbd>,</kbd>. Changes take effect with <b>Apply</b> (restarts audio, rig and API); modem parameters and the language apply immediately.</p>
+
+<h3>Station</h3>
+<p>Your call is sent in macros (<code>%m</code>) and determines your CQ zone and continent (for contests and QTC).</p>
+<figure class="half"><a href="../img/en-settings-0.png"><img src="../img/en-settings-0.png" alt="Settings – Station" loading="lazy"></a></figure>
+
+<h3>Audio</h3>
+<p>Choose the radio's sound card (typically “USB Audio CODEC”) as input and output. Set the TX level so the radio's ALC barely moves. <b>Clock calibration</b> measures the sound card's real sample rate – it improves decoding with cheap sound cards.</p>
+<figure class="half"><a href="../img/en-settings-1.png"><img src="../img/en-settings-1.png" alt="Settings – Audio" loading="lazy"></a></figure>
+
+<h3>PTT / FSK</h3>
+<p>How the transmitter is keyed: <b>CAT</b> (a command to the radio), <b>RTS/DTR</b> of a serial port, or VOX. <b>AFSK</b> = RTTY via audio (radio in SSB/DATA), <b>FSK</b> = keying via a serial line (radio in RTTY/FSK mode). Timing (TX delay, PTT tail) and a safety timer that stops a stuck transmission.</p>
+<figure class="half"><a href="../img/en-settings-2.png"><img src="../img/en-settings-2.png" alt="Settings – PTT / FSK" loading="lazy"></a></figure>
+
+<h3>Modem</h3>
+<p>Demodulator, filter, AFC and transmit parameters. The defaults match MMTTY; they apply immediately without Apply.</p>
+<figure class="half"><a href="../img/en-settings-4.png"><img src="../img/en-settings-4.png" alt="Settings – Modem" loading="lazy"></a></figure>
+</section>
+
+<section id="cat">
+<h2>3. Radio control (CAT)</h2>
+<p>On the <b>Rig</b> tab choose how to control the radio:</p>
+<ul>
+  <li><b>CAT via USB (built-in)</b> – no other programs. Protocols Icom CI-V (IC-7300, 7610, 705, 9700…; picking the model sets the CI-V address), Yaesu (FT-991, FTDX10/101, FT-710), Kenwood (TS-590, TS-890) and Elecraft (K3, K4, KX3). The app reads and sets the frequency and mode and controls PTT.</li>
+  <li><b>hamlib rigctld (network)</b> and <b>flrig</b> – for other radios: connect to a running program. Start rigctld yourself, e.g. <code>rigctld -m &lt;model&gt; -r /dev/cu.X -s &lt;speed&gt;</code> (<code>rigctld -l</code> lists the models). The App Store version cannot start rigctld for you.</li>
+</ul>
+<figure class="half"><a href="../img/en-settings-3.png"><img src="../img/en-settings-3.png" alt="Settings – Rig" loading="lazy"></a>
+  <figcaption>Built-in CAT: protocol, the radio's serial port, speed and stop bits (they must match the radio menu). “Test connection” shows the frequency and mode.</figcaption></figure>
+<div class="note">For PTT via CAT choose the <b>CAT</b> method on the PTT / FSK tab. With newer Yaesu radios keep “RTS on (Yaesu CAT RTS)” enabled. The CAT port cannot be shared with RTS/DTR PTT on the same port.</div>
+</section>
+
+<section id="rx">
+<h2>4. Receiving</h2>
+<ul>
+  <li><b>Tuning:</b> click the spectrum or waterfall to tune mark; space is one shift higher. <b>HAM</b> sets a 170 Hz shift.</li>
+  <li>The <b>mouse wheel</b> over the waterfall changes the squelch level, <b>right-click</b> places a notch against interference.</li>
+  <li><b>AFC</b> tracks the signal (right-click: only with open squelch, range limit), <b>NET</b> transmits on the RX frequency, <b>REV</b> swaps mark and space, <b>ATC</b> and <b>SQ</b> work as in MMTTY.</li>
+  <li><b>Filters</b> (menu next to Shift): BPF, AA6YQ, notch/LMS, UOS. <b>XY</b> shows the cross tuning indicator.</li>
+  <li><b>Call highlighting:</b> in the RX text your call is red, stations already in the log blue, new ones bold and dupes struck through. When someone calls you, a sound plays (optionally a notification).</li>
+  <li><b>Watching:</b> in Settings → Spots you can watch chosen calls and new countries (on the band or at all) in spots and in the RX text.</li>
+  <li><b>Click a word</b> in the received text to put it into the QSO window – call, RST, number or name by word type.</li>
+</ul>
+<h3>Second decoder and multi-channel decoding</h3>
+<ul>
+  <li>The <b>second decoder</b> (the “2nd dec.” switch in the top bar) receives the same signal with another demodulator and shows its text in a panel below the RX window. A weak or disturbed signal is often copied by one of them – much like 2Tone is used next to MMTTY in contests.</li>
+  <li><b>Multi-channel decoding</b> (Window → Channels) finds RTTY signals in the waterfall by itself and decodes each separately (up to 8 channels). <b>Tune</b> retunes the main decoder to the chosen signal. Settings: Settings → Decoders.</li>
+</ul>
+<figure><a href="../img/en-scope.png"><img src="../img/en-scope.png" alt="Demodulator scope" loading="lazy"></a>
+  <figcaption>Window → Demodulator scope: mark and space waveforms, decided bits and sync – for fine-tuning the demodulator parameters.</figcaption></figure>
+</section>
+
+<section id="tx">
+<h2>5. Transmitting and macros</h2>
+<ul>
+  <li><b>TX / RX:</b> the TX button or <kbd>⌘</kbd><kbd>T</kbd>. <kbd>Esc</kbd> = RX now. <b>Tune</b> = carrier for tuning.</li>
+  <li><b>TX window:</b> sends by character, word or line; <b>Send all</b> sends everything.</li>
+  <li><b>Macros F1–F12 and ⇧F1–⇧F4:</b> click or press the key; right-click → <b>Edit…</b> (name, text, color, repeat).</li>
+  <li><b>Messages:</b> longer saved texts (station description, final) in the Messages menu.</li>
+  <li><b>Send text file</b> is in the Transmit menu.</li>
+</ul>
+<table>
+  <tr><th>Variable</th><th>Meaning</th><th>Variable</th><th>Meaning</th></tr>
+  <tr><td><code>%m</code></td><td>my call</td><td><code>%c</code></td><td>other station's call</td></tr>
+  <tr><td><code>%n</code></td><td>other station's name</td><td><code>%q</code></td><td>other station's QTH</td></tr>
+  <tr><td><code>%r</code> / <code>%s</code></td><td>RST sent / received</td><td><code>%N</code> / <code>%M</code></td><td>sent / received number (exchange)</td></tr>
+  <tr><td><code>%g</code></td><td>greeting GM/GA/GE by the other station's local time</td><td><code>%D %T %t</code></td><td>UTC date and time</td></tr>
+  <tr><td><code>%L %F</code></td><td>LTRS / FIGS</td><td><code>%{…}</code></td><td>CW identification</td></tr>
+  <tr><td><code>%l</code></td><td>log the QSO</td><td><code>\</code> / <code>#</code> at the end</td><td>RX after sending / stay in TX</td></tr>
+</table>
+<p>Example “Answer” macro: <code>%c %c DE %m %m %m K\</code></p>
+</section>
+
+<section id="log">
+<h2>6. QSO and log</h2>
+<p>The QSO window shows only the fields the current mode needs. Under the call you see the DXCC country (from cty.dat), CQ and ITU zones, the other station's local time and previous QSOs. <b>Log</b> (<kbd>⌘</kbd><kbd>L</kbd>) saves the QSO, <b>Clear</b> empties the window.</p>
+<h3>Band without a rig, call suggestions, callbook</h3>
+<ul>
+  <li><b>Band:</b> without a connected rig choose the band below the QSO fields or enter the frequency in kHz – it is written to the log and kept for the next QSOs. With a rig the frequency comes from the radio.</li>
+  <li><b>Super Check Partial:</b> while typing a call, known calls (from MASTER.SCP and your log) are suggested below the Call field; “≈” marks calls differing by one character – they help correct a miscopied call. Download MASTER.SCP in Settings → Contest.</li>
+  <li><b>Beam heading:</b> below the country you see the azimuth and distance to the other station (from the locator, otherwise by country) and the long path.</li>
+  <li><b>Frequency:</b> click the frequency in the top bar (or <kbd>⌥</kbd><kbd>⌘</kbd><kbd>F</kbd>) to enter a frequency or pick a band – the rig retunes (not while transmitting).</li>
+  <li><b>Callbook:</b> after entering a call the name, QTH and locator are filled from QRZ.com or HamQTH (Settings → API and log → Callbook; the password is kept in the Keychain).</li>
+</ul>
+<figure><a href="../img/en-log.png"><img src="../img/en-log.png" alt="Log window" loading="lazy"></a>
+  <figcaption>Log window (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): search, edit by double-click, delete. At the bottom the path of the open log, the <b>Log</b> menu (new, open, save as, export ADIF), ADIF import and Cabrillo export. The QTC tab lists QTC series from the WAE contest.</figcaption></figure>
+<p><b>Backups:</b> the log is backed up once a day into the <code>backup</code> folder next to the log (last 10 backups); manually File → Back Up Log Now. <b>Import from MMTTY:</b> File → Import from MMTTY… reads macros, messages, call, modem parameters and keyboard shortcuts from a Windows <code>Mmtty.ini</code>; it shows a preview of what will be overwritten first.</p>
+<p>The log is stored in the folder from Settings → API and log (by default <code>~/Documents/RYRY</code>; a log from mmtty4mac stays in <code>~/Documents/mmtty4mac</code>) as JSONL and also as ADIF (<code>mmtty4mac.adi</code>) that any logger can read. When you open or create a log in another folder, RYRY asks once for access to it. For an old MMTTY log, export it to ADIF in MMTTY and import it in RYRY – duplicates are skipped.</p>
+<h3>Log management</h3>
+<p>Each log is a separate file – for example one for everyday operating and one per contest. In the <b>File</b> menu:</p>
+<table>
+  <tr><th>Command</th><th>What it does</th></tr>
+  <tr><td>New Log… <kbd>⌘</kbd><kbd>N</kbd></td><td>creates an empty log with the chosen name and location; contest serial numbers start at 1</td></tr>
+  <tr><td>Open Log… <kbd>⌘</kbd><kbd>O</kbd></td><td>opens a RYRY log or an ADIF file from another program (it is converted, the original stays as <code>.adi.orig</code>)</td></tr>
+  <tr><td>Open Recent Log</td><td>the last 8 logs</td></tr>
+  <tr><td>Save Log As… <kbd>⇧</kbd><kbd>⌘</kbd><kbd>S</kbd></td><td>saves a copy under a new name and continues in it</td></tr>
+  <tr><td>Export ADIF…</td><td>a copy of the ADIF elsewhere; the log stays open</td></tr>
+  <tr><td>Import ADIF…</td><td>adds QSOs from ADIF to the open log (duplicates are skipped)</td></tr>
+</table>
+<p>Every QSO is saved the moment it is logged, so there is no separate “Save”. The name of the open log is in the Log window title.</p>
+</section>
+
+<section id="contests">
+<h2>7. Contests and QTC</h2>
+<p>On the <b>Contest</b> tab turn on contest mode and pick a preset: ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE or OK DX RTTY. The preset sets the Cabrillo name, the exchange format and the next start date (always check it in the rules).</p>
+<div class="gallery">
+  <figure><a href="../img/en-settings-5.png"><img src="../img/en-settings-5.png" alt="Settings – Contest" loading="lazy"></a><figcaption>Preset, exchange, Cabrillo and contest start.</figcaption></figure>
+  <figure><a href="../img/en-contest.png"><img src="../img/en-contest.png" alt="OK DX RTTY Contest in the main window" loading="lazy"></a><figcaption>OK DX RTTY: the QSO window offers only RST and CQ zone; your zone is filled in and the other station's zone is prefilled from its call.</figcaption></figure>
+</div>
+<p><b>Dupes:</b> when you already have a QSO with the station in this contest on the same band and mode, a red <b>DUPE</b> appears next to the call. You can still log it.</p>
+<p>Exchange formats: RST + serial number (or a fixed exchange), RST + CQ zone, CQ/RJ (zone + QTH), BARTG (number + time), WAE (number + QTC), PED. Serial numbers increase automatically after logging.</p>
+<h3>ESM – Enter Sends Message (Run / S&amp;P)</h3>
+<p>When enabled in Settings → Contest → ESM, Enter in the Call or exchange field sends a macro depending on the QSO state, much like N1MM: <b>Run</b> (calling CQ) – CQ → exchange → TU and log; <b>S&amp;P</b> (answering) – my call → exchange and log. Switch the mode in the QSO panel header or with <kbd>⌃</kbd><kbd>R</kbd>; the panel shows what Enter will send. Enter sends nothing while transmitting and an empty macro is never sent.</p>
+<p><b>Rate:</b> in a contest the status bar shows the QSO count and the rate over the last 10 and 60 minutes (QSOs per hour); the Log window shows counts per band.</p>
+<h3>Score</h3>
+<p><b>Window → Score</b> shows, for the selected preset, QSOs, dupes, points and multipliers per band and in total, plus the resulting score with its formula (e.g. “Points 120 × multipliers 35 = 4,200”). It updates with every logged, edited or deleted QSO; the score is also shown in the status bar. It is an estimate – log checking removes busted and unconfirmed QSOs. Rules that could not be verified are marked in the window.</p>
+<div class="gallery">
+  <figure><a href="../img/en-score.png"><img src="../img/en-score.png" alt="Score window" loading="lazy"></a><figcaption>Points, QSOs and multipliers per band and in total.</figcaption></figure>
+</div>
+<h3>Multipliers and band map</h3>
+<p><b>Window → Multipliers</b> shows, for the selected preset, the worked multipliers per band (DXCC countries, CQ zones, WPX prefixes, states and provinces, call areas…) and the missing ones for finite sets. For the entered call a green <b>NEW MULT</b> appears in the QSO window. Rules that could not be verified in the official contest rules are marked in the window. <b>Window → Band Map</b> shows the RTTY segment of the band with spots by frequency and the rig position; clicking a spot tunes the rig and puts the call in. The band is chosen automatically from the rig, the QSO window frequency or wherever most spots are; you can also pick it from the menu. The scale covers the whole band (the map opens on the digimode part, where RTTY usually lives). The mouse wheel pans it and <b>Shift</b> + wheel zooms; the magnifier buttons and dragging do the same, and the <b>⤢</b> button shows the whole band.</p>
+<p><b>Call history:</b> a file in N1MM Call History format (Settings → Contest) prefills the other station's name, locator and exchange (e.g. zone).</p>
+<h3>WAE and QTC</h3>
+<p>In the WAE format the QSO window has a QTC panel: <b>QTC?</b> asks the other station, <b>QRV – receive</b> opens receiving a series, <b>Send…</b> prepares and sends a series from your log. The app enforces the rules – max. 10 QTC per pair of stations, only between continents, each QSO only once. Received lines are filled by clicking words or with <b>Load from RX</b>.</p>
+</section>
+
+<section id="files">
+<h2>8. Files and WAV</h2>
+<table>
+  <tr><th>File menu</th><th>What it does</th></tr>
+  <tr><td>Save RX text to file…</td><td>saves the contents of the RX window</td></tr>
+  <tr><td>Log RX text to file continuously</td><td>daily files <code>rx-YYYY-MM-DD.txt</code> in the <code>rx</code> folder under the log folder, optionally with UTC time</td></tr>
+  <tr><td>Play WAV into receiver</td><td>real time, 4× or as fast as possible; pause, seek and rewind in the top bar</td></tr>
+  <tr><td>Record RX to WAV…</td><td>a red “REC” shows the recording; click it to stop</td></tr>
+  <tr><td>Import ADIF…</td><td>QSOs from another program (duplicates are skipped)</td></tr>
+  <tr><td>System sound settings…, Audio MIDI Setup…</td><td>sound card level and format</td></tr>
+</table>
+</section>
+
+<section id="api">
+<h2>9. API for loggers</h2>
+<p>To loggers RYRY looks like <b>fldigi</b> (XML-RPC on port 7362), so for example RUMlogNG or MacLoggerDX can control it – choose “fldigi” in the logger. The second API is JSON-RPC over WebSocket (<code>ws://127.0.0.1:7363/v1</code>) with events for received text, state and logged QSOs; a Java client is in <code>clients/java</code>.</p>
+<figure class="half"><a href="../img/en-settings-7.png"><img src="../img/en-settings-7.png" alt="Settings – API and log" loading="lazy"></a>
+  <figcaption>API and log: API ports, the folder and name of the open log and the continuous RX text log.</figcaption></figure>
+<div class="note warn">The API has no authentication and can key the transmitter. By default it listens on this Mac only; enable network access only on a trusted network.</div>
+</section>
+
+<section id="online">
+<h2>10. Online services</h2>
+<p>All services are off by default and connect to the internet only when enabled. Passwords and keys are stored in the macOS Keychain.</p>
+<table>
+  <tr><th>Service</th><th>Where to enable</th><th>What it does</th></tr>
+  <tr><td>Callbook (QRZ.com, HamQTH)</td><td>Settings → API and log</td><td>fills in the other station's name, QTH and locator</td></tr>
+  <tr><td>DX cluster and RBN</td><td>Settings → Spots, Window → Spots</td><td>list of RTTY spots; double-click tunes the rig and puts the call into the QSO window (frequency offset for LSB/AFSK is configurable); spots within the passband appear as labels right in the waterfall (green = new, orange = in the log, red = dupe), a click tunes the mark</td></tr>
+  <tr><td>DX cluster commands</td><td>Window → Spots (bottom)</td><td>10 command buttons (e.g. <code>sh/dx 30</code>, <code>sh/wwv</code>, <code>set/skimmer</code>) and a line for manual commands with history (↑↓ arrows); cluster replies go to the collapsible console. Right-click a button to edit the command in the same editor as TX macros; <code>%k</code> = rig frequency in kHz, <code>%c</code> = other station (e.g. <code>dx %k %c RTTY</code>)</td></tr>
+  <tr><td>LoTW, eQSL, Club Log</td><td>Settings → Online, Log window → Upload</td><td>uploads QSOs not uploaded yet – eQSL and Club Log directly (optionally automatically after logging); for LoTW RYRY saves an ADIF in Downloads and opens it in TrustedQSL, where you sign and send it, then you confirm in RYRY</td></tr>
+</table>
+</section>
+
+<section id="display">
+<h2>11. Display, language, keys</h2>
+<div class="gallery">
+  <figure><a href="../img/en-settings-6.png"><img src="../img/en-settings-6.png" alt="Settings – Display" loading="lazy"></a>
+    <figcaption>Interface language, spectrum and waterfall (range, gain, palette, response), XY scope, window fonts and colors, TX window options, tooltips.</figcaption></figure>
+  <figure><a href="../img/en-settings-8.png"><img src="../img/en-settings-8.png" alt="Settings – Keys" loading="lazy"></a>
+    <figcaption>Keyboard shortcuts: click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).</figcaption></figure>
+</div>
+<p>By default the interface is in English; choose Czech in Settings → Display → Interface language (the choice is remembered).</p>
+<p><b>The language files</b> <code>cs.json</code> and <code>en.json</code> are in <code>~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages</code> – the app runs in the macOS sandbox (the folder button in the Language section). You can edit them – a saved change applies immediately in all windows. An edited file is not overwritten by app updates, and texts missing in it are taken from the bundled version.</p>
+<p><b>Your own translation:</b> in the Language section choose <b>Save template…</b>, translate the values in <code>strings</code>, set <code>code</code> and <code>name</code> and load the file with <b>Load language…</b>. The language switches immediately in all windows.</p>
+</section>
+
+<section id="trouble">
+<h2>12. Troubleshooting</h2>
+<table>
+  <tr><th>Problem</th><th>Solution</th></tr>
+  <tr><td>The waterfall is empty</td><td>Check the input in Settings → Audio and the microphone permission.</td></tr>
+  <tr><td>No decoding</td><td>Mark on the yellow line, shift 170 Hz, 45.45 Bd; try <b>REV</b>.</td></tr>
+  <tr><td>The radio does not transmit</td><td>PTT method on the PTT / FSK tab; for CAT try “Test connection” on the Rig tab.</td></tr>
+  <tr><td>Rig offline</td><td>Port and speed must match the radio menu and no other program may have the port open.</td></tr>
+  <tr><td>Distorted transmission</td><td>Lower the TX level (Settings → Audio) and watch the radio's ALC.</td></tr>
+  <tr><td>The logger does not connect</td><td>Settings → API and log: fldigi XML-RPC on, port 7362.</td></tr>
+</table>
+</section>
+
+<footer>RYRY © 2026 OK1XOE · GNU LGPL v3 license · source: github.com/ok1xoe/mmtty4mac · demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
+</main>
+</div>
+</body>
+</html>

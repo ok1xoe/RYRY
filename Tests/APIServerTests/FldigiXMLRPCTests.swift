@@ -15,7 +15,7 @@ func fldigi(_ h: APIHarness) async throws -> (FldigiXMLRPCServer, HTTPXMLRPCTran
     let h = try await makeAPIHarness()
     let (srv, t) = try await fldigi(h)
     defer { srv.stop() }
-    #expect(try await t.call("fldigi.name", []) == .string("mmtty4mac"))
+    #expect(try await t.call("fldigi.name", []) == .string("RYRY"))
     guard case .array(let list) = try await t.call("fldigi.list", []) else { Issue.record("list"); return }
     #expect(list.count > 40)
     await h.app.stop()
@@ -104,6 +104,6 @@ func fldigi(_ h: APIHarness) async throws -> (FldigiXMLRPCServer, HTTPXMLRPCTran
     req.httpMethod = "POST"; req.httpBody = Data("<methodCall><broken".utf8)
     let (d, _) = try await URLSession.shared.data(for: req)
     #expect(throws: XMLRPCFault.self) { _ = try XMLRPCCodec.decodeResponse(d) }
-    #expect(try await HTTPXMLRPCTransport(url: URL(string: "http://127.0.0.1:\(port)/RPC2")!).call("fldigi.name", []) == .string("mmtty4mac"))
+    #expect(try await HTTPXMLRPCTransport(url: URL(string: "http://127.0.0.1:\(port)/RPC2")!).call("fldigi.name", []) == .string("RYRY"))
     await h.app.stop()
 }

@@ -145,6 +145,8 @@ public actor AppController {
         case .ped: break
         case .wae: q.serialSent = c.nextSerial
         case .zone: q.exchangeSent = c.exchange              // empty → fills in my own zone from DXCC
+        case .serialText: q.serialSent = c.nextSerial; q.exchangeSent = c.exchange
+        case .text: q.exchangeSent = c.exchange
         }
         return q
     }
@@ -321,7 +323,9 @@ public actor AppController {
         case "call":
             let changed = v.uppercased() != qso.call
             qso.call = v.uppercased()
-            if !v.isEmpty, qso.timeOn == nil { qso.timeOn = Date() }
+            // The QSO starts with the station in the Call field: another call (a spot clicked long ago, then replaced)
+            // is a new QSO with a new time; an empty call means no QSO has started yet.
+            if v.isEmpty { qso.timeOn = nil } else if changed || qso.timeOn == nil { qso.timeOn = Date() }
             if changed { releaseAutoFilled() }
             // Priority: manual entry > call history > (callbook, in the GUI) > zone guess from DXCC
             applyCallHistory(v)
@@ -332,7 +336,7 @@ public actor AppController {
                 dxccFilledZone = String(z)
             }
             // BARTG: a cleared call = the QSO has not started, the time is taken as current again (MMTTY UpdateBARTG)
-            if v.isEmpty, isBARTG { qso.exchangeSent = ""; qso.timeOn = nil }
+            if v.isEmpty, isBARTG { qso.exchangeSent = "" }
         case "name": qso.name = v
         case "qth": qso.qth = v
         case "locator": qso.locator = v.uppercased()

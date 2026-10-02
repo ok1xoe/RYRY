@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mmtty4mac – user manual</title>
-<meta name="description" content="User manual for mmtty4mac – RTTY for macOS based on MMTTY.">
+<title>RYRY – user manual</title>
+<meta name="description" content="User manual for RYRY – RTTY for macOS based on MMTTY.">
 <link rel="stylesheet" href="../style.css">
 <link rel="icon" href="../img/icon.png">
 </head>
 <body>
 <header class="top"><div class="in">
   <img class="icon" src="../img/icon.png" alt="">
-  <span class="brand">mmtty4mac</span><span class="ver">user manual · version 0.14</span>
+  <span class="brand">RYRY</span><span class="ver">user manual · version 1.0</span>
   <span class="lang"><a href="../cs/index.html">Čeština</a> <span>English</span></span>
 </div></header>
 
@@ -37,26 +37,28 @@
 <main>
 <div class="hero" id="intro">
   <h1>RTTY for macOS</h1>
-  <p class="lead">mmtty4mac is a native Mac port of MMTTY (JE3HHT). It uses the same proven demodulator and adds a log, contest support, radio control over USB and an API for loggers.</p>
+  <p class="lead">RYRY (formerly mmtty4mac) is a native Mac port of MMTTY (JE3HHT). It uses the same proven demodulator and adds a log, contest support, radio control over USB and an API for loggers.</p>
   <ul class="pills">
     <li>MMTTY demodulator</li><li>AFSK and FSK</li><li>CAT Icom / Yaesu / Kenwood / Elecraft + hamlib</li>
     <li>ADIF log, Cabrillo</li><li>9 contest presets, WAE QTC</li><li>fldigi-compatible API</li><li>English / Czech</li>
   </ul>
 </div>
 <figure>
-  <a href="../img/en-main.png"><img src="../img/en-main.png" alt="mmtty4mac main window while receiving" loading="lazy"></a>
+  <a href="../img/en-main.png"><img src="../img/en-main.png" alt="RYRY main window while receiving" loading="lazy"></a>
   <figcaption>Main window: modem controls at the top, spectrum and waterfall below (yellow = mark, orange = space), received text, the TX window and macros F1–⇧F4. On the right the QSO window with the DXCC country, the other station's local time and previous QSOs.</figcaption>
 </figure>
 
 <section id="install">
 <h2>1. Installation</h2>
 <ol>
-  <li>Open <code>mmtty4mac-0.14.0.dmg</code> and drag the app into <b>Applications</b>.</li>
-  <li>On first launch macOS asks for <b>microphone</b> access – allow it, otherwise receiving does not work. You can change it in System Settings → Privacy &amp; Security → Microphone.</li>
-  <li>The app is signed and notarized by Apple and opens without warnings.</li>
-  <li>Open this manual any time from the app: <b>Help → mmtty4mac Manual</b> (<kbd>⌘</kbd><kbd>?</kbd>).</li>
+  <li>Install <b>RYRY</b> from the Mac App Store (free). Updates come through the App Store.</li>
+  <li>On first launch RYRY asks for the <b>folder for the log</b> (the panel opens on your Documents folder) – click <b>Allow Access</b> and RYRY creates its <code>RYRY</code> folder there. macOS lets the app into a folder only after you choose it; RYRY remembers the access. If you cancel, the log is kept inside the app's container and the status bar says where.</li>
+  <li>macOS asks for <b>microphone</b> access – allow it, otherwise receiving does not work. You can change it in System Settings → Privacy &amp; Security → Microphone.</li>
+  <li>No radio at hand? <b>Help → Play Demo Signal</b> plays a short contest QSO so you can watch RYRY decode.</li>
+  <li>Open this manual any time from the app: <b>Help → RYRY Manual</b> (<kbd>⌘</kbd><kbd>?</kbd>).</li>
 </ol>
-<p>Optional: for radios the built-in CAT does not know, install hamlib with <code>brew install hamlib</code>.</p>
+<p>Coming from mmtty4mac? Your settings move over on the first launch; RYRY asks once for your log folder (usually <code>~/Documents/mmtty4mac</code>), and online passwords may need to be entered again.</p>
+<p>Optional: for radios the built-in CAT does not know, install hamlib with <code>brew install hamlib</code> and start <code>rigctld</code> yourself (see Radio control).</p>
 </section>
 
 <section id="setup">
@@ -85,8 +87,7 @@
 <p>On the <b>Rig</b> tab choose how to control the radio:</p>
 <ul>
   <li><b>CAT via USB (built-in)</b> – no other programs. Protocols Icom CI-V (IC-7300, 7610, 705, 9700…; picking the model sets the CI-V address), Yaesu (FT-991, FTDX10/101, FT-710), Kenwood (TS-590, TS-890) and Elecraft (K3, K4, KX3). The app reads and sets the frequency and mode and controls PTT.</li>
-  <li><b>hamlib – start automatically</b> – for other radios: pick the model from the hamlib list; the app starts and stops <code>rigctld</code> itself.</li>
-  <li><b>hamlib rigctld (network)</b> and <b>flrig</b> – connect to an already running program.</li>
+  <li><b>hamlib rigctld (network)</b> and <b>flrig</b> – for other radios: connect to a running program. Start rigctld yourself, e.g. <code>rigctld -m &lt;model&gt; -r /dev/cu.X -s &lt;speed&gt;</code> (<code>rigctld -l</code> lists the models). The App Store version cannot start rigctld for you.</li>
 </ul>
 <figure class="half"><a href="../img/en-settings-3.png"><img src="../img/en-settings-3.png" alt="Settings – Rig" loading="lazy"></a>
   <figcaption>Built-in CAT: protocol, the radio's serial port, speed and stop bits (they must match the radio menu). “Test connection” shows the frequency and mode.</figcaption></figure>
@@ -148,13 +149,13 @@
 <figure><a href="../img/en-log.png"><img src="../img/en-log.png" alt="Log window" loading="lazy"></a>
   <figcaption>Log window (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>L</kbd>): search, edit by double-click, delete. At the bottom the path of the open log, the <b>Log</b> menu (new, open, save as, export ADIF), ADIF import and Cabrillo export. The QTC tab lists QTC series from the WAE contest.</figcaption></figure>
 <p><b>Backups:</b> the log is backed up once a day into the <code>backup</code> folder next to the log (last 10 backups); manually File → Back Up Log Now. <b>Import from MMTTY:</b> File → Import from MMTTY… reads macros, messages, call, modem parameters and keyboard shortcuts from a Windows <code>Mmtty.ini</code>; it shows a preview of what will be overwritten first.</p>
-<p>The log is stored in <code>~/Documents/mmtty4mac</code> as JSONL and also as ADIF (<code>mmtty4mac.adi</code>) that any logger can read. For an old MMTTY log, export it to ADIF in MMTTY and import it in mmtty4mac – duplicates are skipped.</p>
+<p>The log is stored in the folder from Settings → API and log (by default <code>~/Documents/RYRY</code>; a log from mmtty4mac stays in <code>~/Documents/mmtty4mac</code>) as JSONL and also as ADIF (<code>mmtty4mac.adi</code>) that any logger can read. When you open or create a log in another folder, RYRY asks once for access to it. For an old MMTTY log, export it to ADIF in MMTTY and import it in RYRY – duplicates are skipped.</p>
 <h3>Log management</h3>
 <p>Each log is a separate file – for example one for everyday operating and one per contest. In the <b>File</b> menu:</p>
 <table>
   <tr><th>Command</th><th>What it does</th></tr>
   <tr><td>New Log… <kbd>⌘</kbd><kbd>N</kbd></td><td>creates an empty log with the chosen name and location; contest serial numbers start at 1</td></tr>
-  <tr><td>Open Log… <kbd>⌘</kbd><kbd>O</kbd></td><td>opens an mmtty4mac log or an ADIF file from another program (it is converted, the original stays as <code>.adi.orig</code>)</td></tr>
+  <tr><td>Open Log… <kbd>⌘</kbd><kbd>O</kbd></td><td>opens a RYRY log or an ADIF file from another program (it is converted, the original stays as <code>.adi.orig</code>)</td></tr>
   <tr><td>Open Recent Log</td><td>the last 8 logs</td></tr>
   <tr><td>Save Log As… <kbd>⇧</kbd><kbd>⌘</kbd><kbd>S</kbd></td><td>saves a copy under a new name and continues in it</td></tr>
   <tr><td>Export ADIF…</td><td>a copy of the ADIF elsewhere; the log stays open</td></tr>
@@ -202,7 +203,7 @@
 
 <section id="api">
 <h2>9. API for loggers</h2>
-<p>To loggers mmtty4mac looks like <b>fldigi</b> (XML-RPC on port 7362), so for example RUMlogNG or MacLoggerDX can control it – choose “fldigi” in the logger. The second API is JSON-RPC over WebSocket (<code>ws://127.0.0.1:7363/v1</code>) with events for received text, state and logged QSOs; a Java client is in <code>clients/java</code>.</p>
+<p>To loggers RYRY looks like <b>fldigi</b> (XML-RPC on port 7362), so for example RUMlogNG or MacLoggerDX can control it – choose “fldigi” in the logger. The second API is JSON-RPC over WebSocket (<code>ws://127.0.0.1:7363/v1</code>) with events for received text, state and logged QSOs; a Java client is in <code>clients/java</code>.</p>
 <figure class="half"><a href="../img/en-settings-7.png"><img src="../img/en-settings-7.png" alt="Settings – API and log" loading="lazy"></a>
   <figcaption>API and log: API ports, the folder and name of the open log and the continuous RX text log.</figcaption></figure>
 <div class="note warn">The API has no authentication and can key the transmitter. By default it listens on this Mac only; enable network access only on a trusted network.</div>
@@ -216,8 +217,7 @@
   <tr><td>Callbook (QRZ.com, HamQTH)</td><td>Settings → API and log</td><td>fills in the other station's name, QTH and locator</td></tr>
   <tr><td>DX cluster and RBN</td><td>Settings → Spots, Window → Spots</td><td>list of RTTY spots; double-click tunes the rig and puts the call into the QSO window (frequency offset for LSB/AFSK is configurable); spots within the passband appear as labels right in the waterfall (green = new, orange = in the log, red = dupe), a click tunes the mark</td></tr>
   <tr><td>DX cluster commands</td><td>Window → Spots (bottom)</td><td>10 command buttons (e.g. <code>sh/dx 30</code>, <code>sh/wwv</code>, <code>set/skimmer</code>) and a line for manual commands with history (↑↓ arrows); cluster replies go to the collapsible console. Right-click a button to edit the command in the same editor as TX macros; <code>%k</code> = rig frequency in kHz, <code>%c</code> = other station (e.g. <code>dx %k %c RTTY</code>)</td></tr>
-  <tr><td>LoTW, eQSL, Club Log</td><td>Settings → Online, Log window → Upload</td><td>uploads QSOs not uploaded yet (LoTW via TQSL); optionally automatically after logging</td></tr>
-  <tr><td>Updates</td><td>app menu → Check for Updates…</td><td>tells you about a new version and downloads the DMG (installs nothing by itself)</td></tr>
+  <tr><td>LoTW, eQSL, Club Log</td><td>Settings → Online, Log window → Upload</td><td>uploads QSOs not uploaded yet – eQSL and Club Log directly (optionally automatically after logging); for LoTW RYRY saves an ADIF in Downloads and opens it in TrustedQSL, where you sign and send it, then you confirm in RYRY</td></tr>
 </table>
 </section>
 
@@ -230,7 +230,7 @@
     <figcaption>Keyboard shortcuts: click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).</figcaption></figure>
 </div>
 <p>By default the interface is in English; choose Czech in Settings → Display → Interface language (the choice is remembered).</p>
-<p><b>The language files</b> <code>cs.json</code> and <code>en.json</code> are in <code>~/Library/Application Support/mmtty4mac/Languages</code> (the folder button in the Language section). You can edit them – a saved change applies immediately in all windows. An edited file is not overwritten by app updates, and texts missing in it are taken from the bundled version.</p>
+<p><b>The language files</b> <code>cs.json</code> and <code>en.json</code> are in <code>~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages</code> – the app runs in the macOS sandbox (the folder button in the Language section). You can edit them – a saved change applies immediately in all windows. An edited file is not overwritten by app updates, and texts missing in it are taken from the bundled version.</p>
 <p><b>Your own translation:</b> in the Language section choose <b>Save template…</b>, translate the values in <code>strings</code>, set <code>code</code> and <code>name</code> and load the file with <b>Load language…</b>. The language switches immediately in all windows.</p>
 </section>
 
@@ -247,7 +247,7 @@
 </table>
 </section>
 
-<footer>mmtty4mac © 2026 OK1XOE · GNU LGPL v3 license · demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
+<footer>RYRY © 2026 OK1XOE · GNU LGPL v3 license · source: github.com/ok1xoe/mmtty4mac · demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
 </main>
 </div>
 </body>

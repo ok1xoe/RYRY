@@ -12,6 +12,8 @@ final class FakeRigctld: @unchecked Sendable {
     var freq = 14_080_000.0
     var rigMode = "PKTUSB"
     var ptt = false
+    /// The rig knows no separate DATA PTT (hamlib answers `T 3` with RPRT -11, feature not available).
+    var dataPTTUnsupported = false
     var replyDelayMs = 0          // the response delay (reveals concurrent requests)
     private(set) var commands: [String] = []
 
@@ -88,7 +90,9 @@ final class FakeRigctld: @unchecked Sendable {
             case "m": reply = "\(rigMode)\n2400\n"
             case "M": rigMode = parts[1]; reply = "RPRT 0\n"
             case "t": reply = ptt ? "1\n" : "0\n"
-            case "T": ptt = parts[1] == "1"; reply = "RPRT 0\n"
+            case "T":
+                if parts[1] == "3" && dataPTTUnsupported { reply = "RPRT -11\n" }
+                else { ptt = parts[1] != "0"; reply = "RPRT 0\n" }
             default: reply = "RPRT -11\n"
             }
         }

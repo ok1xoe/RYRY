@@ -81,7 +81,7 @@ import Testing
     #expect(ok.start == ISO8601DateFormatter().date(from: "2026-12-19T00:00:00Z"))
     #expect(ContestSettings.preset(.okDXRTTY, year: 2027).start == ISO8601DateFormatter().date(from: "2027-12-18T00:00:00Z"))
     let wae = ContestSettings.preset(.waeRTTY, year: 2026)
-    #expect(wae.format == .wae && wae.name == "WAEDC" && wae.start == ISO8601DateFormatter().date(from: "2026-11-14T00:00:00Z"))
+    #expect(wae.format == .wae && wae.name == "DARC-WAEDC-RTTY" && wae.start == ISO8601DateFormatter().date(from: "2026-11-14T00:00:00Z"))
 }
 
 // The preset palette: the start dates follow the usual rules (a full weekend = both the Saturday and the Sunday within the month)
@@ -94,7 +94,7 @@ import Testing
         (.sartgRTTY, 2026, "SARTG-RTTY", .serial, "2026-08-15T00:00:00Z"),
         (.cqwwRTTY, 2026, "CQ-WW-RTTY", .cqrj, "2026-09-26T00:00:00Z"),
         (.makrothen, 2026, "MAKROTHEN-RTTY", .serial, "2026-10-10T00:00:00Z"),
-        (.jartsRTTY, 2026, "JARTS-WW-RTTY", .serial, "2026-10-17T00:00:00Z"),
+        (.jartsRTTY, 2026, "JARL-WW-RTTY", .serial, "2026-10-17T00:00:00Z"),
     ]
     for (p, y, name, f, start) in cases {
         let c = ContestSettings.preset(p, year: y)
@@ -102,7 +102,7 @@ import Testing
         #expect(c.start == iso.date(from: start), "\(p)")
         #expect(ContestPreset.matching(c) == p, "\(p)")
     }
-    #expect(ContestPreset.allCases.count == 9)
+    #expect(ContestPreset.allCases.count == 28)
 }
 
 // The selected preset is recognised from the name and the format; a manual edit = custom settings
@@ -140,7 +140,7 @@ import Testing
     s.contest.preset = nil
     try SettingsStore(directory: dir).save(s)
     let loaded = SettingsStore(directory: dir).load().0
-    #expect(loaded.contest.preset == nil && loaded.contest.name == "WAEDC")
+    #expect(loaded.contest.preset == nil && loaded.contest.name == "DARC-WAEDC-RTTY")
     // a format change outside a preset → custom
     var c = ContestSettings.preset(.cqwpxRTTY, year: 2027); c.format = .bartg
     #expect(c.selectedPreset == nil)

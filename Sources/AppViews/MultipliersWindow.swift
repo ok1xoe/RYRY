@@ -65,8 +65,8 @@ public struct MultipliersWindow: View {
         Grid(alignment: .trailing, horizontalSpacing: 14, verticalSpacing: 4) {
             GridRow {
                 Text(L("Pásmo")).bold().gridColumnAlignment(.leading)
-                ForEach(perBandKinds, id: \.self) { Text($0.title).bold() }
-                ForEach(onceKinds, id: \.self) { Text($0.title).bold() }
+                ForEach(perBandKinds, id: \.self) { Text(t.rule.title($0)).bold() }
+                ForEach(onceKinds, id: \.self) { Text(t.rule.title($0)).bold() }
                 Text(L("Celkem")).bold()
             }
             Divider()
@@ -117,7 +117,7 @@ public struct MultipliersWindow: View {
                 ForEach(detailBand == nil ? once : bandKinds, id: \.self) { k in
                     let worked = Self.sorted(t.worked(k, band: detailBand))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("\(k.title) (\(worked.count))").bold()
+                        Text("\(t.rule.title(k)) (\(worked.count))").bold()
                         Text(worked.isEmpty ? "—" : worked.map(k.label).joined(separator: " "))
                             .font(.body.monospaced()).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                         if let miss = t.missing(k, band: detailBand), !miss.isEmpty {

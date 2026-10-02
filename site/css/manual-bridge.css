@@ -1,0 +1,38 @@
+/* RYRY manual on ryry.ok1xoe.dev: maps the manual's own tokens (docs/html/style.css) onto the
+   OK1XOE.dev "instrument" design – same colours, fonts and theme toggle as the rest of the site. */
+@font-face { font-family: "Space Grotesk"; font-weight: 400; font-display: swap; src: url("../assets/fonts/space-grotesk-400.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 700; font-display: swap; src: url("../assets/fonts/space-grotesk-700.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("../assets/fonts/jetbrains-mono-500.woff2") format("woff2"); }
+
+:root, :root:not([data-theme="light"]) {
+  --bg: #0A0C0E; --fg: #E7EBED; --muted: #8B959B; --line: #262D33; --card: #14181C;
+  --accent: #34E2E8; --code: #0D1013; --warn: #E0A64B; --shadow: 0 10px 26px rgba(0,0,0,.28);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #D7DBDD; --fg: #14191C; --muted: #4C565B; --line: #B7BEC1; --card: #EBEDEE;
+    --accent: #0A8992; --code: #CDD2D4; --warn: #B4791E; --shadow: 0 6px 18px rgba(0,0,0,.10);
+  }
+}
+:root[data-theme="light"] {
+  --bg: #D7DBDD; --fg: #14191C; --muted: #4C565B; --line: #B7BEC1; --card: #EBEDEE;
+  --accent: #0A8992; --code: #CDD2D4; --warn: #B4791E; --shadow: 0 6px 18px rgba(0,0,0,.10);
+}
+body { font-family: "Space Grotesk", system-ui, -apple-system, sans-serif; letter-spacing: -.005em; }
+h1, h2, h3 { letter-spacing: -.02em; }
+code, kbd { font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; }
+header.top .brand::after { content: " · ryry.ok1xoe.dev"; font-family: "JetBrains Mono", monospace; font-weight: 500;
+  font-size: .72em; color: var(--muted); }
+header.top .home { font-family: "JetBrains Mono", monospace; font-size: 13px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); margin-left: 8px; }
+header.top .home:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 640px) {
+  header.top .brand::after, header.top .ver { display: none; }
+  header.top .in { flex-wrap: wrap; }
+}
+/* narrow screens: wide tables and code scroll inside themselves, not the whole page */
+@media (max-width: 640px) {
+  table, pre { display: block; max-width: 100%; overflow-x: auto; }
+  img { max-width: 100%; height: auto; }
+  body { overflow-wrap: anywhere; }
+}

@@ -50,7 +50,7 @@ struct LanguageSection: View {
     private func saveTemplate() {
         guard let ref = library.reference() else { return }
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]; panel.nameFieldStringValue = "mmtty4mac-language.json"
+        panel.allowedContentTypes = [.json]; panel.nameFieldStringValue = "RYRY-language.json"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try LanguagePack.template(from: ref).encoded().write(to: url, options: .atomic)

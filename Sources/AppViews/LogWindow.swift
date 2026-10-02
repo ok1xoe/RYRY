@@ -11,7 +11,7 @@ import Localization
 @MainActor public func exportCabrillo(_ model: AppModel) {
     let p = NSSavePanel()
     let base = model.settings.contest.name.isEmpty ? "log" : model.settings.contest.name
-    p.nameFieldStringValue = "\(model.settings.station.call.isEmpty ? "mmtty4mac" : model.settings.station.call)-\(base).log"
+    p.nameFieldStringValue = "\(model.settings.station.call.isEmpty ? "RYRY" : model.settings.station.call)-\(base).log"
     p.allowedContentTypes = [UTType(filenameExtension: "log") ?? .plainText, UTType(filenameExtension: "cbr") ?? .plainText, .plainText]
     func picker(_ d: Date) -> NSDatePicker {
         let dp = NSDatePicker(); dp.datePickerStyle = .textFieldAndStepper
@@ -150,6 +150,15 @@ public struct LogWindow: View {
         .alert(L("Nahrávání"), isPresented: Binding(get: { uploadResult != nil }, set: { if !$0 { uploadResult = nil } })) {
             Button("OK") { uploadResult = nil }
         } message: { Text(uploadResult ?? "") }
+        // after the message about the file handed to TQSL: did TQSL send it? (only then are the QSOs marked)
+        .background(EmptyView().alert(L("Odeslali jste spojení v TQSL do LoTW?"),
+                                      // set is a no-op: SwiftUI calls it together with a button action, and a
+                                      // "not yet" from here could win the race and swallow a "Yes"
+                                      isPresented: Binding(get: { model.pendingLoTW != nil && uploadResult == nil },
+                                                           set: { _ in })) {
+            Button(L("Ano, označit jako nahraná")) { Task { await model.confirmLoTW(true) } }
+            Button(L("Zatím ne"), role: .cancel) { Task { await model.confirmLoTW(false) } }
+        } message: { Text(model.pendingLoTW?.file.lastPathComponent ?? "") })
         .frame(minWidth: 700, minHeight: 300)
     }
 

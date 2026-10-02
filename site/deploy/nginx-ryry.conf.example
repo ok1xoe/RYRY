@@ -1,0 +1,26 @@
+# HOSTOVÝ Nginx pro ryry.ok1xoe.dev – statický web ze složky (bez kontejneru, nic se nesestavuje).
+# Stejný postup jako u xoe-web (deploy/nginx/host-stage.conf.example):
+#   1) Nahraj obsah site/ do /var/www/ryry (viz site/README.md).
+#   2) Tenhle soubor jako /etc/nginx/sites-available/ryry.ok1xoe.dev, symlink do sites-enabled, `nginx -t && systemctl reload nginx`.
+#   3) DNS: A/AAAA záznam ryry.ok1xoe.dev na server.
+#   4) sudo certbot --nginx -d ryry.ok1xoe.dev → dopíše 443 ssl a přesměrování z HTTP.
+# `.dev` je HTTPS-only (HSTS preload) – bez certifikátu web neotevřeš, krok 4 není volitelný.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ryry.ok1xoe.dev;
+
+    root /var/www/ryry;
+    index index.html;
+
+    location / { try_files $uri $uri/ =404; }
+
+    # dlouhé cache pro písma a obrázky, HTML vždy čerstvé
+    location ~* \.(woff2|png|jpg|svg)$ { expires 30d; add_header Cache-Control "public"; }
+    location ~* \.(css|js)$ { expires 1d; }
+    location ~* \.html$ { add_header Cache-Control "no-cache"; }
+
+    gzip on;
+    gzip_types text/css application/javascript image/svg+xml;
+}

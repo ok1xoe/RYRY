@@ -335,7 +335,7 @@ public enum MMTTYImport {
             r.messages = list.isEmpty ? nil : list
         }
         if controlChars > 0 {
-            r.warnings.append(L("Makra a zprávy obsahovala řídicí znaky MMTTY _ ~ [ ] (%ld), které mmtty4mac nevysílá; odstraněny.", controlChars))
+            r.warnings.append(L("Makra a zprávy obsahovala řídicí znaky MMTTY _ ~ [ ] (%ld), které RYRY nevysílá; odstraněny.", controlChars))
         }
 
         // station: MMTTY stores only the call
@@ -415,7 +415,7 @@ public enum MMTTYImport {
         }
         r.ignoredKeyCount = ini.entries.filter { !consumed.contains(INIFile.id($0.section, $0.key)) }.count
         if r.ignoredKeyCount > 0 {
-            r.warnings.append(L("Ignorováno %ld nastavení bez protějšku v mmtty4mac (okna, písma, barvy, TNC, log…).", r.ignoredKeyCount))
+            r.warnings.append(L("Ignorováno %ld nastavení bez protějšku v RYRY (okna, písma, barvy, TNC, log…).", r.ignoredKeyCount))
         }
         if ini.duplicateKeys > 0 { r.warnings.append(L("Duplicitní klíče v souboru: %ld (platí první).", ini.duplicateKeys)) }
         if ini.ignoredLines > 0 { r.warnings.append(L("Nepochopené řádky v souboru: %ld.", ini.ignoredLines)) }

@@ -1,6 +1,7 @@
-# mmtty4mac
+# RYRY (mmtty4mac)
 
-A native macOS RTTY application based on MMTTY (JE3HHT, Makoto Mori).
+A native macOS RTTY application based on MMTTY (JE3HHT, Makoto Mori). Published on the Mac App Store as **RYRY**
+(website: https://ryry.ok1xoe.dev); this repository keeps its original name mmtty4mac.
 
 - Original sources: https://github.com/n5ac/mmtty (see http://mm-open.org)
 - Licence: GNU LGPL v3 (see COPYING and COPYING.LESSER)
@@ -60,16 +61,17 @@ Manual hardware tests: `docs/hardware-checklist.md`.
 - **fldigi XML-RPC** `http://127.0.0.1:7362/RPC2` – loggers that speak fldigi work without any change.
 - **JSON-RPC 2.0 / WebSocket** `ws://127.0.0.1:7363/v1` – with events (received text, state, AFC, rig, log).
 
-Details: `docs/api.md`. Settings: `~/Library/Application Support/mmtty4mac/settings.json`.
+Details: `docs/api.md`. Settings: `~/Library/Application Support/mmtty4mac/settings.json` for `rtty-tool`; the sandboxed
+app keeps them in `~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/`.
 
 ## The application (GUI)
 
-    ./scripts/make-app.sh          # builds build/mmtty4mac.app (signed with Developer ID / Apple Development, otherwise ad-hoc)
-    ./scripts/make-dmg.sh          # build/mmtty4mac-<version>.dmg (notarisation: docs/distribution.md)
-    open build/mmtty4mac.app
+    ./scripts/make-app.sh          # builds build/RYRY.app (RYRY, App Sandbox, signed with Apple Development, otherwise ad-hoc)
+    open build/RYRY.app
+    TEAM_ID=… ./scripts/release-appstore.sh   # App Store build and upload (docs/distribution.md, docs/appstore/README.md)
 
 On first launch macOS asks for microphone access (receiving from the radio) – grant it.
-With a stable signature (Apple Development / Developer ID) macOS remembers the permission; with an ad-hoc signature (`SIGN_ID=-`) it asks after every build.
+With a stable signature (Apple Development) macOS remembers the permission; with an ad-hoc signature (`SIGN_ID=-`) it asks after every build.
 Main window: waterfall (click = tune to mark), receive pane (click a word = call/name/RST into the QSO),
 transmit pane (by characters/words/lines), 16 macros F1–F12 and ⇧F1–⇧F4 (right click = edit, repeat = CQ loop),
 a QSO panel with previous QSOs and the DXCC entity, the Log window (⇧⌘L), Settings (⌘,). Keys: ⌘T TX/RX, Esc for immediate RX, ⌘L to log.
@@ -79,7 +81,7 @@ Further features from MMTTY:
 - sound card clock calibration in ppm (Settings → Audio → Measure; Core Audio measures the real frequency against the system clock);
 - contest mode: serial numbers, click a number in the receive pane = received number, Cabrillo 3.0 export (Log → Export Cabrillo…);
 - spectrum/waterfall range and gain (the menu in the corner of the spectrum), LTRS/FIGS indicator, UOS, J-BELL, timestamps, font size;
-- DXCC from `cty.dat` (AD1C; your own version can be placed in `~/Library/Application Support/mmtty4mac/cty.dat`), the `%g` greeting based on the other station's local time;
+- DXCC from `cty.dat` (AD1C; your own version can be placed in `Application Support/mmtty4mac/cty.dat` inside the app container), the `%g` greeting based on the other station's local time;
 - playing a WAV into the receive path (File → Play WAV into receive);
 - a message list (the "Messages" menu next to the transmit pane), macro button colours, demodulator scope (Window → Demodulator scope);
 - contest exchange formats RST + number, CQ/RJ (zone + QTH), BARTG (number + time), PED and WAE with the QTC exchange

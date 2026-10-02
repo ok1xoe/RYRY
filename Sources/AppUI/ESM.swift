@@ -45,8 +45,10 @@ public enum ESM {
     /// Groups of received fields: a group is complete once at least one of its fields is filled in.
     /// ARRL RTTY Roundup: W/VE send a state/province, everyone else a number → number OR state.
     public static func receivedGroups(_ c: ContestSettings) -> [[String]] {
-        let f = receivedFields(c)
-        if c.isRoundupStateExchange, Set(f) == ["serialRcvd", "exchangeRcvd"] { return [f] }
+        var f = receivedFields(c)
+        if c.receivesSerialOrCode, Set(f) == ["serialRcvd", "exchangeRcvd"] { return [f] }
+        // an optional text (TRC / PRO Digi member mark) does not block the QSO
+        if c.enabled, c.format == .serialText, c.selectedPreset?.textOptional == true { f.removeAll { $0 == "exchangeRcvd" } }
         return f.map { [$0] }
     }
 

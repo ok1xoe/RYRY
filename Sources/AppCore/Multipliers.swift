@@ -27,6 +27,12 @@ public enum MultiplierKind: String, Sendable, CaseIterable, Hashable, Codable {
     case continent
     /// OK DX RTTY: every OK/OL station.
     case okStation
+    /// A code from the received exchange (oblast, territory, province, DOK, year …) – the list or pattern is in the rule.
+    case region
+    /// Each station (base call) – WRT.
+    case station
+    /// The country of a club member (the received exchange carries the member mark) – TRC DIGI.
+    case memberCountry
 
     public var title: String {
         switch self {
@@ -39,6 +45,9 @@ public enum MultiplierKind: String, Sendable, CaseIterable, Hashable, Codable {
         case .waeCountry: return L("Země WAE")
         case .continent: return L("Kontinenty")
         case .okStation: return L("Stanice OK/OL")
+        case .region: return L("Oblasti")
+        case .station: return L("Stanice")
+        case .memberCountry: return L("Země členů")
         }
     }
 
@@ -62,7 +71,26 @@ public struct MultiplierComponent: Sendable, Equatable, Hashable {
     public var kind: MultiplierKind
     /// true = counted separately on every band, false = once per contest.
     public var perBand: Bool
-    public init(_ kind: MultiplierKind, perBand: Bool) { self.kind = kind; self.perBand = perBand }
+    /// Only stations of these countries count (cty.dat primary prefix); nil = all.
+    public var onlyCountries: Set<String>?
+    /// Stations of these countries do not count.
+    public var exceptCountries: Set<String>
+    /// Only stations on this continent count (NAQP: North American countries); nil = all.
+    public var continent: String?
+    public init(_ kind: MultiplierKind, perBand: Bool, only: Set<String>? = nil, except: Set<String> = [],
+                continent: String? = nil) {
+        self.kind = kind; self.perBand = perBand; onlyCountries = only; exceptCountries = except; self.continent = continent
+    }
+
+    /// The station's country passes the filters (an unknown country passes only without a filter).
+    func accepts(_ ci: CountryInfo?) -> Bool {
+        if onlyCountries == nil, exceptCountries.isEmpty, continent == nil { return true }
+        guard let ci else { return false }
+        if let o = onlyCountries, !o.contains(ci.primaryPrefix) { return false }
+        if exceptCountries.contains(ci.primaryPrefix) { return false }
+        if let k = continent, ci.continent != k { return false }
+        return true
+    }
 }
 
 /// Multiplier rules of a single contest.
@@ -84,8 +112,19 @@ public struct MultiplierRule: Sendable, Equatable {
     public var source: String
     /// Note about the contest for the Multipliers window.
     public var note: String = ""
+    /// `.region`: the valid codes (also the list of missing ones); nil = any code matching `regionPattern`.
+    public var regionCodes: [String]?
+    /// `.region` without a list: a regular expression for one word of the exchange (e.g. a year "^(19|20)[0-9]{2}$").
+    public var regionPattern: String?
+    /// Contest-specific names of the multiplier kinds ("Oblasti" → "Ruské oblasti").
+    public var titles: [MultiplierKind: String] = [:]
+    /// `.memberCountry`: the member mark in the received exchange ("TRC").
+    public var memberMark: String?
 
     public var hasMultipliers: Bool { !components.isEmpty }
+    public func title(_ k: MultiplierKind) -> String { titles[k] ?? k.title }
+    /// A finite set of values of a kind (the list of missing ones); nil = an open set.
+    public func universe(_ k: MultiplierKind) -> [String]? { k == .region ? regionCodes : k.universe }
     public func component(_ k: MultiplierKind) -> MultiplierComponent? { components.first { $0.kind == k } }
 
     /// Rules for the contest settings; nil = outside a contest or a custom (unrecognized) contest.
@@ -138,6 +177,128 @@ public struct MultiplierRule: Sendable, Equatable {
                                   bandWeights: ["80m": 4, "40m": 3, "20m": 2, "15m": 2, "10m": 2], verified: true,
                                   source: "https://www.darc.de/der-club/referate/conteste/wae-dx-contest/en/wae-rules/",
                                   note: L("RTTY: evropské i mimoevropské násobiče platí pro všechny stanice. Země WAE na každém pásmu, u W/VE/VK/ZL/ZS/JA/BY/PY a RA8/RA9/RA0 číselné oblasti. Váhy pásem: 80 m × 4, 40 m × 3, ostatní × 2."))
+        case .sartgNewYear:
+            let scandinavia = ["JW", "JX", "LA", "OH", "OH0", "OJ0", "OX", "OY", "OZ", "SM", "TF"]
+            return MultiplierRule(preset: p, components: [.init(.dxcc, perBand: true, except: Set(scandinavia)),
+                                                          .init(.callArea, perBand: true)],
+                                  callAreaCountries: scandinavia, verified: true,
+                                  unverifiedNote: L("Značka JW/JX/OX/OY/TF bez číslice – počítá se jako oblast 0."),
+                                  source: "http://www.sartg.com/contest/nyrules.htm",
+                                  note: L("Země DXCC kromě Skandinávie a skandinávské číselné oblasti (SM3, OH0 …) na každém pásmu."),
+                                  titles: [.callArea: L("Skandinávské oblasti")])
+        case .proDigi:
+            return MultiplierRule(preset: p, components: [.init(.wpxPrefix, perBand: true, except: ownCountry.map { [$0] } ?? [])],
+                                  verified: true,
+                                  unverifiedNote: L("Pravidla si odporují, zda se duplicita počítá na pásmu, nebo na pásmu a módu – počítá se pásmo a mód."),
+                                  source: "https://proradiocontestclub.com/PDC%20Rules.html",
+                                  note: L("Prefixy WPX na každém pásmu; prefixy vlastní země se nepočítají."))
+        case .bartgSprint, .bartgSprint75:
+            return MultiplierRule(preset: p, components: [.init(.dxcc, perBand: false), .init(.callArea, perBand: false),
+                                                          .init(.continent, perBand: false)],
+                                  callAreaCountries: jwvv, verified: true,
+                                  source: p == .bartgSprint ? "https://bartg.org.uk/bartg-sprint-contest/"
+                                                            : "https://bartg.org.uk/bartg-sprint75-contests/",
+                                  note: L("Země DXCC a oblasti JA/W/VE/VK jednou za závod; kontinenty jednou za závod (max. 6), ve skóre se násobí zvlášť."))
+        case .mexicoRTTY:
+            return MultiplierRule(preset: p, components: [.init(.region, perBand: true, only: ["XE"]), .init(.dxcc, perBand: true)],
+                                  verified: true,
+                                  unverifiedNote: L("Anglická a španělská pravidla se liší v bodech i v tom, zda země DXCC platí na každém pásmu – použita anglická verze, země na každém pásmu."),
+                                  source: "https://rtty.fmre.mx/reglas.html",
+                                  note: L("Mexické státy (z výměny XE stanic) a země DXCC na každém pásmu."),
+                                  regionCodes: ContestCodes.xeStates, titles: [.region: L("Mexické státy")])
+        case .naqpRTTY, .naSprintRTTY:
+            let perBand = p == .naqpRTTY
+            return MultiplierRule(preset: p, components: [.init(.region, perBand: perBand, only: ["K", "VE", "KH6", "KL"]),
+                                                          .init(.dxcc, perBand: perBand, except: ["K", "VE", "KL"], continent: "NA")],
+                                  verified: true,
+                                  source: perBand ? "https://www.ncjweb.com/NAQP-Rules.pdf" : "https://ncjweb.com/Sprint-Rules.pdf",
+                                  note: perBand ? L("Státy USA + DC, kanadské provincie a ostatní země Severní Ameriky na každém pásmu. Stanice mimo Severní Ameriku násobiče nedávají.")
+                                                : L("Státy USA + DC, kanadské provincie a ostatní země Severní Ameriky jednou za závod. Spojení DX–DX neplatí."),
+                                  regionCodes: ContestCodes.usStates50 + ContestCodes.veProvinces13,
+                                  titles: [.region: L("Státy a provincie"), .dxcc: L("Země Severní Ameriky")])
+        case .ybDX:
+            let yb = ownCountry == "YB"
+            return MultiplierRule(preset: p, components: [.init(.wpxPrefix, perBand: true, only: yb ? nil : ["YB"]),
+                                                          .init(.dxcc, perBand: true)],
+                                  verified: true,
+                                  unverifiedNote: L("Prefixy 7A–7I a 8A–8I se počítají jako prefixy WPX (7A1 …)."),
+                                  source: "https://rtty.ybdxcontest.com/",
+                                  note: yb ? L("Prefixy WPX a země DXCC na každém pásmu.")
+                                           : L("Indonéské prefixy (YB0–9, YC … , 7A–8I) a země DXCC na každém pásmu."),
+                                  titles: yb ? [:] : [.wpxPrefix: L("Prefixy YB")])
+        case .eaRTTY:
+            return MultiplierRule(preset: p, components: [.init(.dxcc, perBand: true),
+                                                          .init(.region, perBand: true, only: ["EA", "EA6", "EA8", "EA9"]),
+                                                          .init(.callArea, perBand: true)],
+                                  waeList: true, callAreaCountries: jwvv, verified: true,
+                                  unverifiedNote: L("Zda VO/VY patří do oblastí VE – pravidla neuvádějí, počítají se podle číslice prefixu."),
+                                  source: "https://concursos.ure.es/en/eartty/bases/",
+                                  note: L("Země EADX100 (DXCC + Shetlandy, Sicílie …), španělské provincie (a HQ = EA4URE) a oblasti W/VE/JA/VK na každém pásmu."),
+                                  regionCodes: ContestCodes.eaProvinces, titles: [.dxcc: L("Země EADX100"), .region: L("Provincie EA")])
+        case .igryWW:
+            return MultiplierRule(preset: p, components: [.init(.region, perBand: true)], verified: true,
+                                  source: "https://www.ig-ry.de/ig-ry-ww-contest",
+                                  note: L("Každý rok první licence (z výměny) na každém pásmu."),
+                                  regionPattern: "^(19|20)[0-9]{2}$", titles: [.region: L("Roky licence")])
+        case .spDX:
+            let ruBy: Set<String> = ["UA", "UA2", "UA9", "EU"]
+            return MultiplierRule(preset: p, components: [.init(.dxcc, perBand: true, except: ruBy),
+                                                          .init(.region, perBand: true, only: ["SP"]),
+                                                          .init(.continent, perBand: false, except: ruBy)],
+                                  verified: true,
+                                  unverifiedNote: L("Spojení s UA a EW se nepočítají (body ani násobiče); duplicita na pásmu z pravidel pro SWL."),
+                                  source: "https://pkrvg.org/strona,spdxrttyen.html",
+                                  note: L("Země DXCC (bez UA a EW) a polské powiaty na každém pásmu; kontinenty jednou za závod, ve skóre se násobí zvlášť."),
+                                  regionCodes: ContestCodes.spPowiats, titles: [.region: L("Powiaty SP")])
+        case .voltaRTTY:
+            let areas = ["K", "VE", "JA", "VK", "ZL"]
+            return MultiplierRule(preset: p, components: [.init(.dxcc, perBand: true, except: Set(areas + (ownCountry.map { [$0] } ?? []))),
+                                                          .init(.callArea, perBand: true)],
+                                  callAreaCountries: areas, verified: true,
+                                  unverifiedNote: L("Bonusový násobič za zemi jiného kontinentu na 4 pásmech se nepočítá."),
+                                  source: "https://www.contestvolta.it/rules.pdf",
+                                  note: L("Země DXCC na každém pásmu; u JA/W/VE/VK/ZL místo země číselné oblasti. Vlastní země násobič nedává."))
+        case .rookieRoundup:
+            return MultiplierRule(preset: p, components: [.init(.region, perBand: false)], verified: true,
+                                  unverifiedNote: L("Vzorec skóre pravidla výslovně neuvádějí – body × násobiče."),
+                                  source: "https://www.arrl.org/rookie-roundup",
+                                  note: L("Státy USA + DC, kanadské provincie, mexické oblasti XE1/XE2/XE3/XF1/XF4 a jednou „DX“ – vše jednou za závod."),
+                                  regionCodes: ContestCodes.usStates50 + ContestCodes.veProvinces13 + ["XE1", "XE2", "XE3", "XF1", "XF4", "DX"],
+                                  titles: [.region: L("QTH")])
+        case .russianRTTY, .russianDigi:
+            return MultiplierRule(preset: p, components: [.init(.region, perBand: true), .init(.dxcc, perBand: true)],
+                                  waeList: p == .russianRTTY, verified: true,
+                                  unverifiedNote: p == .russianDigi ? L("Aplikace jede jen RTTY – násobiče a duplicity „na pásmu a módu“ se počítají pro RTTY.") : "",
+                                  source: p == .russianRTTY ? "https://www.contest.ru/russian-ww-rtty-contest-rules-en/"
+                                                            : "http://www.rdrclub.ru/rdrc-news/russian-ww-digital-contest/51-rus-ww-digi-rules",
+                                  note: p == .russianRTTY ? L("Ruské oblasti (z výměny) a země DXCC + WAE na každém pásmu.")
+                                                          : L("Ruské oblasti (z výměny) a země DXCC na každém pásmu."),
+                                  regionCodes: ContestCodes.russianOblasts, titles: [.region: L("Ruské oblasti")])
+        case .urcDX:
+            return MultiplierRule(preset: p, components: [.init(.region, perBand: true)], verified: true,
+                                  unverifiedNote: L("Pravidla neuvádějí duplicitu – počítá se jednou na pásmu."),
+                                  source: "https://unicomradio.com/urc-dx-rtty-contest/",
+                                  note: L("Každé teritorium URC (z výměny, např. BHE, MOR, SLA) na každém pásmu; MMS se nepočítá."),
+                                  regionCodes: ContestCodes.urcTerritories, titles: [.region: L("Teritoria URC")])
+        case .darcSprint:
+            return MultiplierRule(preset: p, components: [.init(.region, perBand: true, only: ["DL"]), .init(.wpxPrefix, perBand: true)],
+                                  verified: true,
+                                  unverifiedNote: L("DOK se rozpoznává ve tvaru písmeno + 2 číslice (B01); zvláštní DOKy jinak. „Prefix“ podle WPX."),
+                                  source: "https://www.darc.de/der-club/referate/conteste/rtty-kurz/darc-rtty-contest-english-version/darc-rtty-rules/",
+                                  note: L("DOKy (z výměny DL stanic, NM se nepočítá) a prefixy na každém pásmu."),
+                                  regionPattern: "^[A-Z][0-9]{2}$", titles: [.region: "DOK"])
+        case .trcDigi:
+            return MultiplierRule(preset: p, components: [.init(.dxcc, perBand: true), .init(.memberCountry, perBand: true)],
+                                  verified: true,
+                                  unverifiedNote: L("Pravidla neuvádějí duplicitu – počítá se jednou na pásmu."),
+                                  source: "https://trcdx.org/rules-trc-digi/",
+                                  note: L("Země DXCC a země stanic TRC (výměna s „TRC“) na každém pásmu."),
+                                  titles: [.memberCountry: L("Země členů TRC")], memberMark: "TRC")
+        case .wrt:
+            return MultiplierRule(preset: p, components: [.init(.station, perBand: false)], verified: true,
+                                  unverifiedNote: L("Vzorec skóre a duplicita nejsou v pravidlech výslovně – body × různé značky, jednou na pásmu (modul N1MM)."),
+                                  source: "https://radiosport.world/wrt.html",
+                                  note: L("Každá značka jednou za závod."))
         case .okDXRTTY:
             let ok = ownCountry == "OK"
             return MultiplierRule(preset: p, components: ok ? [.init(.dxcc, perBand: true)]
@@ -203,7 +364,7 @@ public struct MultiplierTally: Sendable, Equatable {
 
     /// Missing values (finite sets only), sorted.
     public func missing(_ kind: MultiplierKind, band: String?) -> [String]? {
-        guard let u = kind.universe else { return nil }
+        guard let u = rule.universe(kind) else { return nil }
         let w = worked(kind, band: band)
         return u.filter { !w.contains($0) }
     }
@@ -259,7 +420,7 @@ public struct MultiplierCalculator: Sendable {
         guard !c.isEmpty, rule.hasMultipliers else { return [] }
         let dx = lookup(c, false)
         var out: [MultiplierHit] = []
-        for comp in rule.components {
+        for comp in rule.components where comp.accepts(comp.kind == .dxcc && rule.waeList ? lookup(c, true) : dx) {
             switch comp.kind {
             case .dxcc:
                 let ci = rule.waeList ? lookup(c, true) : dx
@@ -285,6 +446,12 @@ public struct MultiplierCalculator: Sendable {
                 if let k = dx?.continent, !k.isEmpty { out.append(.init(.continent, k)) }
             case .okStation:
                 if dx?.primaryPrefix == "OK" { out.append(.init(.okStation, QSORecord.baseCall(c))) }
+            case .region:
+                if let r = region(in: exchange) { out.append(.init(.region, r)) }
+            case .station:
+                out.append(.init(.station, QSORecord.baseCall(c)))
+            case .memberCountry:
+                if let m = rule.memberMark, Multipliers.hasMark(m, in: exchange), let dx { out.append(.init(.memberCountry, dx.primaryPrefix)) }
             }
         }
         return out
@@ -302,6 +469,17 @@ public struct MultiplierCalculator: Sendable {
         default: name = country.primaryPrefix
         }
         return name + String(d)
+    }
+
+    /// The first word of the exchange that is a valid region code (from the list, otherwise by the pattern).
+    func region(in exchange: String?) -> String? {
+        let words = Multipliers.tokens(exchange)
+        if let codes = rule.regionCodes {
+            let set = Set(codes)
+            return words.first { set.contains($0) }
+        }
+        guard let p = rule.regionPattern, let re = try? NSRegularExpression(pattern: p) else { return nil }
+        return words.first { re.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil }
     }
 
     public func hits(_ r: QSORecord) -> [MultiplierHit] { hits(call: r.call, exchange: r.exchangeRcvd, zone: r.cqZone) }
@@ -331,6 +509,13 @@ public enum Multipliers {
     static let aliases: [String: String] = ["NWT": "NT", "NF": "NL", "NFL": "NL", "NFLD": "NL", "PEI": "PE", "PQ": "QC",
                                             "YK": "YT", "LAB": "LB"]
     private static let stateSet = Set(usStates), provinceSet = Set(veProvinces)
+
+    /// The exchange carries the mark ("TRC", "M") as a word or right after the number ("001TRC", "001M").
+    public static func hasMark(_ mark: String, in exchange: String?) -> Bool {
+        tokens(exchange).contains { t in
+            t == mark || (t.hasSuffix(mark) && t.dropLast(mark.count).allSatisfy(\.isNumber) && t.count > mark.count)
+        }
+    }
 
     static func tokens(_ s: String?) -> [String] {
         (s ?? "").uppercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)

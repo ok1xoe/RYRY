@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RYRY — Podpora</title>
+<meta name="description" content="Pomoc s RYRY, aplikací pro RTTY na macOS: zvuk, PTT, ovládání rádia, LoTW, složka logu a přechod z mmtty4mac.">
+<meta name="theme-color" content="#0A0C0E">
+<link rel="icon" href="../img/icon-64.png">
+<link rel="alternate" hreflang="en" href="https://ryry.ok1xoe.dev/support.html">
+<link rel="stylesheet" href="../css/site.css">
+<link rel="stylesheet" href="../css/ryry.css">
+</head>
+<body data-page="support" data-lang="cs" data-root="..">
+<div id="site-head"></div>
+<main class="shell doc">
+  <div class="silk silk-sig">Podpora</div>
+  <h1>Pomoc s RYRY</h1>
+  <p>Začněte <a href="../manual/cs/index.html">příručkou</a> – popisuje první nastavení, ovládání rádia, příjem,
+    vysílání, závody i API pro loggery. Když něco nefunguje, většinu potíží vyřeší odpovědi níže.</p>
+
+  <h2>Časté dotazy</h2>
+  <div class="faq">
+    <details class="faceplate"><summary>Ve vodopádu nevidím žádný signál.</summary>
+      <p>Nastavení → Zvuk: zvolte vstup USB zvukové karty rádia (např. „USB Audio CODEC“) a zkontrolujte úroveň v horní
+        liště. Poprvé se macOS zeptá na přístup k mikrofonu – pokud jste ho odmítli, povolte RYRY v Nastavení systému →
+        Soukromí a zabezpečení → Mikrofon. Bez rádia vyzkoušejte Nápověda → Přehrát ukázkový signál.</p></details>
+    <details class="faceplate"><summary>Rádio nevysílá (PTT).</summary>
+      <p>Nastavení → PTT / FSK: zvolte RTS nebo DTR na sériovém portu interfacu, nebo PTT přes CAT, když rig ovládáte
+        přes CAT. Port CAT nejde sdílet s PTT přes RTS/DTR.</p></details>
+    <details class="faceplate"><summary>Jak ovládat rádio?</summary>
+      <p>Nastavení → Rig: „CAT přes USB (vestavěný)“ pro Icom, Yaesu, Kenwood a Elecraft. Pro ostatní rádia spusťte
+        hamlib sami, např. <code>rigctld -m &lt;model&gt; -r /dev/cu.X -s &lt;rychlost&gt;</code>, a zvolte
+        „hamlib rigctld (síť)“, nebo použijte flrig. Verze z App Store neumí rigctld spustit sama.</p></details>
+    <details class="faceplate"><summary>Jak funguje nahrávání do LoTW?</summary>
+      <p>Zapněte LoTW v Nastavení → Online a v okně Log klikněte na L. RYRY uloží dosud nenahraná spojení do složky
+        Stažené soubory a otevře soubor v TrustedQSL, kde ho podepíšete a odešlete (certifikát a Station Location
+        se nastavují v TQSL). Pak odeslání potvrďte v RYRY a spojení se označí jako nahraná.</p></details>
+    <details class="faceplate"><summary>Kde je můj log?</summary>
+      <p>Ve složce uvedené v Nastavení → API a log (výchozí <code>~/Documents/RYRY</code>): soubor JSONL a soubor ADIF,
+        který přečte každý logger. macOS pustí RYRY do složky až po tom, co ji vyberete, proto se RYRY jednou zeptá
+        a přístup si zapamatuje. Pokud jste přístup odmítli, log je v kontejneru aplikace – kde přesně, řekne zpráva
+        ve stavovém řádku.</p></details>
+    <details class="faceplate"><summary>Používal jsem mmtty4mac. Co se stane s nastavením?</summary>
+      <p>RYRY je nové jméno mmtty4mac. Při prvním spuštění se nastavení přenese samo a RYRY se jednou zeptá na přístup
+        ke složce s logem (obvykle <code>~/Documents/mmtty4mac</code>). Hesla a API klíče online služeb jsou v Klíčence
+        a bude je možná potřeba zadat znovu.</p></details>
+    <details class="faceplate"><summary>Můj logger RYRY nevidí.</summary>
+      <p>V loggeru zvolte „fldigi“: RYRY odpovídá na XML-RPC fldigi na portu 7362. V Nastavení → API a log zkontrolujte,
+        že je API fldigi zapnuté. Ve výchozím stavu naslouchá jen na tomto Macu.</p></details>
+  </div>
+
+  <h2>Kontakt</h2>
+  <p>Napište na <a href="mailto:tomas.kaplan@gmail.com">tomas.kaplan@gmail.com</a> (Tomáš Kaplan, OK1XOE) – česky
+    i anglicky. Uveďte prosím verzi macOS, verzi RYRY (RYRY → O aplikaci RYRY) a své rádio a interface.</p>
+  <p>Našli jste chybu nebo chcete novou funkci? Založte issue na
+    <a href="https://github.com/ok1xoe/mmtty4mac/issues">GitHubu</a>.</p>
+</main>
+<div id="site-foot"></div>
+<script src="../js/site.js"></script>
+</body>
+</html>

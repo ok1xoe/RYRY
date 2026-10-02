@@ -19,18 +19,6 @@ final class MockHTTP: HTTPClient, @unchecked Sendable {
     var bodyText: String { String(decoding: requests.last?.httpBody ?? Data(), as: UTF8.self) }
 }
 
-final class MockRunner: ProcessRunner, @unchecked Sendable {
-    var result: Result<ProcessResult, Error>
-    private(set) var calls: [(String, [String])] = []
-    private(set) var fileContent: String?
-    init(_ r: Result<ProcessResult, Error>) { result = r }
-    func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> ProcessResult {
-        calls.append((executable, arguments))
-        if let f = arguments.last { fileContent = try? String(contentsOfFile: f, encoding: .utf8) }
-        return try result.get()
-    }
-}
-
 func rec(_ call: String, hz: Double? = 14_080_000, t: TimeInterval = 1_790_000_000) -> QSORecord {
     var r = QSORecord(call: call, timeOn: Date(timeIntervalSince1970: t))
     r.frequency = hz; r.rstSent = "599"; r.rstRcvd = "599"
@@ -140,60 +128,25 @@ func clublog(_ http: MockHTTP) -> ClubLogUploader {
     await #expect(throws: UploadError.network("offline")) { _ = try await clublog(net).upload([rec("OK1A")]) }
 }
 
-// MARK: LoTW / TQSL
+// MARK: LoTW (hand-off to TrustedQSL)
 
-@Test func tqslArgumentsAndTempFile() async throws {
-    let runner = MockRunner(.success(ProcessResult(status: 0, output: "Final Status: Success (0)")))
-    let up = LoTWUploader(runner: runner, tqslPath: "/fake/tqsl", location: "Doma OK1XOE", isExecutable: { $0 == "/fake/tqsl" })
-    let o = try await up.upload([rec("OK1A"), rec("OK1B")])
-    #expect(o.uploadedIDs.count == 2)
-    let (exe, args) = runner.calls[0]
-    #expect(exe == "/fake/tqsl")
-    #expect(Array(args.dropLast()) == ["-d", "-q", "-u", "-a", "compliant", "-l", "Doma OK1XOE", "-x"])
-    #expect(args.last!.hasSuffix(".adi"))
-    #expect(runner.fileContent?.contains("<CALL:4>OK1B") == true)
-    #expect(!FileManager.default.fileExists(atPath: args.last!))       // the temporary file was deleted
+@Test func lotwExportWritesADIFWithEligibleQSOs() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("lotw-\(UUID())")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let fixed = Date(timeIntervalSince1970: 1_790_000_000)
+    let r = try LoTWExport(directory: dir, now: { fixed }).write([rec("OK1A"), rec("DL1B", hz: nil)], logName: "cqww")
+    #expect(r.file.lastPathComponent == "cqww-lotw-20260921-141320.adi")
+    #expect(r.ids.count == 1 && r.skipped == 1)
+    let text = try String(contentsOf: r.file, encoding: .utf8)
+    #expect(text.contains("<CALL:4>OK1A") && !text.contains("DL1B"))
 }
 
-@Test func tqslExitCodes() async throws {
-    func run(_ code: Int32, out: String = "") async throws -> UploadOutcome {
-        let up = LoTWUploader(runner: MockRunner(.success(ProcessResult(status: code, output: out))), tqslPath: "/fake/tqsl",
-                              location: "L", isExecutable: { _ in true })
-        return try await up.upload([rec("OK1A")])
-    }
-    for ok: Int32 in [0, 8, 9, 14] { #expect(try await run(ok).uploadedIDs.count == 1) }
-    for bad: Int32 in [1, 2, 4, 11] {
-        do { _ = try await run(bad, out: "x\n12:00:00 PM: Final Status: LoTW Connection error (11)\n"); Issue.record("mělo selhat \(bad)") }
-        catch let UploadError.tqsl(code, message) { #expect(code == Int(bad) && message == "LoTW Connection error (11)") }
-    }
-}
-
-@Test func tqslMissingBinaryAndLocation() async {
-    let none = LoTWUploader(runner: MockRunner(.success(ProcessResult(status: 0, output: ""))), tqslPath: "/nope/tqsl",
-                            location: "L", isExecutable: { _ in false })
-    await #expect(throws: UploadError.tqslNotFound) { _ = try await none.upload([rec("OK1A")]) }
-    let noLoc = LoTWUploader(runner: MockRunner(.success(ProcessResult(status: 0, output: ""))), tqslPath: nil,
-                             location: " ", isExecutable: { _ in true })
-    await #expect(throws: UploadError.self) { _ = try await noLoc.upload([rec("OK1A")]) }
-}
-
-@Test func systemRunnerReportsMissingExecutable() async {
-    await #expect(throws: UploadError.tqslNotFound) {
-        _ = try await SystemProcessRunner().run(executable: "/nonexistent/tqsl", arguments: [], timeout: 5)
-    }
-}
-
-@Test func systemRunnerCapturesExitStatus() async throws {
-    let r = try await SystemProcessRunner().run(executable: "/bin/sh", arguments: ["-c", "echo hi; exit 9"], timeout: 5)
-    #expect(r.status == 9 && r.output.contains("hi"))
-}
-
-@Test func locatorOrderCustomThenStandardThenPath() {
-    let seen: Set<String> = ["/custom/tqsl", "/opt/x/tqsl", "/Applications/TrustedQSL/tqsl.app/Contents/MacOS/tqsl"]
-    #expect(TQSLLocator.find(custom: "/custom/tqsl", path: "/opt/x", isExecutable: seen.contains) == "/custom/tqsl")
-    #expect(TQSLLocator.find(custom: nil, path: "/opt/x", isExecutable: seen.contains) == "/Applications/TrustedQSL/tqsl.app/Contents/MacOS/tqsl")
-    #expect(TQSLLocator.find(custom: "", path: "/opt/x", isExecutable: { $0 == "/opt/x/tqsl" }) == "/opt/x/tqsl")
-    #expect(TQSLLocator.find(custom: nil, path: "", isExecutable: { _ in false }) == nil)
+@Test func lotwExportNeverOverwritesAnEarlierFile() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("lotw-\(UUID())")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let e = LoTWExport(directory: dir, now: { Date(timeIntervalSince1970: 1_790_000_000) })
+    let a = try e.write([rec("OK1A")], logName: "x"), b = try e.write([rec("OK1B")], logName: "x")
+    #expect(a.file != b.file && FileManager.default.fileExists(atPath: a.file.path))
 }
 
 // MARK: Keychain

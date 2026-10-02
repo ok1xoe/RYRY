@@ -148,9 +148,9 @@ public final class FldigiXMLRPCServer: @unchecked Sendable {
         switch m {
         case "fldigi.list":
             return .array(Self.methods.map { .dict(["name": .string($0.0), "signature": .string($0.1), "help": .string($0.2)]) })
-        case "fldigi.name": return .string("mmtty4mac")
+        case "fldigi.name": return .string("RYRY")
         case "fldigi.version": return .string(Self.version)
-        case "fldigi.name_version": return .string("mmtty4mac-\(Self.version)")
+        case "fldigi.name_version": return .string("RYRY-\(Self.version)")
         case "fldigi.version_struct": return .dict(["major": .int(0), "minor": .int(1), "patch": .string("0")])
 
         case "main.get_trx_status":

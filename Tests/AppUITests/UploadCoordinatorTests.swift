@@ -17,11 +17,15 @@ private final class FakeHTTP: HTTPClient, @unchecked Sendable {
     }
 }
 
-private struct FakeRunner: ProcessRunner {
-    let status: Int32
-    func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> ProcessResult {
-        ProcessResult(status: status, output: "Final Status: test (\(status))")
-    }
+private struct FakeOpener: TQSLOpener {
+    let ok: Bool
+    func open(_ file: URL) async -> Bool { ok }
+}
+
+private func downloadsDir() -> URL {
+    let d = FileManager.default.temporaryDirectory.appendingPathComponent("dl-\(UUID())")
+    try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+    return d
 }
 
 private func makeLog() async throws -> (QSOLogStore, [QSORecord]) {
@@ -40,7 +44,7 @@ private func settings(_ f: (inout AppSettings) -> Void) -> AppSettings {
     var s = AppSettings(); s.station.call = "ok1xoe"
     s.upload.eqslEnabled = true; s.upload.eqslUser = "OK1XOE"
     s.upload.clublogEnabled = true; s.upload.clublogEmail = "a@b.cz"
-    s.upload.lotwEnabled = true; s.upload.lotwLocation = "Home"
+    s.upload.lotwEnabled = true
     f(&s); return s
 }
 
@@ -55,7 +59,7 @@ private func secrets() throws -> UploadMemoryStore {
 @Test func eqslUploadMarksRecordsAndSecondRunHasNothingToDo() async throws {
     let (log, _) = try await makeLog()
     let http = FakeHTTP(200, "Result: 3 out of 3 records added")
-    let c = UploadCoordinator(http: http, runner: FakeRunner(status: 0), secrets: try secrets())
+    let c = UploadCoordinator(http: http, secrets: try secrets())
     let msg = try await c.uploadPending(.eqsl, settings: settings { _ in }, log: log)
     #expect(msg.contains("3"))
     #expect(await log.records.allSatisfy { $0.isUploaded(.eqsl) && !$0.isUploaded(.lotw) })
@@ -65,29 +69,42 @@ private func secrets() throws -> UploadMemoryStore {
 
 @Test func failedUploadLeavesStateUntouched() async throws {
     let (log, _) = try await makeLog()
-    let c = UploadCoordinator(http: FakeHTTP(403, "no"), runner: FakeRunner(status: 0), secrets: try secrets())
+    let c = UploadCoordinator(http: FakeHTTP(403, "no"), secrets: try secrets())
     await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.clublog, settings: settings { _ in }, log: log) }
     #expect(await log.records.allSatisfy { $0.uploads == nil })
 }
 
 @Test func disabledServiceOrMissingSecretsAreErrors() async throws {
     let (log, _) = try await makeLog()
-    let c = UploadCoordinator(http: FakeHTTP(200, "OK"), runner: FakeRunner(status: 0), secrets: UploadMemoryStore())
+    let c = UploadCoordinator(http: FakeHTTP(200, "OK"), secrets: UploadMemoryStore())
     await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.eqsl, settings: settings { $0.upload.eqslEnabled = false }, log: log) }
     await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.eqsl, settings: settings { _ in }, log: log) }   // without a password
     await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.clublog, settings: settings { _ in }, log: log) }
 }
 
-@Test func lotwViaRunnerMarksRecords() async throws {
+@Test func lotwIsPreparedForTQSLAndNothingIsMarkedUntilConfirmed() async throws {
     let (log, _) = try await makeLog()
-    let c = UploadCoordinator(http: FakeHTTP(200, ""), runner: FakeRunner(status: 0), secrets: UploadMemoryStore(), isExecutable: { _ in true })
-    _ = try await c.uploadPending(.lotw, settings: settings { _ in }, log: log)
-    #expect(await log.records.allSatisfy { $0.isUploaded(.lotw) })
-    let bad = UploadCoordinator(http: FakeHTTP(200, ""), runner: FakeRunner(status: 2), secrets: UploadMemoryStore(), isExecutable: { _ in true })
-    let (log2, _) = try await makeLog()
-    await #expect(throws: UploadError.self) { _ = try await bad.uploadPending(.lotw, settings: settings { _ in }, log: log2) }
-    let none = UploadCoordinator(http: FakeHTTP(200, ""), runner: FakeRunner(status: 0), secrets: UploadMemoryStore(), isExecutable: { _ in false })
-    await #expect(throws: UploadError.tqslNotFound) { _ = try await none.uploadPending(.lotw, settings: settings { $0.upload.lotwTqslPath = "/x/tqsl" }, log: log2) }
+    let c = UploadCoordinator(http: FakeHTTP(200, ""), secrets: UploadMemoryStore(), tqsl: FakeOpener(ok: true), downloads: downloadsDir())
+    let h = try #require(try await c.prepareLoTW(settings: settings { _ in }, log: log, logName: "cq"))
+    #expect(h.openedInTQSL && h.ids.count == 3 && FileManager.default.fileExists(atPath: h.file.path))
+    #expect(await log.records.allSatisfy { !$0.isUploaded(.lotw) })
+    await #expect(throws: UploadError.self) { _ = try await c.uploadPending(.lotw, settings: settings { _ in }, log: log) }
+}
+
+@Test func lotwWithoutTQSLStillWritesTheFileAndMarksNothing() async throws {
+    let (log, _) = try await makeLog()
+    let c = UploadCoordinator(http: FakeHTTP(200, ""), secrets: UploadMemoryStore(), tqsl: FakeOpener(ok: false), downloads: downloadsDir())
+    let h = try #require(try await c.prepareLoTW(settings: settings { _ in }, log: log, logName: "cq"))
+    #expect(!h.openedInTQSL && FileManager.default.fileExists(atPath: h.file.path))
+    #expect(await log.records.allSatisfy { !$0.isUploaded(.lotw) })
+}
+
+@Test func lotwWithNothingPendingOrDisabledPreparesNothing() async throws {
+    let (log, recs) = try await makeLog()
+    let c = UploadCoordinator(http: FakeHTTP(200, ""), secrets: UploadMemoryStore(), tqsl: FakeOpener(ok: true), downloads: downloadsDir())
+    await #expect(throws: UploadError.self) { _ = try await c.prepareLoTW(settings: settings { $0.upload.lotwEnabled = false }, log: log, logName: "cq") }
+    try await log.markUploaded(ids: recs.map(\.id), target: .lotw)
+    #expect(try await c.prepareLoTW(settings: settings { _ in }, log: log, logName: "cq") == nil)
 }
 
 @Test func autoFlagRequiresEnabledAndDefaultsOff() {
@@ -97,6 +114,8 @@ private func secrets() throws -> UploadMemoryStore {
     #expect(!UploadCoordinator.isAuto(.eqsl, s))
     s.eqslEnabled = true
     #expect(UploadCoordinator.isAuto(.eqsl, s) && !UploadCoordinator.isAuto(.lotw, s))
+    s.lotwEnabled = true
+    #expect(!UploadCoordinator.isAuto(.lotw, s))                     // LoTW needs the user in TQSL - never automatic
 }
 
 @Test func uploadSettingsTolerantDecodeAndRoundTrip() throws {

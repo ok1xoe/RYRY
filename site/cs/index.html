@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RYRY — RTTY přes zvukovou kartu pro macOS</title>
+<meta name="description" content="RYRY přijímá a vysílá RTTY přes zvukovou kartu Macu: demodulátor MMTTY, bodování závodů, band mapa, DX cluster a API kompatibilní s fldigi. Zdarma v Mac App Store.">
+<meta name="theme-color" content="#0A0C0E">
+<link rel="icon" href="../img/icon-64.png">
+<link rel="alternate" hreflang="en" href="https://ryry.ok1xoe.dev/">
+<link rel="stylesheet" href="../css/site.css">
+<link rel="stylesheet" href="../css/ryry.css">
+</head>
+<body data-page="index" data-lang="cs" data-root="..">
+<div id="site-head"></div>
+
+<section class="hero">
+  <canvas id="scope" aria-hidden="true"></canvas>
+  <div class="shell">
+    <div class="kick"><span class="led" aria-hidden="true"></span><span class="silk">Mac App Store · Zdarma · macOS 14+</span></div>
+    <div class="brand">
+      <img src="../img/icon-512.png" alt="Ikona aplikace RYRY" width="150" height="150">
+      <h1 class="wordmark">RYRY</h1>
+    </div>
+    <p class="claim"><b>RTTY pro macOS</b> přes zvukovou kartu — postavené na demodulátoru MMTTY, dělané pro závody.</p>
+    <div class="ctas">
+      <!-- po schválení nahraď #appstore adresou https://apps.apple.com/app/id<číslo> (site/README.md) -->
+      <a class="btn btn-accent btn-store" href="#appstore" id="appstore"><span class="small">Stáhnout z</span><span class="big">Mac App Store</span></a>
+      <a class="btn" href="../manual/cs/index.html">Příručka <span class="arw" aria-hidden="true">→</span></a>
+    </div>
+    <div class="readout">
+      <div class="cell"><div class="n">45,45</div><div class="k">Bd Baudot, až 110</div></div>
+      <div class="cell"><div class="n">170 Hz</div><div class="k">shift, i jakýkoli jiný</div></div>
+      <div class="cell"><div class="n">9</div><div class="k">předvoleb RTTY závodů</div></div>
+      <div class="cell"><div class="n">2</div><div class="k">API pro váš logger</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="shell">
+    <div class="sec-head">
+      <div class="eyebrow"><span class="silk">Funkce</span></div>
+      <h2>Všechno, co RTTY stanice potřebuje.</h2>
+      <p class="sub">Od prvního CQ po soubor Cabrillo – příjem, vysílání, log i skóre, s rádiem na USB kabelu a zvukovou kartou Macu.</p>
+    </div>
+    <div class="rack-label"><span class="silk silk-sig">Rack A — Signál</span><span class="ln"></span></div>
+    <div class="rack">
+      <div class="module static"><div><div class="cat">Příjem</div><div class="head"><h3>Demodulátor MMTTY</h3></div></div>
+        <div class="screen"><ul><li>Demodulátory IIR, FIR, PLL a FFT, AFC, ATC</li><li>Squelch, zářez (notch) a LMS filtr</li><li>Druhý dekodér a dekódování více kanálů</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">45,45–110 Bd</span><span class="conn">libovolný shift</span></span></div></div>
+      <div class="module static"><div><div class="cat">Vysílání</div><div class="head"><h3>AFSK nebo FSK</h3></div></div>
+        <div class="screen"><ul><li>AFSK přes zvukovou kartu, FSK přes USB sériový port</li><li>PTT přes RTS/DTR nebo CAT</li><li>Makra F1–F12 s proměnnými MMTTY</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">RTS/DTR</span><span class="conn">CAT PTT</span></span></div></div>
+      <div class="module static"><div><div class="cat">Ladění</div><div class="head"><h3>Spektrum a vodopád</h3></div></div>
+        <div class="screen"><ul><li>Kliknutím naladíte, pravým tlačítkem zářez</li><li>Křížový indikátor XY a scope demodulátoru</li><li>Spoty jako popisky ve vodopádu</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">XY scope</span><span class="conn">popisky pásma</span></span></div></div>
+    </div>
+    <div class="rack-label"><span class="silk silk-sig">Rack B — Provoz</span><span class="ln"></span></div>
+    <div class="rack">
+      <div class="module static"><div><div class="cat">Závody</div><div class="head"><h3>Skóre a ESM</h3></div></div>
+        <div class="screen"><ul><li>ARRL RU, CQ WPX, CQ WW, BARTG, SARTG, Makrothen, JARTS, WAE, OK DX</li><li>Enter Sends Message, duplicity, Super Check Partial</li><li>Násobiče, skóre po pásmech, QTC pro WAE, Cabrillo</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">Cabrillo</span><span class="conn">MASTER.SCP</span></span></div></div>
+      <div class="module static"><div><div class="cat">Spoty</div><div class="head"><h3>Band mapa a DX cluster</h3></div></div>
+        <div class="screen"><ul><li>DX cluster a Reverse Beacon Network</li><li>Filtry pásem a módů</li><li>Upozornění: vaše značka, hledané stanice, nové země</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">telnet</span><span class="conn">RBN</span></span></div></div>
+      <div class="module static"><div><div class="cat">Log</div><div class="head"><h3>Log ADIF a callbook</h3></div></div>
+        <div class="screen"><ul><li>Log ADIF čitelný každým loggerem</li><li>QRZ.com / HamQTH, DXCC, azimut</li><li>eQSL, Club Log, LoTW přes TrustedQSL</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">ADIF</span><span class="conn">eQSL</span><span class="conn">Club Log</span></span></div></div>
+    </div>
+    <div class="rack-label"><span class="silk silk-sig">Rack C — Propojení</span><span class="ln"></span></div>
+    <div class="rack">
+      <div class="module static"><div><div class="cat">Rádio</div><div class="head"><h3>Ovládání rigu</h3></div></div>
+        <div class="screen"><ul><li>Vestavěný CAT: Icom, Yaesu, Kenwood, Elecraft</li><li>hamlib rigctld a flrig po síti</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">CI-V</span><span class="conn">rigctld</span><span class="conn">flrig</span></span></div></div>
+      <div class="module static"><div><div class="cat">API pro logger</div><div class="head"><h3>Tváří se jako fldigi</h3></div></div>
+        <div class="screen"><ul><li>fldigi XML-RPC pro RUMlogNG, MacLoggerDX…</li><li>JSON-RPC přes WebSocket s průběžnými událostmi</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">:7362</span><span class="conn">:7363</span></span></div></div>
+      <div class="module static"><div><div class="cat">Vyzkoušejte</div><div class="head"><h3>Bez rádia</h3></div></div>
+        <div class="screen"><ul><li>Nápověda → Přehrát ukázkový signál dekóduje závodní spojení</li><li>Přehrávání a nahrávání WAV</li><li>Import maker a nastavení z MMTTY pro Windows</li></ul></div>
+        <div class="foot"><span class="connectors"><span class="conn">WAV</span><span class="conn">MMTTY.ini</span></span></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="shell"><hr class="divider"></div>
+
+<section id="screens">
+  <div class="shell">
+    <div class="sec-head">
+      <div class="eyebrow"><span class="silk">Na obrazovce</span></div>
+      <h2>Jedno okno pro celé spojení.</h2>
+    </div>
+    <div class="screens">
+      <figure class="faceplate shot"><img src="../manual/img/cs-main.png" alt="Hlavní okno RYRY: spektrum, vodopád, příjem, makra a panel QSO" loading="lazy">
+        <figcaption>Spektrum a vodopád, přijatý text, makra a panel QSO s údaji z callbooku a předchozími spojeními.</figcaption></figure>
+      <div class="row3">
+        <figure class="faceplate shot"><img src="../manual/img/cs-score.png" alt="Okno skóre závodu" loading="lazy"><figcaption>Skóre závodu a násobiče po pásmech.</figcaption></figure>
+        <figure class="faceplate shot"><img src="../manual/img/en-spots.png" alt="Okno spotů z DX clusteru" loading="lazy"><figcaption>Spoty z DX clusteru a RBN s filtry.</figcaption></figure>
+        <figure class="faceplate shot"><img src="../manual/img/en-bandmap.png" alt="Band mapa" loading="lazy"><figcaption>Band mapa se spoty a polohou rigu.</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="shell"><hr class="divider"></div>
+
+<section id="requirements">
+  <div class="shell">
+    <div class="sec-head">
+      <div class="eyebrow"><span class="silk">Požadavky</span></div>
+      <h2>Co budete potřebovat.</h2>
+    </div>
+    <div class="faceplate patchbay">
+      <div class="grp"><div class="silk">Mac</div><div class="chips"><span class="chip key">macOS 14 Sonoma nebo novější</span><span class="chip">Apple silicon i Intel</span></div></div>
+      <div class="grp"><div class="silk">Stanice</div><div class="chips"><span class="chip">KV transceiver</span><span class="chip">USB zvuk (vestavěný nebo interface)</span><span class="chip">USB kabel pro CAT (volitelně)</span><span class="chip">k vysílání radioamatérská licence</span></div></div>
+      <div class="grp"><div class="silk">Původ</div><div class="chips"><span class="chip">založeno na MMTTY od JE3HHT</span><span class="chip key">zdarma · GNU LGPL v3</span><a class="chip" href="https://github.com/ok1xoe/mmtty4mac">zdrojový kód na GitHubu →</a></div></div>
+    </div>
+  </div>
+</section>
+
+<div id="site-foot"></div>
+<script src="../js/site.js"></script>
+</body>
+</html>

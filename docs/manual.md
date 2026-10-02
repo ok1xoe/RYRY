@@ -1,6 +1,8 @@
-# mmtty4mac – User Manual
+# RYRY – User Manual
 
-mmtty4mac is an RTTY program for macOS: a native port of MMTTY (JE3HHT) with the same demodulator, plus a log, contest support and an API for loggers. Česká verze: [prirucka.md](prirucka.md).
+RYRY (formerly mmtty4mac) is an RTTY program for macOS: a native port of MMTTY (JE3HHT) with the same demodulator, plus a log, contest support and an API for loggers. Česká verze: [prirucka.md](prirucka.md).
+
+**New in 1.0 (Mac App Store):** the new name RYRY and a new icon; distributed through the Mac App Store (the app runs in the macOS sandbox); Help → Play Demo Signal to try decoding without a radio; LoTW through TrustedQSL (RYRY prepares the ADIF, you sign and send it in TQSL); the app asks once for access to the log folder. Removed: starting hamlib from the app (start rigctld yourself) and the update check (the App Store updates the app). Settings from mmtty4mac move over on the first launch; online passwords may need to be entered again.
 
 **New in 0.15.1:** the band map covers the whole band, not just the official RTTY segment (it opens on the digimode part, `⤢` shows the whole band); 160 m, 60 m and 6 m were added.
 
@@ -14,11 +16,12 @@ mmtty4mac is an RTTY program for macOS: a native port of MMTTY (JE3HHT) with the
 
 ## 1. Installation
 
-1. Open `mmtty4mac-<version>.dmg` and drag the app into Applications.
-2. On first launch macOS asks for **microphone** access. Allow it, otherwise receiving does not work. You can change this in System Settings → Privacy & Security → Microphone.
-3. The app is signed and notarized; Gatekeeper opens it without warnings.
+1. Install **RYRY** from the Mac App Store (free). Updates come through the App Store.
+2. On first launch RYRY asks for the **folder for the log** (the panel opens on your Documents folder) – click **Allow Access** and RYRY creates its `RYRY` folder there. macOS lets the app into a folder only after you choose it; RYRY remembers the access. If you cancel, the log is kept inside the app's container and the status bar says where.
+3. macOS asks for **microphone** access. Allow it, otherwise receiving does not work. You can change this in System Settings → Privacy & Security → Microphone.
+4. No radio at hand? **Help → Play Demo Signal** plays a short contest QSO so you can watch RYRY decode.
 
-Optional: for radios the built-in CAT does not know, install hamlib (`brew install hamlib`).
+Optional: for radios the built-in CAT does not know, install hamlib (`brew install hamlib`) and start `rigctld` yourself (see section 3).
 
 ## 2. First setup (⌘,)
 
@@ -47,8 +50,7 @@ Settings → Rig → Controls:
   - **Elecraft** (K3, K4, KX3).
 
   Choose the radio's serial port (`/dev/cu.…`, the arrow reloads the list), speed and stop bits – they must match the CAT settings in the radio menu.
-- **hamlib – start automatically** – for other radios: pick the model from the hamlib list, the port and speed; the app starts and stops `rigctld` itself.
-- **hamlib rigctld (network)** / **flrig** – connect to an already running program.
+- **hamlib rigctld (network)** / **flrig** – for other radios: connect to a running program. Start rigctld yourself, e.g. `rigctld -m <model> -r /dev/cu.X -s <speed>` (`rigctld -l` lists the models). The App Store version cannot start rigctld for you.
 
 **Test connection** shows the frequency and mode. For PTT via CAT choose the **CAT** method on the PTT / FSK tab. The CAT port cannot be shared with RTS/DTR PTT on the same port.
 
@@ -84,10 +86,10 @@ Macro variables:
 - The QSO window on the right shows fields for the current mode (name, QTH, locator outside contests; only the exchange in a contest). Under the call you see the DXCC country, zones, the other station's local time and previous QSOs.
 - **Log** (⌘L) saves the QSO; **Clear** empties the window.
 - **Log window** (⇧⌘L): search, edit (double-click), delete, **Import ADIF…**, **Export Cabrillo…**.
-- The log is stored in `~/Documents/mmtty4mac` (JSONL + ADIF `mmtty4mac.adi` that any logger can read).
-- An old MMTTY log: export it to ADIF in MMTTY and import it in mmtty4mac (duplicates are skipped).
+- The log is stored in the folder from Settings → API and log (by default `~/Documents/RYRY`; a log from mmtty4mac stays in `~/Documents/mmtty4mac`) as JSONL + ADIF `mmtty4mac.adi` that any logger can read. When you open or create a log in another folder, RYRY asks once for access to that folder.
+- An old MMTTY log: export it to ADIF in MMTTY and import it in RYRY (duplicates are skipped).
 
-Log management (File menu): **New Log…** (⌘N; contest serials start at 1), **Open Log…** (⌘O; an mmtty4mac log or ADIF from another program – converted, the original stays as `.adi.orig`), **Open Recent Log**, **Save Log As…** (⇧⌘S; a copy you continue in), **Export ADIF…**, **Import ADIF…**. Each QSO is saved as soon as it is logged.
+Log management (File menu): **New Log…** (⌘N; contest serials start at 1), **Open Log…** (⌘O; a RYRY log or ADIF from another program – converted, the original stays as `.adi.orig`), **Open Recent Log**, **Save Log As…** (⇧⌘S; a copy you continue in), **Export ADIF…**, **Import ADIF…**. Each QSO is saved as soon as it is logged.
 
 ## 7. Contests
 
@@ -108,12 +110,12 @@ File menu:
 
 ## 9. API for loggers
 
-mmtty4mac looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers such as RUMlogNG or MacLoggerDX can control it – choose “fldigi” in the logger. The second API is JSON-RPC over WebSocket (`ws://127.0.0.1:7363/v1`) with events (received text, state, logged QSOs); a Java client is in `clients/java`. Details in [api.md](api.md). By default the API listens on this Mac only.
+RYRY looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers such as RUMlogNG or MacLoggerDX can control it – choose “fldigi” in the logger. The second API is JSON-RPC over WebSocket (`ws://127.0.0.1:7363/v1`) with events (received text, state, logged QSOs); a Java client is in `clients/java`. Details in [api.md](api.md). By default the API listens on this Mac only.
 
 ## 10. Language and keys
 
 - **Language:** English by default; change it in Settings → Display → Interface language (Czech, English, loaded languages). Your own translation: **Save template…**, translate the values in `strings`, set `code` and `name`, **Load language…**.
-- **Language files** `cs.json` and `en.json` are in `~/Library/Application Support/mmtty4mac/Languages` and can be edited (a saved change applies immediately; updates do not overwrite an edited file).
+- **Language files** `cs.json` and `en.json` are in `~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages` (the app runs in the macOS sandbox) and can be edited (a saved change applies immediately; updates do not overwrite an edited file).
 - **Keys:** Settings → Keys – click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).
 
 ## 11. Troubleshooting
@@ -128,4 +130,4 @@ mmtty4mac looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers su
 | The logger does not connect | Settings → API and log: fldigi XML-RPC on, port 7362. |
 
 ---
-mmtty4mac © 2026 OK1XOE, GNU LGPL v3 license. Demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba. DXCC: cty.dat – AD1C.
+RYRY © 2026 OK1XOE, GNU LGPL v3 license (source code: github.com/ok1xoe/mmtty4mac). Demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba. DXCC: cty.dat – AD1C.

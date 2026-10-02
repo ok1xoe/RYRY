@@ -151,6 +151,9 @@ public struct CallHistory: Sendable, Equatable {
                     r["exchangeRcvd"] = st
                 }
             } else if !c.exchange.isEmpty, !e.exch.isEmpty { r["exchangeRcvd"] = e.exch }
+        case .serialText, .text:
+            if !e.exch.isEmpty { r["exchangeRcvd"] = e.exch }
+            else if !e.name.isEmpty, c.selectedPreset?.textIsName == true { r["exchangeRcvd"] = e.name }
         case .bartg, .wae, .ped: break
         }
         return r

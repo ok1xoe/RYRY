@@ -128,7 +128,7 @@ public struct QRZCallbook: CallbookService {
     }
 
     private func login() async throws -> String {
-        let r = try await fetch("\(Self.base)?username=\(callbookEncode(username));password=\(callbookEncode(password));agent=mmtty4mac")
+        let r = try await fetch("\(Self.base)?username=\(callbookEncode(username));password=\(callbookEncode(password));agent=RYRY")
         if let e = r["error"] { throw CallbookError.login(e.trimmingCharacters(in: .whitespaces)) }
         guard let k = r["key"] else { throw CallbookError.invalidResponse }
         return k
@@ -186,7 +186,7 @@ public struct HamQTHCallbook: CallbookService {
         let c = normalize(call)
         for attempt in 0..<2 {
             let id = try await session.get { try await self.login() }
-            let r = try await fetch("\(Self.base)?id=\(callbookEncode(id))&callsign=\(callbookEncode(c))&prg=mmtty4mac")
+            let r = try await fetch("\(Self.base)?id=\(callbookEncode(id))&callsign=\(callbookEncode(c))&prg=RYRY")
             if let e = r["error"] {
                 let l = e.lowercased()
                 if l.contains("not found") { return nil }

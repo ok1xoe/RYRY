@@ -20,7 +20,7 @@ private func rec(_ call: String, _ time: String, sent: Int?, rcvd: Int?, exS: St
     let text = Cabrillo.export(recs, header: h)
     let lines = text.components(separatedBy: "\r\n")
     #expect(lines.first == "START-OF-LOG: 3.0")
-    #expect(lines.contains("CREATED-BY: mmtty4mac"))
+    #expect(lines.contains("CREATED-BY: RYRY"))
     #expect(lines.contains("CALLSIGN: OK1XOE"))
     #expect(lines.contains("CONTEST: BARTG-RTTY"))
     #expect(lines.contains("CATEGORY-OPERATOR: SINGLE-OP"))
@@ -68,4 +68,10 @@ private func rec(_ call: String, _ time: String, sent: Int?, rcvd: Int?, exS: St
     r.serialSent = 15; r.exchangeSent = "1203"; r.serialRcvd = 7; r.exchangeRcvd = "1159"
     let t = Cabrillo.export([r], header: CabrilloHeader(callsign: "OK1XOE", contest: "BARTG-RTTY"))
     #expect(t.contains("QSO: 14083 RY 2026-09-29 1203 OK1XOE        599 015 1203 DL1ABC        599 007 1159"))
+}
+
+// The App Store name is RYRY - other programs see it in exported files.
+@Test func adifHeaderNamesRYRY() {
+    let h = ADIF.header(now: Date(timeIntervalSince1970: 0))
+    #expect(h.hasPrefix("RYRY ADIF export\n") && h.contains("<PROGRAMID:4>RYRY") && h.contains("<PROGRAMVERSION:5>1.0.0"))
 }
