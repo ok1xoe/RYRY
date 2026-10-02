@@ -1,6 +1,7 @@
 import AppKit
 import Testing
 import Settings
+import QSOLog
 @testable import AppViews
 import AppUI
 
@@ -56,4 +57,13 @@ private func fkey(_ n: Int, shift: Bool) -> NSEvent {
     #expect(f.model.macroPreview(4).contains("DL1ABC TU OK1XOE TEST") && f.model.macroPreview(4).contains("+ zaloguje QSO"))
     #expect(f.model.macroPreview(15).isEmpty)                         // an empty slot
     await f.model.stop()
+}
+
+// The log column shows the serial and the exchange text together (URC: only the territory; BARTG: number + time).
+@Test @MainActor func logExchangeColumn() {
+    var r = QSORecord(call: "DL1ABC", timeOn: Date(), mode: "RTTY")
+    r.exchangeSent = "BHE"; r.exchangeRcvd = "BVR"
+    #expect(LogWindow.nrLabel(r) == "BHE/BVR")
+    r.serialSent = 15; r.serialRcvd = 7; r.exchangeSent = "1203"; r.exchangeRcvd = nil
+    #expect(LogWindow.nrLabel(r) == "015 1203/007")
 }
