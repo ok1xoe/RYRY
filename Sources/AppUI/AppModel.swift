@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import APIServer
 import AVFoundation
 import AppCore
@@ -155,7 +155,7 @@ public final class AppModel {
     var lastSentForTesting = ""
     /// The column of the transmitted text within the current line (for wrapping during TX); 0 after switching to RX.
     public private(set) var txSentColumn = 0
-    private let logger = Logger(subsystem: "cz.ok1xoe.mmtty4mac", category: "app")
+    private let logger = Logger(subsystem: "cz.ok1xoe.ryry", category: "app")
     static var micWaitMessage: String { L("Čekám na povolení přístupu k mikrofonu (systémový dialog)…") }
     public var waterfallFromHz: Double { settings.display.fromHz }
     public var waterfallToHz: Double { settings.display.toHz }
@@ -699,7 +699,7 @@ public final class AppModel {
         if n != newMultiplier { newMultiplier = n }
     }
 
-    /// The MASTER.SCP file - in the settings folder (Application Support/mmtty4mac in the app; the tests have their own folder).
+    /// The MASTER.SCP file - in the settings folder (Application Support/RYRY in the app; the tests have their own folder).
     public var scpURL: URL { settingsStore.url.deletingLastPathComponent().appendingPathComponent("MASTER.SCP") }
 
     /// Loads MASTER.SCP and the calls from the log (after startup and after switching logs).

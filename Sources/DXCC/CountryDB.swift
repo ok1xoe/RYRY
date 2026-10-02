@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 
 /// The DXCC country for a call (data from cty.dat, AD1C format).
@@ -148,10 +148,11 @@ public struct CountryDB: Sendable {
 }
 
 public extension CountryDB {
-    /// A user file (Application Support/mmtty4mac/cty.dat) takes precedence over the bundled one.
+    /// A user file (Application Support/RYRY/cty.dat, before the move mmtty4mac/cty.dat) takes precedence over the bundled one.
     static func defaultURLs() -> [URL] {
         var urls: [URL] = []
         if let sup = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            urls.append(sup.appendingPathComponent("RYRY/cty.dat"))
             urls.append(sup.appendingPathComponent("mmtty4mac/cty.dat"))
         }
         if let b = Bundle.main.url(forResource: "cty", withExtension: "dat") { urls.append(b) }

@@ -517,3 +517,9 @@ Logika `AppCore/Score.swift` (`ScoreRule`, `ScoreCalculator`, `ScoreTally` – o
 - Názvy CONTEST změněné podle pravidel: WAE `DARC-WAEDC-RTTY`, JARTS → JARL WW RTTY `JARL-WW-RTTY`; staré názvy se při načtení starého nastavení stále rozpoznají.
 - Nejednoznačnosti (zobrazené v Nastavení u závodu oranžově): Mexico (EN × ES pravidla – použita EN, násobiče na pásmu), PRO Digi (duplicita pásmo+mód), WRT/Rookie (vzorec jen implicitní), VOLTA (bonusový násobič za 4 pásma se nepočítá), DARC (zvláštní DOKy), URC/TRC (duplicita neuvedena → na pásmu). Russian WW Digital a PRO Digi: duplicita na pásmu a módu.
 - Nastavení → Závod: u zvolené předvolby sekce „Pravidla závodu“ (termín, pásma, výměna, body, násobiče, duplicity, neověřené body, odkaz na pravidla).
+
+## Přejmenování mmtty4mac → RYRY (verze 1.1, 2026-10-02)
+- Repozitář `ok1xoe/RYRY`, balíček SwiftPM `RYRY`, spustitelný cíl a proces `RYRY` (dříve `MMTTY4MacApp`), bundle ID `cz.ok1xoe.ryry` (App Store záznam ještě nevznikl), entitlements `Resources/RYRY.entitlements`, Java klient `cz.ok1xoe.ryry.RyryClient`, Klíčenka `cz.ok1xoe.ryry.<služba>`, výchozí log `RYRY`.
+- Data: `Application Support/RYRY`. Při spuštění `AppSupport.migrateLegacy()` přejmenuje starou složku `mmtty4mac` (i tu, kterou do nového kontejneru přesune `container-migration.plist` z DMG verze) a převezme chybějící předvolby z domény `cz.ok1xoe.mmtty4mac`. Do přesunu se čte stará složka (nic se neztratí ani u `rtty-tool`).
+- Zachováno kvůli kompatibilitě: pole ADIF `APP_MMTTY4MAC_ID` (párování spojení v existujících logech), log se jménem `mmtty4mac` dál používá `qtc.jsonl`, dokumenty historie (docs/superpowers, starší záznamy zde).
+- Hesla z Klíčenky a přístup ke složce logu (security-scoped bookmark) se kvůli novému ID zadají jednou znovu.

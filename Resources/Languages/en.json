@@ -518,7 +518,7 @@
     "RTTY: evropské i mimoevropské násobiče platí pro všechny stanice. Země WAE na každém pásmu, u W/VE/VK/ZL/ZS/JA/BY/PY a RA8/RA9/RA0 číselné oblasti. Váhy pásem: 80 m × 4, 40 m × 3, ostatní × 2.": "RTTY: European and non-European multipliers count for all stations. WAE countries on each band, call areas for W/VE/VK/ZL/ZS/JA/BY/PY and RA8/RA9/RA0. Band weights: 80 m × 4, 40 m × 3, others × 2.",
     "RX %@ ppm, TX %@ ppm – potvrďte Použít.": "RX %@ ppm, TX %@ ppm – confirm with Apply.",
     "RYRY potřebuje přístup ke složce s logem „%@“. Vyberte ji prosím.": "RYRY needs access to the folder with the log “%@”. Please choose it.",
-    "RYRY © 2026 OK1XOE. Licence GNU LGPL v3, zdrojový kód: github.com/ok1xoe/mmtty4mac.": "RYRY © 2026 OK1XOE. License GNU LGPL v3, source code: github.com/ok1xoe/mmtty4mac.",
+    "RYRY © 2026 OK1XOE. Licence GNU LGPL v3, zdrojový kód: github.com/ok1xoe/RYRY.": "RYRY © 2026 OK1XOE. License GNU LGPL v3, source code: github.com/ok1xoe/RYRY.",
     "Reverse (prohodit mark/space)": "Reverse (swap mark/space)",
     "Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW a RTTY skimmery). Tok spotů je velký, doporučeno nechat ve filtru módů jen RTTY.": "Reverse Beacon Network: telnet.reversebeacon.net:7000 (CW and RTTY skimmers). The spot stream is large, keeping only RTTY in the mode filter is recommended.",
     "Reálný čas": "Real time",

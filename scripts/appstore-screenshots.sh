@@ -6,7 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
-APP=build/RYRY.app; PROC=MMTTY4MacApp
+APP=build/RYRY.app; PROC=RYRY
 [[ -d "$APP" ]] || { echo "Nejdřív ./scripts/make-app.sh" >&2; exit 1; }
 BG=0A0C0E                                        # pozadí webu OK1XOE.dev
 typeset -A TITLES

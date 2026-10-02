@@ -1,12 +1,12 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
-package cz.ok1xoe.mmtty4mac;
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
+package cz.ok1xoe.ryry;
 
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Client test: with no argument JSON only, with a URI also against a running mmtty4mac (rtty-tool live / the app). */
+/** Client test: with no argument JSON only, with a URI also against a running RYRY (rtty-tool live / the app). */
 public final class SelfTest {
     static int failures = 0;
     static void check(boolean ok, String what) {
@@ -30,7 +30,7 @@ public final class SelfTest {
 
         if (args.length > 0) {
             System.out.println("Server " + args[0] + ":");
-            try (Mmtty4macClient c = Mmtty4macClient.connect(URI.create(args[0]))) {
+            try (RyryClient c = RyryClient.connect(URI.create(args[0]))) {
                 List<String> events = new CopyOnWriteArrayList<>();
                 c.onNotification((method, p) -> events.add(method));
                 Map<String, Object> st = c.status();
@@ -44,9 +44,9 @@ public final class SelfTest {
                 check(((Number) c.getParams().get("mark")).doubleValue() == 2100, "modem.setParams mark");
                 c.setMark(2125);
                 try { c.call("no.such.method"); check(false, "unknown method"); }
-                catch (Mmtty4macClient.RpcException e) { check(e.code == -32601, "unknown method → -32601"); }
+                catch (RyryClient.RpcException e) { check(e.code == -32601, "unknown method → -32601"); }
                 try { c.runMacro(99); check(false, "bad macro"); }
-                catch (Mmtty4macClient.RpcException e) { check(e.code == -32602, "bad macro → -32602"); }
+                catch (RyryClient.RpcException e) { check(e.code == -32602, "bad macro → -32602"); }
                 c.clearQso();
                 Thread.sleep(300);
                 check(events.contains("qso.changed"), "the qso.changed notification");

@@ -1,5 +1,5 @@
 // RTTYCore.cpp – a C++ wrapper around the MMTTY core behind the C API.
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 #include "include/RTTYCore.h"
 #include "MMTTYCompat.h"
 #include "mmtty/Rtty.h"

@@ -1,5 +1,5 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
-package cz.ok1xoe.mmtty4mac;
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
+package cz.ok1xoe.ryry;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

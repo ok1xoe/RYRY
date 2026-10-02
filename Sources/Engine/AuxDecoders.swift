@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 import ModemKit
 
@@ -60,7 +60,7 @@ public enum AuxEvent: Sendable, Equatable {
 final class AuxDecoderHub: @unchecked Sendable {
     typealias Factory = @Sendable () -> (any Modem)?
 
-    private let queue = DispatchQueue(label: "cz.ok1xoe.mmtty4mac.aux-decoders", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "cz.ok1xoe.ryry.aux-decoders", qos: .userInitiated)
     private let factory: Factory
     private let emit: @Sendable (AuxEvent) -> Void
     private let sampleRate: Double

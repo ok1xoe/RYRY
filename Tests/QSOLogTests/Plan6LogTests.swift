@@ -14,7 +14,7 @@ import Testing
 @Test func oldWholeSecondDatesStillLoad() async throws {
     let dir = tempDir()
     let line = #"{"call":"OK1ABC","id":"1483B359-B6F6-4FE0-9829-83278AE002B4","mode":"RTTY","timeOn":"2026-09-28T23:47:12Z"}"# + "\n"
-    try Data(line.utf8).write(to: dir.appendingPathComponent("mmtty4mac.jsonl"))
+    try Data(line.utf8).write(to: dir.appendingPathComponent("RYRY.jsonl"))
     let s = try QSOLogStore(directory: dir)
     #expect(await s.records.count == 1)
 }

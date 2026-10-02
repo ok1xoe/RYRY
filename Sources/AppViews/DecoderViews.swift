@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import AppKit
 import AppUI
 import Engine
@@ -158,7 +158,7 @@ struct ChannelRow: View {
         .contentShape(Rectangle())
     }
 
-    static let scheme = "mmtty4mac-word"
+    static let scheme = "ryry-word"
 
     /// Text in which every word is a link (click → the word is put into the QSO panel).
     static func clickable(_ text: String) -> AttributedString {

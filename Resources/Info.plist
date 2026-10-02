@@ -5,13 +5,13 @@
 	<key>CFBundleDisplayName</key>
 	<string>RYRY</string>
 	<key>CFBundleExecutable</key>
-	<string>MMTTY4MacApp</string>
+	<string>RYRY</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>cz.ok1xoe.mmtty4mac</string>
+	<string>cz.ok1xoe.ryry</string>
 	<key>CFBundleName</key>
 	<string>RYRY</string>
 	<key>CFBundlePackageType</key>

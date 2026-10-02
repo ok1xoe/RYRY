@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+# Copyright 2026 OK1XOE (RYRY), LGPL v3
 """Vytáhne klíče L("…") ze Sources a doplní je do jazykových souborů (cs.json: hodnota = klíč, ostatní prázdné).
 
   scripts/i18n-extract.py            # vypíše chybějící a nepoužívané klíče v Resources/Languages/*.json

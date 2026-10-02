@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import AppKit
 import AppUI
 import Localization
@@ -98,7 +98,7 @@ import UniformTypeIdentifiers
         run { try await model.newLog(file: url); return nil }
     }
 
-    /// Opens an mmtty4mac log or an ADIF file from another program.
+    /// Opens a RYRY log or an ADIF file from another program.
     public static func openLog(_ model: AppModel) {
         let p = NSOpenPanel()
         p.allowedContentTypes = adifTypes + [UTType(filenameExtension: "jsonl")].compactMap { $0 }

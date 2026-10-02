@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 // Settings written by the DMG version must load in the App Store edition (RYRY).
 import Foundation
 import Testing

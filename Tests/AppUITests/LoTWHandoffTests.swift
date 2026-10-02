@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 // The texts are compared against the Czech wording (the localization key) - the tests run in the base language.
 import Foundation
 import Testing

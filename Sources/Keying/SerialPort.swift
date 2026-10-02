@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 public enum SerialError: Error, Equatable, Sendable {
     case openFailed(String), unsupportedBaud(Double), ioError(String), closed
 }

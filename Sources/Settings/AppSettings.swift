@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import AudioIO
 import Engine
 import Foundation
@@ -195,7 +195,7 @@ public struct Macro: Codable, Sendable, Equatable, TolerantFallback {
 public struct LogSettings: Codable, Sendable, Equatable {
     public var directory: String = HomeDirectory.real + "/Documents/RYRY"
     /// Log name (the files `<name>.jsonl`, `<name>.adi`).
-    public var name = "mmtty4mac"
+    public var name = "RYRY"
     /// Most recently opened logs (paths to the ADIF), newest first.
     public var recent: [String] = []
     /// Access to folders outside the sandbox container (the log folder, folders of recent logs).

@@ -2,6 +2,8 @@
 
 RYRY (dříve mmtty4mac) je RTTY program pro macOS: nativní přepis MMTTY (JE3HHT) se stejným demodulátorem, s logem, podporou závodů a s API pro loggery. English version: [manual.md](manual.md).
 
+**Novinky 1.1:** 28 předvoleb RTTY závodů (všechny RTTY závody z contestcalendar.com) s přehledem pravidel v Nastavení → Závod, bodováním a násobiči podle oficiálních pravidel; nové formáty výměny (číslo + text, text, číslo nebo kód); ⇧F1–⇧F4 spouštějí svá makra; projekt přejmenován na RYRY (bundle ID `cz.ok1xoe.ryry`, složka dat `RYRY` – stará se přesune sama).
+
 **Novinky 1.0 (Mac App Store):** nové jméno RYRY a nová ikona; distribuce přes Mac App Store (aplikace běží v sandboxu macOS); Nápověda → Přehrát ukázkový signál – dekódování vyzkoušíte i bez rádia; LoTW přes TrustedQSL (RYRY připraví ADIF, podepíšete a odešlete ho v TQSL); aplikace se jednou zeptá na přístup ke složce s logem. Odstraněno: spouštění hamlibu aplikací (rigctld spusťte sami) a kontrola aktualizací (aktualizuje App Store). Nastavení z mmtty4mac se při prvním spuštění přenese samo; hesla online služeb bude možná potřeba zadat znovu.
 
 **Novinky 0.15.1:** band mapa ukazuje celé pásmo, ne jen oficiální RTTY úsek (otevře se na digitální části, `⤢` zobrazí celé pásmo); přibyla pásma 160 m, 60 m a 6 m.
@@ -86,7 +88,7 @@ Proměnné v makrech:
 - QSO okno vpravo ukazuje pole podle režimu (bez závodu jméno, QTH, lokátor; v závodě jen výměnu). Pod značkou je země DXCC, zóny a místní čas protistanice a předchozí spojení s ní.
 - **Log** (⌘L) zapíše spojení; **Clear** vyprázdní okno.
 - **Okno Log** (⇧⌘L): hledání, oprava (dvojklik), mazání, **Importovat ADIF…**, **Exportovat Cabrillo…**.
-- Log se ukládá do složky z Nastavení → API a log (výchozí `~/Documents/RYRY`; log z mmtty4mac zůstává v `~/Documents/mmtty4mac`) jako JSONL + ADIF `mmtty4mac.adi`, který přečte každý logger. Když otevřete nebo založíte log v jiné složce, RYRY se jednou zeptá na přístup k ní.
+- Log se ukládá do složky z Nastavení → API a log (výchozí `~/Documents/RYRY`; log z mmtty4mac zůstává v `~/Documents/mmtty4mac`) jako JSONL + ADIF `RYRY.adi`, který přečte každý logger. Když otevřete nebo založíte log v jiné složce, RYRY se jednou zeptá na přístup k ní.
 - Starý log z MMTTY: v MMTTY ho exportujte do ADIF a v RYRY importujte (duplicity se přeskočí).
 
 Správa logu (menu Soubor): **Nový log…** (⌘N; pořadová čísla závodu od 1), **Otevřít log…** (⌘O; log RYRY nebo ADIF z jiného programu – převede se, originál zůstane jako `.adi.orig`), **Otevřít nedávný log**, **Uložit log jako…** (⇧⌘S; kopie, dál se pracuje v ní), **Exportovat ADIF…**, **Importovat ADIF…**. Spojení se ukládá hned při zalogování.
@@ -117,7 +119,7 @@ RYRY se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovládají l
 ## 10. Jazyk a klávesy
 
 - **Jazyk:** ve výchozím stavu angličtina; změna v Nastavení → Zobrazení → Jazyk rozhraní (čeština, angličtina, nahrané jazyky). Vlastní překlad: **Uložit šablonu…**, přeložit hodnoty v `strings`, nastavit `code` a `name`, **Nahrát jazyk…**.
-- **Jazykové soubory** `cs.json` a `en.json` jsou v `~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages` (aplikace běží v sandboxu macOS) a lze je upravit (uložená změna se projeví okamžitě; upravený soubor aktualizace nepřepíše).
+- **Jazykové soubory** `cs.json` a `en.json` jsou v `~/Library/Containers/cz.ok1xoe.ryry/Data/Library/Application Support/RYRY/Languages` (aplikace běží v sandboxu macOS) a lze je upravit (uložená změna se projeví okamžitě; upravený soubor aktualizace nepřepíše).
 - **Klávesy:** Nastavení → Klávesy – klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).
 
 ## 11. Když něco nefunguje
@@ -132,4 +134,4 @@ RYRY se tváří jako **fldigi** (XML-RPC na portu 7362), takže ho ovládají l
 | Logger se nepřipojí | Nastavení → API a log: fldigi XML-RPC zapnuté, port 7362. |
 
 ---
-RYRY © 2026 OK1XOE, licence GNU LGPL v3 (zdrojový kód: github.com/ok1xoe/mmtty4mac). Jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba. DXCC: cty.dat – AD1C.
+RYRY © 2026 OK1XOE, licence GNU LGPL v3 (zdrojový kód: github.com/ok1xoe/RYRY). Jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba. DXCC: cty.dat – AD1C.

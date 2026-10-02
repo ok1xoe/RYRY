@@ -5,6 +5,7 @@
 	<key>Move</key>
 	<array>
 		<string>${ApplicationSupport}/mmtty4mac</string>
+		<string>${ApplicationSupport}/RYRY</string>
 		<string>${Library}/Preferences/cz.ok1xoe.mmtty4mac.plist</string>
 	</array>
 </dict>

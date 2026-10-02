@@ -1,4 +1,4 @@
-// Copyright 2000-2013 Makoto Mori, Nobuyuki Oba; Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2000-2013 Makoto Mori, Nobuyuki Oba; Modifications Copyright 2026 OK1XOE (RYRY), LGPL v3
 // A rewrite of TMmttyWd::ConvString / StoreCWID / OutputStr (MMTTY Main.cpp:4142-4370) in Swift.
 import Foundation
 

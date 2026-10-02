@@ -5,7 +5,7 @@ import Testing
 @Test func oldJSONLWithoutUploadsStillReads() async throws {
     let dir = tempDir()
     let line = #"{"call":"OK1ABC","id":"\#(UUID().uuidString)","mode":"RTTY","timeOn":"2026-09-21T10:00:00.000Z"}"#
-    try (line + "\n").write(to: dir.appendingPathComponent("mmtty4mac.jsonl"), atomically: true, encoding: .utf8)
+    try (line + "\n").write(to: dir.appendingPathComponent("RYRY.jsonl"), atomically: true, encoding: .utf8)
     let store = try QSOLogStore(directory: dir)
     let recs = await store.records
     #expect(recs.count == 1 && recs[0].uploads == nil)

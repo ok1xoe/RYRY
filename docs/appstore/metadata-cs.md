@@ -63,7 +63,7 @@ PRO VÁŠ LOGGER
 VYZKOUŠEJTE BEZ RÁDIA
 Zvolte Nápověda → Přehrát ukázkový signál a sledujte, jak RYRY dekóduje závodní spojení.
 
-RYRY je zdarma a otevřený pod licencí GNU LGPL v3, založený na MMTTY od Makota Moriho (JE3HHT). Zdrojový kód: https://github.com/ok1xoe/mmtty4mac
+RYRY je zdarma a otevřený pod licencí GNU LGPL v3, založený na MMTTY od Makota Moriho (JE3HHT). Zdrojový kód: https://github.com/ok1xoe/RYRY
 
 K vysílání je potřeba radioamatérská licence.
 ```

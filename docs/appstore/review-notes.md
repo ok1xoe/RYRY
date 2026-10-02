@@ -28,7 +28,7 @@ Why the app needs these capabilities:
   user signs it (LoTW requires the user's certificate in TrustedQSL).
 
 Transmitting requires an amateur radio licence and a connected radio; the review does not need to transmit.
-RYRY is free and open source (GNU LGPL v3): https://github.com/ok1xoe/mmtty4mac
+RYRY is free and open source (GNU LGPL v3): https://github.com/ok1xoe/RYRY
 
 Contact: Tomáš Kaplan, OK1XOE, tomas.kaplan@gmail.com
 ```

@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 
 /// Collector of warnings during tolerant decoding (passed through JSONDecoder.userInfo).
@@ -10,7 +10,7 @@ final class WarningSink: @unchecked Sendable {
 }
 
 extension CodingUserInfoKey {
-    static let warnings = CodingUserInfoKey(rawValue: "mmtty4mac.warnings")!
+    static let warnings = CodingUserInfoKey(rawValue: "ryry.warnings")!
 }
 
 extension Decoder {

@@ -26,8 +26,8 @@ Všechno, co je k odeslání potřeba, je v této složce. Postupuj shora dolů.
    - Platform: **macOS**
    - Name: **RYRY – RTTY for Contests**. Kdyby bylo obsazené, zkus „RYRY RTTY“ a uprav i web a metadata.
    - Primary Language: **English (U.S.)**
-   - Bundle ID: **cz.ok1xoe.mmtty4mac**. Pokud v nabídce chybí, Certificates, Identifiers & Profiles →
-     Identifiers → „+“ → App IDs, explicitní `cz.ok1xoe.mmtty4mac`, bez dalších schopností.
+   - Bundle ID: **cz.ok1xoe.ryry**. Pokud v nabídce chybí, Certificates, Identifiers & Profiles →
+     Identifiers → „+“ → App IDs, explicitní `cz.ok1xoe.ryry`, bez dalších schopností.
    - SKU: **RYRY-MAC**
    - User Access: Full Access
 4. **Web:** nasaď `site/` na `https://ryry.ok1xoe.dev` (viz `site/README.md`). URL podpory a zásad ochrany
@@ -80,5 +80,5 @@ Po nahrání trvá zpracování buildu v App Store Connect 10–60 minut (přijd
   dokumentaci. Kdyby ho recenze zpochybnila, odkaž na ovládání rádia přes USB (CAT, PTT, FSK) v review notes.
 - **První spuštění.** Nová instalace se hned zeptá na složku pro log. Je to popsané v review notes, aby to
   recenzent nebral jako chybu.
-- **Přechod z DMG verze na vývojovém Macu.** Kontejner `cz.ok1xoe.mmtty4mac` tu už existuje z testů, takže
-  migrace nastavení tu neproběhne. Viz `sandbox-check.md`.
+- **Přechod z DMG verze na vývojovém Macu.** Migrace proběhne jen při vzniku kontejneru `cz.ok1xoe.ryry`;
+  starý vývojový kontejner `cz.ok1xoe.mmtty4mac` (bundle ID do verze 1.0) se nepřenáší. Viz `sandbox-check.md`.

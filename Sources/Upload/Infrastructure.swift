@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 import Localization
 import QSOLog
@@ -91,7 +91,7 @@ public struct URLSessionHTTPClient: HTTPClient {
 public struct MultipartBody: Sendable {
     public let boundary: String
     private var data = Data()
-    public init(boundary: String = "mmtty4mac-\(UUID().uuidString)") { self.boundary = boundary }
+    public init(boundary: String = "RYRY-\(UUID().uuidString)") { self.boundary = boundary }
 
     public var contentType: String { "multipart/form-data; boundary=\(boundary)" }
 
@@ -137,7 +137,7 @@ public protocol UploadSecretStore: Sendable {
 }
 
 public enum SecretServices {
-    public static let prefix = "cz.ok1xoe.mmtty4mac."
+    public static let prefix = "cz.ok1xoe.ryry."
     public static let eqsl = prefix + "eqsl"
     public static let clublog = prefix + "clublog"
     public static let clublogAPIKey = prefix + "clublog-apikey"

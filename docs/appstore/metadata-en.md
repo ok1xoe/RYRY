@@ -62,7 +62,7 @@ FOR YOUR LOGGER
 TRY IT WITHOUT A RADIO
 Choose Help → Play Demo Signal and watch RYRY decode a contest QSO.
 
-RYRY is free and open source under the GNU LGPL v3, based on MMTTY by Makoto Mori (JE3HHT). Source code: https://github.com/ok1xoe/mmtty4mac
+RYRY is free and open source under the GNU LGPL v3, based on MMTTY by Makoto Mori (JE3HHT). Source code: https://github.com/ok1xoe/RYRY
 
 An amateur radio licence is required to transmit.
 ```

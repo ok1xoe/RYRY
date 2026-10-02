@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import AppKit
 import AppUI
 import Settings
@@ -36,7 +36,7 @@ struct RxTextView: NSViewRepresentable {
     }
 
     /// A callsign in the transmitted text (echo) - highlighting skips it.
-    nonisolated static let echoKey = NSAttributedString.Key("cz.ok1xoe.mmtty4mac.echo")
+    nonisolated static let echoKey = NSAttributedString.Key("cz.ok1xoe.ryry.echo")
     /// How many trailing characters are restyled when the state changes (logging a QSO, a band change).
     static let restyleTail = 5000
 

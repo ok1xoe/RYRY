@@ -32,7 +32,7 @@ import Testing
 // Review C2: an unreadable log = an error, not an empty log that would then be overwritten
 @Test func unreadableLogRefusesWrites() async throws {
     let dir = tempDir()
-    try FileManager.default.createDirectory(at: dir.appendingPathComponent("mmtty4mac.jsonl"), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: dir.appendingPathComponent("RYRY.jsonl"), withIntermediateDirectories: true)
     let s = try QSOLogStore(directory: dir)
     #expect(!(await s.warnings).isEmpty)
     await #expect(throws: QSOLogError.self) { try await s.append(qso("OK1ABC")) }

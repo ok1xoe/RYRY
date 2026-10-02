@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 import Testing
 @testable import Settings
@@ -68,7 +68,7 @@ import Testing
 // Log management: the log name and the recent logs
 @Test func logNameAndRecent() throws {
     var l = LogSettings()
-    #expect(l.name == "mmtty4mac" && l.recent.isEmpty)
+    #expect(l.name == "RYRY" && l.recent.isEmpty)
     l.remember("/a/x.adi"); l.remember("/b/y.adi"); l.remember("/a/x.adi")
     #expect(l.recent == ["/a/x.adi", "/b/y.adi"])
     for i in 0..<10 { l.remember("/r/\(i).adi") }
@@ -77,5 +77,5 @@ import Testing
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     try #"{"log":{"name":"../zlo","recent":["/a.adi",5]}}"#.write(to: dir.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
     let o = SettingsStore(directory: dir).load().0.log
-    #expect(o.name == "mmtty4mac")                                   // a name containing a slash is rejected
+    #expect(o.name == "RYRY")                                   // a name containing a slash is rejected
 }
