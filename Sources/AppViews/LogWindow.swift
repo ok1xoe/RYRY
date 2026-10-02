@@ -181,13 +181,24 @@ struct QSOEditor: View {
         Binding(get: { record[keyPath: kp] ?? "" }, set: { record[keyPath: kp] = $0.isEmpty ? nil : $0 })
     }
 
+    /// A number field taken over while typing (`TextField(value:format:)` commits only on Return / focus loss and not
+    /// at all from an empty optional field – Save then kept the old value). Empty or invalid = nil.
+    func int(_ kp: WritableKeyPath<QSORecord, Int?>) -> Binding<String> {
+        Binding(get: { record[keyPath: kp].map(String.init) ?? "" },
+                set: { record[keyPath: kp] = Int($0.trimmingCharacters(in: .whitespaces)) })
+    }
+    var frequencyText: Binding<String> {
+        Binding(get: { record.frequency.map { String(format: "%.0f", $0) } ?? "" },
+                set: { record.frequency = Double($0.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")) })
+    }
+
     var body: some View {
         Form {
             TextField(L("Značka"), text: Binding(get: { record.call }, set: { record.call = $0.uppercased() }))
             DatePicker(L("Začátek (UTC)"), selection: $record.timeOn)
                 .environment(\.timeZone, TimeZone(identifier: "UTC")!)
                 .environment(\.timeZone, TimeZone(identifier: "UTC")!)
-            TextField(L("Frekvence (Hz)"), value: $record.frequency, format: .number)
+            TextField(L("Frekvence (Hz)"), text: frequencyText)
             TextField(L("Mód"), text: $record.mode)
             TextField(L("RST odeslané"), text: text(\.rstSent))
             TextField(L("RST přijaté"), text: text(\.rstRcvd))
@@ -196,11 +207,11 @@ struct QSOEditor: View {
             TextField(L("Lokátor"), text: text(\.grid))
             TextField(L("Poznámka"), text: text(\.comment))
             Section(L("Závod")) {
-                TextField(L("Číslo odeslané"), value: $record.serialSent, format: .number.grouping(.never))
+                TextField(L("Číslo odeslané"), text: int(\.serialSent))
                 TextField(L("Výměna odeslaná"), text: text(\.exchangeSent), prompt: Text(L("zóna, teritorium, oblast, jméno…")))
-                TextField(L("Číslo přijaté"), value: $record.serialRcvd, format: .number.grouping(.never))
+                TextField(L("Číslo přijaté"), text: int(\.serialRcvd))
                 TextField(L("Výměna přijatá"), text: text(\.exchangeRcvd), prompt: Text(L("zóna, teritorium, oblast, jméno…")))
-                TextField(L("CQ zóna"), value: $record.cqZone, format: .number.grouping(.never))
+                TextField(L("CQ zóna"), text: int(\.cqZone))
             }
             HStack {
                 Spacer()
