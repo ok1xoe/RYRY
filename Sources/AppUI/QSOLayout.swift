@@ -20,9 +20,9 @@ public enum QSOLayout {
         let base = [call, .country, rst]
         switch c.format {
         case .serial:
-            // ARRL RTTY Roundup: W/VE send a state/province instead of a number (multiplier) - received exchange handled separately
-            if c.isRoundupStateExchange {
-                return base + [serial, .single("exchangeRcvd", L("Stát/prov. r")), notes]
+            // ARRL RTTY Roundup: W/VE send a state/province instead of a number (multiplier), Russian contests an oblast …
+            if c.receivesSerialOrCode, let code = c.selectedPreset?.alternativeCode {
+                return base + [serial, .single("exchangeRcvd", code + " r"), notes]
             }
             return base + [c.exchange.isEmpty ? serial : .pair("exchangeSent", "Exch s", "exchangeRcvd", "Exch r"), notes]
         case .cqrj: return base + [.pair("exchangeSent", L("Zóna/QTH s"), "exchangeRcvd", L("Zóna/QTH r")), notes]
@@ -30,6 +30,12 @@ public enum QSOLayout {
         case .ped: return base + [notes]
         case .wae: return base + [serial, notes]
         case .zone: return base + [.pair("exchangeSent", L("Zóna s"), "exchangeRcvd", L("Zóna r")), notes]
+        case .text:
+            let t = c.selectedPreset?.textLabel ?? "Exch"
+            return base + [.pair("exchangeSent", t + " s", "exchangeRcvd", t + " r"), notes]
+        case .serialText:
+            let t = c.selectedPreset?.textLabel ?? "Exch"
+            return base + [serial, .pair("exchangeSent", t + " s", "exchangeRcvd", t + " r"), notes]
         }
     }
 

@@ -145,6 +145,8 @@ public actor AppController {
         case .ped: break
         case .wae: q.serialSent = c.nextSerial
         case .zone: q.exchangeSent = c.exchange              // empty → fills in my own zone from DXCC
+        case .serialText: q.serialSent = c.nextSerial; q.exchangeSent = c.exchange
+        case .text: q.exchangeSent = c.exchange
         }
         return q
     }

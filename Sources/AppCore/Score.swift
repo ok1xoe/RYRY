@@ -17,6 +17,24 @@ public enum ScoreFormula: Sendable, Equatable {
     case qsoPlusQTCTimesWeightedMultipliers
     /// Sum of points (Makrothen – without multipliers).
     case pointsSum
+    /// QSOs × points × multipliers (VOLTA).
+    case qsosTimesPointsTimesMultipliers
+}
+
+/// Everything the scoring of one QSO may need (the relation, the band, both countries and both exchanges).
+public struct QSOPointsInput: Sendable {
+    public var relation: ScoreRelation?
+    public var band: String?
+    public var call = ""
+    public var own: CountryInfo?, dx: CountryInfo?
+    public var exchangeSent: String?, exchangeRcvd: String?
+    /// My own CQ zone (VOLTA).
+    public var ownZone: Int?
+    /// The same call area of JA/W/VE/VK/ZL (VOLTA: 0 points).
+    public var sameCallArea = false
+    /// The year of the QSO (Rookie Roundup: a rookie = licensed in the last 3 years).
+    public var year: Int?
+    public init(relation: ScoreRelation? = nil, band: String? = nil) { self.relation = relation; self.band = band }
 }
 
 /// Relation of the other station to my own station (for points by country and continent).
@@ -44,10 +62,11 @@ public struct ScoreRule: Sendable, Equatable {
     public static func rule(for p: ContestPreset) -> ScoreRule {
         let formula: ScoreFormula
         switch p {
-        case .bartgHF: formula = .pointsTimesMultipliersTimesContinents
+        case .bartgHF, .bartgSprint, .bartgSprint75, .spDX: formula = .pointsTimesMultipliersTimesContinents
         case .makrothen: formula = .pointsSum
         case .waeRTTY: formula = .qsoPlusQTCTimesWeightedMultipliers
-        case .arrlRoundup, .cqwpxRTTY, .sartgRTTY, .cqwwRTTY, .jartsRTTY, .okDXRTTY: formula = .pointsTimesMultipliers
+        case .voltaRTTY: formula = .qsosTimesPointsTimesMultipliers
+        default: formula = .pointsTimesMultipliers
         }
         return ScoreRule(preset: p, formula: formula, verified: true, source: MultiplierRule.rule(for: p).source)
     }
@@ -64,36 +83,138 @@ public struct ScoreRule: Sendable, Equatable {
         case .jartsRTTY: L("Stejný kontinent (i vlastní země) 2 body, jiný kontinent 3. Skóre = body × násobiče.")
         case .waeRTTY: L("1 bod za spojení a 1 za každé odeslané i přijaté QTC. Skóre = (QSO + QTC) × násobiče s váhou pásem.")
         case .okDXRTTY: L("20, 15 a 10 m: vlastní kontinent 1 bod, jiný kontinent 2; 80 a 40 m: 3 a 6. Skóre = body × násobiče.")
+        case .sartgNewYear, .igryWW, .darcSprint: L("1 bod za spojení. Skóre = body × násobiče.")
+        case .bartgSprint, .bartgSprint75: L("1 bod za spojení. Skóre = body × (země + oblasti) × kontinenty.")
+        case .proDigi: L("Vlastní země 1 bod, jiná země 2; nečlen se členem +2, člen se členem +6. Skóre = body × prefixy.")
+        case .mexicoRTTY: L("Stejná země 2 body, jiná země 3, spojení se stanicí XE 4. Skóre = body × násobiče.")
+        case .naqpRTTY, .naSprintRTTY: L("1 bod za spojení; aspoň jedna stanice musí být ze Severní Ameriky (DX–DX 0). Skóre = body × násobiče.")
+        case .ybDX: L("Vlastní země 1 bod, stejný kontinent 2, jiný kontinent 3, stanice YB 10 (pro YB: Oceánie 5, jinde 10). Skóre = body × (prefixy + země).")
+        case .eaRTTY: L("Stanice EA: s EA 2 body, s ostatními 1. Ostatní: s EA 3 body, s ostatními 1. Skóre = body × násobiče.")
+        case .spDX: L("Stejná země 2 body, stejný kontinent 5, jiný kontinent 10; UA a EW 0. Skóre = body × (země + powiaty) × kontinenty.")
+        case .voltaRTTY: L("Body podle tabulky CQ zón (vlastní × protistanice), jiný kontinent na 80 a 10 m dvojnásob; vlastní země (u JA/W/VE/VK/ZL oblast) 0. Skóre = QSO × body × násobiče.")
+        case .rookieRoundup: L("Spojení s nováčkem (rok licence v posledních 3 letech) 2 body, jinak 1. Skóre = body × násobiče.")
+        case .russianRTTY: L("Ruská stanice 10 bodů, vlastní země 2, stejný kontinent 3, jiný kontinent 5, /MM 5 (pro RU stanice: Rusko na vlastním kontinentu 2, jinak 5). Skóre = body × (oblasti + země).")
+        case .russianDigi: L("Vlastní země 1 bod, jiná země 3, jiný kontinent a /QRP 5; na 160, 80 a 40 m dvojnásob. Skóre = body × (země + oblasti).")
+        case .urcDX: L("Stejné teritorium 1 bod; stejný kontinent 2 (10 a 80 m: 3, 160 m: 5); jiný kontinent 4 (10 m: 5, 80 m: 6, 160 m: 10); MMS 3. Skóre = body × teritoria.")
+        case .trcDigi: L("Stejný kontinent 1 bod, jiný kontinent 2, stanice TRC 10 (člen TRC s členem 1). Skóre = body × (země + země členů).")
+        case .wrt: L("1 bod za spojení. Skóre = body × různé značky.")
         }
     }
 
     /// Unverified or ambiguous parts (empty = everything verified); translated at display time.
     public var unverifiedNote: String {
         switch preset {
-        case .cqwpxRTTY, .sartgRTTY, .cqwwRTTY, .okDXRTTY:
+        case .cqwpxRTTY, .sartgRTTY, .cqwwRTTY, .okDXRTTY, .proDigi, .mexicoRTTY, .ybDX, .spDX, .russianRTTY, .russianDigi, .trcDigi:
             L("Spojení se značkou bez známé země/kontinentu dostane nejnižší bodovou hodnotu.")
         case .jartsRTTY:
             L("Pravidla píší „body na každém pásmu × násobiče na každém pásmu“ – počítá se součet bodů × součet násobičů (obvyklý výklad).")
-        case .arrlRoundup, .bartgHF, .makrothen, .waeRTTY: ""
+        case .urcDX:
+            L("Kontinent podle DXCC; vlastní teritorium = kód v mé odesílané výměně.")
+        case .voltaRTTY:
+            L("Zóna protistanice z výměny, jinak podle DXCC; kontinent podle DXCC.")
+        case .arrlRoundup, .bartgHF, .makrothen, .waeRTTY, .sartgNewYear, .igryWW, .darcSprint, .bartgSprint, .bartgSprint75,
+             .naqpRTTY, .naSprintRTTY, .eaRTTY, .rookieRoundup, .wrt: ""
         }
     }
 
     /// The points depend on my own country/continent (or the multipliers on my own country) – without it the result is wrong.
-    var needsOwnCountry: Bool { preset != .makrothen }
+    var needsOwnCountry: Bool { ![.makrothen, .sartgNewYear, .igryWW, .darcSprint, .bartgSprint, .bartgSprint75, .wrt].contains(preset) }
 
-    /// Points for a QSO by the relation to my own station and the band (Makrothen separately); nil relation = the lowest value.
+    /// Points for a QSO by the relation to my own station and the band (Makrothen and the contests with exchange-dependent
+    /// points separately – `points(_:)`); nil relation = the lowest value.
     public func points(relation: ScoreRelation?, band: String?) -> Int {
-        let low = band.map(Self.lowBands.contains) ?? false
+        points(QSOPointsInput(relation: relation, band: band))
+    }
+
+    static let russia: Set<String> = ["UA", "UA2", "UA9", "R1FJ"]
+    static let northAmericaExtra: Set<String> = ["KH6"]
+
+    /// Points for a QSO from everything the rules need (relation, band, countries, exchanges).
+    public func points(_ q: QSOPointsInput) -> Int {
+        let low = q.band.map(Self.lowBands.contains) ?? false
+        let dxPrefix = q.dx?.primaryPrefix, ownPrefix = q.own?.primaryPrefix
         let v: (Int, Int, Int)                         // same country, same continent, other continent
         switch preset {
-        case .arrlRoundup, .bartgHF, .waeRTTY, .makrothen: return 1
+        case .arrlRoundup, .bartgHF, .waeRTTY, .makrothen, .sartgNewYear, .igryWW, .darcSprint, .bartgSprint, .bartgSprint75, .wrt:
+            return 1
         case .cqwpxRTTY: v = low ? (2, 4, 6) : (1, 2, 3)
         case .cqwwRTTY: v = (1, 2, 3)
         case .sartgRTTY: v = (5, 10, 15)
         case .jartsRTTY: v = (2, 2, 3)
         case .okDXRTTY: v = low ? (3, 3, 6) : (1, 1, 2)
+        case .proDigi:
+            let base = q.relation == .sameCountry || q.relation == nil ? 1 : 2
+            let dxM = Multipliers.hasMark("M", in: q.exchangeRcvd), myM = Multipliers.hasMark("M", in: q.exchangeSent)
+            return base + (dxM ? (myM ? 6 : 2) : 0)
+        case .mexicoRTTY:
+            if dxPrefix == "XE" { return 4 }
+            v = (2, 3, 3)
+        case .naqpRTTY, .naSprintRTTY:
+            func na(_ c: CountryInfo?) -> Bool { c.map { $0.continent == "NA" || Self.northAmericaExtra.contains($0.primaryPrefix) } ?? false }
+            return q.own == nil || q.dx == nil || na(q.own) || na(q.dx) ? 1 : 0
+        case .ybDX:
+            if ownPrefix == "YB" {
+                if dxPrefix == "YB" { return 0 }
+                return q.relation == .otherContinent ? 10 : 5
+            }
+            if dxPrefix == "YB" { return 10 }
+            v = (1, 2, 3)
+        case .eaRTTY:
+            let ea: Set<String> = ["EA", "EA6", "EA8", "EA9"]
+            let dxEA = dxPrefix.map(ea.contains) ?? false
+            if ownPrefix.map(ea.contains) ?? false { return dxEA ? 2 : 1 }
+            return dxEA ? 3 : 1
+        case .spDX:
+            if let d = dxPrefix, ["UA", "UA2", "UA9", "EU"].contains(d) { return 0 }
+            v = (2, 5, 10)
+        case .voltaRTTY:
+            if q.sameCallArea || q.relation == .sameCountry { return 0 }
+            guard let a = q.ownZone, let b = Multipliers.zone(in: q.exchangeRcvd) ?? q.dx?.cqZone,
+                  (1...40).contains(a), (1...40).contains(b) else { return 0 }
+            let base = ContestCodes.voltaZonePoints[a - 1][b - 1]
+            return q.relation == .otherContinent && (q.band == "80m" || q.band == "10m") ? base * 2 : base
+        case .rookieRoundup:
+            guard let y = q.year, let yy = Multipliers.tokens(q.exchangeRcvd).compactMap({ $0.count == 2 ? Int($0) : nil }).first
+            else { return 1 }
+            return (0...3).contains((y - yy + 100) % 100) ? 2 : 1
+        case .russianRTTY:
+            if QSORecord.normalizeCall(q.call).hasSuffix("/MM") { return 5 }
+            let dxRU = dxPrefix.map(Self.russia.contains) ?? false
+            if ownPrefix.map(Self.russia.contains) ?? false {
+                if dxRU { return q.own?.continent == q.dx?.continent ? 2 : 5 }
+                return q.relation == .otherContinent ? 5 : 3
+            }
+            if dxRU { return 10 }
+            v = (2, 3, 5)
+        case .russianDigi:
+            let call = QSORecord.normalizeCall(q.call)
+            let base: Int
+            if call.hasSuffix("/QRP") { base = 5 }
+            else {
+                switch q.relation {
+                case .sameCountry, nil: base = 1
+                case .sameContinent: base = 3
+                case .otherContinent: base = 5
+                }
+            }
+            return q.band == "160m" || low ? base * 2 : base
+        case .urcDX:
+            let words = Multipliers.tokens(q.exchangeRcvd)
+            if words.contains("MMS") || QSORecord.normalizeCall(q.call).hasSuffix("/MM") { return 3 }
+            let mine = Multipliers.tokens(q.exchangeSent).first { ContestCodes.urcTerritorySet.contains($0) }
+            let his = words.first { ContestCodes.urcTerritorySet.contains($0) }
+            if let mine, mine == his { return 1 }
+            let b = q.band ?? ""
+            if q.relation == .otherContinent {
+                return ["160m": 10, "80m": 6, "10m": 5][b] ?? 4
+            }
+            return ["160m": 5, "80m": 3, "10m": 3][b] ?? 2
+        case .trcDigi:
+            let dxM = Multipliers.hasMark("TRC", in: q.exchangeRcvd), myM = Multipliers.hasMark("TRC", in: q.exchangeSent)
+            if dxM { return myM ? 1 : 10 }
+            return q.relation == .otherContinent ? 2 : 1
         }
-        switch relation {
+        switch q.relation {
         case .sameCountry, nil: return v.0
         case .sameContinent: return v.1
         case .otherContinent: return v.2
@@ -156,17 +277,21 @@ public struct ScoreTally: Sendable, Equatable {
     public var dupes: Int { perBand.values.reduce(0) { $0 + $1.dupes } }
     public var points: Int { perBand.values.reduce(0) { $0 + $1.points } }
     public var qtc: Int { perBand.values.reduce(0) { $0 + $1.qtc } }
-    /// Per-band multipliers (without "once per contest") – BARTG: countries and areas.
-    public var bandMultipliers: Int { multipliers.total - multipliers.onceCount }
+    /// Multipliers without the continents (BARTG, SP DX: countries and areas; the continents are a separate factor).
+    public var bandMultipliers: Int { multipliers.total - multipliers.total(.continent) }
     /// Continents (BARTG).
     public var continents: Int { multipliers.worked(.continent, band: nil).count }
     /// Multipliers in the Total row of the Score table: with BARTG only per-band ones (continents are separate in the formula).
     public var tableMultiplierTotal: Int {
         rule.formula == .pointsTimesMultipliersTimesContinents ? bandMultipliers : multipliers.total
     }
+    /// Multipliers once per contest in the Score table (without the continents of the continent formula).
+    public var onceTableCount: Int {
+        multipliers.onceCount - (rule.formula == .pointsTimesMultipliersTimesContinents ? multipliers.total(.continent) : 0)
+    }
     /// The "Per contest" table row: multipliers once per contest that are part of the total (not BARTG – continents separately).
     public var showsOnceMultiplierRow: Bool {
-        rule.formula != .pointsTimesMultipliersTimesContinents && multipliers.rule.components.contains { !$0.perBand }
+        multipliers.rule.components.contains { !$0.perBand && !(rule.formula == .pointsTimesMultipliersTimesContinents && $0.kind == .continent) }
     }
 
     /// The multiplier factor in the score formula.
@@ -176,6 +301,7 @@ public struct ScoreTally: Sendable, Equatable {
         case .pointsTimesMultipliersTimesContinents: return bandMultipliers * continents
         case .qsoPlusQTCTimesWeightedMultipliers: return multipliers.weightedTotal
         case .pointsSum: return 1
+        case .qsosTimesPointsTimesMultipliers: return multipliers.total
         }
     }
 
@@ -183,6 +309,7 @@ public struct ScoreTally: Sendable, Equatable {
         switch rule.formula {
         case .qsoPlusQTCTimesWeightedMultipliers: return (points + qtc) * multiplierFactor
         case .pointsSum: return points
+        case .qsosTimesPointsTimesMultipliers: return (qsos - dupes) * points * multiplierFactor
         default: return points * multiplierFactor
         }
     }
@@ -199,6 +326,8 @@ public struct ScoreTally: Sendable, Equatable {
             return L("(QSO %@ + QTC %@) × násobiče s váhou pásem %@ = %@", f(points), f(qtc), f(multipliers.weightedTotal), f(score))
         case .pointsSum:
             return L("Součet bodů = %@", f(score))
+        case .qsosTimesPointsTimesMultipliers:
+            return L("QSO %@ × body %@ × násobiče %@ = %@", f(qsos - dupes), f(points), f(multipliers.total), f(score))
         }
     }
 
@@ -243,6 +372,8 @@ public struct ScoreCalculator: Sendable {
     let own: CountryInfo?
     /// My own locator square (4 characters) for Makrothen.
     let ownSquare: String?
+    /// My own call (VOLTA: the same call area).
+    let ownCall: String
 
     public init(rule: ScoreRule, multiplierRule: MultiplierRule, ownCall: String, ownLocator: String,
                 lookup: @escaping @Sendable (String, Bool) -> CountryInfo?) {
@@ -250,6 +381,7 @@ public struct ScoreCalculator: Sendable {
         multipliers = MultiplierCalculator(rule: multiplierRule, lookup: lookup)
         own = lookup(QSORecord.normalizeCall(ownCall), multiplierRule.waeList)
         ownSquare = Self.square(ownLocator)
+        self.ownCall = QSORecord.normalizeCall(ownCall)
     }
 
     /// Calculator for a preset; my own country is determined from my own call.
@@ -275,8 +407,21 @@ public struct ScoreCalculator: Sendable {
             guard let km = Self.makrothenKm(own, dx) else { return 0 }
             return Int((Double(km) * ScoreRule.makrothenFactor(r.band)).rounded(.down))
         }
-        return rule.points(relation: relation(r.call), band: r.band)
+        let wae = multipliers.rule.waeList
+        var q = QSOPointsInput(relation: relation(r.call), band: r.band)
+        q.call = r.call; q.own = own; q.dx = lookup(QSORecord.normalizeCall(r.call), wae)
+        q.exchangeSent = [r.serialSent.map(String.init), r.exchangeSent].compactMap { $0 }.joined(separator: " ")
+        q.exchangeRcvd = r.exchangeRcvd
+        q.ownZone = own?.cqZone
+        if rule.preset == .voltaRTTY, let a = multipliers.callArea(r.call, country: q.dx),
+           let b = multipliers.callArea(ownCall, country: own) { q.sameCallArea = a == b }
+        q.year = Self.utc.component(.year, from: r.timeOn)
+        return rule.points(q)
     }
+
+    static let utc: Calendar = {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c
+    }()
 
     /// Full computation from the QSOs in the contest window [since, until) (and WAE QTC series); the tally fixes the window.
     public func tally(records: [QSORecord], qtc: [QTCSeries], since: Date, until: Date? = nil) -> ScoreTally {

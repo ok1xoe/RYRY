@@ -506,3 +506,14 @@ Logika `AppCore/Score.swift` (`ScoreRule`, `ScoreCalculator`, `ScoreTally` – o
   a recenzenta App Store. `-playDemo YES` ho pustí po startu (snímky obrazovky).
 - **Ikona** ve formátu Icon Composer (`Resources/AppIcon.icon` → `actool` → `Assets.car` + záložní `.icns`),
   aby ji macOS 26 nezavřel do šedého rámečku.
+
+## Katalog závodů (contestcalendar.com, 2026-10-02)
+- Z contestcalendar.com převzaty všechny HF závody, kde se jede RTTY; pravidla ověřena v oficiálních pravidlech (agenti, 2026-10-02). Předvoleb je 28 (`ContestPreset`, `Sources/Settings/ContestPresets.swift`); bodování `ScoreRule.points(_:)`, násobiče `MultiplierRule.rule(for:)`, seznamy kódů `AppCore/ContestCodes.swift`, přehled pravidel a výchozí výměna `ContestCatalog`.
+- Vynecháno: SARL HF Digital (od 2026 jen FT4/FT8), Open Ukraine RTTY (zrušen 2022–2026, pravidla bez seznamu oblastí), 10-10 Fall Digital (už se nekoná), FT4/FT8 a VHF závody (Bucharest Digital, WW Digi, ARRL Digital, CQ VHF Digital).
+- Termíny: `ContestSchedule` – n-tý celý víkend, n-tý den v týdnu, pevné datum, týdně; více termínů za rok (NAQP, NA Sprint, DARC Sprint čtvrtletně). Výběr předvolby vezme nejbližší termín, který ještě neskončil (začátek + délka).
+- Výměna: nové formáty `serialText` (číslo + text: SARTG NY, NA Sprint, VOLTA, TRC/PRO člen – u členství je text nepovinný pro ESM) a `text` (text bez čísla: URC teritorium, WRT, NAQP, Rookie, IG-RY rok). „Číslo NEBO kód“ (`receivesSerialOrCode`) zobecňuje ARRL RU: ruské oblasti, DOK, státy XE, provincie EA, powiaty SP.
+- Násobiče z výměny = `MultiplierKind.region` se seznamem kódů nebo vzorem (rok licence, DOK písmeno + 2 číslice); filtry komponent podle země / kontinentu (NAQP: jen Severní Amerika, SP DX: bez UA/EW, PRO: bez vlastní země).
+- Výchozí odesílaná výměna podle stanice: URC teritorium z prefixu (jen jednoznačné prefixy, OK1 = BHE, OK2 = MOR), WRT/NAQP/NA Sprint/Rookie jméno + QTH (stát z Stanice → QTH, jinak „DX“ / prefix země).
+- Názvy CONTEST změněné podle pravidel: WAE `DARC-WAEDC-RTTY`, JARTS → JARL WW RTTY `JARL-WW-RTTY`; staré názvy se při načtení starého nastavení stále rozpoznají.
+- Nejednoznačnosti (zobrazené v Nastavení u závodu oranžově): Mexico (EN × ES pravidla – použita EN, násobiče na pásmu), PRO Digi (duplicita pásmo+mód), WRT/Rookie (vzorec jen implicitní), VOLTA (bonusový násobič za 4 pásma se nepočítá), DARC (zvláštní DOKy), URC/TRC (duplicita neuvedena → na pásmu). Russian WW Digital a PRO Digi: duplicita na pásmu a módu.
+- Nastavení → Závod: u zvolené předvolby sekce „Pravidla závodu“ (termín, pásma, výměna, body, násobiče, duplicity, neověřené body, odkaz na pravidla).

@@ -646,7 +646,13 @@ public final class AppModel {
     private var ownLocator: String {
         settings.station.locator.isEmpty ? settings.contest.exchange.uppercased() : settings.station.locator.uppercased()
     }
-    private var countryDB: CountryDB? { app?.countries ?? CountryDB.shared }
+    var countryDB: CountryDB? { app?.countries ?? CountryDB.shared }
+    /// The sent exchange a contest preset needs from my station (URC territory, name + QTH …).
+    public func defaultContestExchange(_ p: ContestPreset, station: Station) -> String {
+        ContestCatalog.defaultExchange(p, station: station, countries: countryDB)
+    }
+    /// My own country (cty.dat primary prefix) for the contest rules.
+    public func ownCountryPrefix(_ call: String) -> String? { countryDB?.lookup(call)?.primaryPrefix }
 
     /// The band of the current QSO: the rig when it is online, otherwise the manually entered frequency.
     public var currentBand: String? { Self.band(rig, qso) }
@@ -1721,7 +1727,8 @@ public final class AppModel {
         if settings.contest.enabled, !qso.call.isEmpty, kind != .call {
             for (field, v) in WordClassifier.contestUpdate(word, format: settings.contest.format,
                                                            serialMode: settings.contest.exchange.isEmpty,
-                                                           roundup: settings.contest.isRoundupStateExchange, current: qso) {
+                                                           roundup: settings.contest.isRoundupStateExchange,
+                                                           serialOrCode: settings.contest.receivesSerialOrCode, current: qso) {
                 await setQSOField(field, v)
             }
             return

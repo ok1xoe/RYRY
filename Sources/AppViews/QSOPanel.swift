@@ -23,6 +23,8 @@ struct QSOPanel: View {
         case .ped: f = "PED"
         case .wae: f = "WAE + QTC"
         case .zone: f = L("RST + CQ zóna")
+        case .serialText: f = L("RST + číslo + výměna")
+        case .text: f = L("RST + výměna")
         }
         return c.name.isEmpty ? L("závod") + " · \(f)" : "\(c.name) · \(f)"
     }

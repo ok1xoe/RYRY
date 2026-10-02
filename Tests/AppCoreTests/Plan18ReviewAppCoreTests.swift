@@ -22,8 +22,8 @@ private func calc(_ p: ContestPreset, own: String = "OK1XOE", locator: String = 
 
 // MARK: Dupes
 
-// All presets (RTTY only): the same station once per band regardless of mode and leg (verified against the rules).
-@Test(arguments: ContestPreset.allCases)
+// RTTY-only presets: the same station once per band regardless of mode and leg (verified against the rules).
+@Test(arguments: ContestPreset.allCases.filter { $0 != .russianDigi && $0 != .proDigi })
 func presetDupeIsOncePerBandRegardlessOfMode(_ p: ContestPreset) {
     let log = [rec("W1AW", 14080, exch: "05 CT JO70", min: 1), rec("W1AW", 14081, exch: "05 CT JO70", min: 2, mode: "PSK"),
                rec("W1AW", 14082, exch: "05 CT JO70", min: 9 * 60)]                        // a different leg (SARTG, Makrothen)
@@ -62,7 +62,11 @@ func presetDupeIsOncePerBandRegardlessOfMode(_ p: ContestPreset) {
 
 @Test func presetDurations() {
     let h: [ContestPreset: Double] = [.arrlRoundup: 30, .cqwpxRTTY: 48, .bartgHF: 48, .sartgRTTY: 40, .cqwwRTTY: 48,
-                                      .makrothen: 40, .jartsRTTY: 48, .waeRTTY: 48, .okDXRTTY: 24]
+                                      .makrothen: 40, .jartsRTTY: 48, .waeRTTY: 48, .okDXRTTY: 24,
+                                      .sartgNewYear: 3, .proDigi: 24, .bartgSprint: 24, .mexicoRTTY: 36, .naqpRTTY: 12,
+                                      .naSprintRTTY: 4, .ybDX: 24, .eaRTTY: 24, .igryWW: 30, .bartgSprint75: 4, .spDX: 24,
+                                      .voltaRTTY: 24, .rookieRoundup: 6, .russianRTTY: 24, .urcDX: 24, .russianDigi: 24,
+                                      .darcSprint: 1.5, .trcDigi: 36, .wrt: 0.5]
     for p in ContestPreset.allCases { #expect(p.durationHours == h[p], "\(p)") }
     var c = ContestSettings.preset(.sartgRTTY, year: 2026)
     c.format = .zone                                                          // no longer a preset → the end is unknown

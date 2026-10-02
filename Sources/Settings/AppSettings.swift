@@ -306,91 +306,9 @@ public struct DecoderSettings: Codable, Sendable, Equatable {
 
 /// Contest format (MMTTY Log m_Contest): ON = RST + serial, CQ/RJ = zone + QTH, BARTG = serial + UTC time,
 /// PED = a click on a word always fills the call, without serials. WAE = RST + serial and the QTC exchange (WAE DX Contest).
-/// ZONE = RST + CQ zone (OK DX RTTY Contest).
-public enum ContestFormat: String, Codable, Sendable, CaseIterable { case serial, cqrj, bartg, ped, wae, zone }
-
-/// Presets of known RTTY contests (name for Cabrillo, format, start) – in calendar year order.
-/// The dates follow the usual rules; the exact date needs to be verified in the contest rules.
-public enum ContestPreset: String, CaseIterable, Codable, Sendable {
-    case arrlRoundup, cqwpxRTTY, bartgHF, sartgRTTY, cqwwRTTY, makrothen, jartsRTTY, waeRTTY, okDXRTTY
-    public var title: String {
-        switch self {
-        case .arrlRoundup: return "ARRL RTTY Roundup"
-        case .cqwpxRTTY: return "CQ WPX RTTY"
-        case .bartgHF: return "BARTG HF RTTY"
-        case .sartgRTTY: return "SARTG WW RTTY"
-        case .cqwwRTTY: return "CQ WW RTTY"
-        case .makrothen: return "Makrothen RTTY"
-        case .jartsRTTY: return "JARTS WW RTTY"
-        case .waeRTTY: return "WAE DX Contest RTTY"
-        case .okDXRTTY: return "OK DX RTTY Contest"
-        }
-    }
-    /// CONTEST: in Cabrillo.
-    public var cabrilloName: String {
-        switch self {
-        case .arrlRoundup: return "ARRL-RTTY"
-        case .cqwpxRTTY: return "CQ-WPX-RTTY"
-        case .bartgHF: return "BARTG-RTTY"
-        case .sartgRTTY: return "SARTG-RTTY"
-        case .cqwwRTTY: return "CQ-WW-RTTY"
-        case .makrothen: return "MAKROTHEN-RTTY"
-        case .jartsRTTY: return "JARTS-WW-RTTY"
-        case .waeRTTY: return "WAEDC"
-        case .okDXRTTY: return "OK-DX-RTTY"
-        }
-    }
-    public var format: ContestFormat {
-        switch self {
-        case .cqwwRTTY: return .cqrj
-        case .bartgHF: return .bartg
-        case .waeRTTY: return .wae
-        case .okDXRTTY: return .zone
-        case .arrlRoundup, .cqwpxRTTY, .sartgRTTY, .makrothen, .jartsRTTY: return .serial
-        }
-    }
-    /// Date: month, which full weekend (0 = the last one) and the start hour on Saturday (UTC).
-    var schedule: (month: Int, weekend: Int, hour: Int) {
-        switch self {
-        case .arrlRoundup: return (1, 1, 18)
-        case .cqwpxRTTY: return (2, 2, 0)
-        case .bartgHF: return (3, 3, 2)
-        case .sartgRTTY: return (8, 3, 0)
-        case .cqwwRTTY: return (9, 0, 0)
-        case .makrothen: return (10, 2, 0)
-        case .jartsRTTY: return (10, 3, 0)
-        case .waeRTTY: return (11, 2, 0)
-        case .okDXRTTY: return (12, 3, 0)
-        }
-    }
-    /// Contest length in hours from the start according to the official rules (docs/rulings.md, "Scoring and score").
-    public var durationHours: Double {
-        switch self {
-        case .arrlRoundup: return 30                       // Sat 18:00 – Sun 23:59
-        case .sartgRTTY, .makrothen: return 40             // three legs: Sat 00–08, Sat 16–24, Sun 08–16
-        case .okDXRTTY: return 24                          // Sat 00:00 – 24:00
-        case .cqwpxRTTY, .bartgHF, .cqwwRTTY, .jartsRTTY, .waeRTTY: return 48   // BARTG Sat 02:00 – Mon 01:59
-        }
-    }
-    /// Date and exchange on one line (for the menu and the label in Settings).
-    public var summary: String {
-        switch self {
-        case .arrlRoundup: return L("1. celý víkend v lednu · RST + číslo (W/VE stát)")
-        case .cqwpxRTTY: return L("2. celý víkend v únoru · RST + číslo")
-        case .bartgHF: return L("3. celý víkend v březnu · RST + číslo + čas")
-        case .sartgRTTY: return L("3. celý víkend v srpnu · RST + číslo, tři etapy")
-        case .cqwwRTTY: return L("poslední celý víkend v září · RST + CQ zóna (W/VE + stát)")
-        case .makrothen: return L("2. celý víkend v říjnu · RST + lokátor (4 znaky), tři etapy")
-        case .jartsRTTY: return L("3. celý víkend v říjnu · RST + věk operátora (YL 00)")
-        case .waeRTTY: return L("2. celý víkend v listopadu · RST + číslo, QTC")
-        case .okDXRTTY: return L("3. celý víkend v prosinci · RST + CQ zóna")
-        }
-    }
-    /// The preset matching the settings (by name and format); nil = custom settings.
-    public static func matching(_ c: ContestSettings) -> ContestPreset? {
-        allCases.first { $0.cabrilloName == c.name && $0.format == c.format }
-    }
-}
+/// ZONE = RST + CQ zone (OK DX RTTY Contest). SERIALTEXT = RST + serial + a text (zone, name, QTH, member …).
+/// TEXT = RST + a fixed text without a serial (territory, name + QTH, licence year …).
+public enum ContestFormat: String, Codable, Sendable, CaseIterable { case serial, cqrj, bartg, ped, wae, zone, serialText, text }
 
 /// Contest mode: serial numbers and the Cabrillo header.
 public struct ContestSettings: Codable, Sendable, Equatable {
@@ -407,8 +325,13 @@ public struct ContestSettings: Codable, Sendable, Equatable {
     public init() {}
     /// The preset valid for the UI: only as long as the format matches the preset.
     public var selectedPreset: ContestPreset? { preset.flatMap { $0.format == format ? $0 : nil } }
-    /// ARRL RTTY Roundup with serial numbers: W/VE send a state/province instead of the serial (the "State/prov. r" field).
-    public var isRoundupStateExchange: Bool { enabled && format == .serial && exchange.isEmpty && selectedPreset == .arrlRoundup }
+    /// A contest where I send a serial number but some stations send a code instead (ARRL RU: W/VE a state, Russian
+    /// contests: an oblast …) – the received number OR code (the "State/prov. r" field).
+    public var receivesSerialOrCode: Bool {
+        enabled && format == .serial && exchange.isEmpty && selectedPreset?.alternativeCode != nil
+    }
+    /// ARRL RTTY Roundup with serial numbers (states and provinces from the call history).
+    public var isRoundupStateExchange: Bool { receivesSerialOrCode && selectedPreset == .arrlRoundup }
     public var effectiveStart: Date { start ?? Date().addingTimeInterval(-72 * 3600) }
     /// Contest end (start + preset length); nil = the start or the preset is unknown.
     public var end: Date? {
@@ -416,46 +339,37 @@ public struct ContestSettings: Codable, Sendable, Equatable {
         return s.addingTimeInterval(p.durationHours * 3600)
     }
 
-    /// Settings according to a contest preset in the given year. `locator` = own locator (the Makrothen exchange).
-    public static func preset(_ p: ContestPreset, year: Int, locator: String = "") -> ContestSettings {
+    /// Settings according to a contest preset: the first date in the given year. `locator` = own locator (the Makrothen
+    /// exchange), `exchange` = the sent exchange (empty = the preset's own default).
+    public static func preset(_ p: ContestPreset, year: Int, locator: String = "", exchange: String = "") -> ContestSettings {
         var c = ContestSettings()
         c.enabled = true; c.nextSerial = 1
         c.name = p.cabrilloName; c.format = p.format; c.preset = p
         if p == .makrothen { c.exchange = String(locator.uppercased().prefix(4)) }
-        let s = p.schedule
-        c.start = fullWeekendSaturday(year: year, month: s.month, n: s.weekend)
-            .map { $0.addingTimeInterval(Double(s.hour) * 3600) }
+        if !exchange.isEmpty { c.exchange = exchange }
+        c.start = p.starts(year: year).first
         return c
     }
 
-    /// The nearest date: this year's if it has not ended yet (start + 48 h), otherwise next year.
-    public static func upcoming(_ p: ContestPreset, now: Date = Date(), locator: String = "") -> ContestSettings {
+    /// The nearest date that has not ended yet (this year or the next one).
+    public static func upcoming(_ p: ContestPreset, now: Date = Date(), locator: String = "", exchange: String = "") -> ContestSettings {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
         let y = cal.component(.year, from: now)
-        let c = preset(p, year: y, locator: locator)
-        if let st = c.start, st.addingTimeInterval(48 * 3600) > now { return c }
-        return preset(p, year: y + 1, locator: locator)
+        var c = preset(p, year: y, locator: locator, exchange: exchange)
+        let starts = p.starts(year: y) + p.starts(year: y + 1)
+        c.start = starts.first { $0.addingTimeInterval(p.durationHours * 3600) > now } ?? c.start
+        return c
     }
 
-    /// Saturday of the n-th full weekend (both Saturday and Sunday in the month), 00:00 UTC; n = 0 → the last full weekend.
-    static func fullWeekendSaturday(year: Int, month: Int, n: Int) -> Date? {
-        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
-        var found: [Date] = []
-        for day in 1...31 {
-            guard let d = cal.date(from: DateComponents(year: year, month: month, day: day)),
-                  cal.component(.month, from: d) == month, cal.component(.weekday, from: d) == 7 else { continue }
-            guard let sun = cal.date(byAdding: .day, value: 1, to: d), cal.component(.month, from: sun) == month else { continue }
-            found.append(d)
-        }
-        if n == 0 { return found.last }
-        return found.count >= n ? found[n - 1] : nil
-    }
     /// The format sends a serial number (ON without a fixed exchange, BARTG).
-    public var sendsSerial: Bool { format == .bartg || format == .wae || (format == .serial && exchange.isEmpty) }
+    public var sendsSerial: Bool {
+        format == .bartg || format == .wae || format == .serialText || (format == .serial && exchange.isEmpty)
+    }
     /// A format where the other station's zone is prefilled from DXCC.
     public var prefillsZone: Bool { format == .zone }
     /// A format where, without a filled-in exchange, my CQ zone from DXCC is sent (OK DX RTTY, CQ WW RTTY).
-    public var sendsOwnZone: Bool { format == .zone || format == .cqrj }
+    /// VOLTA (number + zone) as well.
+    public var sendsOwnZone: Bool { format == .zone || format == .cqrj || (format == .serialText && selectedPreset == .voltaRTTY) }
     enum CodingKeys: String, CodingKey { case enabled, format, name, category, nextSerial, exchange, start, preset }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "contest", x = ContestSettings()

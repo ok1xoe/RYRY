@@ -690,7 +690,8 @@ struct ContestTab: View {
         Binding(get: { s.contest.selectedPreset }, set: { p in
             guard let p else { s.contest.preset = nil; return }
             let serial = s.contest.nextSerial
-            s.contest = ContestSettings.upcoming(p, locator: s.station.locator)
+            s.contest = ContestSettings.upcoming(p, locator: s.station.locator,
+                                                 exchange: model.defaultContestExchange(p, station: s.station))
             if p == .waeRTTY { s.contest.nextSerial = max(1, serial) }
         })
     }
@@ -700,6 +701,10 @@ struct ContestTab: View {
         case .serial: return L("Prázdné = posílá se pořadové číslo; jinak tento text (např. stát).")
         case .cqrj: return L("Prázdné = moje CQ zóna podle značky; W/VE přidají stát, např. „05 NY“.")
         case .zone: return L("Prázdné = moje CQ zóna podle značky (DXCC).")
+        case .serialText:
+            if s.contest.selectedPreset == .voltaRTTY { return L("Posílá se číslo a tento text; prázdné = moje CQ zóna podle značky.") }
+            return L("Posílá se pořadové číslo a za ním tento text (jméno, QTH, značka člena …).")
+        case .text: return L("Posílá se tento text bez pořadového čísla (teritorium, jméno a QTH, rok licence …).")
         case .bartg, .wae, .ped: return L("V tomto formátu se nepoužívá.")
         }
     }
@@ -720,6 +725,7 @@ struct ContestTab: View {
                     Text(L("Předvolba nastaví název, formát výměny a nejbližší začátek známého závodu."))
                 }
             }
+            if let p = s.contest.selectedPreset { ContestRulesSection(rules: ContestCatalog.rules(p, ownCountry: model.ownCountryPrefix(s.station.call))) }
             Section {
                 Picker(L("Formát výměny"), selection: $s.contest.format) {
                     Text(L("RST + pořadové číslo")).tag(ContestFormat.serial)
@@ -727,6 +733,8 @@ struct ContestTab: View {
                     Text(L("CQ/RJ – zóna + QTH (CQ WW)")).tag(ContestFormat.cqrj)
                     Text(L("BARTG – číslo + čas UTC")).tag(ContestFormat.bartg)
                     Text(L("WAE – číslo + QTC")).tag(ContestFormat.wae)
+                    Text(L("RST + číslo + text")).tag(ContestFormat.serialText)
+                    Text(L("RST + text (bez čísla)")).tag(ContestFormat.text)
                     Text(L("PED – klik = značka")).tag(ContestFormat.ped)
                 }
                 TextField(L("Odesílaná výměna"), text: $s.contest.exchange, prompt: Text(L("automaticky")))
@@ -1131,5 +1139,28 @@ struct CallHistorySection: View {
         } header: { Text(L("Historie značek")) } footer: {
             Text(L("Po zadání značky doplní jméno, lokátor a výměnu protistanice ze souboru (N1MM Call History: hlavička !!Order!!, nebo jednoduché CSV Call,Name,Exch1). Historie má přednost před zónou z DXCC a před callbookem; ručně zadané hodnoty se nepřepisují. Počet značek se aktualizuje po uložení nastavení."))
         }
+    }
+}
+
+/// The selected contest's rules: dates, bands, what is exchanged, points, multipliers, dupes, the source.
+struct ContestRulesSection: View {
+    let rules: ContestRules
+    func row(_ title: String, _ text: String) -> some View {
+        LabeledContent(title) { Text(text).multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true) }
+    }
+    var body: some View {
+        Section {
+            row(L("Termín"), rules.dates)
+            row(L("Pásma"), rules.bands)
+            row(L("Výměna"), rules.exchange)
+            row(L("Body"), rules.points)
+            row(L("Násobiče"), rules.multipliers)
+            row(L("Duplicity"), rules.dupes)
+            ForEach(rules.unverified, id: \.self) { u in
+                Label(u, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let url = URL(string: rules.source) { Link(L("Oficiální pravidla"), destination: url) }
+        } header: { Text(L("Pravidla závodu")) }
     }
 }

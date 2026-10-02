@@ -74,7 +74,7 @@ public struct ScoreWindow: View {
                 GridRow {
                     Text(L("Za závod")).gridColumnAlignment(.leading)
                     Text(""); Text(""); Text("")
-                    num(m.onceCount)
+                    num(s.onceTableCount)
                     if isWAE { Text(""); Text("") }
                 }
             }
