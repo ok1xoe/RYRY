@@ -21,7 +21,7 @@ struct TopBar: View {
             HStack(spacing: 6) {
                 Button { Task { await model.toggleTx() } } label: {
                     Text(model.state == .rx || model.state == .stopped ? "TX" : "RX")
-                        .font(.headline).frame(width: 44)
+                        .uiFont(.headline).frame(width: 44)
                 }
                 .hint(L("Přepnout TX/RX (⌘T)"))
                 Button("Tune") { Task { await model.tune() } }.fixedSize()
@@ -29,7 +29,7 @@ struct TopBar: View {
                     .keyboardShortcut(.escape, modifiers: [])
                     .hint(L("Okamžitě RX (Esc)"))
                 Text(Self.stateLabel(model.state))
-                    .font(.system(.body, design: .monospaced).bold()).lineLimit(1).fixedSize()
+                    .uiFont(.body, weight: .bold, design: .monospaced).lineLimit(1).fixedSize()
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(stateColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
                 if model.wavPlaying { WAVControls(model: model) }
@@ -57,7 +57,7 @@ struct TopBar: View {
                     ForEach([170.0, 200, 425, 850], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
                 }.fixedSize()
                 Text(model.fig ? "FIGS" : "LTRS")
-                    .font(.caption.monospaced().bold()).lineLimit(1).fixedSize()
+                    .uiFont(.caption, weight: .bold, design: .monospaced).lineLimit(1).fixedSize()
                     .padding(.horizontal, 4).padding(.vertical, 2)
                     .background((model.fig ? Color.orange : Color.secondary).opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
                     .hint(L("Stav přijímače LTRS/FIGS"))
@@ -204,7 +204,7 @@ struct WAVControls: View {
             .frame(width: 110).controlSize(.small)
             .hint(L("Posun v přehrávaném souboru"))
             Text("\(Self.time((dragging ?? model.wavProgress) * model.wavDuration))/\(Self.time(model.wavDuration))")
-                .font(.caption.monospacedDigit()).foregroundStyle(.secondary).fixedSize()
+                .uiFont(.caption, digits: true).foregroundStyle(.secondary).fixedSize()
             Button { Task { await model.stopWAV() } } label: { Image(systemName: "stop.fill") }
                 .hint(L("Zastavit přehrávání WAV"))
         }
@@ -238,7 +238,7 @@ struct FrequencyControl: View {
             .hint(model.settings.rig.type == .none ? L("Pásmo do logu (bez rigu)") : L("Přeladit rig na RTTY kmitočet pásma"))
             Button { open() } label: {
                 Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")
-                    .font(.system(.title3, design: .monospaced))
+                    .uiFont(.title3, design: .monospaced)
                     .lineLimit(1).fixedSize()
                     .foregroundStyle(online ? .primary : .secondary)
             }
@@ -256,7 +256,7 @@ struct FrequencyControl: View {
 
     var entry: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(model.settings.rig.type == .none ? L("Frekvence do logu (kHz)") : L("Přeladit rig (kHz)")).font(.caption).foregroundStyle(.secondary)
+            Text(model.settings.rig.type == .none ? L("Frekvence do logu (kHz)") : L("Přeladit rig (kHz)")).uiFont(.caption).foregroundStyle(.secondary)
             HStack {
                 TextField("kHz", text: $text)
                     .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 130)
@@ -265,7 +265,7 @@ struct FrequencyControl: View {
                     .onChange(of: text) { error = nil }
                 Text("kHz").foregroundStyle(.secondary)
             }
-            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+            if let error { Text(error).uiFont(.caption).foregroundStyle(.red) }
         }
         .padding(10)
         .onAppear { focused = true }

@@ -82,6 +82,7 @@ První vydání RYRY v App Store – programu pro RTTY na Macu, dříve šířen
 • Nové jméno a ikona
 • 28 předvoleb RTTY závodů s přehledem pravidel, bodováním a násobiči
 • Sady maker pro běžný provoz, DX a každý závod; tooltip tlačítka ukáže, co makro pošle
+• Větší písmo v oknech příjmu a vysílání a nastavitelná velikost rozhraní
 • Nápověda → Přehrát ukázkový signál: dekódování si vyzkoušíte i bez rádia
 • LoTW: RYRY připraví soubor ADIF a otevře ho v TrustedQSL
 • Přechod z mmtty4mac: nastavení se přenese samo; RYRY se jednou zeptá na přístup ke složce s logem a hesla k online službám bude možná potřeba zadat znovu

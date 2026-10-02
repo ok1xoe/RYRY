@@ -397,7 +397,11 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     public var gainDB = 0.0
     public var autoGain = true
     public var timestamps = false
+    /// Font size of the receive window (pt); `txFontSize` of the transmit window.
     public var fontSize = 14.0
+    public var txFontSize = 14.0
+    /// Size of the controls and the app's text (buttons, macros, panels).
+    public var uiSize = UISize.normal
     /// Font of the RX and TX windows (family name; empty = the system monospaced one).
     public var rxFont = ""
     /// Window colors (#RRGGBB; nil = system): receive background and text, transmit echo, transmit background and text.
@@ -412,18 +416,23 @@ public struct DisplaySettings: Codable, Sendable, Equatable {
     /// Highlight calls in the received text (own, dupe, in the log, new).
     public var highlightCalls = true
     public init() {}
+    /// The font sizes of the receive and transmit windows (pt).
+    public static let fontRange = 9.0...48.0
     /// The core's FFT covers 0–4000 Hz (TSound m_FFTWINDOW).
     public static let maxHz = 4000.0
     enum CodingKeys: String, CodingKey { case fromHz, toHz, gainDB, autoGain, timestamps, fontSize, rxFont, rxBackground,
                                              rxTextColor, rxEchoColor, txBackground, txTextColor, palette, fftResponse,
-                                             xySize, xyQuality, showHints, highlightCalls }
+                                             xySize, xyQuality, showHints, highlightCalls, txFontSize, uiSize }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self), w = d.warningSink, s = "display", x = DisplaySettings()
         fromHz = c.tolerant(.fromHz, x.fromHz, w, s); toHz = c.tolerant(.toHz, x.toHz, w, s)
         if !(fromHz >= 0 && toHz <= Self.maxHz && toHz - fromHz >= 200) { fromHz = x.fromHz; toHz = x.toHz }
         gainDB = min(30, max(-30, c.tolerant(.gainDB, x.gainDB, w, s)))
         autoGain = c.tolerant(.autoGain, x.autoGain, w, s); timestamps = c.tolerant(.timestamps, x.timestamps, w, s)
-        fontSize = min(40, max(8, c.tolerant(.fontSize, x.fontSize, w, s)))
+        fontSize = min(Self.fontRange.upperBound, max(Self.fontRange.lowerBound, c.tolerant(.fontSize, x.fontSize, w, s)))
+        // older settings: one size for both windows
+        txFontSize = min(Self.fontRange.upperBound, max(Self.fontRange.lowerBound, c.tolerant(.txFontSize, fontSize, w, s)))
+        uiSize = c.tolerant(.uiSize, x.uiSize, w, s)
         rxFont = c.tolerant(.rxFont, x.rxFont, w, s)
         rxBackground = Macro.validColor(c.tolerant(.rxBackground, nil, w, s))
         rxTextColor = Macro.validColor(c.tolerant(.rxTextColor, nil, w, s))

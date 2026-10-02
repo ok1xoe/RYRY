@@ -5,6 +5,7 @@ RYRY (dříve mmtty4mac) je RTTY program pro macOS: nativní přepis MMTTY (JE3H
 **Novinky 1.0 (Mac App Store):**
 - nové jméno RYRY a nová ikona; distribuce přes Mac App Store (aplikace běží v sandboxu macOS), bundle ID `cz.ok1xoe.ryry`; nastavení z mmtty4mac se při prvním spuštění přenese samo, aplikace se jednou zeptá na přístup ke složce s logem a hesla online služeb bude možná potřeba zadat znovu;
 - 28 předvoleb RTTY závodů (všechny RTTY závody z contestcalendar.com) s přehledem pravidel v Nastavení → Závod, bodováním a násobiči podle oficiálních pravidel; nové formáty výměny (číslo + text, text, číslo nebo kód);
+- větší písmo: zvlášť pro okno příjmu a vysílání (až 48 pt, ⌘+ / ⌘−) a velikost rozhraní (tlačítka, makra, písmo aplikace; ⌃⌘+ / ⌃⌘−);
 - sady maker pro běžný provoz, DX a každý závod; tooltip tlačítka makra ukáže, co se pošle; nové zástupné znaky (`%N` = výměna závodu, `%S %X %a %o %Z`) a jejich přehled v editoru maker; ⇧F1–⇧F4 spouštějí svá makra;
 - Nápověda → Přehrát ukázkový signál – dekódování vyzkoušíte i bez rádia; LoTW přes TrustedQSL (RYRY připraví ADIF, podepíšete a odešlete ho v TQSL);
 - odstraněno: spouštění hamlibu aplikací (rigctld spusťte sami) a kontrola aktualizací (aktualizuje App Store).
@@ -38,7 +39,7 @@ Volitelně: pro rádia, která vestavěný CAT nezná, nainstalujte hamlib (`bre
 | **Rig** | Ovládání rádia – viz kapitola 3. |
 | **Modem** | Parametry demodulátoru (výchozí hodnoty odpovídají MMTTY). Mění se hned. |
 | **Závod** | Závodní režim, předvolby závodů, výměna, Cabrillo – viz kapitola 7. |
-| **Zobrazení** | Jazyk rozhraní, spektrum a vodopád (rozsah, zesílení, paleta, odezva), XY scope, písmo a barvy oken, volby okna vysílání, bublinová nápověda. |
+| **Zobrazení** | Jazyk rozhraní, spektrum a vodopád (rozsah, zesílení, paleta, odezva), XY scope, písmo a barvy oken (velikost písma zvlášť pro příjem a vysílání 9–48 pt, velikost rozhraní malá–největší), volby okna vysílání, bublinová nápověda. |
 | **API a log** | API pro loggery, adresář logu, průběžný záznam příjmu do souboru. |
 | **Klávesy** | Klávesové zkratky maker a příkazů. |
 
@@ -75,6 +76,7 @@ Tlačítko **Vyzkoušet spojení** ukáže frekvenci a mód. Pro PTT přes CAT z
 - **Okno vysílání:** režim odesílání po znacích, slovech nebo řádcích; **Odeslat vše** odešle celý text. Volitelně CR/LF na začátku vysílání a zalamování řádků (Nastavení → Zobrazení → Okno vysílání).
 - **Makra F1–F12 a ⇧F1–⇧F4 (16 tlačítek):** klik nebo klávesa. Pravým tlačítkem **Upravit…** (název, text, barva, opakování); editor má přehled zástupných znaků. **Tooltip** tlačítka ukáže, co makro právě pošle – s dosazenou značkou a výměnou z QSO okna – a pod tím jeho šablonu.
 - **Sady maker:** nad lištou maker je přepínač **Běžný provoz / DX**. V závodě má každý závod (i vlastní) svou sadu; přepne se sama se zvoleným závodem a úpravy maker se ukládají do aktivní sady. **Výchozí makra…** nahradí aktivní sadu výchozí – u závodu ji postaví podle jeho výměny.
+- **Velikost písma:** menu Zobrazení → **Větší písmo** ⌘+ / **Menší písmo** ⌘− / **Výchozí velikost písma** ⌘0 mění písmo okna příjmu i vysílání; **Větší rozhraní** ⌃⌘+ / **Menší rozhraní** ⌃⌘− zvětší tlačítka, makra, panel QSO a písmo aplikace. Zvlášť pro příjem a vysílání v Nastavení → Zobrazení.
 - **Zprávy:** delší uložené texty v menu **Zprávy** (stejná syntaxe jako makra).
 - **Odeslat textový soubor:** menu Vysílání → Odeslat textový soubor….
 

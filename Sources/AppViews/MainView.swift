@@ -61,7 +61,7 @@ struct StatusBar: View {
             }
             Text(model.apiStatus).foregroundStyle(.secondary)
         }
-        .font(.caption)
+        .uiFont(.caption)
         .padding(.horizontal, 8).padding(.vertical, 4)
         .background(.bar)
     }

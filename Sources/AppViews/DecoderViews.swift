@@ -15,7 +15,7 @@ struct SecondDecoderPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
-                Text(L("2. dekodér")).font(.caption.bold())
+                Text(L("2. dekodér")).uiFont(.caption, weight: .bold)
                 Picker(L("Demodulátor"), selection: demodBinding) {
                     Text(L("auto (%@)", model.secondDemodEffective.uppercased())).tag(String?.none)
                     ForEach(AuxDecoderConfig.demodTypes, id: \.self) { Text($0.uppercased()).tag(String?.some($0)) }
@@ -139,10 +139,10 @@ struct ChannelRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("\(index)").font(.caption.bold()).foregroundStyle(.green).frame(width: 14)
-            Text(String(format: "%.0f Hz", channel.mark)).font(.body.monospacedDigit()).frame(width: 70, alignment: .trailing)
+            Text("\(index)").uiFont(.caption, weight: .bold).foregroundStyle(.green).frame(width: 14)
+            Text(String(format: "%.0f Hz", channel.mark)).uiFont(.body, digits: true).frame(width: 70, alignment: .trailing)
             Text(Self.clickable(channel.text))
-                .font(.system(.body, design: .monospaced))
+                .uiFont(.body, design: .monospaced)
                 .lineLimit(2).truncationMode(.head)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .tint(.primary)
