@@ -121,7 +121,7 @@ Zástupné znaky v makrech:
 
 - QSO okno vpravo ukazuje pole podle režimu (bez závodu jméno, QTH, lokátor; v závodě jen výměnu). Pod značkou je země DXCC, zóny a místní čas protistanice a předchozí spojení s ní.
 - **Log** (⌘L) zapíše spojení; **Clear** vyprázdní okno.
-- **Okno Log** (⇧⌘L): hledání, oprava (dvojklik), mazání, **Importovat ADIF…**, **Exportovat Cabrillo…**.
+- **Okno Log** (⇧⌘L): hledání, oprava (dvojklik – včetně závodních polí: odeslané a přijaté číslo, výměna, CQ zóna; skóre a násobiče se přepočítají), mazání, **Importovat ADIF…**, **Exportovat Cabrillo…**.
 - Log se ukládá do složky z Nastavení → API a log (výchozí `~/Documents/RYRY`; log z mmtty4mac zůstává v `~/Documents/mmtty4mac`) jako JSONL + ADIF `RYRY.adi`, který přečte každý logger. Když otevřete nebo založíte log v jiné složce, RYRY se jednou zeptá na přístup k ní.
 - Starý log z MMTTY: v MMTTY ho exportujte do ADIF a v RYRY importujte (duplicity se přeskočí).
 

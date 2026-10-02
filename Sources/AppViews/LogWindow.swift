@@ -70,9 +70,10 @@ public struct LogWindow: View {
     static func khzLabel(_ r: QSORecord) -> String { r.frequency.map { String(format: "%.1f", $0 / 1000) } ?? "" }
     static func rstLabel(_ r: QSORecord) -> String { (r.rstSent ?? "") + "/" + (r.rstRcvd ?? "") }
     static func nrLabel(_ r: QSORecord) -> String {
-        let s = r.serialSent.map { String(format: "%03d", $0) } ?? r.exchangeSent ?? ""
-        let v = r.serialRcvd.map { String(format: "%03d", $0) } ?? r.exchangeRcvd ?? ""
-        return s + "/" + v
+        func part(_ n: Int?, _ x: String?) -> String {
+            [n.map { String(format: "%03d", $0) }, x].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+        }
+        return part(r.serialSent, r.exchangeSent) + "/" + part(r.serialRcvd, r.exchangeRcvd)
     }
     /// Upload status: L = LoTW, e = eQSL, C = Club Log (green = uploaded).
     @ViewBuilder static func uploadBadges(_ r: QSORecord) -> some View {
@@ -101,7 +102,7 @@ public struct LogWindow: View {
                 }
                 Group {
                     TableColumn("RST s/r") { (r: QSORecord) in Text(Self.rstLabel(r)) }.width(70)
-                    TableColumn("Nr s/r") { (r: QSORecord) in Text(Self.nrLabel(r)) }.width(70)
+                    TableColumn("Exch s/r") { (r: QSORecord) in Text(Self.nrLabel(r)) }.width(min: 70, ideal: 140)
                     TableColumn(L("Jméno")) { (r: QSORecord) in Text(r.name ?? "") }
                     TableColumn("QTH") { (r: QSORecord) in Text(r.qth ?? "") }
                     TableColumn(L("Země")) { (r: QSORecord) in Text(r.country ?? "") }
@@ -194,6 +195,13 @@ struct QSOEditor: View {
             TextField("QTH", text: text(\.qth))
             TextField(L("Lokátor"), text: text(\.grid))
             TextField(L("Poznámka"), text: text(\.comment))
+            Section(L("Závod")) {
+                TextField(L("Číslo odeslané"), value: $record.serialSent, format: .number.grouping(.never))
+                TextField(L("Výměna odeslaná"), text: text(\.exchangeSent), prompt: Text(L("zóna, teritorium, oblast, jméno…")))
+                TextField(L("Číslo přijaté"), value: $record.serialRcvd, format: .number.grouping(.never))
+                TextField(L("Výměna přijatá"), text: text(\.exchangeRcvd), prompt: Text(L("zóna, teritorium, oblast, jméno…")))
+                TextField(L("CQ zóna"), value: $record.cqZone, format: .number.grouping(.never))
+            }
             HStack {
                 Spacer()
                 Button(L("Zrušit")) { dismiss() }
@@ -201,7 +209,7 @@ struct QSOEditor: View {
             }
         }
         .padding()
-        .frame(width: 420)
+        .frame(width: 460)
     }
 }
 

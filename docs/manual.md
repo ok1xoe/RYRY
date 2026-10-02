@@ -121,7 +121,7 @@ Macro variables:
 
 - The QSO window on the right shows fields for the current mode (name, QTH, locator outside contests; only the exchange in a contest). Under the call you see the DXCC country, zones, the other station's local time and previous QSOs.
 - **Log** (⌘L) saves the QSO; **Clear** empties the window.
-- **Log window** (⇧⌘L): search, edit (double-click), delete, **Import ADIF…**, **Export Cabrillo…**.
+- **Log window** (⇧⌘L): search, edit (double-click – including the contest fields: serial and exchange sent and received, CQ zone; score and multipliers are recomputed), delete, **Import ADIF…**, **Export Cabrillo…**.
 - The log is stored in the folder from Settings → API and log (by default `~/Documents/RYRY`; a log from mmtty4mac stays in `~/Documents/mmtty4mac`) as JSONL + ADIF `RYRY.adi` that any logger can read. When you open or create a log in another folder, RYRY asks once for access to that folder.
 - An old MMTTY log: export it to ADIF in MMTTY and import it in RYRY (duplicates are skipped).
 
