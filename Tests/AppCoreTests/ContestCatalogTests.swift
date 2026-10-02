@@ -72,7 +72,7 @@ private func start(_ p: ContestPreset, _ y: Int) -> [String] {
 }
 
 @Test func defaultExchange() {
-    var st = Station(); st.call = "OK1XOE"; st.name = "Tomas Kaplan"
+    var st = Station(); st.call = "OK1XOE"; st.name = "Tomáš Kaplan"
     #expect(ContestCatalog.defaultExchange(.urcDX, station: st, countries: db) == "BHE")
     st.call = "OK2ABC"
     #expect(ContestCatalog.defaultExchange(.urcDX, station: st, countries: db) == "MOR")

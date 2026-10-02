@@ -41,7 +41,8 @@ public enum ContestCatalog {
     public static func defaultExchange(_ p: ContestPreset, station: Station, countries: CountryDB?) -> String {
         let call = QSORecord.normalizeCall(station.call)
         let country = countries?.lookup(call)
-        let name = station.name.trimmingCharacters(in: .whitespaces).uppercased()
+        // RTTY (ITA2) has no diacritics: Tomáš → TOMAS
+        let name = station.name.trimmingCharacters(in: .whitespaces).folding(options: .diacriticInsensitive, locale: nil).uppercased()
         let firstName = name.split(separator: " ").first.map(String.init) ?? ""
         let northAmerica = country.map { $0.continent == "NA" || $0.primaryPrefix == "KH6" } ?? false
         // QTH for the North American contests: a state/province from Station → QTH, otherwise the DXCC prefix
