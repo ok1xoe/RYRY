@@ -51,6 +51,7 @@ struct MacroBar: View {
                                 .foregroundStyle(Self.textColor(i < macros.count ? macros[i].color : nil))
                         }
                         .shortcut(kb)
+                        .hint(model.macroPreview(i))
                         .buttonStyle(.borderedProminentIf(i < macros.count && macros[i].color != nil,
                                                           color: i < macros.count ? Color(hex: macros[i].color) : nil))
                         .contextMenu { Button(L("Upravit…")) { editing = i } }

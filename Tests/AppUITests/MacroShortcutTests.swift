@@ -43,3 +43,17 @@ private func fkey(_ n: Int, shift: Bool) -> NSEvent {
     #expect(saved.operatingMode == .dx && saved.macroSets["normal"]?[0].text == "\r\nMY CQ\r\n\\")
     await f.model.stop()
 }
+
+// The tooltip of a macro button: the text it sends now (variables from the QSO window) and the template.
+@Test @MainActor func macroPreviewShowsWhatIsSent() async throws {
+    let f = Fixture()
+    f.configure = { $0.contest = ContestSettings.preset(.urcDX, year: 2026, exchange: "BHE"); $0.macros = AppSettings.contestMacros(.urcDX) }
+    await f.model.start()
+    await f.model.setQSOField("call", "DL1ABC")
+    let p = f.model.macroPreview(3)                                  // F4 Exch
+    #expect(p.hasPrefix("DL1ABC 599 BHE 599 BHE"))
+    #expect(p.contains("%c %e %e"))
+    #expect(f.model.macroPreview(4).contains("TU OK1XOE TEST") && f.model.macroPreview(4).contains("+ zaloguje QSO"))
+    #expect(f.model.macroPreview(15).isEmpty)                         // an empty slot
+    await f.model.stop()
+}

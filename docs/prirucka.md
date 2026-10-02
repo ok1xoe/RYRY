@@ -70,7 +70,7 @@ Tlačítko **Vyzkoušet spojení** ukáže frekvenci a mód. Pro PTT přes CAT z
 
 - **TX / RX:** tlačítko TX nebo ⌘T. **Esc** = okamžitě RX. **Tune** = nosná pro ladění.
 - **Okno vysílání:** režim odesílání po znacích, slovech nebo řádcích; **Odeslat vše** odešle celý text. Volitelně CR/LF na začátku vysílání a zalamování řádků (Nastavení → Zobrazení → Okno vysílání).
-- **Makra F1–F12 a ⇧F1–⇧F4:** klik nebo klávesa. Pravým tlačítkem **Upravit…** (název, text, barva, opakování).
+- **Makra F1–F12 a ⇧F1–⇧F4:** klik nebo klávesa. Pravým tlačítkem **Upravit…** (název, text, barva, opakování). Tooltip tlačítka ukáže, co makro právě pošle (s doplněnou značkou a výměnou z QSO okna).
 - **Sady maker:** nad lištou maker je přepínač **Běžný provoz / DX**; v závodě má každý závod (i vlastní) svou sadu. Sada se mění sama se zvoleným závodem a úpravy se ukládají do ní. **Výchozí makra…** nahradí sadu výchozí – u závodu podle jeho výměny (F1 CQ, F4 výměna `%c %e %e`, F5 TU + zalogovat, F11 AGN, ⇧F3 moje značka – sedí s ESM).
 - **Zprávy:** delší uložené texty v menu **Zprávy** (stejná syntaxe jako makra).
 - **Odeslat textový soubor:** menu Vysílání → Odeslat textový soubor….

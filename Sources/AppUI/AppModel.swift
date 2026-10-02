@@ -7,6 +7,7 @@ import AudioIO
 import Engine
 import Foundation
 import Localization
+import MacroEngine
 import Keying
 import ModemKit
 import Observation
@@ -1772,6 +1773,19 @@ public final class AppModel {
         var s = settings; s.resetActiveMacroSet(); settings = s
         await app?.setMacros(s.macros)
         do { try settingsStore.save(s) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
+    }
+
+    /// What macro `i` sends now (variables filled in from the QSO window) – the tooltip of the macro button.
+    public func macroPreview(_ i: Int) -> String {
+        guard settings.macros.indices.contains(i), !settings.macros[i].isBlank else { return "" }
+        let text = settings.macros[i].text
+        let ctx = AppController.macroContext(settings: settings, qso: qso, now: Date()) { [countryDB] in countryDB?.lookup($0) }
+        let r = MacroEngine.expand(text, context: ctx)
+        var out = r.plainText.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+            .trimmingCharacters(in: .newlines)
+        if r.logQSO { out += "\n" + L("+ zaloguje QSO") }
+        let template = text.replacingOccurrences(of: "\r\n", with: " ").trimmingCharacters(in: .whitespaces)
+        return out + "\n\n" + L("Makro: %@", template)
     }
 
     /// The name of the active macro set for the macro bar.
