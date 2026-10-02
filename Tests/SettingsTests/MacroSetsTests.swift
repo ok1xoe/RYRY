@@ -41,10 +41,12 @@ import Testing
     for p in ContestPreset.allCases {
         let m = AppSettings.contestMacros(p)
         #expect(m.count == AppSettings.macroCount)
-        #expect(m[e.runExchange].text.contains("%e") && m[e.runTU].text.contains("%l"), "\(p)")
+        #expect((m[e.runExchange].text.contains("%N") || m[e.runExchange].text.contains("%x %y")) && m[e.runTU].text.contains("%l"), "\(p)")
         #expect(m[e.spMyCall].text.contains("%m") && m[e.runCQ].text.contains("CQ"), "\(p)")
     }
-    #expect(AppSettings.contestMacros(.naSprintRTTY)[3].text == "\r\n%c %e %m\r\n\\")
+    #expect(AppSettings.contestMacros(.naSprintRTTY)[3].text == "\r\n%c %m %N\r\n\\")
+    #expect(AppSettings.contestMacros(.urcDX)[3].text == "\r\n%c 599 %N %N\r\n\\")
+    #expect(AppSettings.contestMacros(.naqpRTTY)[3].text == "\r\n%c %N %N\r\n\\")
     #expect(AppSettings.contestMacros(.urcDX)[11].name == "EXCH?")
 }
 

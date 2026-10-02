@@ -6,7 +6,7 @@ import QSOLog
 import Settings
 @testable import AppCore
 
-// Macro variables for every kind of contest exchange (%e, %S, %X, %N) and the station variables (%a %o %Z).
+// Macro variables for every kind of contest exchange (%N, %S, %X) and the station variables (%a %o %Z).
 
 private func text(_ t: String, _ c: MacroContext) -> String {
     MacroEngine.expand(t, context: c).outputs.compactMap { if case .text(let s) = $0 { return s } else { return nil } }.joined()
@@ -23,21 +23,23 @@ private func ctx(_ p: ContestPreset, exchange: String = "", station: (inout Stat
 }
 
 @Test func exchangeVariablePerContestFormat() async throws {
-    #expect(text("%e", try await ctx(.cqwpxRTTY)) == "599 015")
-    #expect(text("%e", try await ctx(.urcDX, exchange: "BHE")) == "599 BHE")
-    #expect(text("%e", try await ctx(.okDXRTTY)) == "599 15")                     // my CQ zone from DXCC
-    #expect(text("%e", try await ctx(.naSprintRTTY, exchange: "TOMAS DX")) == "015 TOMAS DX")   // no RST
-    #expect(text("%e", try await ctx(.naqpRTTY, exchange: "TOMAS")) == "TOMAS")
-    #expect(text("%e", try await ctx(.bartgSprint)) == "015")
-    #expect(text("%e", try await ctx(.voltaRTTY)) == "599 015 15")                 // serial + my zone
-    #expect(text("%e", try await ctx(.sartgNewYear, exchange: "TOMAS")) == "599 015 TOMAS")
+    // %N = what the contest sends after the RST: a number, a code, number + text
+    #expect(text("%N", try await ctx(.cqwpxRTTY)) == "015")
+    #expect(text("%N", try await ctx(.urcDX, exchange: "BHE")) == "BHE")
+    #expect(text("%N", try await ctx(.okDXRTTY)) == "15")                      // my CQ zone from DXCC
+    #expect(text("%N", try await ctx(.naSprintRTTY, exchange: "TOMAS DX")) == "015 TOMAS DX")
+    #expect(text("%N", try await ctx(.naqpRTTY, exchange: "TOMAS")) == "TOMAS")
+    #expect(text("%N", try await ctx(.voltaRTTY)) == "015 15")                  // serial + my zone
     let v = try await ctx(.naSprintRTTY, exchange: "TOMAS DX")
-    #expect(text("%S|%X|%N", v) == "015|TOMAS DX|015 TOMAS DX")               // %N without the BARTG "-"
+    #expect(text("%S|%X", v) == "015|TOMAS DX")
     #expect(text("%a %o %Z", v) == "TOMAS JN89RB 15")
 }
 
-@Test func exchangeOutsideContestIsRST() {
-    var c = ContestSettings(); c.enabled = false
-    #expect(ContestCatalog.sentExchange(c, rst: "579", serial: 3, text: "X") == "579")
-    #expect(ContestCatalog.sentExchange(ContestSettings.preset(.wrt, year: 2026), rst: "599", serial: nil, text: "TOMAS OK") == "TOMAS OK")
+@Test func contestMacrosSendTheExchangeOfTheContest() async throws {
+    let urc = try await ctx(.urcDX, exchange: "BHE")
+    #expect(text(AppSettings.contestMacros(.urcDX)[3].text, urc).contains(" 599 BHE BHE"))
+    let sprint = try await ctx(.naSprintRTTY, exchange: "TOMAS DX")
+    #expect(text(AppSettings.contestMacros(.naSprintRTTY)[3].text, sprint).contains(" OK1XOE 015 TOMAS DX"))
+    let naqp = try await ctx(.naqpRTTY, exchange: "TOMAS")
+    #expect(text(AppSettings.contestMacros(.naqpRTTY)[5].text, naqp) == "\r\nTOMAS\r\n")
 }

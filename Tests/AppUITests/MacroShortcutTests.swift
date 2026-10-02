@@ -51,8 +51,8 @@ private func fkey(_ n: Int, shift: Bool) -> NSEvent {
     await f.model.start()
     await f.model.setQSOField("call", "DL1ABC")
     let p = f.model.macroPreview(3)                                  // F4 Exch
-    #expect(p.hasPrefix("DL1ABC 599 BHE 599 BHE"))
-    #expect(p.contains("%c %e %e"))
+    #expect(p.hasPrefix("DL1ABC 599 BHE BHE"))
+    #expect(p.contains("%c 599 %N %N"))
     #expect(f.model.macroPreview(4).contains("TU OK1XOE TEST") && f.model.macroPreview(4).contains("+ zaloguje QSO"))
     #expect(f.model.macroPreview(15).isEmpty)                         // an empty slot
     await f.model.stop()

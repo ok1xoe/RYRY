@@ -234,7 +234,6 @@ public actor AppController {
         let ct = settings.contest
         c.mySerial = ct.enabled ? (qso.serialSent.map { String(format: "%03d", $0) } ?? "") : ""
         c.myExchangeText = ct.enabled ? sentExch : ""
-        c.exchange = ContestCatalog.sentExchange(ct, rst: qso.rstSent, serial: ct.enabled ? qso.serialSent : nil, text: c.myExchangeText)
         c.myName = settings.station.name.trimmingCharacters(in: .whitespaces)
             .folding(options: .diacriticInsensitive, locale: nil).uppercased().split(separator: " ").first.map(String.init) ?? ""
         c.myLocator = settings.station.locator.uppercased()

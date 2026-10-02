@@ -123,7 +123,7 @@ struct MacroEditor: View {
                 Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %k frekvence rigu v kHz · %D %T %t čas UTC · jeden řádek = jeden příkaz · \\ # a CW ID se ignorují"))
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-            Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %e celá výměna podle závodu · %S moje číslo · %X text výměny · %N odesílané číslo a výměna · %M přijaté · %x %y číslo a čas (BARTG) · %a moje jméno · %o lokátor · %Z CQ zóna · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX"))
+            Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %N odesílaná výměna závodu (001, BHE, 015 TOMAS DX) · %M přijatá · %S moje číslo · %X text výměny · %x %y číslo a čas (BARTG) · %a moje jméno · %o lokátor · %Z CQ zóna · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX"))
                 .font(.caption).foregroundStyle(.secondary)
             }
             HStack {

@@ -70,21 +70,24 @@ extension AppSettings {
         Macro(name: "My call", text: "\r\n%m %m\r\n\\"),
     ])
 
-    /// A contest set built from the exchange: %e sends the exchange exactly per the contest rules.
+    /// A contest set built from the exchange: %N = what this contest sends after the RST ("001", "BHE", "015 TOMAS DX"),
+    /// the RST written in the macro only where the contest has one; BARTG HF %x %y (number and time).
     public static func contestMacros(_ p: ContestPreset?) -> [Macro] {
         let sprint = p == .naSprintRTTY
         let cq = p == .waeRTTY ? "CQ WAE CQ WAE DE %m %m WAE" : sprint ? "CQ NA %m %m NA" : "CQ TEST CQ TEST DE %m %m TEST"
+        let rst = p?.sendsRST ?? true ? "599 " : ""
+        let x = p == .bartgHF ? "%x %y" : "%N"                         // one copy of the exchange
         // NA Sprint: both calls + the exchange; the station staying on the frequency sends its own call last
-        let exch = sprint ? "\r\n%c %e %m\r\n\\" : "\r\n%c %e %e\r\n\\"
+        let exch = sprint ? "\r\n%c %m \(x)\r\n\\" : "\r\n%c \(rst)\(x) \(x)\r\n\\"
         let ask = p == nil || p?.format == .serial || p?.format == .serialText || p?.format == .wae || p?.format == .bartg
             ? "NR? NR?" : "EXCH? EXCH?"
         return padded([
             Macro(name: "CQ", text: "\r\n\(cq)\r\n\\"),
             Macro(name: "Answer", text: "\r\n%m %m\r\n\\"),
-            Macro(name: "TU Exch", text: "\r\nTU %e %e\r\n\\"),
+            Macro(name: "TU Exch", text: "\r\nTU \(rst)\(x) \(x)\r\n\\"),
             Macro(name: "Exch", text: exch),
             Macro(name: "TU", text: sprint ? "\r\nTU %m\r\n%l\\" : "\r\nTU %m TEST\r\n%l\\"),
-            Macro(name: "Exch ×1", text: "\r\n%e\r\n\\"),
+            Macro(name: "Exch ×1", text: "\r\n\(rst)\(x)\r\n\\"),
             Macro(name: "QRZ", text: "\r\nQRZ? %m\r\n\\"),
             Macro(name: "Call?", text: "\r\n%c? %c?\r\n\\"),
             Macro(name: "RYRY", text: "RYRYRYRYRYRYRYRYRYRY\r\n#"),
@@ -92,7 +95,7 @@ extension AppSettings {
             Macro(name: "AGN", text: "\r\nAGN AGN\r\n\\"),
             Macro(name: ask.components(separatedBy: " ").first ?? "NR?", text: "\r\n\(ask)\r\n\\"),
             Macro(name: "Call", text: "\r\n%c\r\n\\"),
-            Macro(name: "Exch ×3", text: "\r\n%e %e %e\r\n\\"),
+            Macro(name: "Exch ×3", text: "\r\n\(rst)\(x) \(x) \(x)\r\n\\"),
             Macro(name: "My call", text: "\r\n%m %m\r\n\\"),
         ])
     }
