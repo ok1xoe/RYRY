@@ -18,7 +18,10 @@ struct MacroBar: View {
                         let i = row * 8 + col
                         let name = i < macros.count ? macros[i].name : ""
                         let kb = model.settings.binding(for: .macro(i))
-                        Button { Task { await model.runMacro(i) } } label: {
+                        Button {
+                            guard let m = Self.macroIndex(button: i, settings: model.settings, event: NSApp.currentEvent) else { return }
+                            Task { await model.runMacro(m) }
+                        } label: {
                             Text(kb.isNone ? name : "\(kb.display) \(name)").lineLimit(1).frame(maxWidth: .infinity)
                                 .foregroundStyle(Self.textColor(i < macros.count ? macros[i].color : nil))
                         }
@@ -44,6 +47,14 @@ extension MacroBar {
     static func textColor(_ hex: String?) -> Color {
         guard let c = Color(hex: hex) else { return .primary }
         return c.isLight ? .black : .white
+    }
+    /// Which macro a press of button `i` runs. A key shortcut: SwiftUI does not tell Shift apart on function keys
+    /// (⇧F1 triggered the F1 button), so the macro is chosen by the exact key combination of the event; a combination
+    /// that no macro has = nothing. A mouse click = macro `i`.
+    static func macroIndex(button i: Int, settings: AppSettings, event: NSEvent?) -> Int? {
+        guard let e = event, e.type == .keyDown, let b = KeyBinding.from(e) else { return i }
+        if b == settings.binding(for: .macro(i)) { return i }
+        return settings.macro(for: b)
     }
     static func keyName(_ i: Int) -> String { i < 12 ? "F\(i + 1)" : "⇧F\(i - 11)" }
 }
