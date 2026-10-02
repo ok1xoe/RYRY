@@ -84,5 +84,7 @@ Further features from MMTTY:
 - DXCC from `cty.dat` (AD1C; your own version can be placed in `Application Support/mmtty4mac/cty.dat` inside the app container), the `%g` greeting based on the other station's local time;
 - playing a WAV into the receive path (File → Play WAV into receive);
 - a message list (the "Messages" menu next to the transmit pane), macro button colours, demodulator scope (Window → Demodulator scope);
-- contest exchange formats RST + number, CQ/RJ (zone + QTH), BARTG (number + time), PED and WAE with the QTC exchange
-  (both sending and receiving a series in the QSO panel, limits per the DARC rules, QTC in Cabrillo).
+- contest exchange formats RST + number, RST + number + text, RST + text, CQ/RJ (zone + QTH), BARTG (number + time), PED and
+  WAE with the QTC exchange (both sending and receiving a series in the QSO panel, limits per the DARC rules, QTC in Cabrillo);
+- 28 RTTY contest presets (every HF RTTY contest on contestcalendar.com) with the exchange, points, multipliers, dupes and
+  dates per the official rules, and a rules overview in Settings → Contest.
