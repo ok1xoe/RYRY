@@ -180,7 +180,8 @@ private func progress(_ call: String, exch: Bool = false, myCall: Bool = false) 
     #expect(f.model.esmStep == .exchangeAndLog)
     _ = await f.model.esmEnter()
     #expect(f.model.lastESMMacroForTesting == 3)
-    // F4 has no %l → logged explicitly right away
+    // F4 has no %l → logged explicitly (the log reaches the model asynchronously, as in the Run test)
+    for _ in 0..<50 where f.model.logRecords.isEmpty { await f.settle() }
     #expect(f.model.logRecords.count == 1 && f.model.logRecords.first?.exchangeRcvd == "14")
     #expect(f.model.qso.call.isEmpty)
     await drain(f)

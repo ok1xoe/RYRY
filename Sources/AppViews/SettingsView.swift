@@ -763,7 +763,8 @@ struct ContestTab: View {
             }
             .disabled(!s.contest.enabled)
             Section {
-                Text(L("%N odesílaná výměna závodu bez RST (001, BHE, 015 TOMAS DX) · %M přijatá · %S moje číslo · %X text výměny · %x / %y číslo a čas (BARTG) · %r / %s RST · %a %o %Z moje jméno, lokátor, zóna. Každý závod má vlastní sadu maker (lišta maker → Výchozí makra…).")).font(.callout)
+                Text(L("Každý závod má vlastní sadu maker; tlačítko Výchozí makra… nad lištou maker ji postaví podle výměny závodu. Tooltip tlačítka ukáže, co makro pošle."))
+                DisclosureGroup(L("Zástupné znaky v makrech")) { MacroVariablesHelp().padding(.top, 4) }
             } header: { Text(L("Makra")) }
             ESMSection(s: $s)
             CallHistorySection(s: $s, model: model)

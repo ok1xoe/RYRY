@@ -13,7 +13,7 @@ struct MacroBar: View {
     /// The macro set: normal / DX outside a contest (a switch), the contest's own set in a contest; reset to defaults.
     var setRow: some View {
         HStack(spacing: 8) {
-            Text(L("Sada maker:")).font(.caption).foregroundStyle(.secondary)
+            Text(L("Sada maker:")).font(.callout).foregroundStyle(.secondary)
             if model.settings.contest.enabled {
                 Text(model.macroSetTitle).font(.caption.bold())
             } else {
@@ -121,10 +121,12 @@ struct MacroEditor: View {
             }
             if target == .cluster {
                 Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %k frekvence rigu v kHz · %D %T %t čas UTC · jeden řádek = jeden příkaz · \\ # a CW ID se ignorují"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(.secondary)
             } else {
-            Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %N odesílaná výměna závodu (001, BHE, 015 TOMAS DX) · %M přijatá · %S moje číslo · %X text výměny · %x %y číslo a čas (BARTG) · %a moje jméno · %o lokátor · %Z CQ zóna · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX"))
-                .font(.caption).foregroundStyle(.secondary)
+            GroupBox(L("Zástupné znaky")) {
+                ScrollView { MacroVariablesHelp().frame(maxWidth: .infinity, alignment: .leading).padding(4) }
+                    .frame(height: 260)
+            }
             }
             HStack {
                 Spacer()
@@ -144,7 +146,7 @@ struct MacroEditor: View {
             }
         }
         .padding()
-        .frame(width: 520)
+        .frame(width: 640)
         .onAppear {
             let m = index < list.count ? list[index] : Macro(name: "", text: "")
             name = m.name; text = m.text.replacingOccurrences(of: "\r\n", with: "\n"); repeatSec = m.repeatSeconds ?? 0

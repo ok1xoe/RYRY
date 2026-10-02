@@ -12,7 +12,7 @@
 <body>
 <header class="top"><div class="in">
   <img class="icon" src="../img/icon.png" alt="">
-  <span class="brand">RYRY</span><span class="ver">user manual · version 1.1</span>
+  <span class="brand">RYRY</span><span class="ver">user manual · version 1.0</span>
   <a class="home" href="../../index.html">← RYRY</a>
   <span class="lang"><a href="../cs/index.html">Čeština</a> <span>English</span></span>
 </div></header>
@@ -119,25 +119,45 @@
 <section id="tx">
 <h2>5. Transmitting and macros</h2>
 <ul>
-  <li><b>TX / RX:</b> the TX button or <kbd>⌘</kbd><kbd>T</kbd>. <kbd>Esc</kbd> = RX now. <b>Tune</b> = carrier for tuning.</li>
-  <li><b>TX window:</b> sends by character, word or line; <b>Send all</b> sends everything.</li>
-  <li><b>Macros F1–F12 and ⇧F1–⇧F4:</b> click or press the key; right-click → <b>Edit…</b> (name, text, color, repeat).</li>
-  <li><b>Macro sets:</b> a <b>Normal / DX</b> switch above the macro bar; in a contest every contest has its own set that changes with the selected contest. <b>Default macros…</b> replaces the set with the defaults (for a contest built from its exchange).</li>
-  <li><b>Messages:</b> longer saved texts (station description, final) in the Messages menu.</li>
+  <li><b>TX / RX:</b> the TX button or <kbd>⌘</kbd><kbd>T</kbd>. <kbd>Esc</kbd> = immediate RX. <b>Tune</b> = a carrier for tuning.</li>
+  <li><b>Transmit pane:</b> sends by characters, words or lines; <b>Send all</b> sends the whole text.</li>
+  <li><b>Macros F1–F12 and ⇧F1–⇧F4 (16 buttons):</b> click or press the key; right-click → <b>Edit…</b> (name, text, color, repeat) – the editor lists the variables. A button's <b>tooltip</b> shows what the macro sends right now (with the call and exchange from the QSO window) and its template below.</li>
+  <li><b>Macro sets:</b> a <b>Normal / DX</b> switch above the macro bar; in a contest every contest (a custom one too) has its own set that is switched with the selected contest. Edits are saved into the active set. <b>Default macros…</b> replaces the set with the defaults – for a contest built from its exchange.</li>
+  <li><b>Messages:</b> longer saved texts (station description, farewell) in the Messages menu.</li>
   <li><b>Send text file</b> is in the Transmit menu.</li>
 </ul>
+<p><b>The default contest set</b> (example URC DX RTTY, other station DL1ABC, exchange BHE; the layout matches ESM). Contests without an RST (NA Sprint, NAQP, WRT, Rookie Roundup, BARTG Sprint) have macros without 599, NA Sprint keeps the order from its rules.</p>
 <table>
-  <tr><th>Variable</th><th>Meaning</th><th>Variable</th><th>Meaning</th></tr>
-  <tr><td><code>%m</code></td><td>my call</td><td><code>%c</code></td><td>other station's call</td></tr>
-  <tr><td><code>%n</code></td><td>other station's name</td><td><code>%q</code></td><td>other station's QTH</td></tr>
-  <tr><td><code>%r</code> / <code>%s</code></td><td>RST sent / received</td><td><code>%N</code> / <code>%M</code></td><td>contest exchange sent after the RST (001, BHE, 015 TOMAS DX) / received</td></tr>
-  <tr><td><code>%S</code> / <code>%X</code></td><td>my serial / exchange text</td><td></td><td></td></tr>
-  <tr><td><code>%a %o %Z</code></td><td>my name, locator, CQ zone</td><td><code>%x %y</code></td><td>number and time (BARTG)</td></tr>
-  <tr><td><code>%g</code></td><td>greeting GM/GA/GE by the other station's local time</td><td><code>%D %T %t</code></td><td>UTC date and time</td></tr>
-  <tr><td><code>%L %F</code></td><td>LTRS / FIGS</td><td><code>%{…}</code></td><td>CW identification</td></tr>
-  <tr><td><code>%l</code></td><td>log the QSO</td><td><code>\</code> / <code>#</code> at the end</td><td>RX after sending / stay in TX</td></tr>
+  <tr><th>Button</th><th>Macro</th><th>Sends</th></tr>
+  <tr><td>F1 CQ</td><td><code>CQ TEST CQ TEST DE %m %m TEST</code></td><td>CQ TEST CQ TEST DE OK1XOE OK1XOE TEST</td></tr>
+  <tr><td>F2 Answer</td><td><code>%c DE %m %m</code></td><td>DL1ABC DE OK1XOE OK1XOE</td></tr>
+  <tr><td>F3 TU Exch (S&amp;P)</td><td><code>%c TU 599 %N %N %m</code></td><td>DL1ABC TU 599 BHE BHE OK1XOE</td></tr>
+  <tr><td>F4 Exch (Run)</td><td><code>%c 599 %N %N %c</code></td><td>DL1ABC 599 BHE BHE DL1ABC</td></tr>
+  <tr><td>F5 TU + log</td><td><code>%c TU %m TEST %l</code></td><td>DL1ABC TU OK1XOE TEST</td></tr>
+  <tr><td>F6 Exch ×1</td><td><code>%c 599 %N</code></td><td>DL1ABC 599 BHE</td></tr>
+  <tr><td>⇧F3 My call</td><td><code>%m %m</code></td><td>OK1XOE OK1XOE</td></tr>
 </table>
-<p>Example “Answer” macro: <code>%c %c DE %m %m %m K\</code></p>
+<p><b>Macro variables:</b></p>
+<table class="vars">
+  <tr><th colspan="2">Stations</th><th colspan="2">Report and exchange</th></tr>
+  <tr><td><code>%c</code></td><td>other station's call</td><td><code>%r / %s</code></td><td>sent / received RST (with the exchange)</td></tr>
+  <tr><td><code>%n</code></td><td>other station's name (otherwise OM)</td><td><code>%R</code></td><td>sent RST (3 characters only)</td></tr>
+  <tr><td><code>%q</code></td><td>other station's QTH</td><td><code>%N</code></td><td>the contest exchange sent after the RST – 001, BHE, 015 TOMAS DX</td></tr>
+  <tr><td><code>%m</code></td><td>my call</td><td><code>%M</code></td><td>received exchange</td></tr>
+  <tr><td><code>%a</code></td><td>my name (without diacritics)</td><td><code>%S</code></td><td>my serial number</td></tr>
+  <tr><td><code>%o</code></td><td>my locator</td><td><code>%X</code></td><td>exchange text without the serial (zone, territory, name + QTH)</td></tr>
+  <tr><td><code>%Z</code></td><td>my CQ zone</td><td><code>%x %y</code></td><td>serial and time (BARTG)</td></tr>
+</table>
+<table class="vars">
+  <tr><th colspan="2">Time and greeting</th><th colspan="2">Control</th></tr>
+  <tr><td><code>%g</code></td><td>GOOD MORNING/AFTERNOON/EVENING by the other station's local time</td><td><code>%l</code></td><td>log the QSO</td></tr>
+  <tr><td><code>%f</code></td><td>the same, short GM/GA/GE</td><td><code>%{…}</code></td><td>CW identification</td></tr>
+  <tr><td><code>%D</code></td><td>UTC date</td><td><code>%L %F</code></td><td>LTRS / FIGS</td></tr>
+  <tr><td><code>%T %t</code></td><td>UTC time (12:34 / 1234)</td><td><code>%E</code></td><td>end of the macro</td></tr>
+  <tr><td></td><td></td><td><code>\</code></td><td>at the end = receive after sending; at the start = transmit and put the text into the window</td></tr>
+  <tr><td></td><td></td><td><code>#</code></td><td>at the end = stay in transmit; at the start = only into the transmit window</td></tr>
+</table>
+<p>Example of the “Answer” macro: <code>%c %c DE %m %m %m K\</code></p>
 </section>
 
 <section id="log">

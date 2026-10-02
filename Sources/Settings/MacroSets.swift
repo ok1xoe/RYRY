@@ -71,32 +71,37 @@ extension AppSettings {
     ])
 
     /// A contest set built from the exchange: %N = what this contest sends after the RST ("001", "BHE", "015 TOMAS DX"),
-    /// the RST written in the macro only where the contest has one; BARTG HF %x %y (number and time).
+    /// the RST written in the macro only where the contest has one; BARTG HF %x %y (number and time). The calls go around
+    /// the exchange as usual on RTTY ("DL1ABC 599 BHE BHE DL1ABC").
     public static func contestMacros(_ p: ContestPreset?) -> [Macro] {
         let sprint = p == .naSprintRTTY
-        let cq = p == .waeRTTY ? "CQ WAE CQ WAE DE %m %m WAE" : sprint ? "CQ NA %m %m NA" : "CQ TEST CQ TEST DE %m %m TEST"
+        let test = p == .waeRTTY ? "WAE" : sprint ? "NA" : "TEST"
         let rst = p?.sendsRST ?? true ? "599 " : ""
         let x = p == .bartgHF ? "%x %y" : "%N"                         // one copy of the exchange
-        // NA Sprint: both calls + the exchange; the station staying on the frequency sends its own call last
-        let exch = sprint ? "\r\n%c %m \(x)\r\n\\" : "\r\n%c \(rst)\(x) \(x)\r\n\\"
+        // NA Sprint: the station that moves sends both calls first, the one staying on the frequency its own call last
+        let runExch = sprint ? "%c %m \(x)" : "%c \(rst)\(x) \(x) %c"
+        let spExch = sprint ? "%c \(x) %m" : "%c TU \(rst)\(x) \(x) %m"
         let ask = p == nil || p?.format == .serial || p?.format == .serialText || p?.format == .wae || p?.format == .bartg
-            ? "NR? NR?" : "EXCH? EXCH?"
+            ? "NR?" : "EXCH?"
+        func m(_ name: String, _ body: String, log: Bool = false) -> Macro {
+            Macro(name: name, text: "\r\n" + body + (log ? "\r\n%l\\" : "\r\n\\"))
+        }
         return padded([
-            Macro(name: "CQ", text: "\r\n\(cq)\r\n\\"),
-            Macro(name: "Answer", text: "\r\n%m %m\r\n\\"),
-            Macro(name: "TU Exch", text: "\r\nTU \(rst)\(x) \(x)\r\n\\"),
-            Macro(name: "Exch", text: exch),
-            Macro(name: "TU", text: sprint ? "\r\nTU %m\r\n%l\\" : "\r\nTU %m TEST\r\n%l\\"),
-            Macro(name: "Exch ×1", text: "\r\n\(rst)\(x)\r\n\\"),
-            Macro(name: "QRZ", text: "\r\nQRZ? %m\r\n\\"),
-            Macro(name: "Call?", text: "\r\n%c? %c?\r\n\\"),
+            m("CQ", "CQ \(test) CQ \(test) DE %m %m \(test)"),
+            m("Answer", "%c DE %m %m"),
+            m("TU Exch", spExch),
+            m("Exch", runExch),
+            m("TU", sprint ? "%c TU %m" : "%c TU %m \(test)", log: true),
+            m("Exch ×1", "%c \(rst)\(x)"),
+            m("QRZ", "QRZ? DE %m \(test)"),
+            m("Call?", "%c? %c? DE %m"),
             Macro(name: "RYRY", text: "RYRYRYRYRYRYRYRYRYRY\r\n#"),
             Macro(name: "CW ID", text: "%{DE %m}\\"),
-            Macro(name: "AGN", text: "\r\nAGN AGN\r\n\\"),
-            Macro(name: ask.components(separatedBy: " ").first ?? "NR?", text: "\r\n\(ask)\r\n\\"),
-            Macro(name: "Call", text: "\r\n%c\r\n\\"),
-            Macro(name: "Exch ×3", text: "\r\n\(rst)\(x) \(x) \(x)\r\n\\"),
-            Macro(name: "My call", text: "\r\n%m %m\r\n\\"),
+            m("AGN", "%c AGN AGN"),
+            m(ask, "%c \(ask) \(ask)"),
+            m("Call ×2", "%c %c"),
+            m("Exch ×3", "%c \(rst)\(x) \(x) \(x) %c"),
+            m("My call", "%m %m"),
         ])
     }
 }

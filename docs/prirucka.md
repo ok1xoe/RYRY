@@ -2,9 +2,12 @@
 
 RYRY (dříve mmtty4mac) je RTTY program pro macOS: nativní přepis MMTTY (JE3HHT) se stejným demodulátorem, s logem, podporou závodů a s API pro loggery. English version: [manual.md](manual.md).
 
-**Novinky 1.1:** 28 předvoleb RTTY závodů (všechny RTTY závody z contestcalendar.com) s přehledem pravidel v Nastavení → Závod, bodováním a násobiči podle oficiálních pravidel; nové formáty výměny (číslo + text, text, číslo nebo kód); ⇧F1–⇧F4 spouštějí svá makra; projekt přejmenován na RYRY (bundle ID `cz.ok1xoe.ryry`, složka dat `RYRY` – stará se přesune sama).
-
-**Novinky 1.0 (Mac App Store):** nové jméno RYRY a nová ikona; distribuce přes Mac App Store (aplikace běží v sandboxu macOS); Nápověda → Přehrát ukázkový signál – dekódování vyzkoušíte i bez rádia; LoTW přes TrustedQSL (RYRY připraví ADIF, podepíšete a odešlete ho v TQSL); aplikace se jednou zeptá na přístup ke složce s logem. Odstraněno: spouštění hamlibu aplikací (rigctld spusťte sami) a kontrola aktualizací (aktualizuje App Store). Nastavení z mmtty4mac se při prvním spuštění přenese samo; hesla online služeb bude možná potřeba zadat znovu.
+**Novinky 1.0 (Mac App Store):**
+- nové jméno RYRY a nová ikona; distribuce přes Mac App Store (aplikace běží v sandboxu macOS), bundle ID `cz.ok1xoe.ryry`; nastavení z mmtty4mac se při prvním spuštění přenese samo, aplikace se jednou zeptá na přístup ke složce s logem a hesla online služeb bude možná potřeba zadat znovu;
+- 28 předvoleb RTTY závodů (všechny RTTY závody z contestcalendar.com) s přehledem pravidel v Nastavení → Závod, bodováním a násobiči podle oficiálních pravidel; nové formáty výměny (číslo + text, text, číslo nebo kód);
+- sady maker pro běžný provoz, DX a každý závod; tooltip tlačítka makra ukáže, co se pošle; nové zástupné znaky (`%N` = výměna závodu, `%S %X %a %o %Z`) a jejich přehled v editoru maker; ⇧F1–⇧F4 spouštějí svá makra;
+- Nápověda → Přehrát ukázkový signál – dekódování vyzkoušíte i bez rádia; LoTW přes TrustedQSL (RYRY připraví ADIF, podepíšete a odešlete ho v TQSL);
+- odstraněno: spouštění hamlibu aplikací (rigctld spusťte sami) a kontrola aktualizací (aktualizuje App Store).
 
 **Novinky 0.15.1:** band mapa ukazuje celé pásmo, ne jen oficiální RTTY úsek (otevře se na digitální části, `⤢` zobrazí celé pásmo); přibyla pásma 160 m, 60 m a 6 m.
 
@@ -66,25 +69,51 @@ Tlačítko **Vyzkoušet spojení** ukáže frekvenci a mód. Pro PTT přes CAT z
 - **Levý horní roh spektra**: rozsah a zesílení.
 - Přijatý text: **klik na slovo** ho vloží do QSO okna (značka, RST, číslo, jméno… podle typu slova).
 
-## 5. Vysílání
+## 5. Vysílání a makra
 
 - **TX / RX:** tlačítko TX nebo ⌘T. **Esc** = okamžitě RX. **Tune** = nosná pro ladění.
 - **Okno vysílání:** režim odesílání po znacích, slovech nebo řádcích; **Odeslat vše** odešle celý text. Volitelně CR/LF na začátku vysílání a zalamování řádků (Nastavení → Zobrazení → Okno vysílání).
-- **Makra F1–F12 a ⇧F1–⇧F4:** klik nebo klávesa. Pravým tlačítkem **Upravit…** (název, text, barva, opakování). Tooltip tlačítka ukáže, co makro právě pošle (s doplněnou značkou a výměnou z QSO okna).
-- **Sady maker:** nad lištou maker je přepínač **Běžný provoz / DX**; v závodě má každý závod (i vlastní) svou sadu. Sada se mění sama se zvoleným závodem a úpravy se ukládají do ní. **Výchozí makra…** nahradí sadu výchozí – u závodu podle jeho výměny (F1 CQ, F4 výměna `%c 599 %N %N`, u závodů bez RST `%c %N %N`, F5 TU + zalogovat, F11 AGN, ⇧F3 moje značka – sedí s ESM).
+- **Makra F1–F12 a ⇧F1–⇧F4 (16 tlačítek):** klik nebo klávesa. Pravým tlačítkem **Upravit…** (název, text, barva, opakování); editor má přehled zástupných znaků. **Tooltip** tlačítka ukáže, co makro právě pošle – s dosazenou značkou a výměnou z QSO okna – a pod tím jeho šablonu.
+- **Sady maker:** nad lištou maker je přepínač **Běžný provoz / DX**. V závodě má každý závod (i vlastní) svou sadu; přepne se sama se zvoleným závodem a úpravy maker se ukládají do aktivní sady. **Výchozí makra…** nahradí aktivní sadu výchozí – u závodu ji postaví podle jeho výměny.
 - **Zprávy:** delší uložené texty v menu **Zprávy** (stejná syntaxe jako makra).
 - **Odeslat textový soubor:** menu Vysílání → Odeslat textový soubor….
 
-Proměnné v makrech:
+Výchozí sada závodu (příklad URC DX RTTY, protistanice DL1ABC, odesílaná výměna BHE). Rozložení sedí s ESM (Enter Sends Message):
 
-| | | | |
+| Tlačítko | Makro | Pošle |
+|---|---|---|
+| F1 CQ | `CQ TEST CQ TEST DE %m %m TEST` | CQ TEST CQ TEST DE OK1XOE OK1XOE TEST |
+| F2 Answer | `%c DE %m %m` | DL1ABC DE OK1XOE OK1XOE |
+| F3 TU Exch (S&P) | `%c TU 599 %N %N %m` | DL1ABC TU 599 BHE BHE OK1XOE |
+| F4 Exch (Run) | `%c 599 %N %N %c` | DL1ABC 599 BHE BHE DL1ABC |
+| F5 TU + zalogovat | `%c TU %m TEST` + `%l` | DL1ABC TU OK1XOE TEST |
+| F6 Exch ×1 | `%c 599 %N` | DL1ABC 599 BHE |
+| F7 QRZ, F8 Call? | `QRZ? DE %m TEST`, `%c? %c? DE %m` | |
+| F11 AGN, F12 NR?/EXCH? | `%c AGN AGN`, `%c EXCH? EXCH?` | |
+| ⇧F3 My call (S&P) | `%m %m` | OK1XOE OK1XOE |
+
+Závody bez RST v pravidlech (NA Sprint, NAQP, WRT, Rookie Roundup, BARTG Sprint) mají makra bez `599`; NA Sprint drží pořadí podle pravidel (Run `%c %m %N`, S&P `%c %N %m`); WAE volá `CQ WAE`.
+
+Zástupné znaky v makrech:
+
+| Stanice | | Report a výměna | |
 |---|---|---|---|
-| `%m` moje značka | `%c` protistanice | `%n` jméno | `%q` QTH |
-| `%r` RST odeslané | `%s` RST přijaté | `%N` odesílaná výměna závodu bez RST (`001`, `BHE`, `015 TOMAS DX`) | `%M` přijaté číslo a výměna |
-| `%S` moje pořadové číslo | `%X` text výměny (zóna, teritorium, jméno + QTH …) | `%x %y` číslo a čas (BARTG) |
-| `%a` moje jméno (bez diakritiky) | `%o` můj lokátor | `%Z` moje CQ zóna | |
-| `%g` pozdrav (GM/GA/GE podle místního času protistanice) | `%D %T %t` datum a čas UTC | `%L %F` LTRS/FIGS | `%{…}` CW ID |
-| `%l` zalogovat | `\` na konci = po odvysílání RX | `#` na konci = zůstat v TX | |
+| `%c` | značka protistanice | `%r` / `%s` | odesílané / přijaté RST (s výměnou) |
+| `%n` | jméno protistanice (jinak OM) | `%R` | odesílané RST (jen 3 znaky) |
+| `%q` | QTH protistanice | `%N` | odesílaná výměna závodu bez RST – `001`, `BHE`, `015 TOMAS DX` |
+| `%m` | moje značka | `%M` | přijatá výměna |
+| `%a` | moje jméno (bez diakritiky) | `%S` | moje pořadové číslo |
+| `%o` | můj lokátor | `%X` | text výměny bez čísla (zóna, teritorium, jméno + QTH) |
+| `%Z` | moje CQ zóna | `%x %y` | číslo a čas (BARTG) |
+
+| Čas a pozdrav | | Řízení | |
+|---|---|---|---|
+| `%g` | GOOD MORNING/AFTERNOON/EVENING podle místního času protistanice | `%l` | zalogovat QSO |
+| `%f` | totéž krátce GM/GA/GE | `%{…}` | CW identifikace |
+| `%D` | datum UTC | `%L %F` | LTRS / FIGS |
+| `%T %t` | čas UTC (12:34 / 1234) | `%E` | konec makra |
+| | | `\` | na konci = po odvysílání příjem; na začátku = vysílat a text do okna |
+| | | `#` | na konci = zůstat ve vysílání; na začátku = jen do okna vysílání |
 
 ## 6. QSO a log
 

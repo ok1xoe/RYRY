@@ -2,9 +2,12 @@
 
 RYRY (formerly mmtty4mac) is an RTTY program for macOS: a native port of MMTTY (JE3HHT) with the same demodulator, plus a log, contest support and an API for loggers. Česká verze: [prirucka.md](prirucka.md).
 
-**New in 1.1:** 28 RTTY contest presets (every RTTY contest on contestcalendar.com) with a rules overview in Settings → Contest, scoring and multipliers per the official rules; new exchange formats (serial + text, text, serial or code); ⇧F1–⇧F4 run their own macros; the project is renamed to RYRY (bundle ID `cz.ok1xoe.ryry`, data folder `RYRY` – the old one is moved automatically).
-
-**New in 1.0 (Mac App Store):** the new name RYRY and a new icon; distributed through the Mac App Store (the app runs in the macOS sandbox); Help → Play Demo Signal to try decoding without a radio; LoTW through TrustedQSL (RYRY prepares the ADIF, you sign and send it in TQSL); the app asks once for access to the log folder. Removed: starting hamlib from the app (start rigctld yourself) and the update check (the App Store updates the app). Settings from mmtty4mac move over on the first launch; online passwords may need to be entered again.
+**New in 1.0 (Mac App Store):**
+- the new name RYRY and a new icon; distributed through the Mac App Store (the app runs in the macOS sandbox), bundle ID `cz.ok1xoe.ryry`; settings from mmtty4mac move over on the first launch, the app asks once for access to the log folder and online passwords may need to be entered again;
+- 28 RTTY contest presets (every RTTY contest on contestcalendar.com) with a rules overview in Settings → Contest, scoring and multipliers per the official rules; new exchange formats (serial + text, text, serial or code);
+- macro sets for normal operating, DX and every contest; a macro button's tooltip shows what is sent; new variables (`%N` = the contest exchange, `%S %X %a %o %Z`) listed in the macro editor; ⇧F1–⇧F4 run their own macros;
+- Help → Play Demo Signal to try decoding without a radio; LoTW through TrustedQSL (RYRY prepares the ADIF, you sign and send it in TQSL);
+- removed: starting hamlib from the app (start rigctld yourself) and the update check (the App Store updates the app).
 
 **New in 0.15.1:** the band map covers the whole band, not just the official RTTY segment (it opens on the digimode part, `⤢` shows the whole band); 160 m, 60 m and 6 m were added.
 
@@ -66,25 +69,51 @@ Settings → Rig → Controls:
 - **Top-left corner of the spectrum:** range and gain.
 - RX text: **click a word** to put it into the QSO window (call, RST, number, name… by word type).
 
-## 5. Transmitting
+## 5. Transmitting and macros
 
-- **TX / RX:** the TX button or ⌘T. **Esc** = RX now. **Tune** = carrier for tuning.
-- **TX window:** send by character, word or line; **Send all** sends everything. Optionally CR/LF at TX start and line wrapping (Settings → Display → TX window).
-- **Macros F1–F12 and ⇧F1–⇧F4:** click or press the key. Right-click → **Edit…** (name, text, color, repeat). The button's tooltip shows what the macro sends right now (with the call and exchange from the QSO window).
-- **Macro sets:** above the macro bar is a **Normal / DX** switch; in a contest every contest (custom too) has its own set. The set changes with the selected contest and your edits are saved into it. **Default macros…** replaces the set with the defaults – for a contest built from its exchange (F1 CQ, F4 exchange `%c 599 %N %N`, without RST `%c %N %N`, F5 TU + log, F11 AGN, ⇧F3 my call – matching ESM).
-- **Messages:** longer saved texts in the **Messages** menu (same syntax as macros).
-- **Send a text file:** Transmit menu → Send text file….
+- **TX / RX:** the TX button or ⌘T. **Esc** = immediate RX. **Tune** = a carrier for tuning.
+- **Transmit pane:** sends by characters, words or lines; **Send all** sends the whole text. Optional CR/LF at the start of a transmission and line wrapping (Settings → Display → Transmit pane).
+- **Macros F1–F12 and ⇧F1–⇧F4 (16 buttons):** click or press the key. Right-click → **Edit…** (name, text, color, repeat); the editor lists the variables. A button's **tooltip** shows what the macro sends right now – with the call and exchange from the QSO window – and its template below.
+- **Macro sets:** above the macro bar is a **Normal / DX** switch. In a contest every contest (a custom one too) has its own set; it is switched with the selected contest and macro edits are saved into the active set. **Default macros…** replaces the active set with the defaults – for a contest built from its exchange.
+- **Messages:** longer saved texts in the **Messages** menu (the same syntax as macros).
+- **Send text file:** the Transmit menu → Send Text File….
+
+The default contest set (example URC DX RTTY, other station DL1ABC, sent exchange BHE). The layout matches ESM (Enter Sends Message):
+
+| Button | Macro | Sends |
+|---|---|---|
+| F1 CQ | `CQ TEST CQ TEST DE %m %m TEST` | CQ TEST CQ TEST DE OK1XOE OK1XOE TEST |
+| F2 Answer | `%c DE %m %m` | DL1ABC DE OK1XOE OK1XOE |
+| F3 TU Exch (S&P) | `%c TU 599 %N %N %m` | DL1ABC TU 599 BHE BHE OK1XOE |
+| F4 Exch (Run) | `%c 599 %N %N %c` | DL1ABC 599 BHE BHE DL1ABC |
+| F5 TU + log | `%c TU %m TEST` + `%l` | DL1ABC TU OK1XOE TEST |
+| F6 Exch ×1 | `%c 599 %N` | DL1ABC 599 BHE |
+| F7 QRZ, F8 Call? | `QRZ? DE %m TEST`, `%c? %c? DE %m` | |
+| F11 AGN, F12 NR?/EXCH? | `%c AGN AGN`, `%c EXCH? EXCH?` | |
+| ⇧F3 My call (S&P) | `%m %m` | OK1XOE OK1XOE |
+
+Contests without an RST in their rules (NA Sprint, NAQP, WRT, Rookie Roundup, BARTG Sprint) have macros without `599`; NA Sprint keeps the order from its rules (Run `%c %m %N`, S&P `%c %N %m`); WAE calls `CQ WAE`.
 
 Macro variables:
 
-| | | | |
+| Stations | | Report and exchange | |
 |---|---|---|---|
-| `%m` my call | `%c` other station | `%n` name | `%q` QTH |
-| `%r` RST sent | `%s` RST received | `%N` the contest exchange sent after the RST (`001`, `BHE`, `015 TOMAS DX`) | `%M` received number and exchange |
-| `%S` my serial number | `%X` exchange text (zone, territory, name + QTH …) | `%x %y` number and time (BARTG) |
-| `%a` my name (no diacritics) | `%o` my locator | `%Z` my CQ zone | |
-| `%g` greeting (GM/GA/GE by the other station's local time) | `%D %T %t` UTC date and time | `%L %F` LTRS/FIGS | `%{…}` CW ID |
-| `%l` log the QSO | `\` at the end = RX after sending | `#` at the end = stay in TX | |
+| `%c` | other station's call | `%r` / `%s` | sent / received RST (with the exchange) |
+| `%n` | other station's name (otherwise OM) | `%R` | sent RST (3 characters only) |
+| `%q` | other station's QTH | `%N` | the contest exchange sent after the RST – `001`, `BHE`, `015 TOMAS DX` |
+| `%m` | my call | `%M` | received exchange |
+| `%a` | my name (without diacritics) | `%S` | my serial number |
+| `%o` | my locator | `%X` | exchange text without the serial (zone, territory, name + QTH) |
+| `%Z` | my CQ zone | `%x %y` | serial and time (BARTG) |
+
+| Time and greeting | | Control | |
+|---|---|---|---|
+| `%g` | GOOD MORNING/AFTERNOON/EVENING by the other station's local time | `%l` | log the QSO |
+| `%f` | the same, short GM/GA/GE | `%{…}` | CW identification |
+| `%D` | UTC date | `%L %F` | LTRS / FIGS |
+| `%T %t` | UTC time (12:34 / 1234) | `%E` | end of the macro |
+| | | `\` | at the end = receive after sending; at the start = transmit and put the text into the window |
+| | | `#` | at the end = stay in transmit; at the start = only into the transmit window |
 
 ## 6. QSO and log
 
