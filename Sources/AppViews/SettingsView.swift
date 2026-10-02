@@ -763,7 +763,7 @@ struct ContestTab: View {
             }
             .disabled(!s.contest.enabled)
             Section {
-                Text(L("%N odesílané číslo nebo výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST")).font(.callout)
+                Text(L("%e celá odesílaná výměna podle pravidel závodu (s RST nebo bez, číslo, text) · %S moje číslo · %X text výměny · %N číslo a výměna · %M přijaté · %x / %y číslo a čas (BARTG) · %r / %s RST · %a %o %Z moje jméno, lokátor, zóna. Každý závod má vlastní sadu maker (lišta maker → Výchozí makra…).")).font(.callout)
             } header: { Text(L("Makra")) }
             ESMSection(s: $s)
             CallHistorySection(s: $s, model: model)

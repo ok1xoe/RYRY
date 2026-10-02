@@ -120,6 +120,7 @@
   <li><b>TX / RX:</b> the TX button or <kbd>⌘</kbd><kbd>T</kbd>. <kbd>Esc</kbd> = RX now. <b>Tune</b> = carrier for tuning.</li>
   <li><b>TX window:</b> sends by character, word or line; <b>Send all</b> sends everything.</li>
   <li><b>Macros F1–F12 and ⇧F1–⇧F4:</b> click or press the key; right-click → <b>Edit…</b> (name, text, color, repeat).</li>
+  <li><b>Macro sets:</b> a <b>Normal / DX</b> switch above the macro bar; in a contest every contest has its own set that changes with the selected contest. <b>Default macros…</b> replaces the set with the defaults (for a contest built from its exchange).</li>
   <li><b>Messages:</b> longer saved texts (station description, final) in the Messages menu.</li>
   <li><b>Send text file</b> is in the Transmit menu.</li>
 </ul>
@@ -127,7 +128,9 @@
   <tr><th>Variable</th><th>Meaning</th><th>Variable</th><th>Meaning</th></tr>
   <tr><td><code>%m</code></td><td>my call</td><td><code>%c</code></td><td>other station's call</td></tr>
   <tr><td><code>%n</code></td><td>other station's name</td><td><code>%q</code></td><td>other station's QTH</td></tr>
-  <tr><td><code>%r</code> / <code>%s</code></td><td>RST sent / received</td><td><code>%N</code> / <code>%M</code></td><td>sent / received number (exchange)</td></tr>
+  <tr><td><code>%r</code> / <code>%s</code></td><td>RST sent / received</td><td><code>%N</code> / <code>%M</code></td><td>sent / received number and exchange</td></tr>
+  <tr><td><code>%e</code></td><td>the whole exchange per the contest rules (599 001, 599 BHE, 001 TOMAS DX)</td><td><code>%S</code> / <code>%X</code></td><td>my serial / exchange text</td></tr>
+  <tr><td><code>%a %o %Z</code></td><td>my name, locator, CQ zone</td><td><code>%x %y</code></td><td>number and time (BARTG)</td></tr>
   <tr><td><code>%g</code></td><td>greeting GM/GA/GE by the other station's local time</td><td><code>%D %T %t</code></td><td>UTC date and time</td></tr>
   <tr><td><code>%L %F</code></td><td>LTRS / FIGS</td><td><code>%{…}</code></td><td>CW identification</td></tr>
   <tr><td><code>%l</code></td><td>log the QSO</td><td><code>\</code> / <code>#</code> at the end</td><td>RX after sending / stay in TX</td></tr>

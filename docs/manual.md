@@ -71,6 +71,7 @@ Settings → Rig → Controls:
 - **TX / RX:** the TX button or ⌘T. **Esc** = RX now. **Tune** = carrier for tuning.
 - **TX window:** send by character, word or line; **Send all** sends everything. Optionally CR/LF at TX start and line wrapping (Settings → Display → TX window).
 - **Macros F1–F12 and ⇧F1–⇧F4:** click or press the key. Right-click → **Edit…** (name, text, color, repeat).
+- **Macro sets:** above the macro bar is a **Normal / DX** switch; in a contest every contest (custom too) has its own set. The set changes with the selected contest and your edits are saved into it. **Default macros…** replaces the set with the defaults – for a contest built from its exchange (F1 CQ, F4 exchange `%c %e %e`, F5 TU + log, F11 AGN, ⇧F3 my call – matching ESM).
 - **Messages:** longer saved texts in the **Messages** menu (same syntax as macros).
 - **Send a text file:** Transmit menu → Send text file….
 
@@ -79,7 +80,9 @@ Macro variables:
 | | | | |
 |---|---|---|---|
 | `%m` my call | `%c` other station | `%n` name | `%q` QTH |
-| `%r` RST sent | `%s` RST received | `%N` sent number / exchange | `%M` received number |
+| `%r` RST sent | `%s` RST received | `%N` sent number and exchange | `%M` received number and exchange |
+| `%e` the whole exchange per the contest rules (`599 001`, `599 BHE`, `001 TOMAS DX`, `001`) | `%S` my serial number | `%X` exchange text (zone, territory, name + QTH …) | `%x %y` number and time (BARTG) |
+| `%a` my name (no diacritics) | `%o` my locator | `%Z` my CQ zone | |
 | `%g` greeting (GM/GA/GE by the other station's local time) | `%D %T %t` UTC date and time | `%L %F` LTRS/FIGS | `%{…}` CW ID |
 | `%l` log the QSO | `\` at the end = RX after sending | `#` at the end = stay in TX | |
 

@@ -448,7 +448,12 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var callbook = CallbookSettings()
     public var callHistory = CallHistorySettings()
     public var rtty: [String: ParameterValue] = [:]
+    /// The active macro set (F1–F12, ⇧F1–⇧F4) – a copy of `macroSets[activeMacroSetKey]`.
     public var macros: [Macro] = AppSettings.defaultMacros
+    /// Stored macro sets: "normal", "dx" and "contest.<preset>" / "contest.custom" (MacroSets.swift).
+    public var macroSets: [String: [Macro]] = [:]
+    /// Operating outside a contest: normal (ragchew) or DX – picks the macro set.
+    public var operatingMode: OperatingMode = .normal
     public var log = LogSettings()
     public var clock = ClockSettings()
     public var rttyCore = RTTYCoreSettings()
@@ -492,7 +497,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey { case schemaVersion, station, audio, ptt, fsk, rig, api, callbook, callHistory, rtty,
                                              macros, log, clock, rttyCore, contest, display, messages, txWindow,
-                                             shortcuts, upload, spots, decoders, esm, alerts }
+                                             shortcuts, upload, spots, decoders, esm, alerts, macroSets, operatingMode }
 
     /// Default messages per MMTTY (sys.m_MsgList), without the author's details.
     public static let defaultMessages: [Macro] = [
@@ -531,6 +536,8 @@ public struct AppSettings: Codable, Sendable, Equatable {
         }
         esm = c.tolerant(.esm, x.esm, w, s)
         alerts = c.tolerant(.alerts, x.alerts, w, s)
+        macroSets = c.tolerant(.macroSets, TolerantDict<TolerantArray<Macro>>(), w, s).items.mapValues { Self.padded($0.items) }
+        operatingMode = c.tolerant(.operatingMode, x.operatingMode, w, s)
     }
 
     /// Engine configuration from the settings.

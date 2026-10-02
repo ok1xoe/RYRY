@@ -71,6 +71,7 @@ Tlačítko **Vyzkoušet spojení** ukáže frekvenci a mód. Pro PTT přes CAT z
 - **TX / RX:** tlačítko TX nebo ⌘T. **Esc** = okamžitě RX. **Tune** = nosná pro ladění.
 - **Okno vysílání:** režim odesílání po znacích, slovech nebo řádcích; **Odeslat vše** odešle celý text. Volitelně CR/LF na začátku vysílání a zalamování řádků (Nastavení → Zobrazení → Okno vysílání).
 - **Makra F1–F12 a ⇧F1–⇧F4:** klik nebo klávesa. Pravým tlačítkem **Upravit…** (název, text, barva, opakování).
+- **Sady maker:** nad lištou maker je přepínač **Běžný provoz / DX**; v závodě má každý závod (i vlastní) svou sadu. Sada se mění sama se zvoleným závodem a úpravy se ukládají do ní. **Výchozí makra…** nahradí sadu výchozí – u závodu podle jeho výměny (F1 CQ, F4 výměna `%c %e %e`, F5 TU + zalogovat, F11 AGN, ⇧F3 moje značka – sedí s ESM).
 - **Zprávy:** delší uložené texty v menu **Zprávy** (stejná syntaxe jako makra).
 - **Odeslat textový soubor:** menu Vysílání → Odeslat textový soubor….
 
@@ -79,7 +80,9 @@ Proměnné v makrech:
 | | | | |
 |---|---|---|---|
 | `%m` moje značka | `%c` protistanice | `%n` jméno | `%q` QTH |
-| `%r` RST odeslané | `%s` RST přijaté | `%N` odesílané číslo / výměna | `%M` přijaté číslo |
+| `%r` RST odeslané | `%s` RST přijaté | `%N` odesílané číslo a výměna | `%M` přijaté číslo a výměna |
+| `%e` celá výměna podle pravidel závodu (`599 001`, `599 BHE`, `001 TOMAS DX`, `001`) | `%S` moje pořadové číslo | `%X` text výměny (zóna, teritorium, jméno + QTH …) | `%x %y` číslo a čas (BARTG) |
+| `%a` moje jméno (bez diakritiky) | `%o` můj lokátor | `%Z` moje CQ zóna | |
 | `%g` pozdrav (GM/GA/GE podle místního času protistanice) | `%D %T %t` datum a čas UTC | `%L %F` LTRS/FIGS | `%{…}` CW ID |
 | `%l` zalogovat | `\` na konci = po odvysílání RX | `#` na konci = zůstat v TX | |
 

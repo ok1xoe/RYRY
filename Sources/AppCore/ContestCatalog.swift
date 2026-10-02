@@ -61,6 +61,19 @@ public enum ContestCatalog {
         }
     }
 
+    /// Contests whose exchange has no RST (NA Sprint, NAQP, WRT, Rookie Roundup, BARTG Sprint).
+    public static func sendsRST(_ p: ContestPreset?) -> Bool {
+        ![.naSprintRTTY, .naqpRTTY, .wrt, .rookieRoundup, .bartgSprint, .bartgSprint75].contains(p)
+    }
+
+    /// The whole sent exchange (%e) per the contest rules: [RST] [serial] [text] separated by spaces; outside a contest the RST.
+    public static func sentExchange(_ c: ContestSettings, rst: String, serial: Int?, text: String) -> String {
+        let r = rst.isEmpty ? "599" : rst
+        guard c.enabled else { return r }
+        let parts = [sendsRST(c.selectedPreset) ? r : "", serial.map { String(format: "%03d", $0) } ?? "", text]
+        return parts.filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
     /// URC territory from the call: the longest URC prefix with a single territory (OK1 → BHE, OM → SLA).
     public static func urcTerritory(_ call: String) -> String? {
         let c = QSORecord.normalizeCall(call)
