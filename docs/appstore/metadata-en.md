@@ -37,7 +37,7 @@ TRANSMIT
 • Macros F1–F12 with MMTTY variables, saved messages and a TX window
 
 CONTESTS
-• Presets for ARRL RTTY Roundup, CQ WPX RTTY, CQ WW RTTY, BARTG, SARTG, Makrothen, JARTS, WAE and OK DX RTTY
+• Presets for 28 RTTY contests (CQ WW, CQ WPX, ARRL Roundup, WAE, URC, Russian WW, BARTG, SARTG, NAQP, OK DX and more) with exchange, scoring and multiplier rules
 • Enter Sends Message (Run and S&P), serial numbers, dupe check, Super Check Partial and call history
 • Score and multipliers per band, WAE QTC, Cabrillo export
 
@@ -62,7 +62,7 @@ FOR YOUR LOGGER
 TRY IT WITHOUT A RADIO
 Choose Help → Play Demo Signal and watch RYRY decode a contest QSO.
 
-RYRY is free and open source under the GNU LGPL v3, based on MMTTY by Makoto Mori (JE3HHT). Source code: https://github.com/ok1xoe/mmtty4mac
+RYRY is free and open source under the GNU LGPL v3, based on MMTTY by Makoto Mori (JE3HHT). Source code: https://github.com/ok1xoe/RYRY
 
 An amateur radio licence is required to transmit.
 ```
@@ -79,6 +79,7 @@ rtty,ham,amateur radio,radioteletype,contest,fsk,afsk,dx cluster,band map,logger
 The first App Store release of RYRY – the Mac RTTY program formerly distributed as mmtty4mac.
 
 • New name and icon
+• 28 RTTY contest presets with a rules overview, scoring and multipliers
 • Help → Play Demo Signal lets you try decoding without a radio
 • LoTW: RYRY prepares the ADIF file and opens it in TrustedQSL
 • Coming from mmtty4mac: your settings move over automatically; RYRY asks once for access to your log folder, and you may need to enter your online service passwords again

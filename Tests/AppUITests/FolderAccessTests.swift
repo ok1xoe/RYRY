@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 import Testing
 import Settings
@@ -20,15 +20,15 @@ struct FakeBookmarkCodec: BookmarkCodec {
     }
 }
 
-private let container = "/Users/x/Library/Containers/cz.ok1xoe.mmtty4mac/Data"
+private let container = "/Users/x/Library/Containers/cz.ok1xoe.ryry/Data"
 
 @Test @MainActor func noBookmarkAsksOnceAndRemembers() async {
-    let p = FakeFolderPrompt(URL(fileURLWithPath: "/Users/x/Documents/mmtty4mac"))
+    let p = FakeFolderPrompt(URL(fileURLWithPath: "/Users/x/Documents/RYRY"))
     let fa = FolderAccess(prompt: p, codec: FakeBookmarkCodec(), sandboxed: true, containerHome: container)
     var b = FolderBookmarks()
-    let u = await fa.acquire("/Users/x/Documents/mmtty4mac", bookmarks: &b, message: "m")
-    #expect(u?.path == "/Users/x/Documents/mmtty4mac" && p.asked.map(\.path) == ["/Users/x/Documents/mmtty4mac"])
-    _ = await fa.acquire("/Users/x/Documents/mmtty4mac/", bookmarks: &b, message: "m")
+    let u = await fa.acquire("/Users/x/Documents/RYRY", bookmarks: &b, message: "m")
+    #expect(u?.path == "/Users/x/Documents/RYRY" && p.asked.map(\.path) == ["/Users/x/Documents/RYRY"])
+    _ = await fa.acquire("/Users/x/Documents/RYRY/", bookmarks: &b, message: "m")
     #expect(p.asked.count == 1)                                   // remembered, trailing slash ignored
 }
 

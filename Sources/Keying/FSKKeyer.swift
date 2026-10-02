@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 
 /// FSK keyer: receives codes in MMTTY bit order (see rttycore_read_fsk_codes).
 public protocol FSKKeyer: AnyObject, Sendable {

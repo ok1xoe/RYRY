@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 
 /// Icom CI-V: frame `FE FE <to> <from> <cmd> [data…] FD`, the computer has address E0.

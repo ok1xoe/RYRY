@@ -2,7 +2,7 @@
 # Sestaví RYRY a nahraje ho do App Store Connect (s --export-only jen vytvoří podepsaný .pkg bez nahrání).
 #
 # Potřebuje: Xcode přihlášené k účtu týmu (Settings → Accounts), TEAM_ID v prostředí
-# a založenou aplikaci v App Store Connect (bundle ID cz.ok1xoe.mmtty4mac). Hesla ani lokální klíče nejsou potřeba:
+# a založenou aplikaci v App Store Connect (bundle ID cz.ok1xoe.ryry). Hesla ani lokální klíče nejsou potřeba:
 # Xcode podepíše cloudovým certifikátem Apple Distribution a profil vytvoří sám (-allowProvisioningUpdates).
 #
 #   TEAM_ID=XXXXXXXXXX ./scripts/release-appstore.sh               # sestavit a nahrát
@@ -26,7 +26,7 @@ cat > "$A/Info.plist" <<PL
   <key>ApplicationProperties</key><dict>
     <key>ApplicationPath</key><string>Applications/RYRY.app</string>
     <key>Architectures</key><array><string>arm64</string><string>x86_64</string></array>
-    <key>CFBundleIdentifier</key><string>cz.ok1xoe.mmtty4mac</string>
+    <key>CFBundleIdentifier</key><string>cz.ok1xoe.ryry</string>
     <key>CFBundleShortVersionString</key><string>$V</string>
     <key>CFBundleVersion</key><string>$B</string>
     <key>Team</key><string>$TEAM_ID</string>

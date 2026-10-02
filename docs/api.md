@@ -1,6 +1,6 @@
-# mmtty4mac API
+# RYRY API
 
-mmtty4mac nabízí dvě API vrstvy. Každou lze v nastavení zapnout nebo vypnout zvlášť (`settings.json` → `api`):
+RYRY nabízí dvě API vrstvy. Každou lze v nastavení zapnout nebo vypnout zvlášť (`settings.json` → `api`):
 
 | Vrstva | Výchozí adresa | Nastavení |
 |---|---|---|
@@ -19,9 +19,9 @@ mmtty4mac nabízí dvě API vrstvy. Každou lze v nastavení zapnout nebo vypnou
 
 Loggery, které umí ovládat fldigi (RUMlogNG, MacLoggerDX, Log4OM a další), se připojí beze změny. Seznam metod vrací `fldigi.list`.
 
-| Metoda | Signatura | Význam v mmtty4mac |
+| Metoda | Signatura | Význam v RYRY |
 |---|---|---|
-| `fldigi.name` / `version` / `name_version` / `version_struct` | `s:n` / `S:n` | identifikace (`mmtty4mac`) |
+| `fldigi.name` / `version` / `name_version` / `version_struct` | `s:n` / `S:n` | identifikace (`RYRY`) |
 | `fldigi.list` | `A:n` | seznam metod `{name, signature, help}` |
 | `main.get_trx_status` | `s:n` | `rx`, `tx` nebo `tune` |
 | `main.tx`, `main.rx`, `main.tune`, `main.abort` | `n:n` | TX. `main.rx` = RX po dovysílání, `main.abort` = okamžitě RX |
@@ -136,7 +136,7 @@ Klient, který nestíhá číst (fronta přes 1000 zpráv), se odpojí. Požadav
 Když se odpojí klient, který zahájil vysílání (`engine.tx`, `engine.tune`, `macro.run`), vysílání se okamžitě ukončí.
 
 ### Klienti
-- **Java/Kotlin (JDK 21, bez závislostí):** `clients/java` – `Mmtty4macClient`, ukázka a test, návod na napojení MacContestLoggeru.
+- **Java/Kotlin (JDK 21, bez závislostí):** `clients/java` – `RyryClient`, ukázka a test, návod na napojení MacContestLoggeru.
 - **Python:** příklad níže.
 
 Ověřená kompatibilita fldigi XML-RPC: sekvence volání RUMlogNG (metody zjištěné z jeho binárky) – test `rumlogNGCallSequence`.

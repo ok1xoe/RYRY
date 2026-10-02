@@ -1,13 +1,13 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
+import Localization
 import ModemKit
 
 public enum SettingsError: Error, Equatable, Sendable { case io(String), badSlot(Int) }
 
 public enum SettingsPaths {
     public static var defaultDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("mmtty4mac")
+        AppSupport.directory
     }
 }
 

@@ -1,5 +1,5 @@
 //Copyright+LGPL
-// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Modifications Copyright 2026 OK1XOE (RYRY), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba

@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 // Import of settings from Windows MMTTY (Mmtty.ini). Sections and keys per TMmttyWd::ReadRegister / WriteRegister
 // (MMTTY Main.cpp), macro escaping per Yen2CrLf / CrLf2Yen (ComLib.cpp). A pure parser without side effects.
 import Foundation
@@ -76,7 +76,7 @@ public struct MMTTYImportResult: Sendable, Equatable {
     /// Custom keyboard shortcuts (command id → shortcut), only those usable on macOS.
     public var shortcuts: [String: KeyBinding] = [:]
     public var warnings: [String] = []
-    /// How many keys of the file have no counterpart in mmtty4mac (windows, fonts, TNC, …).
+    /// How many keys of the file have no counterpart in RYRY (windows, fonts, TNC, …).
     public var ignoredKeyCount = 0
 
     public init() {}
@@ -176,7 +176,7 @@ public enum MMTTYImport {
         return out
     }
 
-    /// MMTTY macro text → mmtty4mac. The syntax (`%c`, `\` at the start and the end, `#`, `%{…}`) is the same; the MMTTY
+    /// MMTTY macro text → RYRY. The syntax (`%c`, `\` at the start and the end, `#`, `%{…}`) is the same; the MMTTY
     /// control characters `_ ~ [ ]` (mark, carrier off, diddle) are not sent by the core, so they are removed outside CW ID `%{…}`.
     public static func convertMacroText(_ s: String, removed: inout Int) -> String {
         var out = "", inCW = false
@@ -244,7 +244,7 @@ public enum MMTTYImport {
 
     // MARK: shortcuts
 
-    /// SysKey: index of the kk… enum in ComLib.h (key `S<index+1>`) → mmtty4mac command; the MMTTY default code is not taken.
+    /// SysKey: index of the kk… enum in ComLib.h (key `S<index+1>`) → RYRY command; the MMTTY default code is not taken.
     private static let sysKeys: [(index: Int, id: String, mmttyDefault: Int)] = [
         (3, "openLog", 0), (24, "toggleTx", 0x78), (25, "rxNow", 0x77), (58, "clearRx", 0),
     ]

@@ -1,5 +1,5 @@
 //Copyright+LGPL
-// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Modifications Copyright 2026 OK1XOE (RYRY), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba
@@ -880,7 +880,7 @@ public:
 	void PutData(int d);
 	double Do(int echo);
 	inline void SetDem(CFSKDEM *p){pDem = p;};
-	// mmtty4mac: the codes the modulator has started transmitting (for the FSK keyer)
+	// RYRY: the codes the modulator has started transmitting (for the FSK keyer)
 	BYTE	m_FskOut[256];
 	int		m_FskW, m_FskR;
 	inline void PushFskCode(BYTE c){ m_FskOut[m_FskW & 255] = c; m_FskW++; if( m_FskW - m_FskR > 256 ) m_FskR = m_FskW - 256; };

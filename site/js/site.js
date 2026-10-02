@@ -96,9 +96,9 @@
             '<a href="' + here + 'index.html">RYRY</a> · <a href="' + here + 'support.html">' + T.support + "</a> · " +
             '<a href="' + manualHref + '">' + T.manual + '</a> · <a href="' + here + 'privacy.html">' + T.privacy + "</a></div></div>" +
           '<div><div class="silk k">' + T.source + '</div><div class="v" style="font-family:var(--mono);font-size:.82rem">' +
-            '<a href="https://github.com/ok1xoe/mmtty4mac">github.com/ok1xoe/mmtty4mac</a></div></div>' +
+            '<a href="https://github.com/ok1xoe/RYRY">github.com/ok1xoe/RYRY</a></div></div>' +
         "</div>" +
-        '<div class="serial"><span>RYRY · cz.ok1xoe.mmtty4mac</span><span>' + T.license + "</span></div>" +
+        '<div class="serial"><span>RYRY · cz.ok1xoe.ryry</span><span>' + T.license + "</span></div>" +
       "</div></footer>";
   }
 

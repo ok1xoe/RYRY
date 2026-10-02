@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 // Plan 16 check: ESM, import from MMTTY, the band map in RTTY/FSK, backups.
 import Foundation
 import Testing

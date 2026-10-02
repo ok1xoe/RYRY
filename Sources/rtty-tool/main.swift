@@ -4,6 +4,7 @@ import AudioIO
 import Engine
 import Foundation
 import Keying
+import Localization
 import MacroEngine
 import QSOLog
 import Settings
@@ -107,7 +108,7 @@ let usage = """
                      [--rig none|hamlib|flrig] [--fsk uart|soft-dtr|soft-rts|soft-break] [--baud B] [--mark F]
          stdin: text = odvysílat (TX → text → RX po dovysílání), :tx, :rx, :abort, :tune, :q,
                 :c ZNAČKA (protistanice), :m1…:m12 (makra), :log; [--call MOJE] [--his PROTISTANICE] [--settings DIR] [--no-api]
-         nastavení: ~/Library/Application Support/mmtty4mac/settings.json (API: fldigi :7362, JSON-RPC :7363)
+         nastavení: ~/Library/Application Support/RYRY/settings.json (API: fldigi :7362, JSON-RPC :7363)
     """
 
 let argv = CommandLine.arguments
@@ -194,6 +195,7 @@ case "macro":
 
 case "live":
     // Settings from the file (or --settings DIR); the command-line switches take precedence.
+    if o.settingsDir == nil { AppSupport.migrateLegacy() }
     let store = SettingsStore(directory: o.settingsDir.map { URL(fileURLWithPath: $0) } ?? SettingsPaths.defaultDirectory)
     var (settings, warnings) = store.load()
     for w in warnings { FileHandle.standardError.write(Data("[nastavení] \(w)\n".utf8)) }

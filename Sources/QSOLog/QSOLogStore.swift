@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 
 public enum QSOLogError: Error, Equatable, Sendable { case notFound(UUID), io(String) }
@@ -37,7 +37,7 @@ public actor QSOLogStore {
         return d
     }()
 
-    public init(directory: URL, baseName: String = "mmtty4mac") throws {
+    public init(directory: URL, baseName: String = "RYRY") throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         adifURL = directory.appendingPathComponent(baseName + ".adi")
         jsonlURL = directory.appendingPathComponent(baseName + ".jsonl")

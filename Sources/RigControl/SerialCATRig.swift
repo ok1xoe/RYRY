@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import CSerial
 import Foundation
 
@@ -27,7 +27,7 @@ public final class SerialCATRig: Rig, @unchecked Sendable {
     private let transport: CATTransport
     private let proto: CATProtocol
     private let timeout: Duration
-    private let queue = DispatchQueue(label: "mmtty4mac.cat")
+    private let queue = DispatchQueue(label: "ryry.cat")
     private var isOpen = false { didSet { let v = isOpen; openLock.withLock { openFlag = v } } }
     /// After an explicit disconnect() the port is not reopened (until a connect() arrives).
     private var closedByOwner = false

@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import AppKit
 import AppUI
 import AppViews
@@ -49,7 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         L("RTTY pro macOS – nativní přepis MMTTY s API pro loggery (fldigi XML-RPC, JSON-RPC)."),
         "",
         L("Jádro demodulátoru a modulátoru: MMTTY © 2000–2013 Makoto Mori (JE3HHT), Nobuyuki Oba."),
-        L("RYRY © 2026 OK1XOE. Licence GNU LGPL v3, zdrojový kód: github.com/ok1xoe/mmtty4mac."),
+        L("RYRY © 2026 OK1XOE. Licence GNU LGPL v3, zdrojový kód: github.com/ok1xoe/RYRY."),
         L("DXCC: cty.dat – Jim Reisert AD1C (country-files.com)."),
     ].joined(separator: "\n")
     let para = NSMutableParagraphStyle(); para.alignment = .center
@@ -60,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
-struct MMTTY4MacApp: App {
+struct RYRYApp: App {
     @MainActor func playWAV(speed: Double) {
         let p = NSOpenPanel()
         p.allowedContentTypes = [.wav]
@@ -90,6 +90,7 @@ struct MMTTY4MacApp: App {
     private let languageWatcher: LanguageWatcher
 
     init() {
+        AppSupport.migrateLegacy()               // the former name mmtty4mac: data folder and preferences
         let lib = LanguageLibrary.standard()
         lib.seedUserDirectory()                  // cs.json, en.json into the languages folder (for editing)
         lib.restore()

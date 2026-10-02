@@ -1,5 +1,5 @@
 // RTTYCore.h – the C API of the RTTY core from MMTTY.
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 #ifndef RTTYCORE_H
 #define RTTYCORE_H
 #include <stddef.h>

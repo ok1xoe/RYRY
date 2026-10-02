@@ -1,5 +1,5 @@
 //Copyright+LGPL
-// Modifications Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Modifications Copyright 2026 OK1XOE (RYRY), LGPL v3
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------
 // Copyright 2000-2013 Makoto Mori, Nobuyuki Oba
@@ -450,7 +450,7 @@ _try:;
 						}
 					}
 					m_figout = 0;
-					PushFskCode(BYTE(m_Data));	// mmtty4mac: the code for the FSK keyer
+					PushFskCode(BYTE(m_Data));	// RYRY: the code for the FSK keyer
 					m_DataCount = m_BitLen;
 					m_SumParity = 0;
 					m_mode++;
@@ -492,7 +492,7 @@ _try:;
 							}
 							break;
 					}
-					PushFskCode(BYTE(m_Data));	// mmtty4mac: the code for the FSK keyer
+					PushFskCode(BYTE(m_Data));	// RYRY: the code for the FSK keyer
 					m_DataCount = m_BitLen;
 					m_SumParity = 0;
 					m_mode++;

@@ -1,8 +1,8 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 
 /// Log location: folder and name. A log consists of `<name>.jsonl` (source of truth), `<name>.adi` (derived ADIF)
-/// and the QTC series (`<name>-qtc.jsonl`; the default log "mmtty4mac" uses the existing `qtc.jsonl`).
+/// and the QTC series (`<name>-qtc.jsonl`; the default log – "RYRY", formerly "mmtty4mac" – uses `qtc.jsonl`).
 public struct LogLocation: Sendable, Equatable {
     public enum LocationError: Error, Equatable, LocalizedError {
         case exists(String), same
@@ -14,7 +14,9 @@ public struct LogLocation: Sendable, Equatable {
         }
     }
 
-    public static let defaultName = "mmtty4mac"
+    public static let defaultName = "RYRY"
+    /// The default log name before the rename (its QTC file is `qtc.jsonl` as well).
+    public static let legacyDefaultName = "mmtty4mac"
     public var directory: URL
     public var name: String
 
@@ -34,7 +36,7 @@ public struct LogLocation: Sendable, Equatable {
 
     public var jsonlURL: URL { directory.appendingPathComponent(name + ".jsonl") }
     public var adifURL: URL { directory.appendingPathComponent(name + ".adi") }
-    public var qtcFileName: String { name == Self.defaultName ? "qtc.jsonl" : name + "-qtc.jsonl" }
+    public var qtcFileName: String { name == Self.defaultName || name == Self.legacyDefaultName ? "qtc.jsonl" : name + "-qtc.jsonl" }
     public var qtcURL: URL { directory.appendingPathComponent(qtcFileName) }
     /// Path for display and for the list of recent logs (ADIF – the one the user knows).
     public var displayPath: String { adifURL.path }

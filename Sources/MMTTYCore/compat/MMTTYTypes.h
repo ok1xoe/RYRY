@@ -1,5 +1,5 @@
 // MMTTYTypes.h – replacements for the types and macros from Windows/VCL/ComLib.h for the MMTTY core.
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 #pragma once
 #include <cstdint>
 #include <cstring>

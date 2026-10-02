@@ -1,7 +1,8 @@
-# RYRY (mmtty4mac)
+# RYRY
 
 A native macOS RTTY application based on MMTTY (JE3HHT, Makoto Mori). Published on the Mac App Store as **RYRY**
-(website: https://ryry.ok1xoe.dev); this repository keeps its original name mmtty4mac.
+(website: https://ryry.ok1xoe.dev). Formerly mmtty4mac; renamed to RYRY in version 1.1 (repository, bundle ID
+`cz.ok1xoe.ryry`, data folder `Application Support/RYRY` – the old folder and preferences are moved on the first launch).
 
 - Original sources: https://github.com/n5ac/mmtty (see http://mm-open.org)
 - Licence: GNU LGPL v3 (see COPYING and COPYING.LESSER)
@@ -61,8 +62,8 @@ Manual hardware tests: `docs/hardware-checklist.md`.
 - **fldigi XML-RPC** `http://127.0.0.1:7362/RPC2` – loggers that speak fldigi work without any change.
 - **JSON-RPC 2.0 / WebSocket** `ws://127.0.0.1:7363/v1` – with events (received text, state, AFC, rig, log).
 
-Details: `docs/api.md`. Settings: `~/Library/Application Support/mmtty4mac/settings.json` for `rtty-tool`; the sandboxed
-app keeps them in `~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/`.
+Details: `docs/api.md`. Settings: `~/Library/Application Support/RYRY/settings.json` for `rtty-tool`; the sandboxed
+app keeps them in `~/Library/Containers/cz.ok1xoe.ryry/Data/Library/Application Support/RYRY/`.
 
 ## The application (GUI)
 
@@ -81,8 +82,10 @@ Further features from MMTTY:
 - sound card clock calibration in ppm (Settings → Audio → Measure; Core Audio measures the real frequency against the system clock);
 - contest mode: serial numbers, click a number in the receive pane = received number, Cabrillo 3.0 export (Log → Export Cabrillo…);
 - spectrum/waterfall range and gain (the menu in the corner of the spectrum), LTRS/FIGS indicator, UOS, J-BELL, timestamps, font size;
-- DXCC from `cty.dat` (AD1C; your own version can be placed in `Application Support/mmtty4mac/cty.dat` inside the app container), the `%g` greeting based on the other station's local time;
+- DXCC from `cty.dat` (AD1C; your own version can be placed in `Application Support/RYRY/cty.dat` inside the app container), the `%g` greeting based on the other station's local time;
 - playing a WAV into the receive path (File → Play WAV into receive);
 - a message list (the "Messages" menu next to the transmit pane), macro button colours, demodulator scope (Window → Demodulator scope);
-- contest exchange formats RST + number, CQ/RJ (zone + QTH), BARTG (number + time), PED and WAE with the QTC exchange
-  (both sending and receiving a series in the QSO panel, limits per the DARC rules, QTC in Cabrillo).
+- contest exchange formats RST + number, RST + number + text, RST + text, CQ/RJ (zone + QTH), BARTG (number + time), PED and
+  WAE with the QTC exchange (both sending and receiving a series in the QSO panel, limits per the DARC rules, QTC in Cabrillo);
+- 28 RTTY contest presets (every HF RTTY contest on contestcalendar.com) with the exchange, points, multipliers, dupes and
+  dates per the official rules, and a rules overview in Settings → Contest.

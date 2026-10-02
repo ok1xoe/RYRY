@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "mmtty4mac",
+    name: "RYRY",
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "WaveFile", targets: ["WaveFile"]),
         .library(name: "ModemKit", targets: ["ModemKit"]),
         .library(name: "RTTYModem", targets: ["RTTYModem"]),
         .executable(name: "rtty-tool", targets: ["rtty-tool"]),
-        .executable(name: "MMTTY4MacApp", targets: ["MMTTY4MacApp"]),
+        .executable(name: "RYRY", targets: ["RYRY"]),
     ],
     targets: [
         .target(name: "WaveFile"),
@@ -33,7 +33,7 @@ let package = Package(
         .testTarget(name: "RTTYModemTests", dependencies: ["RTTYModem", "ModemKit", "RTTYSignalKit"]),
         .executableTarget(name: "rtty-tool", dependencies: ["RTTYModem", "ModemKit", "WaveFile", "RTTYSignalKit",
                                                           "Engine", "AudioIO", "Keying", "RigControl",
-                                                          "MacroEngine", "Settings", "AppCore", "APIServer", "QSOLog"]),
+                                                          "MacroEngine", "Settings", "AppCore", "APIServer", "QSOLog", "Localization"]),
         .target(name: "XMLRPC"),
         .testTarget(name: "XMLRPCTests", dependencies: ["XMLRPC"]),
         .target(name: "RigControl", dependencies: ["XMLRPC", "CSerial"]),
@@ -69,7 +69,7 @@ let package = Package(
         // AppViews kvůli obsahu oken (např. seznam zaškrtávátek filtru spotů); AppViews závisí na AppUI, ne naopak
         .testTarget(name: "AppUITests", dependencies: ["AppUI", "AppViews", "Upload", "QSOLog", "AppCore", "Engine", "Settings", "ModemKit", "AudioIO",
                                                        "Keying", "RigControl", "RTTYModem", "RTTYSignalKit", "TestSupport", "WaveFile", "Spots"]),
-        .executableTarget(name: "MMTTY4MacApp", dependencies: ["AppViews", "AppUI", "Localization", "Settings"]),
+        .executableTarget(name: "RYRY", dependencies: ["AppViews", "AppUI", "Localization", "Settings"]),
         .target(name: "DXCC"),
         .target(name: "Spots", dependencies: ["QSOLog"]),
         .testTarget(name: "SpotsTests", dependencies: ["Spots", "QSOLog"]),

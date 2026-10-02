@@ -11,7 +11,7 @@
 <body>
 <header class="top"><div class="in">
   <img class="icon" src="../img/icon.png" alt="">
-  <span class="brand">RYRY</span><span class="ver">příručka · verze 1.0</span>
+  <span class="brand">RYRY</span><span class="ver">příručka · verze 1.1</span>
   <span class="lang"><span>Čeština</span> <a href="../en/index.html">English</a></span>
 </div></header>
 
@@ -166,13 +166,13 @@
 
 <section id="zavody">
 <h2>7. Závody a QTC</h2>
-<p>V záložce <b>Závod</b> zapněte závodní režim a vyberte předvolbu: ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE nebo OK DX RTTY. Předvolba nastaví název pro Cabrillo, formát výměny a nejbližší termín (vždy ho ověřte v pravidlech).</p>
+<p>V záložce <b>Závod</b> zapněte závodní režim a vyberte předvolbu – 28 RTTY závodů z kalendáře contestcalendar.com: SARTG New Year, ARRL RTTY Roundup, PRO Digi, BARTG RTTY Sprint, Mexico RTTY, CQ WPX RTTY, NAQP RTTY, North American Sprint RTTY, YB DX RTTY, BARTG HF RTTY, EA RTTY, IG-RY WW RTTY, BARTG Sprint 75, SP DX RTTY, VOLTA WW RTTY, SARTG WW RTTY, ARRL Rookie Roundup RTTY, Russian WW RTTY, CQ WW RTTY, URC DX RTTY, Russian WW Digital, Makrothen RTTY, DARC RTTY Sprint, JARL WW RTTY (dříve JARTS), WAE DX Contest RTTY, TRC DIGI, OK DX RTTY Contest a týdenní Weekly RTTY Test (WRT). Předvolba nastaví název pro Cabrillo, formát výměny, nejbližší termín, který ještě neskončil (i právě běžící závod), a odesílanou výměnu podle Stanice (např. teritorium URC z prefixu: OK1 = BHE, OK2 = MOR). Pod předvolbou je sekce <b>Pravidla závodu</b>: termín, pásma, co se předává, body, násobiče, duplicity, odkaz na oficiální pravidla a oranžově nejasná místa pravidel. Termín vždy ověřte v pravidlech.</p>
 <div class="gallery">
   <figure><a href="../img/cs-settings-5.png"><img src="../img/cs-settings-5.png" alt="Nastavení – Závod" loading="lazy"></a><figcaption>Předvolba, výměna, Cabrillo a začátek závodu.</figcaption></figure>
   <figure><a href="../img/cs-contest.png"><img src="../img/cs-contest.png" alt="OK DX RTTY Contest v hlavním okně" loading="lazy"></a><figcaption>OK DX RTTY: QSO okno nabízí jen RST a CQ zónu; vaši zónu doplní aplikace, zónu protistanice předvyplní podle značky.</figcaption></figure>
 </div>
-<p><b>Duplicity:</b> když se stanicí už máte v tomto závodě spojení na stejném pásmu a módu, zobrazí se u značky červené <b>DUPE</b>. Zalogovat lze i tak.</p>
-<p>Formáty výměny: RST + pořadové číslo (nebo pevná výměna), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Pořadová čísla se po zalogování zvyšují sama.</p>
+<p><b>Duplicity:</b> když se stanicí už máte v tomto závodě spojení na stejném pásmu (Russian WW Digital, PRO Digi a vlastní závod: na pásmu a módu), zobrazí se u značky červené <b>DUPE</b>. Zalogovat lze i tak.</p>
+<p>Formáty výměny: RST + pořadové číslo (nebo pevná výměna), RST + číslo + text (jméno, QTH, CQ zóna, značka člena), RST + text bez čísla (teritorium, jméno + QTH, rok licence), RST + CQ zóna, CQ/RJ (zóna + QTH), BARTG (číslo + čas), WAE (číslo + QTC), PED. Kde část stanic posílá místo čísla kód (ARRL RU – stát, ruské závody – oblast, DARC – DOK, Mexico – stát, EA – provincie, SP DX – powiat), má QSO okno pole čísla i kódu a stačí vyplnit jedno. Pořadová čísla se po zalogování zvyšují sama. Okna Násobiče a Skóre počítají podle pravidel zvoleného závodu.</p>
 <h3>ESM – Enter posílá zprávy (Run / S&amp;P)</h3>
 <p>Po zapnutí v Nastavení → Závod → ESM pošle Enter v poli Call nebo výměny makro podle stavu spojení, podobně jako v N1MM: <b>Run</b> (voláte CQ) – CQ → výměna → TU a zalogování; <b>S&amp;P</b> (odpovídáte) – moje značka → výměna a zalogování. Režim přepnete v hlavičce QSO panelu nebo <kbd>⌃</kbd><kbd>R</kbd>; panel ukazuje, co Enter pošle. Během vysílání Enter nic neposílá a prázdné makro se nikdy neodešle.</p>
 <p><b>Rychlost:</b> ve stavovém řádku je v závodě počet spojení a rychlost za posledních 10 a 60 minut (spojení za hodinu); v okně Log jsou počty podle pásem.</p>
@@ -230,7 +230,7 @@
     <figcaption>Klávesové zkratky: klikněte na zkratku a stiskněte novou kombinaci (Delete = bez zkratky, Esc = zrušit).</figcaption></figure>
 </div>
 <p>Ve výchozím stavu je rozhraní anglicky; češtinu zvolíte v Nastavení → Zobrazení → Jazyk rozhraní (volba se pamatuje).</p>
-<p><b>Jazykové soubory</b> <code>cs.json</code> a <code>en.json</code> najdete ve složce <code>~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages</code> – aplikace běží v sandboxu macOS (tlačítko se složkou v sekci Jazyk). Můžete je upravit – uložená změna se projeví okamžitě ve všech oknech. Upravený soubor aplikace při aktualizaci nepřepíše a texty, které v něm chybějí, doplní z přibalené verze.</p>
+<p><b>Jazykové soubory</b> <code>cs.json</code> a <code>en.json</code> najdete ve složce <code>~/Library/Containers/cz.ok1xoe.ryry/Data/Library/Application Support/RYRY/Languages</code> – aplikace běží v sandboxu macOS (tlačítko se složkou v sekci Jazyk). Můžete je upravit – uložená změna se projeví okamžitě ve všech oknech. Upravený soubor aplikace při aktualizaci nepřepíše a texty, které v něm chybějí, doplní z přibalené verze.</p>
 <p><b>Vlastní překlad:</b> v sekci Jazyk zvolte <b>Uložit šablonu…</b>, přeložte hodnoty v <code>strings</code>, nastavte <code>code</code> a <code>name</code> a soubor nahrajte tlačítkem <b>Nahrát jazyk…</b>. Jazyk se přepne hned ve všech oknech.</p>
 </section>
 
@@ -247,7 +247,7 @@
 </table>
 </section>
 
-<footer>RYRY © 2026 OK1XOE · licence GNU LGPL v3 · zdrojový kód: github.com/ok1xoe/mmtty4mac · jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
+<footer>RYRY © 2026 OK1XOE · licence GNU LGPL v3 · zdrojový kód: github.com/ok1xoe/RYRY · jádro demodulátoru MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
 </main>
 </div>
 </body>

@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 
 /// Watches the languages folder: reloads the active language after an edited file is saved (no app restart needed).
@@ -11,7 +11,7 @@ public final class LanguageWatcher: @unchecked Sendable {
     private var source: DispatchSourceFileSystemObject?
     private var fd: Int32 = -1
     private var pending: DispatchWorkItem?
-    private let queue = DispatchQueue(label: "mmtty4mac.languages")
+    private let queue = DispatchQueue(label: "ryry.languages")
 
     public init(library: LanguageLibrary, localizer: Localizer = .shared, defaults: UserDefaults = .standard,
                 deliverOn: DispatchQueue = .main) {

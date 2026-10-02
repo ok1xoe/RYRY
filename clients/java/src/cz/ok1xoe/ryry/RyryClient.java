@@ -1,5 +1,5 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
-package cz.ok1xoe.mmtty4mac;
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
+package cz.ok1xoe.ryry;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,10 +19,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 
 /**
- * Client for the JSON-RPC 2.0 API of mmtty4mac (ws://127.0.0.1:7363/v1) – JDK 21 only, no dependencies.
+ * Client for the JSON-RPC 2.0 API of RYRY (ws://127.0.0.1:7363/v1) – JDK 21 only, no dependencies.
  *
  * <pre>{@code
- * try (var c = Mmtty4macClient.connect()) {
+ * try (var c = RyryClient.connect()) {
  *     c.onNotification((method, params) -> {
  *         if (method.equals("rx.char")) System.out.print(params.get("char"));
  *     });
@@ -35,7 +35,7 @@ import java.util.function.BiConsumer;
  * All calls block with a timeout (5 s by default); an API error → {@link RpcException}.
  * Notifications are delivered from the WebSocket thread – the listener must not block (forward them to the UI thread).
  */
-public final class Mmtty4macClient implements AutoCloseable {
+public final class RyryClient implements AutoCloseable {
 
     /** Error returned by the API (code per docs/api.md: -32001 TX rejected, -32002 rig, -32602 parameters…). */
     public static final class RpcException extends IOException {
@@ -52,23 +52,23 @@ public final class Mmtty4macClient implements AutoCloseable {
     private final CompletableFuture<Void> closed = new CompletableFuture<>();
     private volatile Duration timeout = Duration.ofSeconds(5);
 
-    private Mmtty4macClient(WebSocket ws) { this.ws = ws; }
+    private RyryClient(WebSocket ws) { this.ws = ws; }
 
-    public static Mmtty4macClient connect() throws IOException { return connect(DEFAULT_URI); }
+    public static RyryClient connect() throws IOException { return connect(DEFAULT_URI); }
 
     /** Connects (without an Origin header – the server rejects requests from a browser). */
-    public static Mmtty4macClient connect(URI uri) throws IOException {
+    public static RyryClient connect(URI uri) throws IOException {
         Holder h = new Holder();
         try {
             WebSocket ws = HttpClient.newHttpClient().newWebSocketBuilder()
                     .connectTimeout(Duration.ofSeconds(5))
                     .buildAsync(uri, h)
                     .get(10, TimeUnit.SECONDS);
-            Mmtty4macClient c = new Mmtty4macClient(ws);
+            RyryClient c = new RyryClient(ws);
             h.client = c;
             return c;
         } catch (Exception e) {
-            throw new IOException("mmtty4mac: cannot connect to " + uri + ": " + e.getMessage(), e);
+            throw new IOException("RYRY: cannot connect to " + uri + ": " + e.getMessage(), e);
         }
     }
 
@@ -180,7 +180,7 @@ public final class Mmtty4macClient implements AutoCloseable {
 
     /** WebSocket.Listener; messages may arrive in parts. */
     private static final class Holder implements WebSocket.Listener {
-        volatile Mmtty4macClient client;
+        volatile RyryClient client;
         private final StringBuilder buf = new StringBuilder();
         private final List<String> early = new ArrayList<>();
 
@@ -189,7 +189,7 @@ public final class Mmtty4macClient implements AutoCloseable {
             if (last) {
                 String s = buf.toString();
                 buf.setLength(0);
-                Mmtty4macClient c = client;
+                RyryClient c = client;
                 if (c != null) {
                     synchronized (early) { for (String e : early) c.handle(e); early.clear(); }
                     c.handle(s);
@@ -200,13 +200,13 @@ public final class Mmtty4macClient implements AutoCloseable {
         }
 
         @Override public CompletionStage<?> onClose(WebSocket w, int code, String reason) {
-            Mmtty4macClient c = client;
+            RyryClient c = client;
             if (c != null) c.fail(new IOException("the server closed the connection: " + code + " " + reason));
             return null;
         }
 
         @Override public void onError(WebSocket w, Throwable error) {
-            Mmtty4macClient c = client;
+            RyryClient c = client;
             if (c != null) c.fail(error);
         }
     }

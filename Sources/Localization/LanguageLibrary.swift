@@ -1,8 +1,8 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import CryptoKit
 import Foundation
 
-/// Available languages: bundled with the app and added by the user (Application Support/mmtty4mac/Languages).
+/// Available languages: bundled with the app and added by the user (Application Support/RYRY/Languages).
 /// A user file with the same code takes precedence over the bundled one.
 public struct LanguageLibrary: Sendable {
     public let bundled: [URL]
@@ -18,9 +18,7 @@ public struct LanguageLibrary: Sendable {
         if let r = Bundle.main.resourceURL { dirs.append(r.appendingPathComponent("Languages")) }
         dirs.append(URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("Resources/Languages"))
-        let sup = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        return LanguageLibrary(bundled: dirs, userDirectory: sup.appendingPathComponent("mmtty4mac/Languages"))
+        return LanguageLibrary(bundled: dirs, userDirectory: AppSupport.directory.appendingPathComponent("Languages"))
     }
 
     private func packs(in dir: URL) -> [LanguagePack] {

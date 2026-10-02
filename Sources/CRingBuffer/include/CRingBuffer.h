@@ -1,5 +1,5 @@
 // CRingBuffer.h – lock-free SPSC ring buffer for float samples (C11 atomics).
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 #pragma once
 #include <stddef.h>
 

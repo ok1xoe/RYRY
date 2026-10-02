@@ -11,7 +11,7 @@
 <body>
 <header class="top"><div class="in">
   <img class="icon" src="../img/icon.png" alt="">
-  <span class="brand">RYRY</span><span class="ver">user manual · version 1.0</span>
+  <span class="brand">RYRY</span><span class="ver">user manual · version 1.1</span>
   <span class="lang"><a href="../cs/index.html">Čeština</a> <span>English</span></span>
 </div></header>
 
@@ -166,13 +166,13 @@
 
 <section id="contests">
 <h2>7. Contests and QTC</h2>
-<p>On the <b>Contest</b> tab turn on contest mode and pick a preset: ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE or OK DX RTTY. The preset sets the Cabrillo name, the exchange format and the next start date (always check it in the rules).</p>
+<p>On the <b>Contest</b> tab turn on contest mode and pick a preset – 28 RTTY contests from contestcalendar.com: SARTG New Year, ARRL RTTY Roundup, PRO Digi, BARTG RTTY Sprint, Mexico RTTY, CQ WPX RTTY, NAQP RTTY, North American Sprint RTTY, YB DX RTTY, BARTG HF RTTY, EA RTTY, IG-RY WW RTTY, BARTG Sprint 75, SP DX RTTY, VOLTA WW RTTY, SARTG WW RTTY, ARRL Rookie Roundup RTTY, Russian WW RTTY, CQ WW RTTY, URC DX RTTY, Russian WW Digital, Makrothen RTTY, DARC RTTY Sprint, JARL WW RTTY (formerly JARTS), WAE DX Contest RTTY, TRC DIGI, OK DX RTTY Contest and the weekly Weekly RTTY Test (WRT). The preset sets the Cabrillo name, the exchange format, the nearest start that has not ended yet (a running contest too) and the sent exchange from your Station (e.g. the URC territory from the prefix: OK1 = BHE, OK2 = MOR). Below the preset is the <b>Contest rules</b> section: date, bands, what is exchanged, points, multipliers, dupes, a link to the official rules, and in orange the ambiguous parts of the rules. Always check the date in the rules.</p>
 <div class="gallery">
   <figure><a href="../img/en-settings-5.png"><img src="../img/en-settings-5.png" alt="Settings – Contest" loading="lazy"></a><figcaption>Preset, exchange, Cabrillo and contest start.</figcaption></figure>
   <figure><a href="../img/en-contest.png"><img src="../img/en-contest.png" alt="OK DX RTTY Contest in the main window" loading="lazy"></a><figcaption>OK DX RTTY: the QSO window offers only RST and CQ zone; your zone is filled in and the other station's zone is prefilled from its call.</figcaption></figure>
 </div>
-<p><b>Dupes:</b> when you already have a QSO with the station in this contest on the same band and mode, a red <b>DUPE</b> appears next to the call. You can still log it.</p>
-<p>Exchange formats: RST + serial number (or a fixed exchange), RST + CQ zone, CQ/RJ (zone + QTH), BARTG (number + time), WAE (number + QTC), PED. Serial numbers increase automatically after logging.</p>
+<p><b>Dupes:</b> when you already have a QSO with the station in this contest on the same band (Russian WW Digital, PRO Digi and a custom contest: band and mode), a red <b>DUPE</b> appears next to the call. You can still log it.</p>
+<p>Exchange formats: RST + serial number (or a fixed exchange), RST + serial + text (name, QTH, CQ zone, member mark), RST + text without a serial (territory, name + QTH, licence year), RST + CQ zone, CQ/RJ (zone + QTH), BARTG (number + time), WAE (number + QTC), PED. Where some stations send a code instead of the number (ARRL RU – state, Russian contests – oblast, DARC – DOK, Mexico – state, EA – province, SP DX – powiat), the QSO window has both a number and a code field and one is enough. Serial numbers increase automatically after logging. The Multipliers and Score windows follow the rules of the selected contest.</p>
 <h3>ESM – Enter Sends Message (Run / S&amp;P)</h3>
 <p>When enabled in Settings → Contest → ESM, Enter in the Call or exchange field sends a macro depending on the QSO state, much like N1MM: <b>Run</b> (calling CQ) – CQ → exchange → TU and log; <b>S&amp;P</b> (answering) – my call → exchange and log. Switch the mode in the QSO panel header or with <kbd>⌃</kbd><kbd>R</kbd>; the panel shows what Enter will send. Enter sends nothing while transmitting and an empty macro is never sent.</p>
 <p><b>Rate:</b> in a contest the status bar shows the QSO count and the rate over the last 10 and 60 minutes (QSOs per hour); the Log window shows counts per band.</p>
@@ -230,7 +230,7 @@
     <figcaption>Keyboard shortcuts: click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).</figcaption></figure>
 </div>
 <p>By default the interface is in English; choose Czech in Settings → Display → Interface language (the choice is remembered).</p>
-<p><b>The language files</b> <code>cs.json</code> and <code>en.json</code> are in <code>~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages</code> – the app runs in the macOS sandbox (the folder button in the Language section). You can edit them – a saved change applies immediately in all windows. An edited file is not overwritten by app updates, and texts missing in it are taken from the bundled version.</p>
+<p><b>The language files</b> <code>cs.json</code> and <code>en.json</code> are in <code>~/Library/Containers/cz.ok1xoe.ryry/Data/Library/Application Support/RYRY/Languages</code> – the app runs in the macOS sandbox (the folder button in the Language section). You can edit them – a saved change applies immediately in all windows. An edited file is not overwritten by app updates, and texts missing in it are taken from the bundled version.</p>
 <p><b>Your own translation:</b> in the Language section choose <b>Save template…</b>, translate the values in <code>strings</code>, set <code>code</code> and <code>name</code> and load the file with <b>Load language…</b>. The language switches immediately in all windows.</p>
 </section>
 
@@ -247,7 +247,7 @@
 </table>
 </section>
 
-<footer>RYRY © 2026 OK1XOE · GNU LGPL v3 license · source: github.com/ok1xoe/mmtty4mac · demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
+<footer>RYRY © 2026 OK1XOE · GNU LGPL v3 license · source: github.com/ok1xoe/RYRY · demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba · DXCC: cty.dat – Jim Reisert AD1C</footer>
 </main>
 </div>
 </body>

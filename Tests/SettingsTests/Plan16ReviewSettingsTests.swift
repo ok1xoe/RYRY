@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 // Plan 16 check: import from MMTTY – invalid numbers, shortcut clashes, the call, the file size; Macro.repeatSeconds.
 import Foundation
 import Testing

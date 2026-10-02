@@ -2,6 +2,8 @@
 
 RYRY (formerly mmtty4mac) is an RTTY program for macOS: a native port of MMTTY (JE3HHT) with the same demodulator, plus a log, contest support and an API for loggers. Česká verze: [prirucka.md](prirucka.md).
 
+**New in 1.1:** 28 RTTY contest presets (every RTTY contest on contestcalendar.com) with a rules overview in Settings → Contest, scoring and multipliers per the official rules; new exchange formats (serial + text, text, serial or code); ⇧F1–⇧F4 run their own macros; the project is renamed to RYRY (bundle ID `cz.ok1xoe.ryry`, data folder `RYRY` – the old one is moved automatically).
+
 **New in 1.0 (Mac App Store):** the new name RYRY and a new icon; distributed through the Mac App Store (the app runs in the macOS sandbox); Help → Play Demo Signal to try decoding without a radio; LoTW through TrustedQSL (RYRY prepares the ADIF, you sign and send it in TQSL); the app asks once for access to the log folder. Removed: starting hamlib from the app (start rigctld yourself) and the update check (the App Store updates the app). Settings from mmtty4mac move over on the first launch; online passwords may need to be entered again.
 
 **New in 0.15.1:** the band map covers the whole band, not just the official RTTY segment (it opens on the digimode part, `⤢` shows the whole band); 160 m, 60 m and 6 m were added.
@@ -86,16 +88,18 @@ Macro variables:
 - The QSO window on the right shows fields for the current mode (name, QTH, locator outside contests; only the exchange in a contest). Under the call you see the DXCC country, zones, the other station's local time and previous QSOs.
 - **Log** (⌘L) saves the QSO; **Clear** empties the window.
 - **Log window** (⇧⌘L): search, edit (double-click), delete, **Import ADIF…**, **Export Cabrillo…**.
-- The log is stored in the folder from Settings → API and log (by default `~/Documents/RYRY`; a log from mmtty4mac stays in `~/Documents/mmtty4mac`) as JSONL + ADIF `mmtty4mac.adi` that any logger can read. When you open or create a log in another folder, RYRY asks once for access to that folder.
+- The log is stored in the folder from Settings → API and log (by default `~/Documents/RYRY`; a log from mmtty4mac stays in `~/Documents/mmtty4mac`) as JSONL + ADIF `RYRY.adi` that any logger can read. When you open or create a log in another folder, RYRY asks once for access to that folder.
 - An old MMTTY log: export it to ADIF in MMTTY and import it in RYRY (duplicates are skipped).
 
 Log management (File menu): **New Log…** (⌘N; contest serials start at 1), **Open Log…** (⌘O; a RYRY log or ADIF from another program – converted, the original stays as `.adi.orig`), **Open Recent Log**, **Save Log As…** (⇧⌘S; a copy you continue in), **Export ADIF…**, **Import ADIF…**. Each QSO is saved as soon as it is logged.
 
 ## 7. Contests
 
-Settings → Contest: turn on **Contest mode** and pick a **Preset** (ARRL RTTY Roundup, CQ WPX RTTY, BARTG HF, SARTG, CQ WW RTTY, Makrothen, JARTS, WAE, OK DX RTTY). The preset sets the Cabrillo name, the exchange format and the next start date – always check the date in the contest rules.
+Settings → Contest: turn on **Contest mode** and pick a **Preset** – 28 RTTY contests from contestcalendar.com: SARTG New Year, ARRL RTTY Roundup, PRO Digi, BARTG RTTY Sprint, Mexico RTTY, CQ WPX RTTY, NAQP RTTY, North American Sprint RTTY, YB DX RTTY, BARTG HF RTTY, EA RTTY, IG-RY WW RTTY, BARTG Sprint 75, SP DX RTTY, VOLTA WW RTTY, SARTG WW RTTY, ARRL Rookie Roundup RTTY, Russian WW RTTY, CQ WW RTTY, URC DX RTTY, Russian WW Digital, Makrothen RTTY, DARC RTTY Sprint, JARL WW RTTY (formerly JARTS), WAE DX Contest RTTY, TRC DIGI, OK DX RTTY Contest and the weekly Weekly RTTY Test (WRT). The preset sets the Cabrillo name, the exchange format, the nearest start that has not ended yet (a running contest too) and the sent exchange from your Station (e.g. the URC territory from the prefix: OK1 = BHE, OK2 = MOR; name and QTH for NAQP, NA Sprint and WRT – without diacritics). Below the preset is the **Contest rules** section: date and length, bands, what is exchanged, points, multipliers, dupes, a link to the official rules, and in orange the places where the rules are ambiguous. Always check the date in the contest rules.
 
-Exchange formats: RST + serial number (or a fixed exchange), RST + CQ zone, CQ/RJ (zone + QTH), BARTG (number + time), WAE (number + QTC), PED. Serial numbers increase automatically after logging. With a contest preset selected the app computes multipliers (Window → Multipliers) and points and score (Window → Score: QSOs, dupes, points and multipliers per band, QTCs for WAE; final score with its formula, plus “Score N” in the status bar). It is an estimate – log checking removes bad QSOs.
+Exchange formats: RST + serial number (or a fixed exchange), RST + serial + text (name, QTH, CQ zone, member mark), RST + text without a serial (territory, name + QTH, licence year), RST + CQ zone, CQ/RJ (zone + QTH), BARTG (number + time), WAE (number + QTC), PED. In contests where some stations send a code instead of the number (ARRL RU – state, Russian contests – oblast, DARC – DOK, Mexico – state, EA – province, SP DX – powiat) the QSO window has both a number and a code field and one of them is enough; clicking a word in the receive pane puts a number into the number and a code into the code. Serial numbers increase automatically after logging. With a contest preset selected the app computes multipliers (Window → Multipliers; exchange codes and areas too, with the list of missing ones) and points and score (Window → Score: QSOs, dupes, points and multipliers per band, QTCs for WAE; final score with its formula, plus “Score N” in the status bar). It is an estimate – log checking removes bad QSOs.
+
+**Dupes:** the same station once per band (Russian WW Digital, PRO Digi and a custom contest: per band and mode); a red **DUPE** appears next to the call, you can still log it.
 
 **WAE and QTC:** the QSO window has a QTC panel – **QTC?** asks the other station, **QRV – receive** opens receiving a series, **Send…** prepares and sends a series from your log (max. 10 QTC per pair of stations, only between continents, each QSO once). Received lines are filled by clicking words in the RX text or with **Load from RX**. Series are on the QTC tab of the Log window and in Cabrillo.
 
@@ -115,7 +119,7 @@ RYRY looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers such as
 ## 10. Language and keys
 
 - **Language:** English by default; change it in Settings → Display → Interface language (Czech, English, loaded languages). Your own translation: **Save template…**, translate the values in `strings`, set `code` and `name`, **Load language…**.
-- **Language files** `cs.json` and `en.json` are in `~/Library/Containers/cz.ok1xoe.mmtty4mac/Data/Library/Application Support/mmtty4mac/Languages` (the app runs in the macOS sandbox) and can be edited (a saved change applies immediately; updates do not overwrite an edited file).
+- **Language files** `cs.json` and `en.json` are in `~/Library/Containers/cz.ok1xoe.ryry/Data/Library/Application Support/RYRY/Languages` (the app runs in the macOS sandbox) and can be edited (a saved change applies immediately; updates do not overwrite an edited file).
 - **Keys:** Settings → Keys – click a shortcut and press a new key combination (Delete = no shortcut, Esc = cancel).
 
 ## 11. Troubleshooting
@@ -130,4 +134,4 @@ RYRY looks like **fldigi** to loggers (XML-RPC on port 7362), so loggers such as
 | The logger does not connect | Settings → API and log: fldigi XML-RPC on, port 7362. |
 
 ---
-RYRY © 2026 OK1XOE, GNU LGPL v3 license (source code: github.com/ok1xoe/mmtty4mac). Demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba. DXCC: cty.dat – AD1C.
+RYRY © 2026 OK1XOE, GNU LGPL v3 license (source code: github.com/ok1xoe/RYRY). Demodulator core MMTTY © Makoto Mori (JE3HHT), Nobuyuki Oba. DXCC: cty.dat – AD1C.

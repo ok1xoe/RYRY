@@ -1,5 +1,5 @@
 // CSerial.h – thin ioctl wrappers for macOS serial ports (the ioctl macros are not visible to Swift).
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 #pragma once
 /* All return 0 = OK, otherwise errno. */
 int cserial_open(const char* path, int* fd_out);

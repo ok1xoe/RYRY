@@ -17,16 +17,16 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 ARCH_LIST=(${=MMTTY_ARCHS:-arm64 x86_64})
 PARTS=()
 for a in $ARCH_LIST; do
-    swift build -c release --arch "$a" --product MMTTY4MacApp
-    PARTS+=("$(swift build -c release --arch "$a" --show-bin-path)/MMTTY4MacApp")
+    swift build -c release --arch "$a" --product RYRY
+    PARTS+=("$(swift build -c release --arch "$a" --show-bin-path)/RYRY")
 done
-BIN=build/MMTTY4MacApp.universal
+BIN=build/RYRY.universal
 mkdir -p build
 lipo -create "${PARTS[@]}" -output "$BIN"
 APP=build/RYRY.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/MMTTY4MacApp"
+cp "$BIN" "$APP/Contents/MacOS/RYRY"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp COPYING COPYING.LESSER "$APP/Contents/Resources/"
 cp Resources/cty.dat "$APP/Contents/Resources/"      # DXCC (AD1C country file)
@@ -60,6 +60,6 @@ else
     done
 fi
 # Vývojový podpis se sandboxem; pro App Store aplikaci znovu podepíše release-appstore.sh (Apple Distribution).
-codesign --force --sign "$ID" --entitlements Resources/mmtty4mac.entitlements --options runtime "$APP"
+codesign --force --sign "$ID" --entitlements Resources/RYRY.entitlements --options runtime "$APP"
 echo "Podpis: $ID_NAME"
 echo "Hotovo: $APP (verze $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist") ($BUILD_NO))"

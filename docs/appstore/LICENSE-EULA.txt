@@ -9,7 +9,7 @@ RYRY is distributed under the terms of the GNU Lesser General Public License, ve
   https://www.gnu.org/licenses/gpl-3.0.html
 
 The complete corresponding source code is available at no charge:
-  https://github.com/ok1xoe/mmtty4mac
+  https://github.com/ok1xoe/RYRY
 
 You may use, copy, modify and redistribute RYRY under the terms of that license. Nothing in
 the App Store terms limits the rights the LGPL v3 grants you for this software. Where they

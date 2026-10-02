@@ -1,4 +1,4 @@
-// Copyright 2026 OK1XOE (mmtty4mac), LGPL v3
+// Copyright 2026 OK1XOE (RYRY), LGPL v3
 import Foundation
 import Security
 
@@ -11,10 +11,10 @@ public protocol SecretStore: Sendable {
 
 public struct SecretStoreError: Error, Equatable, Sendable { public let status: Int32 }
 
-/// macOS Keychain (`kSecClassGenericPassword`, service `cz.ok1xoe.mmtty4mac.<service>`).
+/// macOS Keychain (`kSecClassGenericPassword`, service `cz.ok1xoe.ryry.<service>`).
 public struct KeychainSecretStore: SecretStore {
     public init() {}
-    static func serviceName(_ s: String) -> String { "cz.ok1xoe.mmtty4mac.\(s)" }
+    static func serviceName(_ s: String) -> String { "cz.ok1xoe.ryry.\(s)" }
     private func query(_ service: String, _ account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: Self.serviceName(service),

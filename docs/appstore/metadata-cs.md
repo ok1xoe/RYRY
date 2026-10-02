@@ -38,7 +38,7 @@ VYSÍLÁNÍ
 • Makra F1–F12 s proměnnými MMTTY, uložené zprávy a vysílací okno
 
 ZÁVODY
-• Předvolby ARRL RTTY Roundup, CQ WPX RTTY, CQ WW RTTY, BARTG, SARTG, Makrothen, JARTS, WAE a OK DX RTTY
+• Předvolby 28 RTTY závodů (CQ WW, CQ WPX, ARRL Roundup, WAE, URC, Russian WW, BARTG, SARTG, NAQP, OK DX a další) s pravidly výměny, bodování a násobičů
 • Enter Sends Message (Run i S&P), pořadová čísla, kontrola duplicit, Super Check Partial a historie značek
 • Skóre a násobiče po pásmech, QTC pro WAE, export Cabrillo
 
@@ -63,7 +63,7 @@ PRO VÁŠ LOGGER
 VYZKOUŠEJTE BEZ RÁDIA
 Zvolte Nápověda → Přehrát ukázkový signál a sledujte, jak RYRY dekóduje závodní spojení.
 
-RYRY je zdarma a otevřený pod licencí GNU LGPL v3, založený na MMTTY od Makota Moriho (JE3HHT). Zdrojový kód: https://github.com/ok1xoe/mmtty4mac
+RYRY je zdarma a otevřený pod licencí GNU LGPL v3, založený na MMTTY od Makota Moriho (JE3HHT). Zdrojový kód: https://github.com/ok1xoe/RYRY
 
 K vysílání je potřeba radioamatérská licence.
 ```
@@ -80,6 +80,7 @@ rtty,radioamatér,radioamatéři,dálnopis,závod,fsk,afsk,dx cluster,band mapa,
 První vydání RYRY v App Store – programu pro RTTY na Macu, dříve šířeného jako mmtty4mac.
 
 • Nové jméno a ikona
+• 28 předvoleb RTTY závodů s přehledem pravidel, bodováním a násobiči
 • Nápověda → Přehrát ukázkový signál: dekódování si vyzkoušíte i bez rádia
 • LoTW: RYRY připraví soubor ADIF a otevře ho v TrustedQSL
 • Přechod z mmtty4mac: nastavení se přenese samo; RYRY se jednou zeptá na přístup ke složce s logem a hesla k online službám bude možná potřeba zadat znovu
