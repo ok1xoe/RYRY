@@ -40,9 +40,8 @@ struct TopBar: View {
                     }
                     .fixedSize().hint(L("Nahrává se příjem do WAV – kliknutím zastavit"))
                 }
-                Picker("Demod", selection: model.choiceBinding("demodType")) {
-                    ForEach(["iir", "fir", "pll", "fft"], id: \.self) { Text($0.uppercased()).tag($0) }
-                }.labelsHidden().fixedSize().hint(L("Demodulátor"))
+                UIMenuPicker(selection: model.choiceBinding("demodType"), options: ["iir", "fir", "pll", "fft"].map { ($0, $0.uppercased()) })
+                    .fixedSize().hint(L("Demodulátor"))
                 Button("HAM") { Task { await model.hamShift() } }.fixedSize().hint("Shift 170 Hz")
                 ProfileMenu(model: model)
                 Spacer()
@@ -50,12 +49,10 @@ struct TopBar: View {
                 SignalMeter(level: model.signalLevel, open: model.squelchOpen).frame(width: 56, height: 12)
             }
             HStack(spacing: 6) {
-                Picker("Baud", selection: baudBinding) {
-                    ForEach([45.45, 50, 75, 100, 110], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
-                }.fixedSize()
-                Picker("Shift", selection: model.doubleBinding("shift")) {
-                    ForEach([170.0, 200, 425, 850], id: \.self) { Text(String(format: "%g", $0)).tag($0) }
-                }.fixedSize()
+                UIMenuPicker(title: "Baud", selection: baudBinding, options: [45.45, 50, 75, 100, 110].map { ($0, String(format: "%g", $0)) })
+                    .fixedSize()
+                UIMenuPicker(title: "Shift", selection: model.doubleBinding("shift"), options: [170.0, 200, 425, 850].map { ($0, String(format: "%g", $0)) })
+                    .fixedSize()
                 Text(model.fig ? "FIGS" : "LTRS")
                     .uiFont(.caption, weight: .bold, design: .monospaced).lineLimit(1).fixedSize()
                     .padding(.horizontal, 4).padding(.vertical, 2)
@@ -85,7 +82,7 @@ struct TopBar: View {
                 }
                 .toggleStyle(.button).fixedSize()
             }
-            .controlSize(.small)
+            .uiControlSize(-1)
         }
         .padding(8)
     }
@@ -132,9 +129,9 @@ struct FilterMenu: View {
             Divider()
             Toggle(L("UOS – unshift on space"), isOn: model.boolBinding("uos"))
         } label: {
-            Text(active).lineLimit(1)
+            UIMenuLabel(active)
         }
-        .fixedSize()
+        .fixedSize().uiMenu()
         .hint(L("Filtry příjmu (pravé tlačítko ve spektru = zářez) a UOS"))
     }
 }
@@ -161,7 +158,7 @@ struct ProfileMenu: View {
     @State private var name = ""
 
     var body: some View {
-        Menu(L("Profily")) {
+        Menu {
             Section(L("Načíst")) {
                 ForEach(0..<16, id: \.self) { i in
                     let n = i < model.profileNames.count ? model.profileNames[i] : nil
@@ -174,8 +171,8 @@ struct ProfileMenu: View {
                     Button("\(i + 1): \(n ?? L("prázdný"))") { name = n ?? ""; saveSlot = i }
                 }
             }
-        }
-        .fixedSize()
+        } label: { UIMenuLabel(L("Profily")) }
+        .fixedSize().uiMenu()
         .alert(L("Název profilu"), isPresented: Binding(get: { saveSlot != nil }, set: { if !$0 { saveSlot = nil } })) {
             TextField(L("Název"), text: $name)
             Button(L("Uložit")) { if let s = saveSlot { let n = name; Task { await model.saveProfile(s, name: n.isEmpty ? L("Profil %ld", s + 1) : n) } }; saveSlot = nil }
@@ -201,7 +198,7 @@ struct WAVControls: View {
             Slider(value: Binding(get: { dragging ?? model.wavProgress }, set: { dragging = $0 }), in: 0...1) { editing in
                 if !editing, let f = dragging { Task { await model.seekWAV(f); dragging = nil } }
             }
-            .frame(width: 110).controlSize(.small)
+            .frame(width: 110).uiControlSize(-1)
             .hint(L("Posun v přehrávaném souboru"))
             Text("\(Self.time((dragging ?? model.wavProgress) * model.wavDuration))/\(Self.time(model.wavDuration))")
                 .uiFont(.caption, digits: true).foregroundStyle(.secondary).fixedSize()
@@ -232,9 +229,9 @@ struct FrequencyControl: View {
                     Button("\(b.0) (\(Int(b.1)) kHz)") { Task { await model.setFrequency(kHz: b.1) } }
                 }
             } label: {
-                Text(Bands.band(forHz: model.rig?.frequency ?? model.qso.frequency) ?? L("Pásmo")).lineLimit(1)
+                UIMenuLabel(Bands.band(forHz: model.rig?.frequency ?? model.qso.frequency) ?? L("Pásmo"))
             }
-            .fixedSize().controlSize(.small)
+            .fixedSize().uiControlSize(-1).uiMenu()
             .hint(model.settings.rig.type == .none ? L("Pásmo do logu (bez rigu)") : L("Přeladit rig na RTTY kmitočet pásma"))
             Button { open() } label: {
                 Text(model.rig?.frequency.map { String(format: "%.3f kHz", $0 / 1000) } ?? "— kHz")

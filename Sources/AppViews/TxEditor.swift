@@ -19,11 +19,8 @@ struct TxEditor: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("TX").uiFont(.caption, weight: .bold).foregroundStyle(.secondary)
-                Picker("", selection: $model.sendMode) {
-                    Text(L("po znacích")).tag(SendMode.char)
-                    Text(L("po slovech")).tag(SendMode.word)
-                    Text(L("po řádcích")).tag(SendMode.line)
-                }.pickerStyle(.segmented).frame(width: 260)
+                UISegmented(selection: $model.sendMode, options: [(SendMode.char, L("po znacích")), (.word, L("po slovech")),
+                                                                  (.line, L("po řádcích"))]).fixedSize()
                 Spacer()
                 MessagesMenu(model: model)
                 Button(L("Odeslat vše")) { Task { await model.sendDraft(mode: .char) } }

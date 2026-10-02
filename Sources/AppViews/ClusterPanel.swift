@@ -102,7 +102,7 @@ struct ClusterPanel: View {
                 .onChange(of: lines.count) { proxy.scrollTo("end", anchor: .bottom) }
                 .onChange(of: showConsole) { proxy.scrollTo("end", anchor: .bottom) }
             }
-            Button(L("Vymazat konzolu")) { model.spotFeed.clearConsole() }.controlSize(.small)
+            Button(L("Vymazat konzolu")) { model.spotFeed.clearConsole() }.uiControlSize(-1)
         }
     }
 

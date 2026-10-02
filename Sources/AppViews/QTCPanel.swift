@@ -60,7 +60,7 @@ struct QTCPanel: View {
                 .disabled(model.qso.call.isEmpty || sameContinent || (model.qtcStatus?.available.isEmpty ?? true))
             }
         }
-        .controlSize(.small)
+        .uiControlSize(-1)
     }
 
     func sendEditor(_ lines: [QTCLine]) -> some View {
@@ -73,7 +73,7 @@ struct QTCPanel: View {
                     Spacer()
                     if model.qtcPending != nil {
                         Button("↻") { Task { await model.qtcRepeat(i + 1) } }.hint(L("Zopakovat řádek (AGN %ld)", i + 1))
-                            .controlSize(.mini)
+                            .uiControlSize(-2)
                     } else {
                         Button { sending?.remove(at: i) } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.borderless).hint(L("Vynechat"))
@@ -93,7 +93,7 @@ struct QTCPanel: View {
                 Button(L("Zrušit")) { Task { await model.qtcCancelSent(); sending = nil } }
             }
         }
-        .controlSize(.small)
+        .uiControlSize(-1)
     }
 
     var receiveEditor: some View {
@@ -117,7 +117,7 @@ struct QTCPanel: View {
                         .uiFont(.caption, design: .monospaced)
                         // a new field when the content changes from the receive side - a half-typed (empty) field must not overwrite the loaded row
                         .id("\(i)-\(d.lines[i].map(QTCText.line) ?? "")")
-                    Button("AGN") { Task { await model.qtcPhrase(.agn(i + 1)) } }.controlSize(.mini)
+                    Button("AGN") { Task { await model.qtcPhrase(.agn(i + 1)) } }.uiControlSize(-2)
                 }
             }
             Text(L("Klik na slova v příjmu: série n/k, pak čas, značka, číslo.")).uiFont(.caption2).foregroundStyle(.secondary)
@@ -133,6 +133,6 @@ struct QTCPanel: View {
                 Button(L("Zrušit")) { model.cancelQTCReceive() }
             }
         }
-        .controlSize(.small)
+        .uiControlSize(-1)
     }
 }

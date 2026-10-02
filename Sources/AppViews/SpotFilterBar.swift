@@ -38,7 +38,7 @@ public struct SpotFilterBar: View {
             Spacer(minLength: 0)
         }
         .font(.caption)
-        .controlSize(.small)
+        .uiControlSize(-1)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

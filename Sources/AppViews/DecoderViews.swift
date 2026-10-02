@@ -28,7 +28,7 @@ struct SecondDecoderPanel: View {
                 Button { Task { await model.setSecondDecoder(false) } } label: { Image(systemName: "xmark") }
                     .buttonStyle(.borderless).hint(L("Vypnout druhý dekodér"))
             }
-            .controlSize(.small)
+            .uiControlSize(-1)
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(.bar)
             AuxTextView(model: model)
@@ -112,7 +112,7 @@ public struct ChannelsWindow: View {
                                                              set: { v in Task { await model.updateDecoders { $0.showChannelMarks = v } } }))
                 Spacer()
             }
-            .controlSize(.small)
+            .uiControlSize(-1)
             .padding(8)
             Divider()
             if !model.settings.decoders.channelsEnabled {
@@ -152,7 +152,7 @@ struct ChannelRow: View {
                 })
                 .hint(L("Klik na slovo = vložit do QSO"))
             Button(L("Naladit")) { Task { await model.tuneChannel(channel.id) } }
-                .controlSize(.small)
+                .uiControlSize(-1)
                 .hint(L("Přeladit hlavní dekodér na tento signál"))
         }
         .contentShape(Rectangle())

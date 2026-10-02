@@ -85,7 +85,11 @@ extension View {
         case .xlarge: cs = .extraLarge
         }
         return controlSize(cs).font(.system(size: size.basePoints)).environment(\.uiScale, size.basePoints / UISize.normal.basePoints)
+            .environment(\.uiSize, size).buttonStyle(ScaledButtonStyle())
     }
+
+    /// A control size `steps` below the interface size (was a fixed `.small` = -1 / `.mini` = -2) – grows with the interface.
+    public func uiControlSize(_ steps: Int) -> some View { modifier(UIControlSizeModifier(steps: steps)) }
 
     /// A text style scaled by the interface size (instead of `.font(.caption)` etc., which have a fixed size on macOS).
     public func uiFont(_ style: Font.TextStyle, weight: Font.Weight? = nil, design: Font.Design? = nil, digits: Bool = false) -> some View {
@@ -113,7 +117,37 @@ struct HintModifier: ViewModifier {
 }
 
 private struct UIScaleKey: EnvironmentKey { static let defaultValue = 1.0 }
+private struct UISizeKey: EnvironmentKey { static let defaultValue = UISize.normal }
+
+/// Buttons without their own style: the system look at the normal interface size; otherwise a drawn button whose text
+/// follows the interface size (the system bordered button keeps its 13 pt text even at the largest control size).
+struct ScaledButtonStyle: PrimitiveButtonStyle {
+    @Environment(\.uiSize) private var size
+    func makeBody(configuration: Configuration) -> some View {
+        if size == .normal {
+            Button(configuration).buttonStyle(.automatic)
+        } else {
+            Button(configuration).buttonStyle(ColorFillButtonStyle(color: Color.primary.opacity(0.1)))
+        }
+    }
+}
+
+struct UIControlSizeModifier: ViewModifier {
+    let steps: Int
+    @Environment(\.uiSize) private var size
+    static let sizes: [ControlSize] = [.mini, .small, .regular, .large, .extraLarge]
+    func body(content: Content) -> some View {
+        // normal = regular (2); small −1, large +1, largest +2
+        let base = 2 + (UISize.allCases.firstIndex(of: size) ?? 1) - 1
+        return content.controlSize(Self.sizes[min(Self.sizes.count - 1, max(0, base + steps))])
+    }
+}
 extension EnvironmentValues {
+    /// The interface size (Settings → Display) – `uiSized` sets it.
+    public var uiSize: UISize {
+        get { self[UISizeKey.self] }
+        set { self[UISizeKey.self] = newValue }
+    }
     /// The interface scale (1 = normal) – `uiSized` sets it, `uiFont` uses it.
     public var uiScale: Double {
         get { self[UIScaleKey.self] }

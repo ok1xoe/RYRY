@@ -296,13 +296,13 @@ struct FrequencyRow: View {
                 Text("\(Bands.band(forHz: f) ?? "?") · \(QSOFields.kHzString(f)) kHz").monospacedDigit()
                 Text("(rig)").uiFont(.caption).foregroundStyle(.secondary)
             } else {
-                Menu(Bands.band(forHz: model.qso.frequency) ?? L("zvolit")) {
+                Menu {
                     ForEach(AppModel.bandPresets, id: \.0) { b in
                         Button("\(b.0) (\(Int(b.1)) kHz)") { Task { await model.setQSOField("freq", String(b.1)) } }
                     }
                     Divider()
                     Button(L("Bez frekvence")) { Task { await model.setQSOField("freq", "") } }
-                }.fixedSize()
+                } label: { UIMenuLabel(Bands.band(forHz: model.qso.frequency) ?? L("zvolit")) }.fixedSize().uiMenu()
                 QSOField(model: model, label: "kHz", field: "freq").frame(width: 90)
                 Text("kHz").uiFont(.caption).foregroundStyle(.secondary)
             }
