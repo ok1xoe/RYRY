@@ -61,7 +61,7 @@ Postup odeslání, texty, snímky a odpovědi pro App Store Connect jsou v `docs
 `~/Library/Application Support/mmtty4mac` (případně `…/RYRY` z `rtty-tool`) a předvolby do kontejneru sandboxu
 `cz.ok1xoe.ryry`; aplikace pak složku `mmtty4mac` přejmenuje na `RYRY` a převezme předvolby z domény
 `cz.ok1xoe.mmtty4mac` (`AppSupport.migrateLegacy`). Vývojový kontejner `cz.ok1xoe.mmtty4mac` (bundle ID do
-verze 1.0, App Store ho nikdy nevydal) se nepřenáší. Log mimo kontejner si
+vývojových sestavení, App Store ho nikdy nevydal) se nepřenáší. Log mimo kontejner si
 aplikace vyžádá dialogem s předvybranou složkou. Hesla v Klíčence je nejspíš potřeba zadat znovu, protože se
 změnil podpis. Podrobnosti a omezení (migrace proběhne jen při vzniku kontejneru) jsou v
 `docs/appstore/sandbox-check.md`.
