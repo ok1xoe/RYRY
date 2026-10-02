@@ -10,15 +10,15 @@ struct MessagesMenu: View {
     @Bindable var model: AppModel
     @State private var editing = false
     var body: some View {
-        Menu(L("Zprávy")) {
+        Menu {
             ForEach(Array(model.settings.messages.enumerated()), id: \.offset) { i, m in
                 Button(m.name.isEmpty ? L("Zpráva %ld", i + 1) : m.name) { Task { await model.runMessage(i) } }
                     .disabled(m.text.isEmpty)
             }
             if !model.settings.messages.isEmpty { Divider() }
             Button(L("Upravit zprávy…")) { editing = true }
-        }
-        .fixedSize()
+        } label: { UIMenuLabel(L("Zprávy")) }
+        .fixedSize().uiMenu()
         .hint(L("Seznam uložených zpráv – výběr zprávu odešle (syntaxe maker)"))
         .sheet(isPresented: $editing) { MessagesEditor(model: model) }
     }

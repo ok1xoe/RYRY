@@ -58,7 +58,7 @@ public struct SpotBandFilterWindow: View {
             Text(L("Zaškrtnutá pásma se zobrazují v tabulce Spoty; „ostatní“ = spoty mimo pevný seznam pásem."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
-        .controlSize(.small)
+        .uiControlSize(-1)
         .padding(12)
         .frame(width: 300, alignment: .leading)
     }
@@ -106,7 +106,7 @@ public struct SpotModeFilterWindow: View {
             Text(L("Skupiny módů spotů; „ostatní“ = i spoty, u kterých mód nejde poznat. Právě RTTY = „Jen RTTY“ v okně Spoty."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
-        .controlSize(.small)
+        .uiControlSize(-1)
         .padding(12)
         .frame(width: 300, alignment: .leading)
     }

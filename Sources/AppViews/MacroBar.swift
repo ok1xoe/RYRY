@@ -21,10 +21,10 @@ struct MacroBar: View {
                     Text(L("Běžný provoz")).tag(OperatingMode.normal)
                     Text("DX").tag(OperatingMode.dx)
                 }
-                .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
+                .pickerStyle(.segmented).labelsHidden().fixedSize().uiControlSize(-1)
             }
             Spacer()
-            Button(L("Výchozí makra…")) { confirmReset = true }.controlSize(.small)
+            Button(L("Výchozí makra…")) { confirmReset = true }.uiControlSize(-1)
                 .hint(L("Nahradí makra této sady výchozími (v závodě podle jeho výměny)."))
         }
         .confirmationDialog(L("Nahradit makra sady „%@“ výchozími?", model.macroSetTitle), isPresented: $confirmReset) {
@@ -160,20 +160,18 @@ struct BorderedProminentIf: PrimitiveButtonStyle {
     let on: Bool
     var color: Color? = nil
     func makeBody(configuration: Configuration) -> some View {
-        if on, let color {
-            Button(configuration).buttonStyle(ColorFillButtonStyle(color: color))
-        } else {
-            Button(configuration).buttonStyle(.automatic)
-        }
+        // the system bordered style keeps its own font size – our style follows the interface size (Settings → Display)
+        Button(configuration).buttonStyle(ColorFillButtonStyle(color: on ? color ?? .accentColor : Color.primary.opacity(0.1)))
     }
 }
 
 struct ColorFillButtonStyle: ButtonStyle {
     let color: Color
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.uiScale) private var scale
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .padding(.vertical, 4).padding(.horizontal, 8)
+            .padding(.vertical, 4 * scale).padding(.horizontal, 8)
             .background(RoundedRectangle(cornerRadius: 6).fill(color.opacity(configuration.isPressed ? 0.7 : 1)))
             .opacity(enabled ? 1 : 0.45)
     }
