@@ -41,5 +41,5 @@ private func ctx(_ p: ContestPreset, exchange: String = "", station: (inout Stat
     let sprint = try await ctx(.naSprintRTTY, exchange: "TOMAS DX")
     #expect(text(AppSettings.contestMacros(.naSprintRTTY)[3].text, sprint).contains(" OK1XOE 015 TOMAS DX"))
     let naqp = try await ctx(.naqpRTTY, exchange: "TOMAS")
-    #expect(text(AppSettings.contestMacros(.naqpRTTY)[5].text, naqp) == "\r\nTOMAS\r\n")
+    #expect(text(AppSettings.contestMacros(.naqpRTTY)[5].text, naqp) == "\r\n TOMAS\r\n")       // %c empty without a call
 }

@@ -71,7 +71,7 @@ Settings → Rig → Controls:
 - **TX / RX:** the TX button or ⌘T. **Esc** = RX now. **Tune** = carrier for tuning.
 - **TX window:** send by character, word or line; **Send all** sends everything. Optionally CR/LF at TX start and line wrapping (Settings → Display → TX window).
 - **Macros F1–F12 and ⇧F1–⇧F4:** click or press the key. Right-click → **Edit…** (name, text, color, repeat). The button's tooltip shows what the macro sends right now (with the call and exchange from the QSO window).
-- **Macro sets:** above the macro bar is a **Normal / DX** switch; in a contest every contest (custom too) has its own set. The set changes with the selected contest and your edits are saved into it. **Default macros…** replaces the set with the defaults – for a contest built from its exchange (F1 CQ, F4 exchange `%c 599 %N %N`, without RST `%c %N %N`, F5 TU + log, F11 AGN, ⇧F3 my call – matching ESM).
+- **Macro sets:** above the macro bar is a **Normal / DX** switch; in a contest every contest (custom too) has its own set. The set changes with the selected contest and your edits are saved into it. **Default macros…** replaces the set with the defaults – for a contest built from its exchange (F1 CQ, F4 exchange `%c 599 %N %N %c`, F3 in S&P `%c TU 599 %N %N %m`, F5 `%c TU %m TEST` + log, no 599 where the contest has no RST, F5 TU + log, F11 AGN, ⇧F3 my call – matching ESM).
 - **Messages:** longer saved texts in the **Messages** menu (same syntax as macros).
 - **Send a text file:** Transmit menu → Send text file….
 

@@ -45,8 +45,11 @@ import Testing
         #expect(m[e.spMyCall].text.contains("%m") && m[e.runCQ].text.contains("CQ"), "\(p)")
     }
     #expect(AppSettings.contestMacros(.naSprintRTTY)[3].text == "\r\n%c %m %N\r\n\\")
-    #expect(AppSettings.contestMacros(.urcDX)[3].text == "\r\n%c 599 %N %N\r\n\\")
-    #expect(AppSettings.contestMacros(.naqpRTTY)[3].text == "\r\n%c %N %N\r\n\\")
+    #expect(AppSettings.contestMacros(.naSprintRTTY)[2].text == "\r\n%c %N %m\r\n\\")
+    #expect(AppSettings.contestMacros(.urcDX)[3].text == "\r\n%c 599 %N %N %c\r\n\\")
+    #expect(AppSettings.contestMacros(.urcDX)[2].text == "\r\n%c TU 599 %N %N %m\r\n\\")
+    #expect(AppSettings.contestMacros(.urcDX)[4].text == "\r\n%c TU %m TEST\r\n%l\\")
+    #expect(AppSettings.contestMacros(.naqpRTTY)[3].text == "\r\n%c %N %N %c\r\n\\")
     #expect(AppSettings.contestMacros(.urcDX)[11].name == "EXCH?")
 }
 
