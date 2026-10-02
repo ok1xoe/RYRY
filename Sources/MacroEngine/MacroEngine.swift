@@ -13,6 +13,12 @@ public struct MacroContext: Sendable, Equatable {
     public var hisUTCOffsetHours: Double?
     /// The rig frequency in kHz (%k; only for DX cluster commands, e.g. `dx %k %c RTTY`); nil = unknown (%k → nothing).
     public var rigKHz: Double?
+    /// %S: my serial number ("001"; empty when the contest does not send one).
+    public var mySerial = ""
+    /// %X: the text part of my exchange (zone, territory, oblast, name + QTH …) without the serial.
+    public var myExchangeText = ""
+    /// %a my name (without diacritics), %o my locator, %Z my CQ zone.
+    public var myName = "", myLocator = "", myZone = ""
     public init() {}
 }
 
@@ -156,6 +162,11 @@ public enum MacroEngine {
             let n = after3(c.hisRST)
             let parts = n.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
             return parts.count > 1 ? String(parts[1]) : ""
+        case "S": return c.mySerial
+        case "X": return c.myExchangeText
+        case "a": return c.myName
+        case "o": return c.myLocator
+        case "Z": return c.myZone
         case "k":
             guard let k = c.rigKHz, k.isFinite, k > 0 else { return "" }
             return String(format: "%.1f", k)

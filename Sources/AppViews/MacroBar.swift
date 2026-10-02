@@ -8,9 +8,34 @@ import Localization
 struct MacroBar: View {
     @Bindable var model: AppModel
     @State private var editing: Int?
+    @State private var confirmReset = false
+
+    /// The macro set: normal / DX outside a contest (a switch), the contest's own set in a contest; reset to defaults.
+    var setRow: some View {
+        HStack(spacing: 8) {
+            Text(L("Sada maker:")).font(.caption).foregroundStyle(.secondary)
+            if model.settings.contest.enabled {
+                Text(model.macroSetTitle).font(.caption.bold())
+            } else {
+                Picker("", selection: Binding(get: { model.settings.operatingMode }, set: { model.setOperatingMode($0) })) {
+                    Text(L("Běžný provoz")).tag(OperatingMode.normal)
+                    Text("DX").tag(OperatingMode.dx)
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
+            }
+            Spacer()
+            Button(L("Výchozí makra…")) { confirmReset = true }.controlSize(.small)
+                .hint(L("Nahradí makra této sady výchozími (v závodě podle jeho výměny)."))
+        }
+        .confirmationDialog(L("Nahradit makra sady „%@“ výchozími?", model.macroSetTitle), isPresented: $confirmReset) {
+            Button(L("Nahradit"), role: .destructive) { Task { await model.resetMacroSet() } }
+        }
+    }
 
     var body: some View {
         let macros = model.settings.macros
+        VStack(spacing: 4) {
+        setRow.padding(.horizontal, 6).padding(.top, 4)
         Grid(horizontalSpacing: 4, verticalSpacing: 4) {
             ForEach(0..<2) { row in
                 GridRow {
@@ -26,6 +51,7 @@ struct MacroBar: View {
                                 .foregroundStyle(Self.textColor(i < macros.count ? macros[i].color : nil))
                         }
                         .shortcut(kb)
+                        .hint(model.macroPreview(i))
                         .buttonStyle(.borderedProminentIf(i < macros.count && macros[i].color != nil,
                                                           color: i < macros.count ? Color(hex: macros[i].color) : nil))
                         .contextMenu { Button(L("Upravit…")) { editing = i } }
@@ -35,6 +61,7 @@ struct MacroBar: View {
             }
         }
         .padding(6)
+        }
         .sheet(item: Binding(get: { editing.map { EditIndex(id: $0) } }, set: { editing = $0?.id })) { e in
             MacroEditor(model: model, index: e.id)
         }
@@ -96,7 +123,7 @@ struct MacroEditor: View {
                 Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %k frekvence rigu v kHz · %D %T %t čas UTC · jeden řádek = jeden příkaz · \\ # a CW ID se ignorují"))
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-            Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %N odesílané číslo · %M přijaté číslo · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX"))
+            Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %r RST odeslané · %s přijaté · %N odesílaná výměna závodu (001, BHE, 015 TOMAS DX) · %M přijatá · %S moje číslo · %X text výměny · %x %y číslo a čas (BARTG) · %a moje jméno · %o lokátor · %Z CQ zóna · %g pozdrav · %D %T %t čas UTC · %L %F LTRS/FIGS · %{…} CW ID · %l zalogovat · \\ na konci = RX · # na konci = zůstat TX"))
                 .font(.caption).foregroundStyle(.secondary)
             }
             HStack {

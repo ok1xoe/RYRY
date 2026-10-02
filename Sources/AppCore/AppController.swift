@@ -216,16 +216,30 @@ public actor AppController {
     public var state: EngineState { get async { await engine.state } }
 
     public func macroContext() -> MacroContext {
+        Self.macroContext(settings: settings, qso: qso, now: Date()) { [countries] in countries?.lookup($0) }
+    }
+
+    /// The macro variables from the settings and the QSO window (also for the macro preview in the GUI).
+    public static func macroContext(settings: AppSettings, qso: QSOFields, now: Date,
+                                    country: (String) -> CountryInfo?) -> MacroContext {
+        let isBARTG = settings.contest.enabled && settings.contest.format == .bartg
         var c = MacroContext()
         c.myCall = settings.station.call.uppercased()
         c.hisCall = qso.call; c.name = qso.name; c.qth = qso.qth
         // MMTTY: HisRST = what I send (%r %N), MyRST = what I received (%s %M); in a contest "599" + serial or exchange
         // BARTG: until the QSO start the current time (MMTTY UpdateBARTG every minute)
-        let sentExch = isBARTG && qso.exchangeSent.isEmpty ? Self.hhmm.string(from: Date()) : qso.exchangeSent
-        c.hisRST = qso.rstSent + Self.exchangeSuffix(qso.serialSent, sentExch)
-        c.myRST = qso.rstRcvd + Self.exchangeSuffix(qso.serialRcvd, qso.exchangeRcvd)
-        c.now = Date()
-        c.hisUTCOffsetHours = country(for: qso.call)?.utcOffsetHours
+        let sentExch = isBARTG && qso.exchangeSent.isEmpty ? Self.hhmm.string(from: now) : qso.exchangeSent
+        c.hisRST = qso.rstSent + Self.exchangeSuffix(qso.serialSent, sentExch, bartg: isBARTG)
+        c.myRST = qso.rstRcvd + Self.exchangeSuffix(qso.serialRcvd, qso.exchangeRcvd, bartg: isBARTG)
+        let ct = settings.contest
+        c.mySerial = ct.enabled ? (qso.serialSent.map { String(format: "%03d", $0) } ?? "") : ""
+        c.myExchangeText = ct.enabled ? sentExch : ""
+        c.myName = settings.station.name.trimmingCharacters(in: .whitespaces)
+            .folding(options: .diacriticInsensitive, locale: nil).uppercased().split(separator: " ").first.map(String.init) ?? ""
+        c.myLocator = settings.station.locator.uppercased()
+        c.myZone = country(settings.station.call).map { String($0.cqZone) } ?? ""
+        c.now = now
+        c.hisUTCOffsetHours = country(qso.call)?.utcOffsetHours
         return c
     }
 
@@ -259,10 +273,11 @@ public actor AppController {
     }
 
     /// The part after RST: a serial, an exchange, or both "NNN-exchange" (MMTTY BARTG "599NNN-HHMM"; %x/%y).
-    static func exchangeSuffix(_ serial: Int?, _ exch: String) -> String {
+    /// The number and the text after the RST (%N, %M): BARTG "001-1203" (MMTTY, %x / %y split it), otherwise "001 TOMAS DX".
+    static func exchangeSuffix(_ serial: Int?, _ exch: String, bartg: Bool = true) -> String {
         switch (serial, exch.isEmpty) {
         case (let n?, true): return String(format: "%03d", n)
-        case (let n?, false): return String(format: "%03d", n) + "-" + exch
+        case (let n?, false): return String(format: "%03d", n) + (bartg ? "-" : " ") + exch
         case (nil, _): return exch
         }
     }

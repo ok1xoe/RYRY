@@ -63,7 +63,7 @@ let package = Package(
         .testTarget(name: "APIServerTests", dependencies: ["APIServer", "AppCore", "Engine", "XMLRPC", "QSOLog", "ModemKit", "Settings",
                                                            "RigControl", "RTTYModem", "RTTYSignalKit", "TestSupport", "AudioIO", "Keying"]),
         .target(name: "AppUI", dependencies: ["DXCC", "AppCore", "APIServer", "Engine", "Settings", "QSOLog", "ModemKit",
-                                               "AudioIO", "Keying", "RigControl", "RTTYModem", "WaveFile", "Localization", "Upload", "Spots"]),
+                                               "AudioIO", "Keying", "RigControl", "RTTYModem", "WaveFile", "Localization", "Upload", "Spots", "MacroEngine"]),
         .target(name: "AppViews", dependencies: ["AppUI", "Upload", "AppCore", "QSOLog", "Settings", "AudioIO", "Keying",
                                                   "ModemKit", "Engine", "RigControl", "RTTYModem", "Localization", "Spots"]),
         // AppViews kvůli obsahu oken (např. seznam zaškrtávátek filtru spotů); AppViews závisí na AppUI, ne naopak

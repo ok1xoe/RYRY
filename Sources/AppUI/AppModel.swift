@@ -7,6 +7,7 @@ import AudioIO
 import Engine
 import Foundation
 import Localization
+import MacroEngine
 import Keying
 import ModemKit
 import Observation
@@ -72,6 +73,13 @@ public final class AppModel {
 
     public private(set) var settings: AppSettings {
         didSet {
+            // a different contest or operating mode = a different macro set (stored, the other one loaded)
+            if oldValue.activeMacroSetKey != settings.activeMacroSetKey {
+                settings = settings.switchingMacroSet(from: oldValue.activeMacroSetKey)
+                let m = settings.macros
+                Task { await self.app?.setMacros(m) }
+                do { try settingsStore.save(settings) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
+            }
             if multiplierKey != multiplierKeyApplied { refreshMultipliers() }
             if oldValue.contest.enabled != settings.contest.enabled || oldValue.contest.start != settings.contest.start
                 || oldValue.contest.selectedPreset != settings.contest.selectedPreset {
@@ -1748,9 +1756,42 @@ public final class AppModel {
     public func dismissMessages() { messages.removeAll() }
 
     public func saveMacros(_ m: [Macro]) async {
-        var s = settings; s.macros = m; settings = s
+        var s = settings; s.macros = m; s.macroSets[s.activeMacroSetKey] = m; settings = s
         await app?.setMacros(m)
         do { try settingsStore.save(s) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
+    }
+
+    /// Normal operating or DX (outside a contest) – switches the macro set.
+    public func setOperatingMode(_ mode: OperatingMode) {
+        guard settings.operatingMode != mode else { return }
+        var s = settings; s.operatingMode = mode; settings = s
+        do { try settingsStore.save(settings) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
+    }
+
+    /// Replaces the active macro set with its defaults (for the contest: built from its exchange).
+    public func resetMacroSet() async {
+        var s = settings; s.resetActiveMacroSet(); settings = s
+        await app?.setMacros(s.macros)
+        do { try settingsStore.save(s) } catch { note(L("Makra nelze uložit: %@", "\(error)")) }
+    }
+
+    /// What macro `i` sends now (variables filled in from the QSO window) – the tooltip of the macro button.
+    public func macroPreview(_ i: Int) -> String {
+        guard settings.macros.indices.contains(i), !settings.macros[i].isBlank else { return "" }
+        let text = settings.macros[i].text
+        let ctx = AppController.macroContext(settings: settings, qso: qso, now: Date()) { [countryDB] in countryDB?.lookup($0) }
+        let r = MacroEngine.expand(text, context: ctx)
+        var out = r.plainText.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+            .trimmingCharacters(in: .newlines)
+        if r.logQSO { out += "\n" + L("+ zaloguje QSO") }
+        let template = text.replacingOccurrences(of: "\r\n", with: " ").trimmingCharacters(in: .whitespaces)
+        return out + "\n\n" + L("Makro: %@", template)
+    }
+
+    /// The name of the active macro set for the macro bar.
+    public var macroSetTitle: String {
+        guard settings.contest.enabled else { return settings.operatingMode == .dx ? "DX" : L("Běžný provoz") }
+        return settings.contest.selectedPreset?.title ?? L("Vlastní závod")
     }
 
     /// Saves the cluster macros (10 items) - the connection does not change.

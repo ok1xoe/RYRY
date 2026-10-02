@@ -122,6 +122,7 @@
   <li><b>TX / RX:</b> tlačítko TX nebo <kbd>⌘</kbd><kbd>T</kbd>. <kbd>Esc</kbd> = okamžitě RX. <b>Tune</b> = nosná pro ladění.</li>
   <li><b>Okno vysílání:</b> odesílá po znacích, slovech nebo řádcích; <b>Odeslat vše</b> odešle celý text.</li>
   <li><b>Makra F1–F12 a ⇧F1–⇧F4:</b> klik nebo klávesa; pravým tlačítkem <b>Upravit…</b> (název, text, barva, opakování).</li>
+  <li><b>Sady maker:</b> přepínač <b>Běžný provoz / DX</b> nad lištou maker; v závodě má každý závod svou sadu, která se mění sama se zvoleným závodem. <b>Výchozí makra…</b> nahradí sadu výchozí (u závodu podle jeho výměny).</li>
   <li><b>Zprávy:</b> delší uložené texty (popis stanice, rozlučka) v menu Zprávy.</li>
   <li><b>Odeslat textový soubor</b> najdete v menu Vysílání.</li>
 </ul>
@@ -129,7 +130,9 @@
   <tr><th>Proměnná</th><th>Význam</th><th>Proměnná</th><th>Význam</th></tr>
   <tr><td><code>%m</code></td><td>moje značka</td><td><code>%c</code></td><td>značka protistanice</td></tr>
   <tr><td><code>%n</code></td><td>jméno protistanice</td><td><code>%q</code></td><td>QTH protistanice</td></tr>
-  <tr><td><code>%r</code> / <code>%s</code></td><td>RST odeslané / přijaté</td><td><code>%N</code> / <code>%M</code></td><td>odesílané / přijaté číslo (výměna)</td></tr>
+  <tr><td><code>%r</code> / <code>%s</code></td><td>RST odeslané / přijaté</td><td><code>%N</code> / <code>%M</code></td><td>odesílaná výměna závodu bez RST (001, BHE, 015 TOMAS DX) / přijatá</td></tr>
+  <tr><td><code>%S</code> / <code>%X</code></td><td>moje číslo / text výměny</td><td></td><td></td></tr>
+  <tr><td><code>%a %o %Z</code></td><td>moje jméno, lokátor, CQ zóna</td><td><code>%x %y</code></td><td>číslo a čas (BARTG)</td></tr>
   <tr><td><code>%g</code></td><td>pozdrav GM/GA/GE podle místního času protistanice</td><td><code>%D %T %t</code></td><td>datum a čas UTC</td></tr>
   <tr><td><code>%L %F</code></td><td>LTRS / FIGS</td><td><code>%{…}</code></td><td>CW identifikace</td></tr>
   <tr><td><code>%l</code></td><td>zalogovat spojení</td><td><code>\</code> / <code>#</code> na konci</td><td>po odvysílání RX / zůstat v TX</td></tr>

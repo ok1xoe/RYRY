@@ -39,16 +39,16 @@ Všechno, co je k odeslání potřeba, je v této složce. Postupuj shora dolů.
     TEAM_ID=GN8G426WK4 ./scripts/release-appstore.sh                 # nahraje do App Store Connect
 
 Po nahrání trvá zpracování buildu v App Store Connect 10–60 minut (přijde e-mail). Build se pak objeví ve verzi
-1.0 v sekci **Build**.
+1.1.0 v sekci **Build**.
 
-## 3. Vyplnění verze 1.0 🧑
+## 3. Vyplnění verze 1.1.0 🧑
 
 1. **App Information:** kategorie Utilities, věkové hodnocení (vše „None“ → 4+, `privacy.md`), Content Rights
    („No“), **License Agreement → Custom** a vložit `LICENSE-EULA.txt`.
 2. **Pricing and Availability:** Free, všechna území.
 3. **App Privacy:** Get Started → „No, we do not collect data from this app“ (zdůvodnění v `privacy.md`),
    Privacy Policy URL `https://ryry.ok1xoe.dev/privacy.html`.
-4. **Verze 1.0 (English):**
+4. **Verze 1.1.0 (English):**
    - vlož texty z `metadata-en.md`,
    - nahraj snímky `screenshots/en/*.png` (Mac: 2880 × 1800),
    - URL podpory a marketingu,

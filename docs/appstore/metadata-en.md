@@ -34,7 +34,7 @@ RECEIVE
 TRANSMIT
 • AFSK through the sound card or FSK (keying through a USB serial port)
 • PTT by RTS/DTR or CAT
-• Macros F1–F12 with MMTTY variables, saved messages and a TX window
+• 16 macros with MMTTY variables, macro sets for normal operating, DX and every contest, saved messages and a TX window
 
 CONTESTS
 • Presets for 28 RTTY contests (CQ WW, CQ WPX, ARRL Roundup, WAE, URC, Russian WW, BARTG, SARTG, NAQP, OK DX and more) with exchange, scoring and multiplier rules
@@ -80,6 +80,7 @@ The first App Store release of RYRY – the Mac RTTY program formerly distribute
 
 • New name and icon
 • 28 RTTY contest presets with a rules overview, scoring and multipliers
+• Macro sets for normal operating, DX and every contest; a button's tooltip shows what the macro sends
 • Help → Play Demo Signal lets you try decoding without a radio
 • LoTW: RYRY prepares the ADIF file and opens it in TrustedQSL
 • Coming from mmtty4mac: your settings move over automatically; RYRY asks once for access to your log folder, and you may need to enter your online service passwords again

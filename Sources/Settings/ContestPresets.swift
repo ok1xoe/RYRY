@@ -231,6 +231,9 @@ public enum ContestPreset: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// The exchange contains an RST (not in NA Sprint, NAQP, WRT, Rookie Roundup, BARTG Sprint).
+    public var sendsRST: Bool { ![.naSprintRTTY, .naqpRTTY, .wrt, .rookieRoundup, .bartgSprint, .bartgSprint75].contains(self) }
+
     /// The text part is optional (a member mark – non-members send nothing).
     public var textOptional: Bool { self == .trcDigi || self == .proDigi }
     /// The received text starts with the name (the call history fills it in).
