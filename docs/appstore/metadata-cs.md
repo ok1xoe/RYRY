@@ -35,7 +35,7 @@ PŘÍJEM
 VYSÍLÁNÍ
 • AFSK přes zvukovou kartu nebo FSK (klíčování přes USB sériový port)
 • PTT přes RTS/DTR nebo CAT
-• Makra F1–F12 s proměnnými MMTTY, uložené zprávy a vysílací okno
+• 16 maker s proměnnými MMTTY, sady maker pro běžný provoz, DX a každý závod, uložené zprávy a vysílací okno
 
 ZÁVODY
 • Předvolby 28 RTTY závodů (CQ WW, CQ WPX, ARRL Roundup, WAE, URC, Russian WW, BARTG, SARTG, NAQP, OK DX a další) s pravidly výměny, bodování a násobičů
@@ -81,6 +81,7 @@ První vydání RYRY v App Store – programu pro RTTY na Macu, dříve šířen
 
 • Nové jméno a ikona
 • 28 předvoleb RTTY závodů s přehledem pravidel, bodováním a násobiči
+• Sady maker pro běžný provoz, DX a každý závod; tooltip tlačítka ukáže, co makro pošle
 • Nápověda → Přehrát ukázkový signál: dekódování si vyzkoušíte i bez rádia
 • LoTW: RYRY připraví soubor ADIF a otevře ho v TrustedQSL
 • Přechod z mmtty4mac: nastavení se přenese samo; RYRY se jednou zeptá na přístup ke složce s logem a hesla k online službám bude možná potřeba zadat znovu
