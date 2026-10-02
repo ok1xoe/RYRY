@@ -11,14 +11,14 @@ struct TxEditor: View {
 
     var d: DisplaySettings { model.settings.display }
     var txFont: Font {
-        if !d.rxFont.isEmpty, NSFont(name: d.rxFont, size: d.fontSize) != nil { return .custom(d.rxFont, size: d.fontSize) }
-        return .system(size: d.fontSize, design: .monospaced)
+        if !d.rxFont.isEmpty, NSFont(name: d.rxFont, size: d.txFontSize) != nil { return .custom(d.rxFont, size: d.txFontSize) }
+        return .system(size: d.txFontSize, design: .monospaced)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("TX").font(.caption.bold()).foregroundStyle(.secondary)
+                Text("TX").uiFont(.caption, weight: .bold).foregroundStyle(.secondary)
                 Picker("", selection: $model.sendMode) {
                     Text(L("po znacích")).tag(SendMode.char)
                     Text(L("po slovech")).tag(SendMode.word)

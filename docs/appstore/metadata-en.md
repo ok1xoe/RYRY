@@ -81,6 +81,7 @@ The first App Store release of RYRY – the Mac RTTY program formerly distribute
 • New name and icon
 • 28 RTTY contest presets with a rules overview, scoring and multipliers
 • Macro sets for normal operating, DX and every contest; a button's tooltip shows what the macro sends
+• Bigger text in the receive and transmit windows and an adjustable interface size
 • Help → Play Demo Signal lets you try decoding without a radio
 • LoTW: RYRY prepares the ADIF file and opens it in TrustedQSL
 • Coming from mmtty4mac: your settings move over automatically; RYRY asks once for access to your log folder, and you may need to enter your online service passwords again

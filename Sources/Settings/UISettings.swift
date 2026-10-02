@@ -31,6 +31,11 @@ public enum XYScopeSize: String, Codable, Sendable, CaseIterable {
     case small, medium, large
     public var points: Double { switch self { case .small: 100; case .medium: 160; case .large: 240 } }
 }
+/// Size of the controls and the app's text: the control size and the base font (pt) of the windows and the macro buttons.
+public enum UISize: String, Codable, Sendable, CaseIterable {
+    case small, normal, large, xlarge
+    public var basePoints: Double { switch self { case .small: 11; case .normal: 13; case .large: 15; case .xlarge: 18 } }
+}
 /// XY scope quality (MMTTY "XYScope Quality"): low = every other point.
 public enum XYScopeQuality: String, Codable, Sendable, CaseIterable { case low, high }
 

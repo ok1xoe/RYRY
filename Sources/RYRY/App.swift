@@ -101,7 +101,7 @@ struct RYRYApp: App {
     var body: some Scene {
         Window("RYRY", id: "main") {
             MainView(model: model)
-                .environment(\.showHints, model.settings.display.showHints)
+                .environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
                 .task {
                     delegate.model = model
                     model.folderAccess = FolderAccess(prompt: FolderAccessPanel())
@@ -194,6 +194,15 @@ struct RYRYApp: App {
                 Button(L("Nastavení zvuku systému…")) { FileActions.openSoundSettings() }
                 Button(L("Audio MIDI Setup…")) { FileActions.openAudioMIDISetup() }
             }
+            CommandGroup(after: .toolbar) {
+                Button(L("Větší písmo")) { Task { await model.changeTextSize(by: 1) } }.keyboardShortcut("+", modifiers: .command)
+                Button(L("Menší písmo")) { Task { await model.changeTextSize(by: -1) } }.keyboardShortcut("-", modifiers: .command)
+                Button(L("Výchozí velikost písma")) { Task { await model.changeTextSize(by: nil) } }.keyboardShortcut("0", modifiers: .command)
+                Divider()
+                Button(L("Větší rozhraní")) { Task { await model.changeUISize(by: 1) } }.keyboardShortcut("+", modifiers: [.command, .control])
+                Button(L("Menší rozhraní")) { Task { await model.changeUISize(by: -1) } }.keyboardShortcut("-", modifiers: [.command, .control])
+                Divider()
+            }
             CommandGroup(after: .windowArrangement) {
                 Button("Log") { openWindow(id: "log") }.shortcut(model.settings.binding(for: .openLog))
                 Button(L("Exportovat Cabrillo…")) { exportCabrillo(model) }
@@ -212,35 +221,35 @@ struct RYRYApp: App {
                 Button(L("Kanály")) { openWindow(id: "channels") }
             }
         }
-        Window("Log – " + model.settings.log.name, id: "log") { LogWindow(model: model).environment(\.showHints, model.settings.display.showHints) }
+        Window("Log – " + model.settings.log.name, id: "log") { LogWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize) }
         Window(L("Scope demodulátoru"), id: "scope") {
-            ScopeWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+            ScopeWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
         }
             .windowResizability(.contentSize)
         Window(L("Spoty"), id: "spots") {
-            SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+            SpotsWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
         }
         // filtr zobrazení spotů ve dvou samostatných oknech (zaškrtávátka pásem a skupin módů)
         Window(L("Filtr pásem"), id: SpotFilterWindowID.bands) {
-            SpotBandFilterWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+            SpotBandFilterWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
         }
         .windowResizability(.contentSize)
         Window(L("Filtr módů"), id: SpotFilterWindowID.modes) {
-            SpotModeFilterWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+            SpotModeFilterWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
         }
         .windowResizability(.contentSize)
         Window(L("Band mapa"), id: "bandmapwindow") {
-            BandMapWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+            BandMapWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
         }
         Window(L("Násobiče"), id: "multipliers") {
-            MultipliersWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+            MultipliersWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
         }
         Window(L("Skóre"), id: "score") {
-            ScoreWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+            ScoreWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
         }
         Window(L("Kanály"), id: "channels") {
-            ChannelsWindow(model: model).environment(\.showHints, model.settings.display.showHints)
+            ChannelsWindow(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize)
         }
-        Settings { SettingsView(model: model).environment(\.showHints, model.settings.display.showHints) }
+        Settings { SettingsView(model: model).environment(\.showHints, model.settings.display.showHints).uiSized(model.settings.display.uiSize) }
     }
 }

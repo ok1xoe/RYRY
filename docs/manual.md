@@ -5,6 +5,7 @@ RYRY (formerly mmtty4mac) is an RTTY program for macOS: a native port of MMTTY (
 **New in 1.0 (Mac App Store):**
 - the new name RYRY and a new icon; distributed through the Mac App Store (the app runs in the macOS sandbox), bundle ID `cz.ok1xoe.ryry`; settings from mmtty4mac move over on the first launch, the app asks once for access to the log folder and online passwords may need to be entered again;
 - 28 RTTY contest presets (every RTTY contest on contestcalendar.com) with a rules overview in Settings → Contest, scoring and multipliers per the official rules; new exchange formats (serial + text, text, serial or code);
+- bigger text: separately for the receive and transmit windows (up to 48 pt, ⌘+ / ⌘−) and the interface size (buttons, macros, the app's text; ⌃⌘+ / ⌃⌘−);
 - macro sets for normal operating, DX and every contest; a macro button's tooltip shows what is sent; new variables (`%N` = the contest exchange, `%S %X %a %o %Z`) listed in the macro editor; ⇧F1–⇧F4 run their own macros;
 - Help → Play Demo Signal to try decoding without a radio; LoTW through TrustedQSL (RYRY prepares the ADIF, you sign and send it in TQSL);
 - removed: starting hamlib from the app (start rigctld yourself) and the update check (the App Store updates the app).
@@ -38,7 +39,7 @@ Optional: for radios the built-in CAT does not know, install hamlib (`brew insta
 | **Rig** | Radio control – see chapter 3. |
 | **Modem** | Demodulator parameters (defaults match MMTTY). They apply immediately. |
 | **Contest** | Contest mode, contest presets, exchange, Cabrillo – see chapter 7. |
-| **Display** | Interface language, spectrum and waterfall (range, gain, palette, response), XY scope, window fonts and colors, TX window options, tooltips. |
+| **Display** | Interface language, spectrum and waterfall (range, gain, palette, response), XY scope, window fonts and colors (font size separately for receive and transmit 9–48 pt, interface size small–largest), TX window options, tooltips. |
 | **API and log** | API for loggers, log folder, continuous RX text log. |
 | **Keys** | Keyboard shortcuts for macros and commands. |
 
@@ -75,6 +76,7 @@ Settings → Rig → Controls:
 - **Transmit pane:** sends by characters, words or lines; **Send all** sends the whole text. Optional CR/LF at the start of a transmission and line wrapping (Settings → Display → Transmit pane).
 - **Macros F1–F12 and ⇧F1–⇧F4 (16 buttons):** click or press the key. Right-click → **Edit…** (name, text, color, repeat); the editor lists the variables. A button's **tooltip** shows what the macro sends right now – with the call and exchange from the QSO window – and its template below.
 - **Macro sets:** above the macro bar is a **Normal / DX** switch. In a contest every contest (a custom one too) has its own set; it is switched with the selected contest and macro edits are saved into the active set. **Default macros…** replaces the active set with the defaults – for a contest built from its exchange.
+- **Text size:** View → **Bigger Text** ⌘+ / **Smaller Text** ⌘− / **Default Text Size** ⌘0 changes the receive and transmit windows; **Bigger Interface** ⌃⌘+ / **Smaller Interface** ⌃⌘− enlarges the buttons, macros, the QSO panel and the app's text. Separately for receive and transmit in Settings → Display.
 - **Messages:** longer saved texts in the **Messages** menu (the same syntax as macros).
 - **Send text file:** the Transmit menu → Send Text File….
 

@@ -21,7 +21,7 @@ struct QTCPanel: View {
                 else { idleButtons }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        } label: { Text("QTC (WAE)").font(.subheadline.bold()) }
+        } label: { Text("QTC (WAE)").uiFont(.subheadline, weight: .bold) }
         .task(id: model.qso.call) {
             if model.qtcPending == nil { sending = nil }           // the list belongs to the station it was prepared for
             await model.refreshQTC()
@@ -32,12 +32,12 @@ struct QTCPanel: View {
         if let st = model.qtcStatus {
             let call = model.qso.call.isEmpty ? "—" : model.qso.call
             Text(L("S %@: vyměněno %ld/10 · k odeslání %ld · další série %ld", call, st.exchanged, st.available.count, st.nextSeries))
-                .font(.caption).fixedSize(horizontal: false, vertical: true)
+                .uiFont(.caption).fixedSize(horizontal: false, vertical: true)
             if st.differentContinent == false {
-                Text(L("Stejný kontinent – v RTTY se QTC vyměňují jen mezi kontinenty.")).font(.caption).foregroundStyle(.orange)
+                Text(L("Stejný kontinent – v RTTY se QTC vyměňují jen mezi kontinenty.")).uiFont(.caption).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text(L("Body za QTC celkem: %ld", st.points)).font(.caption).foregroundStyle(.secondary)
+            Text(L("Body za QTC celkem: %ld", st.points)).uiFont(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -66,10 +66,10 @@ struct QTCPanel: View {
     func sendEditor(_ lines: [QTCLine]) -> some View {
         let n = model.qtcPending?.number ?? model.qtcStatus?.nextSeries ?? 1
         return VStack(alignment: .leading, spacing: 4) {
-            Text(L("QTC %ld/%ld pro %@", n, lines.count, model.qtcPending?.counterpart ?? model.qso.call)).font(.caption.bold())
+            Text(L("QTC %ld/%ld pro %@", n, lines.count, model.qtcPending?.counterpart ?? model.qso.call)).uiFont(.caption, weight: .bold)
             ForEach(Array(lines.enumerated()), id: \.offset) { i, l in
                 HStack {
-                    Text("\(i + 1). \(QTCText.line(l))").font(.caption.monospaced())
+                    Text("\(i + 1). \(QTCText.line(l))").uiFont(.caption, design: .monospaced)
                     Spacer()
                     if model.qtcPending != nil {
                         Button("↻") { Task { await model.qtcRepeat(i + 1) } }.hint(L("Zopakovat řádek (AGN %ld)", i + 1))
@@ -100,27 +100,27 @@ struct QTCPanel: View {
         let d = model.qtcReceive ?? AppModel.QTCReceiveDraft()
         let rows = d.count ?? max(1, d.lines.lastIndex { $0 != nil }.map { $0 + 1 } ?? 1)
         return VStack(alignment: .leading, spacing: 4) {
-            Text(L("Od %@", d.counterpart)).font(.caption.bold())
+            Text(L("Od %@", d.counterpart)).uiFont(.caption, weight: .bold)
             HStack {
-                Text(L("Série")).font(.caption)
+                Text(L("Série")).uiFont(.caption)
                 TextField("n/k", text: Binding(get: { d.number.map { "\($0)/\(d.count ?? 0)" } ?? "" },
                                                set: { model.qtcSetHeader($0) }))
-                    .frame(width: 60).font(.caption.monospaced())
+                    .frame(width: 60).uiFont(.caption, design: .monospaced)
                 Spacer()
                 Button(L("Načíst z příjmu")) { NSApp.keyWindow?.makeFirstResponder(nil); model.qtcFillFromRx() }.hint(L("Rozebrat text přijatý od „Přijmout…“"))
             }
             ForEach(0..<min(rows, 10), id: \.self) { i in
                 HStack {
-                    Text("\(i + 1).").font(.caption.monospaced()).frame(width: 20, alignment: .trailing)
+                    Text("\(i + 1).").uiFont(.caption, design: .monospaced).frame(width: 20, alignment: .trailing)
                     TextField("HHMM ZNAČKA NNN", text: Binding(get: { d.lines[i].map(QTCText.line) ?? "" },
                                                               set: { model.qtcSetLine(i, $0) }))
-                        .font(.caption.monospaced())
+                        .uiFont(.caption, design: .monospaced)
                         // a new field when the content changes from the receive side - a half-typed (empty) field must not overwrite the loaded row
                         .id("\(i)-\(d.lines[i].map(QTCText.line) ?? "")")
                     Button("AGN") { Task { await model.qtcPhrase(.agn(i + 1)) } }.controlSize(.mini)
                 }
             }
-            Text(L("Klik na slova v příjmu: série n/k, pak čas, značka, číslo.")).font(.caption2).foregroundStyle(.secondary)
+            Text(L("Klik na slova v příjmu: série n/k, pak čas, značka, číslo.")).uiFont(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 4) {
                 Button("QRV") { Task { await model.qtcPhrase(.qrv) } }

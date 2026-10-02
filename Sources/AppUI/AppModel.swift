@@ -179,6 +179,27 @@ public final class AppModel {
         do { try settingsStore.save(settings) } catch { note(L("Nastavení nelze uložit: %@", "\(error)")) }
     }
 
+    /// ⌘+ / ⌘−: the font of the receive and transmit windows by `step` pt (both, within 9–48 pt); nil = the defaults.
+    public func changeTextSize(by step: Double?) async {
+        await setDisplay { d in
+            let r = DisplaySettings.fontRange
+            if let step {
+                d.fontSize = min(r.upperBound, max(r.lowerBound, d.fontSize + step))
+                d.txFontSize = min(r.upperBound, max(r.lowerBound, d.txFontSize + step))
+            } else {
+                d.fontSize = DisplaySettings().fontSize; d.txFontSize = DisplaySettings().txFontSize
+            }
+        }
+    }
+
+    /// ⌃⌘+ / ⌃⌘−: the size of the controls and the app's text one step up or down.
+    public func changeUISize(by step: Int) async {
+        let all = UISize.allCases
+        guard let i = all.firstIndex(of: settings.display.uiSize) else { return }
+        let n = min(all.count - 1, max(0, i + step))
+        await setDisplay { $0.uiSize = all[n] }
+    }
+
     private func syncDisplay() {
         waterfall.gainDB = settings.display.gainDB
         waterfall.autoGain = settings.display.autoGain
@@ -387,7 +408,7 @@ public final class AppModel {
                 m.clock = s.clock; m.rttyCore = s.rttyCore
                 func take<T: Equatable>(_ kp: WritableKeyPath<AppSettings, T>) { if s[keyPath: kp] != base[keyPath: kp] { m[keyPath: kp] = s[keyPath: kp] } }
                 take(\.display.fromHz); take(\.display.toHz); take(\.display.gainDB); take(\.display.autoGain)
-                take(\.display.timestamps); take(\.display.fontSize); take(\.display.rxFont)
+                take(\.display.timestamps); take(\.display.fontSize); take(\.display.txFontSize); take(\.display.uiSize); take(\.display.rxFont)
                 take(\.display.rxBackground); take(\.display.rxTextColor); take(\.display.rxEchoColor)
                 take(\.display.txBackground); take(\.display.txTextColor); take(\.display.palette)
                 take(\.display.fftResponse); take(\.display.xySize); take(\.display.xyQuality); take(\.display.showHints)

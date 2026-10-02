@@ -13,9 +13,9 @@ struct MacroBar: View {
     /// The macro set: normal / DX outside a contest (a switch), the contest's own set in a contest; reset to defaults.
     var setRow: some View {
         HStack(spacing: 8) {
-            Text(L("Sada maker:")).font(.callout).foregroundStyle(.secondary)
+            Text(L("Sada maker:")).uiFont(.callout).foregroundStyle(.secondary)
             if model.settings.contest.enabled {
-                Text(model.macroSetTitle).font(.caption.bold())
+                Text(model.macroSetTitle).uiFont(.caption, weight: .bold)
             } else {
                 Picker("", selection: Binding(get: { model.settings.operatingMode }, set: { model.setOperatingMode($0) })) {
                     Text(L("Běžný provoz")).tag(OperatingMode.normal)
@@ -105,9 +105,9 @@ struct MacroEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(target == .cluster ? L("Příkaz clusteru %ld", index + 1) : L("Makro %@", MacroBar.keyName(index))).font(.headline)
+            Text(target == .cluster ? L("Příkaz clusteru %ld", index + 1) : L("Makro %@", MacroBar.keyName(index))).uiFont(.headline)
             TextField(L("Název"), text: $name)
-            TextEditor(text: $text).font(.system(.body, design: .monospaced)).frame(minHeight: 120)
+            TextEditor(text: $text).uiFont(.body, design: .monospaced).frame(minHeight: 120)
             HStack {
                 Toggle(L("Barva tlačítka"), isOn: $useColor)
                 ColorPicker("", selection: $color, supportsOpacity: false).labelsHidden().disabled(!useColor)
@@ -121,7 +121,7 @@ struct MacroEditor: View {
             }
             if target == .cluster {
                 Text(L("%m moje značka · %c protistanice · %n jméno · %q QTH · %k frekvence rigu v kHz · %D %T %t čas UTC · jeden řádek = jeden příkaz · \\ # a CW ID se ignorují"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .uiFont(.callout).foregroundStyle(.secondary)
             } else {
             GroupBox(L("Zástupné znaky")) {
                 ScrollView { MacroVariablesHelp().frame(maxWidth: .infinity, alignment: .leading).padding(4) }

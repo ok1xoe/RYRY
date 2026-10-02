@@ -40,7 +40,7 @@ struct MessagesEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("Seznam zpráv")).font(.headline)
+            Text(L("Seznam zpráv")).uiFont(.headline)
             HStack(alignment: .top, spacing: 10) {
                 VStack(spacing: 4) {
                     List(selection: $sel) {
@@ -63,7 +63,7 @@ struct MessagesEditor: View {
                         TextField(L("Název"), text: binding(s, \.name))
                         TextEditor(text: Binding(get: { binding(s, \.text).wrappedValue.replacingOccurrences(of: "\r\n", with: "\n") },
                                                  set: { binding(s, \.text).wrappedValue = $0.replacingOccurrences(of: "\n", with: "\r\n") }))
-                            .font(.system(.body, design: .monospaced))
+                            .uiFont(.body, design: .monospaced)
                     }
                     .id(s)                                           // a new field when the selection changes, no state carried over
                 } else {
@@ -71,7 +71,7 @@ struct MessagesEditor: View {
                 }
             }
             Text(L("Syntaxe jako makra: %c %m %n %r %g … · \\ na konci = RX · # na konci = zůstat TX · %l = zalogovat"))
-                .font(.caption).foregroundStyle(.secondary)
+                .uiFont(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()
                 Button(L("Zrušit")) { dismiss() }

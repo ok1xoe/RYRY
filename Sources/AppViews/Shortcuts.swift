@@ -75,6 +75,23 @@ extension View {
         if let k = b.keyEquivalent { keyboardShortcut(k, modifiers: b.eventModifiers) } else { self }
     }
 
+    /// The size of the controls and the app's text (Settings → Display → Interface size).
+    public func uiSized(_ size: UISize) -> some View {
+        let cs: ControlSize
+        switch size {
+        case .small: cs = .small
+        case .normal: cs = .regular
+        case .large: cs = .large
+        case .xlarge: cs = .extraLarge
+        }
+        return controlSize(cs).font(.system(size: size.basePoints)).environment(\.uiScale, size.basePoints / UISize.normal.basePoints)
+    }
+
+    /// A text style scaled by the interface size (instead of `.font(.caption)` etc., which have a fixed size on macOS).
+    public func uiFont(_ style: Font.TextStyle, weight: Font.Weight? = nil, design: Font.Design? = nil, digits: Bool = false) -> some View {
+        modifier(UIFontModifier(style: style, weight: weight, design: design, digits: digits))
+    }
+
     /// A tooltip that can be turned off in Settings (MMTTY "Show Button Hint").
     public func hint(_ text: String) -> some View { modifier(HintModifier(text: text)) }
 }
@@ -92,5 +109,45 @@ struct HintModifier: ViewModifier {
     @Environment(\.showHints) private var show
     func body(content: Content) -> some View {
         if show { content.help(text) } else { content }
+    }
+}
+
+private struct UIScaleKey: EnvironmentKey { static let defaultValue = 1.0 }
+extension EnvironmentValues {
+    /// The interface scale (1 = normal) – `uiSized` sets it, `uiFont` uses it.
+    public var uiScale: Double {
+        get { self[UIScaleKey.self] }
+        set { self[UIScaleKey.self] = newValue }
+    }
+}
+
+struct UIFontModifier: ViewModifier {
+    let style: Font.TextStyle
+    let weight: Font.Weight?
+    let design: Font.Design?
+    let digits: Bool
+    @Environment(\.uiScale) private var scale
+
+    /// The macOS sizes of the text styles (pt).
+    static func points(_ s: Font.TextStyle) -> Double {
+        switch s {
+        case .largeTitle: 26
+        case .title: 22
+        case .title2: 17
+        case .title3: 15
+        case .headline, .body: 13
+        case .callout: 12
+        case .subheadline: 11
+        case .footnote, .caption: 10
+        case .caption2: 10
+        @unknown default: 13
+        }
+    }
+
+    func body(content: Content) -> some View {
+        var f = Font.system(size: Self.points(style) * scale, weight: weight ?? (style == .headline ? .bold : .regular),
+                            design: design ?? .default)
+        if digits { f = f.monospacedDigit() }
+        return content.font(f)
     }
 }

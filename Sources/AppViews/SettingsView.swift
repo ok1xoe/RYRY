@@ -839,18 +839,30 @@ struct DisplayTab: View {
                     Text(L("Systémové neproporcionální")).tag("")
                     ForEach(Self.monospacedFamilies, id: \.self) { f in Text(f).tag(f) }
                 }
-                LabeledContent(L("Velikost písma")) {
+                LabeledContent(L("Písmo příjmu")) {
                     HStack(spacing: 4) {
                         Text("\(Int(s.display.fontSize)) pt").monospacedDigit()
-                        Stepper("", value: $s.display.fontSize, in: 9...32).labelsHidden()
+                        Stepper("", value: $s.display.fontSize, in: DisplaySettings.fontRange).labelsHidden()
                     }
+                }
+                LabeledContent(L("Písmo vysílání")) {
+                    HStack(spacing: 4) {
+                        Text("\(Int(s.display.txFontSize)) pt").monospacedDigit()
+                        Stepper("", value: $s.display.txFontSize, in: DisplaySettings.fontRange).labelsHidden()
+                    }
+                }
+                Picker(L("Velikost rozhraní"), selection: $s.display.uiSize) {
+                    Text(L("malá")).tag(UISize.small)
+                    Text(L("normální")).tag(UISize.normal)
+                    Text(L("velká")).tag(UISize.large)
+                    Text(L("největší")).tag(UISize.xlarge)
                 }
                 ColorRow(title: L("Pozadí příjmu"), hex: $s.display.rxBackground, fallback: Color(nsColor: .textBackgroundColor))
                 ColorRow(title: L("Text příjmu"), hex: $s.display.rxTextColor, fallback: Color(nsColor: .textColor))
                 ColorRow(title: L("Echo vysílání v příjmu"), hex: $s.display.rxEchoColor, fallback: .red)
                 ColorRow(title: L("Pozadí vysílání"), hex: $s.display.txBackground, fallback: Color(nsColor: .textBackgroundColor))
                 ColorRow(title: L("Text vysílání"), hex: $s.display.txTextColor, fallback: Color(nsColor: .textColor))
-            } header: { Text(L("Písmo a barvy oken")) } footer: { Text(L("„Výchozí“ vrátí systémovou barvu (přizpůsobí se tmavému režimu).")) }
+            } header: { Text(L("Písmo a barvy oken")) } footer: { Text(L("Velikost rozhraní zvětší tlačítka, makra a písmo aplikace. Rychle: Zobrazení → Větší písmo ⌘+ / Menší písmo ⌘− (příjem i vysílání), Větší rozhraní ⌃⌘+ / Menší rozhraní ⌃⌘−. „Výchozí“ vrátí systémovou barvu (přizpůsobí se tmavému režimu).")) }
             Section {
                 Toggle(L("CR/LF na začátku vysílání tlačítkem TX"), isOn: $s.txWindow.autoCRLF)
                 Toggle(L("Zalamovat psaný text"), isOn: Binding(get: { s.txWindow.wrapColumn > 0 },

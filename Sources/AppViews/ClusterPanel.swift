@@ -37,7 +37,7 @@ struct ClusterPanel: View {
                 // typing ends the history walk (the arrow then starts again from the newest entry)
                 TextField(L("Příkaz pro DX cluster (např. sh/dx 30)"),
                           text: Binding(get: { command }, set: { command = $0; historyPos = nil }))
-                    .textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced))
+                    .textFieldStyle(.roundedBorder).uiFont(.body, design: .monospaced)
                     .focused($fieldFocused)
                     .onSubmit { send() }
                     .onKeyPress(.upArrow) { history(-1); return .handled }
@@ -55,10 +55,10 @@ struct ClusterPanel: View {
                 .hint(L("Upravit tlačítka příkazů (i bez spojení s clusterem)"))
             }
             if let msg = model.clusterMessage {
-                Text(msg).font(.caption).foregroundStyle(.red)
+                Text(msg).uiFont(.caption).foregroundStyle(.red)
             } else if !connected {
                 Text(L("Příkazy lze odeslat, až je DX cluster připojený a přihlášený."))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .uiFont(.caption).foregroundStyle(.secondary)
             }
             DisclosureGroup(L("Konzola clusteru"), isExpanded: $showConsole) { console }
         }
@@ -90,7 +90,7 @@ struct ClusterPanel: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
-                            Text(l.isEmpty ? " " : l).font(.system(.caption, design: .monospaced))
+                            Text(l.isEmpty ? " " : l).uiFont(.caption, design: .monospaced)
                                 .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                         }
                         Color.clear.frame(height: 1).id("end")

@@ -50,7 +50,7 @@ struct QSOPanel: View {
 
     /// The label in the grid's left column.
     func label(_ t: String) -> some View {
-        Text(t).font(.callout).foregroundStyle(.secondary).gridColumnAlignment(.trailing).lineLimit(1).fixedSize()
+        Text(t).uiFont(.callout).foregroundStyle(.secondary).gridColumnAlignment(.trailing).lineLimit(1).fixedSize()
     }
 
     var body: some View {
@@ -59,9 +59,9 @@ struct QSOPanel: View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("QSO").font(.headline)
+                    Text("QSO").uiFont(.headline)
                     if model.settings.contest.enabled {
-                        Text(Self.contestTitle(model.settings.contest)).font(.caption).foregroundStyle(.secondary)
+                        Text(Self.contestTitle(model.settings.contest)).uiFont(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if model.esmActive { ESMBar(model: model) }
@@ -76,19 +76,19 @@ struct QSOPanel: View {
                                     HStack(spacing: 6) {
                                         QSOField(model: model, label: "", field: field, esm: true,
                                                  onTyping: { model.superCheckPreview($0) })
-                                            .font(.title3.monospaced())
+                                            .uiFont(.title3, design: .monospaced)
                                         if model.isDupe {
-                                            Text("DUPE").font(.caption.bold()).foregroundStyle(.white)
+                                            Text("DUPE").uiFont(.caption, weight: .bold).foregroundStyle(.white)
                                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                                 .background(.red, in: RoundedRectangle(cornerRadius: 4))
                                                 .hint(L("Duplicita: se stanicí už je v tomto závodě spojení na stejném pásmu (u vlastního závodu i módu)"))
                                         }
                                         if !model.isDupe, !model.newMultiplier.isEmpty {
-                                            Text("NEW MULT").font(.caption.bold()).foregroundStyle(.white)
+                                            Text("NEW MULT").uiFont(.caption, weight: .bold).foregroundStyle(.white)
                                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                                 .background(.green, in: RoundedRectangle(cornerRadius: 4))
                                                 .hint(L("Nový násobič: %@", model.newMultiplier.text))
-                                            Text(model.newMultiplier.text).font(.caption).foregroundStyle(.secondary)
+                                            Text(model.newMultiplier.text).uiFont(.caption).foregroundStyle(.secondary)
                                                 .lineLimit(1)
                                         }
                                     }.gridCellColumns(3)
@@ -113,7 +113,7 @@ struct QSOPanel: View {
                                 GridRow {
                                     label(L("Země"))
                                     Text("\(c.name) · \(c.continent) · CQ \(c.cqZone) · ITU \(c.ituZone) · \(Self.hm.string(from: local)) \(L("místně"))")
-                                        .font(.caption).foregroundStyle(.secondary)
+                                        .uiFont(.caption).foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                         .gridCellColumns(3)
                                 }
@@ -122,8 +122,8 @@ struct QSOPanel: View {
                                 GridRow {
                                     label(L("Směr"))
                                     VStack(alignment: .leading, spacing: 1) {
-                                        Text(Self.beamShort(b)).font(.caption.monospacedDigit())
-                                        Text(Self.beamLong(b)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                                        Text(Self.beamShort(b)).uiFont(.caption, digits: true)
+                                        Text(Self.beamLong(b)).uiFont(.caption2, digits: true).foregroundStyle(.secondary)
                                     }
                                     .foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -136,7 +136,7 @@ struct QSOPanel: View {
                 }
                 FrequencyRow(model: model)
                 if !model.callbookStatus.isEmpty {
-                    Text(model.callbookStatus).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                    Text(model.callbookStatus).uiFont(.caption2).foregroundStyle(.secondary).lineLimit(2)
                 }
                 HStack {
                     Button("Log") { Task { await model.logQSO() } }.hint(L("Zalogovat (⌘L)"))
@@ -144,11 +144,11 @@ struct QSOPanel: View {
                 }
                 if QSOLayout.showsQTC(model.settings.contest) { QTCPanel(model: model) }
                 if !model.previousQSOs.isEmpty {
-                    Text(L("Předchozí spojení (%ld)", model.previousQSOs.count)).font(.subheadline.bold())
+                    Text(L("Předchozí spojení (%ld)", model.previousQSOs.count)).uiFont(.subheadline, weight: .bold)
                     ForEach(model.previousQSOs.prefix(20)) { r in
                         VStack(alignment: .leading) {
-                            Text(r.timeOn.formatted(date: .abbreviated, time: .shortened)).font(.caption)
-                            Text("\(r.band ?? "?") \(r.mode) \(r.name ?? "")").font(.caption2).foregroundStyle(.secondary)
+                            Text(r.timeOn.formatted(date: .abbreviated, time: .shortened)).uiFont(.caption)
+                            Text("\(r.band ?? "?") \(r.mode) \(r.name ?? "")").uiFont(.caption2).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -176,7 +176,7 @@ struct ESMBar: View {
             let macro = ESM.macro(for: step, model.settings.esm)
             let key = macro.map { " (" + model.settings.binding(for: .macro($0)).display + ")" } ?? ""
             Text("Enter → " + ESM.title(step) + key)
-                .font(.callout.bold().monospaced())
+                .uiFont(.callout, weight: .bold, design: .monospaced)
                 .foregroundStyle(step == .none ? Color.secondary : Color.white)
                 .padding(.horizontal, 8).padding(.vertical, 2)
                 .background(step == .none ? Color.clear : color(step), in: RoundedRectangle(cornerRadius: 4))
@@ -220,7 +220,7 @@ struct QSOField: View {
             .overlay(alignment: .trailing) {
                 // a discreet label next to a value filled in from the call history (it disappears once the field is edited by hand)
                 if let v = model.qso.historyFilled[field], !v.isEmpty, model.qso.value(field) == v {
-                    Text(L("z historie")).font(.caption2).foregroundStyle(.secondary).padding(.trailing, 6)
+                    Text(L("z historie")).uiFont(.caption2).foregroundStyle(.secondary).padding(.trailing, 6)
                         .allowsHitTesting(false)
                 }
             }
@@ -264,7 +264,7 @@ struct SuperCheckList: View {
             if !model.scpPartial.isEmpty { chips(model.scpPartial, color: .secondary) }
             if !model.scpNear.isEmpty {
                 HStack(spacing: 4) {
-                    Text("≈").font(.caption.bold()).foregroundStyle(.orange).hint(L("Značky lišící se o jeden znak"))
+                    Text("≈").uiFont(.caption, weight: .bold).foregroundStyle(.orange).hint(L("Značky lišící se o jeden znak"))
                     chips(model.scpNear, color: .orange)
                 }
             }
@@ -278,7 +278,7 @@ struct SuperCheckList: View {
                 HStack(spacing: 4) {
                     ForEach(calls[i..<min(i + 4, calls.count, 12)], id: \.self) { c in
                         Button(c) { Task { await model.setQSOField("call", c) } }
-                            .buttonStyle(.borderless).font(.caption.monospaced()).foregroundStyle(color)
+                            .buttonStyle(.borderless).uiFont(.caption, design: .monospaced).foregroundStyle(color)
                     }
                 }
             }
@@ -291,10 +291,10 @@ struct FrequencyRow: View {
     @Bindable var model: AppModel
     var body: some View {
         HStack(spacing: 6) {
-            Text(L("Pásmo")).font(.callout).foregroundStyle(.secondary)
+            Text(L("Pásmo")).uiFont(.callout).foregroundStyle(.secondary)
             if let f = model.rig?.frequency, model.rig?.online == true {
                 Text("\(Bands.band(forHz: f) ?? "?") · \(QSOFields.kHzString(f)) kHz").monospacedDigit()
-                Text("(rig)").font(.caption).foregroundStyle(.secondary)
+                Text("(rig)").uiFont(.caption).foregroundStyle(.secondary)
             } else {
                 Menu(Bands.band(forHz: model.qso.frequency) ?? L("zvolit")) {
                     ForEach(AppModel.bandPresets, id: \.0) { b in
@@ -304,7 +304,7 @@ struct FrequencyRow: View {
                     Button(L("Bez frekvence")) { Task { await model.setQSOField("freq", "") } }
                 }.fixedSize()
                 QSOField(model: model, label: "kHz", field: "freq").frame(width: 90)
-                Text("kHz").font(.caption).foregroundStyle(.secondary)
+                Text("kHz").uiFont(.caption).foregroundStyle(.secondary)
             }
         }
         .hint(L("Bez rigu zadejte pásmo nebo frekvenci ručně – zapíše se do logu"))
