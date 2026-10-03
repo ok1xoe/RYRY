@@ -20,7 +20,7 @@ panel with callbook data and previous QSOs.
 | Contest score | DX cluster spots | Band map |
 |---|---|---|
 | ![Score window](docs/html/img/en-score.png) | ![Spots window](docs/html/img/en-spots.png) | ![Band map](docs/html/img/en-bandmap.png) |
-| Points, QSOs and multipliers per band and in total, for nine RTTY contests. | Spots from a DX cluster and the RBN, with band and mode filters. | The RTTY segment of the band with spots and the rig position. |
+| Points, QSOs and multipliers per band and in total, for 28 RTTY contests. | Spots from a DX cluster and the RBN, with band and mode filters. | The RTTY segment of the band with spots and the rig position. |
 
 More screenshots are in the manual: [English](docs/html/en/index.html), [Czech](docs/html/cs/index.html).
 
