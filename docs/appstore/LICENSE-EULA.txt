@@ -1,7 +1,7 @@
-RYRY – License Agreement
+RYRY - License Agreement
 
-RYRY is free software. Copyright © 2026 OK1XOE (Tomáš Kaplan). It is based on MMTTY,
-copyright © 2000–2013 Makoto Mori (JE3HHT) and Nobuyuki Oba.
+RYRY is free software. Copyright (c) 2026 OK1XOE (Tomas Kaplan). It is based on MMTTY,
+copyright (c) 2000-2013 Makoto Mori (JE3HHT) and Nobuyuki Oba.
 
 RYRY is distributed under the terms of the GNU Lesser General Public License, version 3
 (LGPL v3), which incorporates the GNU General Public License, version 3:
