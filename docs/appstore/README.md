@@ -30,7 +30,7 @@ Všechno, co je k odeslání potřeba, je v této složce. Postupuj shora dolů.
      Identifiers → „+“ → App IDs, explicitní `cz.ok1xoe.ryry`, bez dalších schopností.
    - SKU: **RYRY-MAC**
    - User Access: Full Access
-4. **Web:** nasaď `site/` na `https://ryry.ok1xoe.dev` (viz `site/README.md`). URL podpory a zásad ochrany
+4. **Web:** nasaď `site/` na `https://ok1xoe.dev/ryry/` (viz `site/README.md`). URL podpory a zásad ochrany
    osobních údajů musí fungovat, než aplikaci odešleš ke schválení.
 
 ## 2. Sestavení a nahrání
@@ -47,7 +47,7 @@ Po nahrání trvá zpracování buildu v App Store Connect 10–60 minut (přijd
    („No“), **License Agreement → Custom** a vložit `LICENSE-EULA.txt`.
 2. **Pricing and Availability:** Free, všechna území.
 3. **App Privacy:** Get Started → „No, we do not collect data from this app“ (zdůvodnění v `privacy.md`),
-   Privacy Policy URL `https://ryry.ok1xoe.dev/privacy.html`.
+   Privacy Policy URL `https://ok1xoe.dev/ryry/privacy/`.
 4. **Verze 1.0.0 (English):**
    - vlož texty z `metadata-en.md`,
    - nahraj snímky `screenshots/en/*.png` (Mac: 2880 × 1800),

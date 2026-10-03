@@ -1,7 +1,7 @@
 # RYRY
 
 A native macOS RTTY application based on MMTTY (JE3HHT, Makoto Mori). Published on the Mac App Store as **RYRY**
-(website: https://ryry.ok1xoe.dev). Formerly mmtty4mac; renamed to RYRY in version 1.0 (repository, bundle ID
+(website: https://ok1xoe.dev/ryry/). Formerly mmtty4mac; renamed to RYRY in version 1.0 (repository, bundle ID
 `cz.ok1xoe.ryry`, data folder `Application Support/RYRY` – the old folder and preferences are moved on the first launch).
 
 - Original sources: https://github.com/n5ac/mmtty (see http://mm-open.org)

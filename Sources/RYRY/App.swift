@@ -38,10 +38,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     NSWorkspace.shared.open(r)
 }
 
-/// A page of the product website (ryry.ok1xoe.dev) in the UI language (Czech under /cs/).
+/// A page of the product website (ok1xoe.dev/ryry/, English): "" = the product page, "support/", "privacy/".
 @MainActor func openWeb(_ page: String) {
-    let base = Localizer.shared.code == "cs" ? "https://ryry.ok1xoe.dev/cs/" : "https://ryry.ok1xoe.dev/"
-    if let u = URL(string: base + page) { NSWorkspace.shared.open(u) }
+    if let u = URL(string: "https://ok1xoe.dev/ryry/" + page) { NSWorkspace.shared.open(u) }
 }
 
 @MainActor func showAbout() {
@@ -149,8 +148,8 @@ struct RYRYApp: App {
                 Button(L("Přehrát ukázkový signál")) { playDemo() }
                 Divider()
                 Button(L("Web RYRY")) { openWeb("") }
-                Button(L("Podpora")) { openWeb("support.html") }
-                Button(L("Ochrana osobních údajů")) { openWeb("privacy.html") }
+                Button(L("Podpora")) { openWeb("support/") }
+                Button(L("Ochrana osobních údajů")) { openWeb("privacy/") }
             }
             CommandGroup(replacing: .newItem) {
                 Button(L("Nový log…")) { FileActions.newLog(model) }.keyboardShortcut("n", modifiers: .command)
