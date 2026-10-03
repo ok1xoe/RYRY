@@ -16,7 +16,7 @@ for lang in en cs; do
     OUT=docs/appstore/screenshots/$lang; mkdir -p $OUT
     pkill -x $PROC 2>/dev/null || true; sleep 2
     open -n "$APP" --args -language $lang -playDemo YES -openWindow bandmapwindow,score,spots,log
-    sleep 12
+    sleep 22                                     # the demo is 26 s: the whole QSO decoded, the waterfall full
     i=0
     for title in ${(s:|:)TITLES[$lang]}; do
         i=$((i + 1))
