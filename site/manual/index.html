@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="cs">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RYRY – dokumentace / documentation</title>
+<title>RYRY – documentation / dokumentace</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="bridge.css">
 <link rel="icon" href="img/icon.png">
 <script>
-  // podle jazyka prohlížeče / by browser language
+  // English by default; Czech and Slovak browsers get the Czech manual / angličtina výchozí, česky pro cs a sk
   var cs = (navigator.languages || [navigator.language]).some(function (l) { return /^(cs|sk)/i.test(l); });
   location.replace(cs ? "cs/index.html" : "en/index.html");
 </script>
@@ -17,7 +17,7 @@
 <main style="max-width:600px;margin:80px auto;padding:0 20px;text-align:center">
   <img src="img/icon.png" alt="" width="96" height="96">
   <h1>RYRY</h1>
-  <p><a href="cs/index.html">Příručka česky</a> · <a href="en/index.html">User manual in English</a></p>
+  <p><a href="en/index.html">User manual in English</a> · <a href="cs/index.html">Příručka česky</a></p>
 </main>
 </body>
 </html>
