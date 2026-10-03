@@ -92,9 +92,9 @@ The first App Store release of RYRY – the Mac RTTY program formerly distribute
 
 | Field | Value |
 |---|---|
-| Support URL | https://ryry.ok1xoe.dev/support.html |
-| Marketing URL | https://ryry.ok1xoe.dev |
-| Privacy Policy URL | https://ryry.ok1xoe.dev/privacy.html |
+| Support URL | https://ok1xoe.dev/ryry/support/ |
+| Marketing URL | https://ok1xoe.dev/ryry/ |
+| Privacy Policy URL | https://ok1xoe.dev/ryry/privacy/ |
 
 ## App Information
 
