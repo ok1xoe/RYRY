@@ -80,7 +80,7 @@ struct TopBar: View {
                     Toggle("ATC", isOn: model.boolBinding("atc"))
                     Toggle("SQ", isOn: model.boolBinding("squelch"))
                 }
-                .toggleStyle(.button).fixedSize()
+                .toggleStyle(OnStateToggleStyle()).fixedSize()
             }
             .uiControlSize(-1)
         }
@@ -280,5 +280,21 @@ struct FrequencyControl: View {
             case .rig, .manual: shown = false
             }
         }
+    }
+}
+
+/// Button-like toggle whose on state is clearly visible (green fill, white text); off = neutral grey.
+struct OnStateToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            configuration.label
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .foregroundStyle(configuration.isOn ? Color.white : Color.primary)
+                .background(configuration.isOn ? Color.green : Color.secondary.opacity(0.18),
+                            in: RoundedRectangle(cornerRadius: 5))
+                .contentShape(RoundedRectangle(cornerRadius: 5))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(configuration.isOn ? .isSelected : [])
     }
 }
